@@ -64,7 +64,8 @@ Confirmed:
 - A shareable link can be used to invite someone.
 - A link invitee can respond as a guest without creating an account; only a display name is initially required.
 - A guest can revisit the same link to revise their response.
-- Every guest receives a unique invitation link. It expires after the session and cannot be renewed.
+- Every guest receives a unique invitation link. It expires after the session, is revoked immediately if the session is canceled, and cannot be renewed.
+- Guests receive no notifications through any channel. A guest sees the current session state, including cancellation, only by revisiting their link.
 - Private sessions can use guest links. A guest link is a transferable bearer credential: forwarding it gives the recipient control of that single guest identity and response.
 - A private fixed-time session can be created using only guest links. The same guest link may be used on multiple devices; edits use last-write-wins until revocation or expiry.
 - An organizer can remove confirmed or pending guests; removal immediately revokes that guest's link.
@@ -124,9 +125,9 @@ The following working terms will be refined during discovery:
 9. If capacity becomes available, the organizer chooses whom to promote. Promoting either a Going- or Maybe-waitlisted participant fills the slot immediately while preserving their attendance status.
 10. When the number of Going participants reaches the configured minimum, the session becomes Confirmed automatically.
 
-If the organizer changes the session's start time, confirmation is cleared, the waitlist is cleared, and everyone returns to Pending. Changes to other details do not reset responses.
+If the organizer changes the session's start time before the session starts, confirmation is cleared and every participant, including waitlisted participants, returns to Pending. After the session starts, the start time and minimum attendance can no longer be edited. Changes to other details do not reset responses.
 
-Going and Maybe participants can leave a session. If Going attendance falls below the minimum, the session remains Confirmed while any Going- or Maybe-waitlisted candidate remains. It becomes unconfirmed only after the organizer rejects every remaining waitlisted candidate. After the start time, a Confirmed session remains Confirmed and will Complete even if attendance falls below minimum; an unconfirmed in-progress session may still Confirm if Going reaches minimum before the end. Only the organizer can cancel a session, including after it becomes Completed. Cancellation is immediate, removes the session from history, and notifies its participants. A Confirmed session becomes Completed automatically after its end time unless it is later canceled; an unconfirmed past session becomes Expired. Only non-canceled Completed sessions remain in history.
+Going and Maybe participants can leave a session. If Going attendance falls below the minimum, the session remains Confirmed while any Going-waitlisted candidate remains; Maybe-waitlisted candidates do not preserve confirmation. It becomes unconfirmed only when no Going-waitlisted candidate remains. After the start time, a Confirmed session remains Confirmed and will Complete even if attendance falls below minimum; an unconfirmed in-progress session may still Confirm if Going reaches minimum before the end. Only the organizer can cancel a session, including after it becomes Completed. Cancellation is immediate, removes the session from history, notifies its registered participants, and immediately revokes every guest link. A Confirmed session becomes Completed automatically after its end time unless it is later canceled; an unconfirmed past session becomes Expired. Only non-canceled Completed sessions remain in history.
 
 ### 7.2 Share availability
 
@@ -144,8 +145,8 @@ Availability uses specific time blocks and is visible to all friends in the init
    The default deadline is 24 hours and at least two initial options are required. Candidate times are not required to occur after the voting deadline.
 2. Registered or guest invitees mark each option **Available**, **Maybe**, or **Unavailable**. Voters can suggest additional times.
    Suggested times become poll options immediately without organizer approval.
-3. Identical date-times are deduplicated and a poll can contain at most 12 options. The organizer can delete any option without notifying its voters.
-4. Voting closes at the deadline and waits for the organizer to select an option; there is no automatic winner. If no option is selected within 48 hours after the deadline, the poll expires.
+3. Identical date-times are deduplicated and a poll can contain at most 12 options. Suggesting an option beyond the limit fails with a clear error. The organizer can delete any option without notifying its voters.
+4. Voting closes at the deadline and waits for the organizer to select an option; there is no automatic winner. If no option is selected within 48 hours after the deadline, the poll expires and its registered participants are notified.
 5. The selected option becomes the session's fixed start time. Available voters become Going, Maybe voters remain Maybe, and Unavailable voters become Declined, except that the organizer becomes Going regardless of their vote.
 
 Candidate options remain visible and selectable after their start times pass. A poll does not expire early when every option has passed; its normal voting deadline and 48-hour organizer-selection window still apply.
@@ -154,7 +155,7 @@ If the chosen option has started but not ended, finalization creates an in-progr
 
 A non-private poll follows the same inherited visibility rules as a fixed session and requires at least one directly invited registered friend. Eligible friends can request to join while it is Polling; approval makes them a voter with access to all current options. A private poll may instead be created using only guest links.
 
-When a poll is finalized with more Available and Maybe voters than maximum capacity, allocate active capacity in this order: organizer, Available voters ordered by response time, then Maybe voters ordered by response time. Overflow enters the matching Going or Maybe waitlist state.
+When a poll is finalized with more Available and Maybe voters than maximum capacity, allocate active capacity in this order: organizer, Available voters ordered by response time, then Maybe voters ordered by response time. Overflow enters the matching Going or Maybe waitlist state. A voter's response time is the timestamp of their first submitted poll response and does not change when they revise their votes.
 
 ## 8. Functional requirements
 
@@ -179,11 +180,11 @@ Confirmed:
 - Poll deadlines are organizer-selected durations of 6, 12, 24, or 48 hours.
 - The poll default is 24 hours and creation requires at least two initial options. Options may occur before the voting deadline.
 - Poll options remain visible and selectable after their start time. A poll does not expire early merely because all options have passed.
-- Polls support at most 12 distinct date-time options. Duplicate date-times are merged, and the organizer can delete any option without notifying its voters.
-- At the deadline, voting closes and the organizer selects the final option manually. The poll expires after 48 additional hours without a selection.
+- Polls support at most 12 distinct date-time options. Duplicate date-times are merged, suggesting an option beyond the limit fails with a clear error, and the organizer can delete any option without notifying its voters.
+- At the deadline, voting closes and the organizer selects the final option manually. The poll expires after 48 additional hours without a selection, notifying its registered participants.
 - Non-private polls use normal inherited visibility, accept join requests during Polling, and require one directly invited registered friend. Approved requesters become voters with all current options.
 - Private polls can be created with guest links only.
-- Poll finalization allocates capacity to the organizer first, then Available voters by response time, then Maybe voters by response time; overflow is waitlisted with matching attendance status.
+- Poll finalization allocates capacity to the organizer first, then Available voters by response time, then Maybe voters by response time; overflow is waitlisted with matching attendance status. Response time is the timestamp of the voter's first submitted poll response and is not changed by later revisions.
 - Voter-suggested times become poll options immediately without organizer approval.
 - Choosing a poll option maps Available to Going, Maybe to Maybe, and Unavailable to Declined. The organizer is the exception and becomes Going regardless of their vote.
 - A poll carries the eventual session's title, duration, platform, optional game, optional notes, minimum attendance, optional maximum capacity, and privacy. Its candidate options vary only by start time.
@@ -203,25 +204,27 @@ Confirmed:
 - At maximum capacity, new Going or Maybe responses enter the waitlist with their selected status. Existing active Maybe participants remain active.
 - The organizer manually chooses whom to promote when capacity becomes available.
 - Promoting either a Going- or Maybe-waitlisted participant fills the available slot immediately and preserves their selected status.
-- Changing a fixed session's start time clears confirmation and the waitlist and returns every participant to Pending; changing other details does not reset responses.
+- Changing a fixed session's start time clears confirmation and returns every participant, including waitlisted participants, to Pending; changing other details does not reset responses.
+- After a session starts, its start time and minimum attendance can no longer be edited.
 - Recurring sessions are outside the initial release.
 - Going and Maybe participants can leave.
-- After a previously Confirmed session drops below minimum, it remains Confirmed while at least one Going- or Maybe-waitlisted candidate remains. It becomes unconfirmed and notifies everyone only when the organizer rejects all remaining waitlisted candidates.
+- After a previously Confirmed session drops below minimum, it remains Confirmed while at least one Going-waitlisted candidate remains; Maybe-waitlisted candidates do not preserve confirmation. It becomes unconfirmed and notifies everyone only when no Going-waitlisted candidate remains.
 - Only the organizer can cancel a session. Cancellation is available while it is unconfirmed, Confirmed, in progress, or Completed. There is no separate Delete action.
-- Cancellation is immediate, transitions the session to Canceled, removes it from history, and notifies every registered or guest participant who still has access, subject to per-session mute settings.
-- The organizer can cancel an unfinished poll at any point before finalization; cancellation is immediate, is not retained in history, and notifies every poll participant subject to mute settings.
+- Cancellation is immediate, transitions the session to Canceled, removes it from history, revokes every guest link, and notifies every registered participant who still has access, subject to per-session mute settings.
+- The organizer can cancel an unfinished poll at any point before finalization; cancellation is immediate, is not retained in history, and notifies every registered poll participant subject to mute settings.
 - A Confirmed session becomes Completed automatically after its end time. An unconfirmed past session becomes Expired. Only non-canceled Completed sessions remain in history; Canceled and Expired sessions do not.
 - Completed-session history shows the final RSVP roster. Separate actual-attendance tracking is not supported.
 - A session is created either directly at a fixed time or in Polling mode. Polling is optional and never required for direct scheduling.
 - Availability and recommendations use 15-minute increments.
 - Fixed-time invitation responses close when the session starts.
+- Join requests remain open until the session's end time, including while it is in progress and regardless of its Confirmed state.
 - Pending responses remain Pending at session start. Going and Maybe participants can continue changing between those attendance states while the session is in progress.
 - Once a Confirmed session starts, later attendance changes cannot unconfirm it and it will become Completed. An unconfirmed session may still Confirm until its end time.
 - Join requests do not include attendance intent. Approval makes the requester Going, or Going-waitlisted when maximum capacity is full.
 - Join requesters can withdraw pending requests. Acceptance and rejection both notify the requester, and an accepted requester can subsequently change attendance normally.
 - A non-private session must include at least one directly invited registered friend at creation.
 - Reducing maximum capacity below current Going + Maybe occupancy is forbidden. Increasing maximum leaves waitlist promotion manual.
-- Changing minimum attendance immediately recalculates confirmation and sends the corresponding confirmation/unconfirmation notification.
+- Changing minimum attendance, allowed only before the session starts, immediately recalculates confirmation and sends the corresponding confirmation/unconfirmation notification. Raising the minimum above the current Going count follows the normal waitlist grace: a Confirmed session remains Confirmed while any Going-waitlisted candidate remains and becomes unconfirmed only when none remains.
 - Changing duration sends a rescheduling notification without resetting RSVPs.
 - Changes to title, game, platform, notes, maximum capacity, or privacy do not generate notifications.
 
@@ -293,7 +296,9 @@ To be decided:
 
 ### 8.4 Communication and notifications
 
-The initial web product will use in-app notifications and Web Push notifications on supported desktop and mobile browsers. After the user completes their first invitation or session action, the app shows its own **Enable notifications** prompt and invokes the browser permission dialog only after the user chooses to enable them. If push is unavailable or denied, the in-app notification center and unread badge are the fallback. Native mobile push notifications are expected when the native apps are built. Email, Discord, WhatsApp, and other channels may be added later.
+Notifications are delivered only to registered users. Guests have no notification channel; they see the current session or poll state, including cancellation, by revisiting their invitation link. Wherever this specification says participants are notified, guests are excluded.
+
+The initial web product will use in-app notifications and Web Push notifications on supported desktop and mobile browsers. iOS Safari supports Web Push only for home-screen-installed PWAs; the product does not pursue that path. iOS Safari users rely on the in-app fallback until the native iOS app ships. After the user completes their first invitation or session action, the app shows its own **Enable notifications** prompt and invokes the browser permission dialog only after the user chooses to enable them. If push is unavailable or denied, the in-app notification center and unread badge are the fallback. Native mobile push notifications are expected when the native apps are built. Email, Discord, WhatsApp, and other channels may be added later.
 
 Push notifications are initially generated for:
 
@@ -309,6 +314,7 @@ Push notifications are initially generated for:
 - Voter-suggested poll option.
 - Approaching poll deadline.
 - Poll closed awaiting organizer selection.
+- Poll expired without organizer selection.
 - Poll option selected.
 - Added to, promoted from, or rejected from a waitlist.
 - A waitlist vacancy requiring organizer action.
@@ -318,7 +324,7 @@ Push notifications are initially generated for:
 
 Friend-request acceptance, friend removal, and blocking do not generate notifications.
 
-For poll notifications, a voter-suggested option notifies only the organizer, “deadline approaching” is sent one hour before the deadline, and poll closure or cancellation notifies every poll participant.
+For poll notifications, a voter-suggested option notifies only the organizer, “deadline approaching” is sent one hour before the deadline, and poll closure, expiry, or cancellation notifies every registered poll participant.
 
 Session comments are not supported.
 
@@ -331,7 +337,7 @@ To be decided:
 
 ### 8.5 Calendars and time zones
 
-Each user specifies a time zone. All dates and times are displayed in the viewer's specified time zone. The product does not detect or specially handle travel.
+Each user specifies a time zone. All dates and times are displayed in the viewer's specified time zone. Guests have no specified time zone; guest views display times in the browser-detected time zone. The product does not detect or specially handle travel.
 
 The interface language defaults from the browser or device, falls back to English when unsupported, and can be overridden at the account level. The initial languages are English, Portuguese (Brazil), and Spanish; dates, times, numbers, and week formatting follow the selected locale.
 
@@ -518,7 +524,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-039 | The first client is a responsive website with Web Push; installable PWA behavior is not required. | Confirmed |
 | D-040 | The initial platform list is Steam, PlayStation, Xbox, and N/A, with one platform per session. | Confirmed |
 | D-041 | A platform game can come from its catalog or free text, subject to catalog feasibility. | Confirmed |
-| D-042 | Initial pushes cover invitations, confirmation, unconfirmation, rescheduling, and a configurable reminder. | Confirmed |
+| D-042 | Initial pushes cover invitations, confirmation, unconfirmation, rescheduling, and a configurable reminder. | Superseded by the §8.4 notification list |
 | D-043 | Making a session private preserves existing non-invited participants and outstanding join requests. | Confirmed |
 | D-044 | Guests can edit through the same link; the organizer can remove pending or confirmed guests and revoke their access. | Confirmed |
 | D-045 | Anyone who can see a session can read and write its comments, including guests. | Superseded by D-073 |
@@ -539,7 +545,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-060 | Initial localization supports English, Portuguese (Brazil), and Spanish with locale-aware date and time formatting. | Confirmed |
 | D-061 | Changing the user's specified time zone moves weekly availability to the same local clock time in the new zone. | Confirmed |
 | D-062 | A Going organizer and Going guests count toward minimum; Going and Maybe count toward optional maximum, which cannot be below minimum. | Confirmed |
-| D-063 | A start-time change clears confirmation and the waitlist and returns everyone to Pending. | Confirmed |
+| D-063 | A start-time change clears confirmation and returns every participant, including waitlisted participants, to Pending. | Confirmed |
 | D-064 | Polling is an optional creation mode; organizers can instead schedule a fixed-time session directly. | Confirmed |
 | D-065 | Blocking is mutually invisible and removes friendship; it does not generally remove users from shared sessions. | Confirmed |
 | D-066 | Authors can edit/delete their comments and session organizers can delete any session comment. | Superseded by D-073 |
@@ -550,7 +556,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-071 | Availability entry and recommendations use 15-minute increments. | Confirmed |
 | D-072 | Account deletion is available in-app and through a public web request route. | Policy-required |
 | D-073 | Session comments are not supported. | Confirmed |
-| D-074 | A previously Confirmed session remains Confirmed while any Going- or Maybe-waitlisted candidate remains and becomes unconfirmed only when all are rejected. | Confirmed |
+| D-074 | A previously Confirmed session remains Confirmed while any Going-waitlisted candidate remains and becomes unconfirmed when none remains; Maybe-waitlisted candidates do not preserve confirmation. | Confirmed |
 | D-075 | The organizer begins Going, may change attendance, and cannot transfer ownership. | Confirmed |
 | D-076 | Blocked users retain third-party shared-session access but see one another as Anonymous User. | Confirmed |
 | D-077 | Blocking between an organizer and participant removes the participant from that organizer's sessions in either direction. | Confirmed |
@@ -598,7 +604,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-119 | Poll finalization allocates organizer first, Available by response time, then Maybe by response time; overflow is waitlisted. | Confirmed |
 | D-120 | Suggested poll options notify only the organizer; poll closure notifies everyone; deadline warning is one hour before. | Confirmed |
 | D-121 | Maximum capacity cannot be reduced below active Going + Maybe occupancy. | Confirmed |
-| D-122 | Minimum changes recalculate confirmation immediately; duration changes send rescheduling notifications without resetting RSVPs. | Confirmed |
+| D-122 | Minimum changes recalculate confirmation immediately, with raises subject to the D-074 Going-waitlist grace; duration changes send rescheduling notifications without resetting RSVPs. | Confirmed |
 | D-123 | Title, game, platform, notes, maximum, and privacy changes do not notify participants. | Confirmed |
 | D-124 | Guest-link access does not require the 13+ age gate. | Confirmed with policy risk |
 | D-125 | Private sessions may be created with guest links only; non-private polls require an invited registered friend. | Confirmed |
@@ -642,7 +648,17 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-163 | All initial-release features ship together in the first public web release; reduced public alpha/beta scopes are rejected. | Confirmed |
 | D-164 | Expired sessions, including Expired results from late poll finalization, are never retained in history. | Confirmed |
 | D-165 | Starting account deletion invalidates all active login sessions; a successful login during the grace period cancels deletion. | Confirmed |
-| D-166 | Canceling any session, including a Completed session, notifies its remaining participants; canceling a poll notifies every poll participant. | Confirmed |
+| D-166 | Canceling any session, including a Completed session, notifies its remaining registered participants; canceling a poll notifies every registered poll participant. | Confirmed |
+| D-167 | Guests receive no notifications through any channel; they see current state only by revisiting their link. | Confirmed |
+| D-168 | Start time and minimum attendance cannot be edited after the session starts. | Confirmed |
+| D-169 | Guest views display times in the browser-detected time zone. | Confirmed |
+| D-170 | Poll expiry without organizer selection notifies every registered poll participant. | Confirmed |
+| D-171 | Suggesting a poll option beyond the 12-option limit fails with a clear error. | Confirmed |
+| D-172 | Poll-finalization response time is the voter's first-response timestamp and is unchanged by vote revisions. | Confirmed |
+| D-173 | Join requests remain open until the session's end time, including while it is in progress. | Confirmed |
+| D-174 | Canceling a session immediately revokes all of its guest links. | Confirmed |
+| D-175 | iOS Safari Web Push (home-screen PWA requirement) is not pursued; iOS web users get the in-app fallback until the native app. | Confirmed |
+| D-176 | PlayStation and Xbox game fields are free text at launch (no viable public catalog APIs); only Steam offers catalog selection, per the D-058 fallback. | Confirmed |
 
 ## 15. Open questions
 
