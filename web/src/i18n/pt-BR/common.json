@@ -1,0 +1,9 @@
+{
+  "app": {
+    "name": "PartyUp",
+    "tagline": "Encontre um horário para jogar com seus amigos."
+  },
+  "common": {
+    "loading": "Carregando…"
+  }
+}

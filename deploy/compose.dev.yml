@@ -1,0 +1,22 @@
+# Local development database only. Run: docker compose -f deploy/compose.dev.yml up -d
+# Matches the default dev connection string in ARCHITECTURE.md §6:
+#   Host=localhost;Port=5432;Database=partyup;Username=partyup;Password=partyup
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: partyup
+      POSTGRES_PASSWORD: partyup
+      POSTGRES_DB: partyup
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U partyup -d partyup"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pg_data:

@@ -1,0 +1,56 @@
+# Runs only after CI succeeds on main (ARCHITECTURE.md §7) — a red build never reaches the VM.
+# Requires repo variable DEPLOY_ENABLED=true, plus repo secrets VM_HOST, VM_USER, VM_SSH_KEY.
+# Until all four are set, both jobs below are gated off and every run of this workflow no-ops.
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+
+jobs:
+  build-push:
+    if: github.event.workflow_run.conclusion == 'success' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      # workflow_run runs default to the branch head, which may already be ahead of the commit
+      # CI validated; pin to that exact commit.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # GHCR rejects image references containing uppercase; the owner login may have them.
+      - id: image
+        run: echo "repo=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/partyup" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.image.outputs.repo }}:latest
+            ${{ steps.image.outputs.repo }}:${{ github.event.workflow_run.head_sha }}
+
+  deploy:
+    needs: build-push
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            cd /opt/partyup && docker compose pull && docker compose up -d

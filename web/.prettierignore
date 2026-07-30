@@ -1,0 +1,5 @@
+dist
+coverage
+
+# Regenerated verbatim by `npm run gen:api`; formatting it only creates churn.
+src/api/schema.d.ts

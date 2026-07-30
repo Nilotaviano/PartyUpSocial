@@ -1,0 +1,94 @@
+# Single-VM production stack (ARCHITECTURE.md §8). Deployed by .github/workflows/cd.yml via
+# `docker compose pull && docker compose up -d` run from the directory this file lives in on
+# the VM (/opt/partyup). The name must stay `compose.yaml` — that is what a bare `docker compose`
+# auto-discovers, and both cd.yml and the runbooks invoke it without `-f`. Needs a populated
+# `.env` next to it (see .env.example) plus Caddyfile and backup-entrypoint.sh, which are
+# bind-mounted below by relative path.
+# Without log rotation the default json-file driver grows without bound and eventually fills
+# the one disk Postgres and the backups volume also live on.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  caddy:
+    image: caddy:2
+    logging: *default-logging
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    networks:
+      - internal
+
+  app:
+    image: ghcr.io/OWNER/partyup:latest # replace OWNER with the GitHub org/user this repo lives under
+    logging: *default-logging
+    environment:
+      ConnectionStrings__Db: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      Database__MigrateOnStartup: "true"
+      ASPNETCORE_ENVIRONMENT: "Production"
+    volumes:
+      - app_dataprotection:/data/dataprotection
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    expose:
+      - "8080"
+    networks:
+      - internal
+
+  postgres:
+    image: postgres:17-alpine
+    logging: *default-logging
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB}"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - internal
+
+  backup:
+    image: postgres:17-alpine
+    logging: *default-logging
+    environment:
+      PGHOST: postgres
+      PGUSER: "${POSTGRES_USER}"
+      PGPASSWORD: "${POSTGRES_PASSWORD}"
+      PGDATABASE: "${POSTGRES_DB}"
+    volumes:
+      - ./backup-entrypoint.sh:/backup-entrypoint.sh:ro
+      - backups:/backups
+    entrypoint: ["sh", "/backup-entrypoint.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - internal
+
+networks:
+  internal:
+
+volumes:
+  pg_data:
+  caddy_data:
+  caddy_config:
+  app_dataprotection:
+  backups:

@@ -1,0 +1,23 @@
+partyup.social {
+	encode zstd gzip
+
+	reverse_proxy app:8080
+
+	log {
+		output stdout
+		format json
+	}
+
+	# Phase 4 adds guest links (bearer-token URLs, ARCHITECTURE.md §10). Once those
+	# routes exist, scrub the token from access logs with a uri regexp filter, e.g.:
+	#
+	# log {
+	# 	output stdout
+	# 	format filter {
+	# 		wrap json
+	# 		fields {
+	# 			request>uri regexp "(guest/)[^/?]+" "${1}REDACTED"
+	# 		}
+	# 	}
+	# }
+}

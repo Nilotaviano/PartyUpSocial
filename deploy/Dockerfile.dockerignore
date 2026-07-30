@@ -1,0 +1,9 @@
+# BuildKit picks this up instead of a repo-root .dockerignore because it's named after
+# this directory's Dockerfile (deploy/Dockerfile) — see BuildKit's per-Dockerfile ignore
+# file convention. Keeps host-side build artifacts and node_modules out of the image
+# regardless of what a local working tree happens to have lying around.
+**/bin/
+**/obj/
+**/node_modules/
+web/dist/
+.git/

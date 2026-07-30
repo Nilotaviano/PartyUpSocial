@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - run: dotnet restore PartyUp.sln
+
+      - run: dotnet build PartyUp.sln --no-restore -warnaserror
+
+      # Integration tests are included (Category=Integration, Testcontainers) — ubuntu-latest
+      # runners ship Docker. Locally without Docker: dotnet test --filter Category!=Integration
+      - run: dotnet test PartyUp.sln --no-build
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      # tsc -b && vite build — covers the typecheck gate and the production build in one step.
+      - run: npm run build
+      - run: npm test
