@@ -12,6 +12,9 @@ services:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
+    # Docker-in-WSL: the WSL VM idle-stops when no session is open, killing containers;
+    # this brings the database back automatically on the next VM wake.
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U partyup -d partyup"]
       interval: 5s
