@@ -1,0 +1,14 @@
+{
+  "name": "spike-c-webpush",
+  "private": true,
+  "type": "module",
+  "description": "Spike C: Web Push client-side prototype (VAPID subscribe + deliver, D-159 permission flow)",
+  "scripts": {
+    "keys": "node keys.mjs",
+    "start": "node server.mjs",
+    "send": "node send.mjs"
+  },
+  "dependencies": {
+    "web-push": "^3.6.7"
+  }
+}

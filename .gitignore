@@ -48,6 +48,9 @@ pnpm-debug.log*
 *.pfx
 *.key
 
+# Tooling artifacts
+.playwright-mcp/
+
 # OS
 .DS_Store
 Thumbs.db

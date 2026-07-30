@@ -1,0 +1,268 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #1a1a2a;
+  background: #fafafc;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.topnav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: #23233b;
+  color: #fff;
+}
+
+.topnav .brand {
+  font-weight: 600;
+}
+
+.topnav nav {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.topnav a {
+  color: #cfcfe8;
+  text-decoration: none;
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+}
+
+.topnav a:hover {
+  background: #37375a;
+}
+
+.topnav a.active {
+  background: #4a4a7a;
+  color: #fff;
+}
+
+.topnav a:focus-visible,
+button:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 1px;
+}
+
+main {
+  padding: 0.75rem;
+  max-width: 70rem;
+  margin: 0 auto;
+}
+
+.page h1 {
+  font-size: 1.2rem;
+  margin: 0.25rem 0;
+}
+
+.hint {
+  font-size: 0.82rem;
+  color: #555;
+  margin: 0.25rem 0 0.75rem;
+}
+
+/* ---------- FullCalendar variant ---------- */
+
+.fc-kb-wrap:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+.fc-kb-wrap .fc {
+  font-size: 0.8rem;
+}
+
+.fc-kb-wrap .fc .fc-timegrid-slot {
+  height: 0.9em; /* 96 slot rows get very tall otherwise */
+}
+
+/* ---------- Custom grid variant ---------- */
+
+.cg-scroll {
+  overflow-y: auto;
+  max-height: calc(100vh - 190px);
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.cg-days {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  background: #f0f0f6;
+  border-bottom: 1px solid #ccc;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.cg-gutter {
+  flex: 0 0 44px;
+}
+
+.cg-dayname {
+  flex: 1 1 0;
+  text-align: center;
+  padding: 0.3rem 0;
+}
+
+.cg-body {
+  display: flex;
+}
+
+.cg-times {
+  flex: 0 0 44px;
+  font-size: 0.7rem;
+  color: #666;
+}
+
+.cg-hourlabel {
+  height: 56px; /* 4 slots x 14px */
+  padding: 1px 4px 0 0;
+  text-align: right;
+  border-top: 1px solid #e6e6ee;
+}
+
+.cg-gridwrap {
+  position: relative;
+  flex: 1 1 auto;
+}
+
+.cg-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: 14px;
+  touch-action: none; /* required for pointer drag-select on touch; see NOTES.md */
+}
+
+.cg-row {
+  display: contents;
+}
+
+.cg-cell {
+  border-left: 1px solid #e6e6ee;
+  border-top: 1px solid #f2f2f8;
+}
+
+.cg-cell.cg-hour-end {
+  border-bottom: 1px solid #d8d8e4;
+}
+
+.cg-cell:focus {
+  outline: 2px solid #2a5bd7;
+  outline-offset: -2px;
+  z-index: 2;
+}
+
+.cg-cell.cg-sel {
+  background: #bcd2ff;
+}
+
+.cg-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cg-block {
+  position: absolute;
+  pointer-events: auto;
+  border: 1px solid #1c7c43;
+  border-radius: 4px;
+  background: #35a166;
+  color: #fff;
+  font-size: 0.68rem;
+  padding: 1px 2px;
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cg-block:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 1px;
+}
+
+/* ---------- edit dialog ---------- */
+
+.edit-dialog {
+  border: 1px solid #999;
+  border-radius: 8px;
+  padding: 1rem;
+  min-width: 16rem;
+}
+
+.edit-dialog::backdrop {
+  background: rgb(0 0 0 / 40%);
+}
+
+.edit-dialog h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.dialog-fields {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dialog-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dialog-actions button {
+  padding: 0.35rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid #888;
+  background: #f2f2f6;
+  cursor: pointer;
+}
+
+.dialog-actions button[type="submit"] {
+  background: #2a5bd7;
+  border-color: #2a5bd7;
+  color: #fff;
+}
+
+@media (max-width: 480px) {
+  main {
+    padding: 0.4rem;
+  }
+
+  .cg-gutter,
+  .cg-times {
+    flex-basis: 34px;
+  }
+
+  .cg-hourlabel {
+    font-size: 0.6rem;
+  }
+}

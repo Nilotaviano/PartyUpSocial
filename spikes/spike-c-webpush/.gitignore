@@ -1,0 +1,4 @@
+node_modules/
+vapid.json
+subscriptions.json
+server.log

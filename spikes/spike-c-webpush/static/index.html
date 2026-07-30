@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spike C — Web Push (D-159 flow)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+    .card { border: 1px solid #ccc; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+    button { font-size: 1rem; padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid #888; cursor: pointer; }
+    button.primary { background: #4f46e5; border-color: #4f46e5; color: white; }
+    .muted { color: #666; font-size: 0.9rem; }
+    #log { font-family: ui-monospace, monospace; font-size: 0.8rem; padding-left: 1.25rem; }
+    #log li { margin-bottom: 0.15rem; }
+    code { background: #f0f0f0; padding: 0.1rem 0.3rem; border-radius: 4px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <h1>Spike C — Web Push</h1>
+  <p class="muted">D-159: contextual in-page prompt first; the browser permission dialog only fires after you click Enable.</p>
+
+  <section id="state-unsupported" class="card" hidden>
+    <h2>Push not supported</h2>
+    <p>This browser has no <code>serviceWorker</code> or <code>PushManager</code> support. Web Push is unavailable here.</p>
+  </section>
+
+  <section id="state-prompt" class="card" hidden>
+    <h2>Get notified when a session is confirmed</h2>
+    <p>PartyUp can send you a push notification the moment your group locks in a time — no need to keep the tab open.</p>
+    <p class="muted">Clicking Enable will open the browser's own notification permission dialog.</p>
+    <button id="enable" class="primary">Enable notifications</button>
+  </section>
+
+  <section id="state-subscribed" class="card" hidden>
+    <h2>Notifications enabled</h2>
+    <p>Subscribed via push service: <code id="endpoint-origin"></code></p>
+    <p>
+      <button id="send-test" class="primary">Send test push</button>
+      <button id="unsubscribe">Unsubscribe</button>
+    </p>
+    <p class="muted">The test push goes through the server (<code>POST /send</code>) → push service → service worker.</p>
+  </section>
+
+  <section id="state-denied" class="card" hidden>
+    <h2>Notifications blocked</h2>
+    <p>You (or the browser) denied the notification permission, so PartyUp cannot subscribe this device.</p>
+    <p>To reset: click the icon left of the address bar (padlock / tune icon) → <strong>Site settings</strong> → <strong>Notifications</strong> → set back to <em>Ask</em> or <em>Allow</em>, then reload this page.</p>
+  </section>
+
+  <h2>Event log</h2>
+  <ol id="log" reversed></ol>
+
+  <script type="module" src="/main.js"></script>
+</body>
+</html>

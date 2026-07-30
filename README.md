@@ -73,7 +73,7 @@ Api → all three         composition root: minimal APIs, OpenAPI, health, SPA h
 
 Engineering practices that keep it honest:
 
-- 📋 **Spec-first, decisions on record** — product decisions (D-numbers) and architecture decisions ([A-001…A-017](ARCHITECTURE.md#9-decision-record-foundation)) are written down, numbered, and cited in code reviews and test names
+- 📋 **Spec-first, decisions on record** — product decisions (D-numbers) and architecture decisions ([A-001…A-020](ARCHITECTURE.md#9-decision-record-foundation)) are written down, numbered, and cited in code reviews and test names
 - 🧪 **Tests named after the rules they prove** — domain tests carry decision IDs (`grep D_074` finds the waitlist-grace rule); integration tests run against real PostgreSQL via Testcontainers
 - 🚦 **CI-gated CD** — a red build can never reach the server; images are immutably sha-tagged for one-command rollback
 - 🔐 **Security as design input** — guest links are hashed bearer credentials (256-bit CSPRNG, never logged), visibility checks fail closed, deletion compliance survives database restores
