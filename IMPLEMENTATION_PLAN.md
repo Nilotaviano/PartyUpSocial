@@ -65,7 +65,7 @@ Exit criteria: every **behavior-bearing** Confirmed decision (D-053..D-176) has 
 
 ## Phase 2 — Accounts, auth, onboarding
 
-- Identity, cookie-based: email+password, passwordless email (magic link), Google, Steam OpenID 2.0 (D-067). Sign in with Apple is deferred to the mobile phase — the paid Apple Developer account isn't opened until iOS publish (pending D-067 amendment). No token server; session cookie + antiforgery for the SPA (BFF-lite).
+- Identity, cookie-based: email+password, passwordless email (magic link), Google, Steam OpenID 2.0 (D-067). Sign in with Apple is deferred to the mobile phase per D-067 — the paid Apple Developer account isn't opened until iOS publish. No token server; session cookie + antiforgery for the SPA (BFF-lite).
 - Transactional email provider selected; sending domain is **mail.partyup.social** (subdomain isolates root-domain reputation); **SPF/DKIM/DMARC configured and inbox-tested** — magic-link auth is dead if mail lands in spam.
 - Onboarding per D-127: age gate → auth → username → display name → avatar (emoji or platform) → time zone → optional linking → friends.
 - Username rules: uniqueness, case-insensitivity, 30-day change cooldown + 30-day reservation (D-128, D-145); stable friend code generation.

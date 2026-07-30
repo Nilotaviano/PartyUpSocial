@@ -160,4 +160,4 @@ Secrets at this scale are the VM's `.env` (mode 600, never committed — `.gitig
 - **Phase 4/6:** Hangfire wiring + sweeper jobs; guest-link security package (A-015 + plan Phase 4).
 - **Phase 5:** Playwright E2E + axe lane (§4).
 - **Phase 7:** Web Push/VAPID transport + send-log.
-- **Later:** Steam OpenID + Web API (Phase 2/3, Spike B), OpenAPI client staleness check in CI once real endpoints exist (A-011), uptime monitor + Hangfire dashboard auth-gated (Phase 9), Apple Developer account + Sign in with Apple (mobile phase — account opened only at iOS publish; pending D-067 amendment).
+- **Later:** Steam OpenID + Web API (Phase 2/3, Spike B), OpenAPI client staleness check in CI once real endpoints exist (A-011), uptime monitor + Hangfire dashboard auth-gated (Phase 9), Apple Developer account + Sign in with Apple (mobile phase per D-067 — account opened only at iOS publish).

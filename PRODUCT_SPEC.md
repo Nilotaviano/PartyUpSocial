@@ -278,7 +278,7 @@ Confirmed:
 - Profile links, QR codes, and friend codes initiate friendship. A QR code represents the stable friend code.
 - Steam friend-list import is supported initially; other platform imports may follow.
 - Arbitrary avatar uploads are not supported. Avatars come from linked platform accounts; unlinked accounts use a selected emoji.
-- Registered users can authenticate with email and password, passwordless email, Steam, Google, or Apple.
+- Registered users can authenticate with email and password, passwordless email, Steam, or Google. Sign in with Apple is added with the mobile release (App Store guideline 4.8 requires it once third-party login ships in an iOS app).
 - Email can be used for account recovery.
 - Social-only accounts are allowed and are not required to add a separate verified email.
 - Users can link multiple authentication methods after registration. The UI does not warn when only one method remains connected.
@@ -549,7 +549,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-064 | Polling is an optional creation mode; organizers can instead schedule a fixed-time session directly. | Confirmed |
 | D-065 | Blocking is mutually invisible and removes friendship; it does not generally remove users from shared sessions. | Confirmed |
 | D-066 | Authors can edit/delete their comments and session organizers can delete any session comment. | Superseded by D-073 |
-| D-067 | Initial authentication supports password, passwordless email, Steam, Google, and Apple; email supports recovery. | Confirmed |
+| D-067 | Initial authentication supports password, passwordless email, Steam, and Google; email supports recovery. Sign in with Apple is added with the mobile release (App Store guideline 4.8 requires it once third-party login ships in an iOS app). | Confirmed |
 | D-068 | Before friendship approval, a profile exposes only its unique username; friend-code rotation is outside MVP. | Confirmed |
 | D-069 | Users can mute notifications per session and customize the default one-hour reminder. | Confirmed |
 | D-070 | Poll organizers choose a 6-, 12-, 24-, or 48-hour voting deadline. | Confirmed |
