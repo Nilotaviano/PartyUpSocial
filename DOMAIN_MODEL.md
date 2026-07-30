@@ -1,0 +1,297 @@
+# PartyUp — Domain Model (Phase 1 design)
+
+**Status:** v3 — the A-014 opening deliverable, hardened through two adversarial review rounds (six spec-slice reviewers, then fix-verification + two cold reviewers) against the full decision log.
+**Basis:** PRODUCT_SPEC.md (D-001..D-176), ARCHITECTURE.md §3, IMPLEMENTATION_PLAN.md Phase 1.
+**Scope:** the domain layer — entity shapes, invariants, state machines, visibility rules, notification contracts, deletion lifecycle. EF mapping lands in Infrastructure; auth flows land in Phase 2. Spec-silent points this document resolves are collected in §12 for ratification. `spec §n` refers to PRODUCT_SPEC.md sections; bare `§n` refers to this document.
+
+## 1. Cross-cutting rules
+
+- IDs are `Guid.CreateVersion7()` behind strongly-typed readonly record structs; every fixed point in time is a NodaTime `Instant`; `IClock` is always a parameter, never ambient.
+- **All time intervals are half-open `[start, end)`.** Abutting intervals do not intersect; a session ending 20:00 and one starting 20:00 do not overlap; instantaneous (zero-length) intervals cannot arise from the merge or window rules below.
+- **Guards vs authorization:** the state/time guards in the transition tables are domain preconditions inside the shared transition functions. *Actor* authorization (organizer-only, owner-only) is applied by the application layer above them — system actors (the sweeper, the deletion executor) call the same functions directly.
+- **Clock-gated windows, both directions:** deadline- and start-sensitive rules are evaluated against `IClock`, never against the stored status alone. A late sweep never *extends* a window (invitation responses after session start D-081, votes after the poll deadline D-079, finalization after the 48 h selection window D-088, confirmation at or after `EndTime` D-106 — all rejected by clock even before the status flips) and never *delays opening* one (organizer selection is valid from the deadline instant onward, §6.1, even if the Close sweep hasn't run). Commands that depend on the current status first apply any *due* time-based transition (idempotent, shared functions), then evaluate — canceling a logically-expired session is impossible because Expire applies first.
+- **Terminal-state gate:** `Completed`, `Expired`, `Canceled` (sessions) and `Finalized`, `Expired`, `Canceled` (polls) are terminal. No roster, vote, option, invite, or edit command is valid in a terminal state; canceling a `Completed` session (D-156) is the sole exception. Reaching a terminal state lapses every pending `JoinRequest` on the target (§5.3).
+- **"Removed from history" ≠ row deletion.** Canceled and Expired sessions/polls are excluded from every user-facing history/list view but their rows are retained — D-160's metric denominator ("including later cancellations") and referential integrity require it. Notification entries whose subject is no longer visible render from their own structured fields without a link.
+- **`EndTime` is derived** (`StartTime + Duration`), never stored. Sweeper scans and guest-link expiry evaluate a computed expression over (start, duration); arithmetic over immutable inputs is not a re-derivation of *status* and doesn't violate the materialized-status invariant.
+- Logical uniqueness below is DB-enforced; invariant-touching commands (`RSVP, join approval, promotion, capacity/minimum edits, option suggestion, poll finalization, guest response`) lock the parent session/poll row before reading occupancy or option counts. Guest last-write-wins (D-126) means *no inter-device conflict check* — the capacity lock still applies to every guest response.
+- Text constraints (D-096): domain value objects carry the length bounds (username 3–30, display name 1–50 — guests included, title 1–80, notes ≤500, handle ≤64, free-text game ≤100); charset policy and the profanity filter are application-layer validation over the same value objects.
+
+## 2. Aggregate map
+
+| Aggregate root | Children | Owns |
+|---|---|---|
+| `User` | `PlatformLink` | profile, zone, locale, avatar, friend code, reminder default, deletion lifecycle |
+| Username registry | — | one constraint domain for active + reserved names |
+| `Friendship` | — | one row per unordered pair |
+| `Block` | — | one row per ordered (blocker, blocked) pair |
+| `Session` | `Participation`, `JoinRequest`, `GuestIdentity`, `GuestLink`, `NotificationMute` | session state machine, roster, waitlist, guest access |
+| `Poll` | `PollOption`, `PollParticipant`, `PollVote`, `JoinRequest`, `GuestIdentity`, `GuestLink`, `NotificationMute` | poll state machine, voting, finalization |
+| `AvailabilitySeries` / `AvailabilityBlock` | occurrence exceptions | one-time + weekly availability |
+| `Notification` | — | in-app records (A-016) |
+| `PushSubscription` | — | shape only in Phase 1; transport in Phase 7 |
+
+Cross-aggregate references are by ID. The visibility engine, identity-masking service, overlap engine, and recipient computation are domain services.
+
+## 3. User
+
+- `UserId`, `Username`, `DisplayName`, `AvatarKind` (Emoji | Platform) + value (Platform points at a `PlatformLink`), `TimeZone` (`DateTimeZone`), `Locale`, `FriendCode` (stable, unique — D-031/D-144), `AgeGatePassed` + source (D-093; never a birth date), `ReminderDefault` ∈ {Off, 15 m, 30 m, 1 h, 3 h, 12 h, 24 h}, default 1 h (D-082).
+- `PlatformLink`: (`UserId`, `Platform`, `Handle` ≤64) — D-032's "linked gaming platforms and handles". Exactly one may be the avatar source when `AvatarKind = Platform` (D-050); unlinking the avatar-source platform falls the avatar back to emoji selection. (Auth-method linking/unlinking D-087/D-137 is Phase 2 identity, distinct from platform links.)
+- **Username registry:** one table owns the name space — rows (`NameCanonical` case-insensitive unique, `State`: Active(owner) | Reserved(freeAfter)). A change flips the old row to Reserved(+30 d) (D-128/D-145) and claims/creates the new one — a single constraint domain, so a reserved or tombstone-freed name is un-claimable at the DB level. Change cooldown: 30 days (`UsernameChangedAt`). Reservation rows carry the name only — no `UserId` after deletion execution (§11).
+- **Lifecycle:** `Onboarding` → `Active` → `PendingDeletion(GraceEndsAt)` → `Deleted` (tombstone). `Onboarding` exists because D-127 creates the account (post-auth) *before* username/display name/avatar/zone are chosen — profile fields are nullable in that state only; `Active` requires all of them. An `Onboarding` user is invisible to lookup and cannot be friended (§12-22).
+- **Tombstone:** PII nulled (username → registry Reserved row per §11, display name, avatar; platform links deleted; friend code retired — code lookups fail), row and `UserId` FK-stable so history survives (D-092). Tombstoned users are excluded from every lookup surface and can neither send nor receive friend requests. Rendered as **Anonymous User** by the masking service.
+
+## 4. Friendship and Block
+
+- `Friendship`: canonical unordered pair (`UserLoId` < `UserHiId`, DB unique), `RequestedBy`, `Status`: Pending | Accepted. Rejection and removal (D-105 names both) delete the row — a rejected requester may re-request (no domain cooldown; abuse is bounded by API-layer rate limiting, §12-23).
+- `Block`: (`BlockerId`, `BlockedId`) unique ordered pair. Creating one, atomically:
+  1. deletes any friendship (either status) between the pair (D-065);
+  2. where either party organizes a session the other participates in: the non-organizer's `Participation` → `Removed` (§5.2), capacity freed, confirmation re-evaluated, their pending reminder canceled (D-077, D-074, §9);
+  3. where either party organizes a poll the other participates in: the non-organizer's `PollParticipant` → `Removed` (§6.3);
+  4. open `JoinRequest`s between the pair (on either's sessions or polls) → `Lapsed` — the organizer must never be able to approve a blocked counterpart;
+  5. no notification (D-105).
+- **Unblock** deletes the Block row and restores nothing: no friendship, and no resurrection of `Removed` rows — those encode a removal that already happened. Unblock only re-enables discovery and future interaction (§12-24).
+- Mutual invisibility is enforced on **every** surface: the visibility engine (§7 rule 4), the user-lookup paths — profile link, friend code, QR resolution, username search — the friend-request command, **and Steam friend-list import matching** (a blocked counterpart or tombstoned user is never surfaced as a match, D-049/D-065). The only coexistence is an existing third-party session/poll, rendered through masking (D-076/D-086).
+
+## 5. Session aggregate
+
+### 5.1 Session
+
+| Field | Rule |
+|---|---|
+| `OrganizerId` | permanent (D-075) |
+| `Title` | required, 1–80 (D-057) |
+| `StartTime`, `Duration` | duration 15 min–24 h in 15-min steps (D-142). D-130 window (start ≥ now+15 min, ≤ now+1 y) applies to **direct creation and every reschedule**, validated against the *new* start — never to finalization-created sessions, whose start may already be past (D-153) |
+| `Platform` / game / `Notes` | D-040/D-041/D-058/D-176; lengths per §1 |
+| `MinAttendance` | int ≥ 1 (D-141) |
+| `MaxCapacity` | null = unlimited → **no waitlist can exist** (D-091); else ≥ MinAttendance (D-141) — enforced against min raises *and* max reductions symmetrically |
+| `IsPrivate` | non-private requires ≥1 directly invited registered friend **at creation** (D-099); private may be guest-only (D-125) |
+| `OriginPollId?` | set by poll finalization — D-160's poll→session success linkage |
+| `Status` | `Unconfirmed` \| `Confirmed` \| `Completed` \| `Expired` \| `Canceled` |
+
+"In progress" is not a status — it is a clock evaluation (`StartTime ≤ now < EndTime`) inside command handlers. Creation defaults (D-129) are application-layer.
+
+### 5.2 Participation
+
+One per (session, participant); `ParticipantRef` = `UserId` xor `GuestIdentityId`; DB-unique per session on each.
+
+- `Status`: `Pending` | `Going` | `Maybe` | `Declined` | `Removed`. `Declined` is a *response or voluntary departure*; **`Removed` is terminal** — it encodes expulsion (block D-077, waitlist reject, guest removal D-044, deletion execution D-092) and is never reset or re-invited over.
+- `Origin`: `Invited` | `JoinRequest` | `GuestLink` | `PollFinalization` — load-bearing for private-flip retention (§7 rule 1).
+- `IsWaitlisted`: orthogonal flag preserving the selected Going/Maybe (D-084). No stored order — promotion is an explicit organizer pick; the one ordered allocation (D-119) is computed transiently.
+- `ReminderChoice?` (registered only): per-(user, session) override of `ReminderDefault` (D-082); null = default.
+- **Capacity semantics (D-062/D-084/D-091):** active (non-waitlisted) Going + Maybe consume max; only active Going counts toward min; Going guests count like registered Going; organizer counts toward min only while Going. The capacity check applies **only to entries becoming active consumers** (Pending/Declined/new → Going/Maybe); an active Going↔Maybe self-flip never re-tests capacity. The organizer has **no capacity privilege outside D-119**: an organizer who voluntarily declined and re-RSVPs at a full session waitlists like anyone (§12-2).
+
+### 5.3 JoinRequest (shared by sessions and polls)
+
+Target = `SessionId` xor `PollId` (DB CHECK); registered requesters only; one open request per (target, user); **a requester with a `Removed` Participation/PollParticipant on the target cannot open a request** — removal is permanent for that target (§12-24), and this is a domain error, not a uniqueness-constraint crash at approval time. `Status`: `Pending` | `Approved` | `Rejected` | `Withdrawn` | `Lapsed`. Lapse causes (system-closed, silent): block (§4), the target reaching a terminal state (cancel/complete/expire/finalize), a poll leaving `Polling` (the Close transition), requester deletion (§11).
+
+- No attendance intent (D-098). Session approval (under lock): Participation `Going`, or `Going`+waitlisted at capacity. Poll approval: creates an Active `PollParticipant` with access to all current options (D-118).
+- Windows: sessions — until `EndTime` (D-173); polls — while `Polling` and now < deadline (D-118); pending poll requests do not transfer to the finalized session (§12-9).
+- Approval/rejection notify the requester; a new request notifies the organizer (D-107, §10).
+
+### 5.4 Guests
+
+- `GuestLink`: created by the organizer, **unclaimed** — (owning session xor poll, token ≥256-bit hashed A-015, `State`: Active | RevokedByCancel | RevokedByRemoval | ExpiredPoll, `GuestIdentityId?` null until claimed). Unclaimed links create no Participation, reserve no capacity, and are not slot reservations — a guest claiming at full capacity waitlists like anyone (D-084; §12-6).
+- Claim: first visit supplies a display name (1–50) → `GuestIdentity` + Participation/PollParticipant (D-017). Claims and guest *responses* close at session start like any invitation response (D-081); the link keeps resolving to a read-only view afterward.
+- **Lifetime.** Session-owned links: valid until the session's `EndTime` (D-048), revoked early by cancel (D-174 → `RevokedByCancel`) or guest removal (D-044 → `RevokedByRemoval`). Poll-owned links: `Active` through `Polling` and `Closed`; on finalization they re-parent to the created session **with their tokens preserved** (re-issue is impossible — D-048 forbids renewal); on poll cancel → `RevokedByCancel`; on poll expiry → `ExpiredPoll`.
+- **Link resolution is not the fail-closed engine** — a bearer token is its own proof, and D-167 promises guests can *see cancellation*: `Active` → live view; `RevokedByCancel` → terminal "canceled" notice (the guest's only cancellation channel — D-167/spec §8.4); `RevokedByRemoval` → "link revoked" notice; `ExpiredPoll` → "poll expired" notice; past-`EndTime` → "session ended" notice. None leaks anything the bearer didn't already have.
+- Removal (D-044) is a roster command: Participation → `Removed`, link → `RevokedByRemoval`, capacity freed, confirmation re-evaluated.
+
+### 5.5 Session state machine
+
+| Transition | From → To | Guard | Effects |
+|---|---|---|---|
+| Confirm | `Unconfirmed` → `Confirmed` | active Going ≥ Min **and** now < EndTime (D-053, D-106) | notify confirmation |
+| Unconfirm | `Confirmed` → `Unconfirmed` | active Going < Min, no Going-waitlisted candidate (D-074), **and** session not started (D-106) | notify unconfirmation |
+| Complete | `Confirmed` → `Completed` | now ≥ EndTime (sweeper) | history, final roster frozen (D-095); pending join requests lapse |
+| Expire | `Unconfirmed` → `Expired` | now ≥ EndTime (sweeper) | excluded from history (D-164); pending join requests lapse |
+| Cancel | `Unconfirmed`/`Confirmed`/`Completed` → `Canceled` | due time transitions applied first (§1) — a logically-expired session cannot be canceled; a logically-completed one cancels as Completed (D-156/D-157) | excluded from history; all guest links → RevokedByCancel (D-174); pending join requests lapse; notify per §10 (D-166) |
+
+Poll finalization may **create** a session directly in `Unconfirmed`, `Confirmed`, `Completed`, or `Expired` (D-153) — the only path to Completed without prior Confirmed; sweeper re-runs on such rows are no-ops.
+
+Confirmation is re-evaluated after **any command touching a participation's status or waitlist flag, min, max, or start time** — RSVP, leave, waitlist reject, approval, promotion, guest claim/response/removal, block removal, invite-decline, min change (D-122), start-time reset (D-063), deletion effects (§11).
+
+### 5.6 Commands (each row = domain rule + D-test)
+
+All roster commands require non-terminal status **and** now < EndTime (due transitions applied first, §1).
+
+- **Invite** (D-020): organizer adds registered invitees **before start** (§12-8); Pending consumes no capacity; re-inviting a `Declined` row flips it to Pending (re-extends visibility); `Removed` rows and blocked counterparts cannot be invited.
+- **RSVP:** Pending/Declined/new → Going/Maybe consumes capacity or waitlists at max (D-084); invitation responses close at start (D-081); Pending stays Pending at start (D-089); active Going↔Maybe stays open in progress (D-089) but can never unconfirm a started Confirmed session (D-106).
+- **Leave:** active or waitlisted Going/Maybe → `Declined` (D-055), **before start only** — in-progress attendance changes are restricted to active Going↔Maybe by D-089's "between those attendance states" (§12-3); post-start, the only waitlist exit is the organizer's reject.
+- **Waitlist reject:** organizer drops a waitlisted entry → `Removed` — the spec §8.4 "rejected from a waitlist" event (recipient carve-out in §10).
+- **Promotion:** organizer picks any waitlisted entry; fills a free slot immediately, preserves status; capacity-guarded under lock. A freed slot is **not** reserved — a faster RSVP may take it, and a waitlisted user may leave and re-RSVP into it (§12-4); the "waitlist vacancy" notification fires when a slot frees while the waitlist is non-empty.
+- **Start-time change:** before start only (D-168); new start re-validated against D-130; clears confirmation; resets every `Pending`/`Going`/`Maybe`/waitlisted **and `Declined`** row to `Pending` (waitlist flags cleared) — `Removed` rows never reset (D-063 vs D-077/D-092; §12-5); the organizer's own row resets too (§12-5); reschedule notification recipients computed **after** the reset so revived invitees are told; reminders recomputed.
+- **Min change:** before start only (D-168); rejected if it would exceed max (D-141); immediate re-evaluation, raises subject to the D-074 grace (D-122).
+- **Max change:** reduction below active Going+Maybe occupancy **or below min** is forbidden (D-121/D-141); raising never auto-promotes (spec §8.1); **clearing to unlimited is rejected while the waitlist is non-empty** — promote or reject the waitlist first, else D-091 (no waitlist without a max) and spec §8.1 (promotion stays manual) cannot both hold (§12-1).
+- **Duration change:** reschedule notification, no reset (D-122). **Title/game/platform/notes/max/privacy:** silent (D-123).
+- **Privacy → private:** retained set per §7 (D-043/D-047). **Privacy → non-private:** allowed silently (D-123); D-099 is creation-time only — a guest-only session flipped public is discoverable through the organizer (D-085) (§12-7).
+
+There is no organizer command to remove a *registered* participant — D-044 covers guests only; the levers against a registered member are waitlist reject and blocking (§12-25).
+
+## 6. Poll aggregate
+
+### 6.1 Poll
+
+`OrganizerId`; every eventual session detail (D-154); `DeadlineChoice` ∈ {6, 12, 24, 48} h (D-070, default 24 — D-131); `Deadline` = created + choice; selection window ends `Deadline + 48 h` (D-088). `Status`: `Polling` | `Closed` | `Finalized` | `Expired` | `Canceled`. Polls have **no edit surface** — details and deadline are immutable after creation; only options change (§12-26).
+
+| Transition | From → To | Guard | Effects |
+|---|---|---|---|
+| Close | `Polling` → `Closed` | now ≥ Deadline (sweeper; D-079) | notify closed-awaiting-selection; pending join requests lapse (§5.3 — requests are open only while `Polling`); guest links unaffected |
+| Expire | `Closed` → `Expired` | now ≥ Deadline+48 h (sweeper; D-088) | notify per §10 (D-170); excluded from history; guest links → `ExpiredPoll`; pending join requests lapse |
+| Expire (deletion) | `Polling`/`Closed` → `Expired` | organizer's deletion executed (D-092) | same effects (D-170) |
+| Finalize | (`Polling`)/`Closed` → `Finalized` | **clock-gated both ways:** now ≥ Deadline (a due Close applies first — a late sweep never delays the organizer, §1) and now < Deadline+48 h (half-open like every window, §1) | §6.4 |
+| Cancel | `Polling`/`Closed` → `Canceled` | before finalization (D-156) | excluded from history; guest links → RevokedByCancel (§5.4 notice); pending join requests lapse; notify per §10 (D-166) |
+
+No early expiry when all options pass (D-140). No finalization before the deadline (§12-10).
+
+### 6.2 Options
+
+`PollOption`: (`PollId`, `StartTime` Instant, `SuggestedBy` **ParticipantRef** — guests suggest too, D-033/D-051). DB-unique (PollId, StartTime). Option instants are bounded to ≤ poll creation + 1 year (the D-130 ceiling's analogue; §12-11). Suggestion (voters, registered or guest) is valid only while `Polling` **and** now < Deadline, takes the poll row lock, and resolves in this order: (1) identical instant exists → **merge**: return the existing option, no error, count unchanged (D-080 — dedupe is not a failure, even at 12 options); (2) new instant at 12 options → clear error (D-171; the lock makes the count race-free); (3) else insert, notify organizer only (D-120). ≥2 options at creation (D-131); options may precede the deadline (D-131); elapsed options stay selectable (D-140).
+
+Deletion: organizer, **any option** (D-080 — no floor), while `Polling` or `Closed`, silently (D-088); votes on a deleted option cascade, but `FirstResponseAt` values they established are never recomputed (D-172). A poll deleted down to zero options can only be canceled or expire (§12-12).
+
+### 6.3 Participants and votes
+
+- `PollParticipant`: `ParticipantRef`, `Status`: Active | `Removed` (block D-077 / deletion D-092 — removed participants' votes are excluded from finalization mapping and allocation), `FirstResponseAt?` — **write-once, set by the first vote submission only** (not by suggesting, not by approval; §12-13) (D-172). The organizer holds a PollParticipant and votes like anyone (D-155).
+- `PollVote`: (`OptionId`, `ParticipantRef`) → Available | Maybe | Unavailable (D-033); one per (option, participant); submission/revision valid only while now < Deadline (D-079; clock-gated per §1 — stored status alone never extends voting).
+
+### 6.4 Finalization (one atomic transition)
+
+1. Guard: per §6.1 Finalize row; option belongs to the poll.
+2. Create the Session from the poll's details (`OriginPollId` set); `StartTime` = the option's instant (D-130 does not apply).
+3. Map votes on the selected option from **Active** participants: Available → Going, Maybe → Maybe, Unavailable → Declined (D-051); no vote on that option → Pending; organizer → Going regardless (D-155); all rows `Origin = PollFinalization`.
+4. Capacity allocation when mapped active Going+Maybe would exceed max: organizer first, then Available voters, then Maybe voters — each ordered by (`FirstResponseAt`, ParticipantRef id) as a deterministic total order (§12-14), the organizer excluded from the ordered lists; overflow waitlisted with matching status (D-119).
+5. Status: future option → normal confirmation evaluation; started-not-ended → in-progress (Confirmed iff active Going ≥ min); ended → `Completed` iff mapped Going ≥ min else `Expired`, excluded from history (D-153/D-164). Non-voters mapped Pending onto a started session stay Pending forever (D-081/D-089) — expected, not a bug.
+6. Guest identities re-parent onto the session, tokens preserved (§5.4); poll `NotificationMute` rows carry over (§12-15).
+7. Pending poll join requests → `Lapsed`.
+8. Notify: "option selected" to the §10 poll audience **in every branch, including Expired** (the spec §8.4 list has no branch exception, and voters must learn the outcome; §12-16); plus "added to waitlist" to each participant waitlisted by step 4's overflow.
+9. Reminders are scheduled for mapped active Going/Maybe participants only where the computed reminder instant is still in the future (§9).
+
+## 7. Visibility engine (one domain service; the security boundary)
+
+Every session/poll/availability read and write by a **registered viewer** resolves here and fails closed (no match → not found). Guest *link resolution* is the §5.4 exception: an `Active` link yields the live view — rendered identically to a participant's view (D-030/D-114) — scoped to exactly that one session/poll.
+
+**For a registered viewer V and a session/poll T:**
+
+1. **Direct access:** V is the organizer; or V has a Participation/PollParticipant that is **not `Removed`** and satisfies: `Origin = Invited` (any status — a Declined invitee keeps seeing what they were invited to, D-019), or current status ∈ {Pending, Going, Maybe (incl. waitlisted), Active}; a voluntarily-departed (`Declined`) non-invitee does **not** retain direct access; or V has a **Pending** JoinRequest (rejected/withdrawn/lapsed requests grant nothing — D-043's "outstanding" only).
+2. **Inherited access (non-private only):** V has an **Accepted** friendship with ≥1 extender. Session extenders — **status-only, origin-irrelevant**: the organizer (regardless of own attendance, D-085) plus every non-`Removed` registered Participation with status ∈ {Pending, Going, Maybe (incl. waitlisted)} (D-018 — this deliberately includes Pending rows of every origin, e.g. revived or poll-finalized non-voters). Poll extenders: the organizer plus Active registered PollParticipants, **except** one whose every current vote is Unavailable — the poll analogue of Declined under D-051's mapping (§12-17); a participant with no votes yet extends (pending-invitee analogue). Never extenders: `Declined`, `Removed`, requesters of any status, guests (D-018).
+3. **Private:** rule 1 only. The privacy-flip retained set (D-043/D-047) *is* rule 1 — Origin=Invited rows, active participants, Pending requests.
+4. **Block filter — takes precedence over rules 1–3:** if (V, organizer) is a blocked pair, T does not exist for V (their rows are `Removed` on block creation, and inherited grants exclude blocked counterparts' participation as a path). The only blocked-pair coexistence is a *third-party* T where both remain participants — access intact, masking on (D-065/D-076/D-077).
+
+- **Availability:** Accepted friends only (D-024).
+- **Rendering (one masking service, rules in order):** tombstoned user → **Anonymous User** for every viewer (D-092); blocked pair → Anonymous User between the two only, attendance/capacity effects untouched (D-076/D-086) — applied equally to rosters, poll voter grids, and option attribution. Otherwise rosters and voter lists render display name + avatar for everyone with access — D-030/D-114 scope; D-068's username-only rule governs **profile pages** before friendship, not rosters (§12-18). Guest entries render their self-supplied display name; guests cannot be blocked or tombstoned in the MVP (D-150).
+
+## 8. Availability + overlap engine
+
+- **One-time block:** (`OwnerId`, `Start`, `End` Instants, `SourceSeriesId?` + occurrence date when materialized from an edit-one), 15-min grid (D-071).
+- **Weekly series:** (`OwnerId`, `IsoDayOfWeek`, `StartTime` LocalTime, `Duration` Period, `Zone` DateTimeZone, `EffectiveFrom` LocalDate, `EffectiveUntil?` exclusive). EffectiveFrom = the dragged week's date (D-132) — no infinite-past expansion; null Until = continues until deleted (D-133).
+- **Occurrence expansion:** for each occurrence date d in [EffectiveFrom, EffectiveUntil): `LocalDateTime s = d.At(StartTime); LocalDateTime e = s + Duration` — **LocalDateTime arithmetic, so midnight-crossing blocks carry into the next day, never wrap** — then map `s` and `e` through `Zone` with the lenient resolver (**wall-clock endpoints**, spec §8.5: local time preserved across DST; a block spanning fall-back is longer in real time, spring-forward shorter; an occurrence entirely inside a DST gap collapses and is dropped; §12-19). Exception key: (SeriesId, occurrence start LocalDate in series zone).
+- **Edit semantics (D-134/D-143):** delete-one → skip exception; edit-one → skip + materialized one-time block carrying `SourceSeriesId`; edit-this-and-future → split at the **ISO-week start of the selected occurrence**: old series `EffectiveUntil` = that Monday, successor from it (week-granular so a weekday change never orphans the selected week; §12-20) — skip exceptions and materialized blocks dated ≥ the split are **dropped**, not migrated: the user is redefining the future (§12-20). Series deletion cascades to its skip rows *and* its materialized blocks (§12-21). Materialized blocks are absolute instants: a later D-061 zone change does not move them (§12-21).
+- **Zone change (D-061):** every series' `Zone` → the new zone, same local clock time.
+- **Merging (D-101)** is a read-model projection — *strictly overlapping* (half-open, §1 — abutting blocks stay distinct, which is what keeps D-136's no-merge rule meaningful) intervals of one owner coalesce for display and as engine input; edits always address a concrete block or (series, date).
+- **Overlap engine (pure):** inputs — selected friends (all optional), range (default next 7 days, D-108; ranges beyond 92 days are rejected with an error, §12-27), expanded+merged availability of visible friends. **Window construction:** for every realizable non-empty subset S of the selected friends, emit the maximal continuous intervals throughout which all of S are simultaneously available (intersection of merged interval sets — maximality is within a contiguous intersection run; nothing merges across a gap or an abutment); dedupe identical intervals. For window w: `Available(w)` = friends available for all of w; `Maybe(w)` = friends available for part of w (half-open — endpoint touching is not availability). Nesting is intended: A 18–22 ∩ B 19–20 yields both 19–20 (Available 2) and 18–22 (Available 1, Maybe 1) — the spec's "full and partial overlap windows" (D-035/D-052; §12-28). Ranking: Available desc, Maybe desc, then earliest start, then longest. No result limit, duration not an input (D-100/D-108); adjacent equivalent windows are never merged (D-136). Home top-5 suggestions additionally require **≥15 min and Available ≥ 2** — a singleton window is not an overlap (D-136; §12-28). Other consumers: Find-a-time, session/poll prefill (D-102 — prefill clamps a past/near start up to now+15 min before hitting D-130), over-duration warning (D-109). The construction is implemented as a boundary sweep, not subset enumeration.
+- tzdb resilience: a series whose `Zone` id is no longer in the tzdb expands via the owner's current zone (§12-29).
+
+## 9. Notification records
+
+`Notification`: (`Id`, `RecipientUserId`, `Type` enum, structured subject refs — `SessionId?`/`PollId?`/actor `UserId?`/option instant as needed — `CreatedAt`, `ReadAt?`). **Structured fields only — no pre-rendered text, no denormalized names.** Rendering happens at read time in the recipient's locale (plan principle 6) through the masking service, so tombstoning and blocking retroactively mask history and no PII survives in notification rows (§11).
+
+Written in the same transaction as the causing state change (A-016). **Mute is applied at write time**: a recipient with a `NotificationMute` (target session xor poll) gets *no record at all* — D-090/D-113 suppress the notification, not just the push; the sole mute exception is the reminder, governed by `ReminderChoice`/`ReminderDefault` for Going/Maybe participants (D-082/D-090). Guests are never recipients (D-167). Recipients are computed against visibility at emission — with the per-event carve-outs in §10 for targets whose access the same command just changed.
+
+**Reminders** target *active* (non-waitlisted) Going/Maybe registered participants only (§12-30). Recompute/cancel triggers: RSVP change, waitlist flag change (promotion/reject), start-time or duration change, cancel, **block-driven and deletion-driven removal** — a `Removed` participant's pending reminder must die with their access. A reminder whose computed instant is already past is skipped, never fired late (D-153 finalization can create such cases).
+
+## 10. Event → recipient contracts (the spec §8.4 list, D-112)
+
+Recipients are defined per event — some legitimate recipients hold no Participation (a rejected requester) or just lost access through the very command being reported (a waitlist reject); those are explicit targets, not visibility-set members.
+
+| Event | Recipients |
+|---|---|
+| Session/poll invitation | the new invitee only |
+| Confirmation / unconfirmation / reschedule (start or duration) | all registered participants with status ∈ {Pending, Going, Maybe, waitlisted} + organizer — including the actor whose command caused it (state-change broadcast; §12-31) |
+| Session canceled | access-scoped per spec §8.1 ("every registered participant who still has access"): every registered user with §7 rule-1 access via a Participation — Declined invitees included — minus the organizer (actor), subject to mute (D-166) |
+| Join request received / waitlist vacancy | organizer |
+| Join request accepted / rejected | the requester (explicit target) |
+| Added to / promoted from / rejected from waitlist | the affected participant (explicit target — reaches the rejected participant even though their row just became `Removed`) |
+| Poll: voter-suggested option | organizer only (D-120) |
+| Poll: deadline approaching | all Active registered poll participants + organizer, at Deadline − 1 h (D-120); skipped if the poll has left `Polling` by then; scheduled event, not a transition |
+| Poll: closed awaiting selection / expired / canceled / option selected | all Active registered poll participants + organizer (D-120/D-170/D-166); option-selected fires in every finalization branch (§6.4-8) |
+| Friend request received | the target user (D-105; acceptance, removal, blocking: silent) |
+| Steam-import match | the importer — at import time and when a Steam friend registers/links later; the matched user learns nothing until an actual friend request arrives (§12-32) |
+| Reminder | active Going/Maybe registered participants per preference (D-082); waitlisted excluded (§12-30) |
+
+## 11. Deletion lifecycle (tombstones)
+
+`Active` → `PendingDeletion(GraceEndsAt = now+7 d)` on request (D-148); all login sessions invalidated (Phase 2, D-165). **Cancellation = successful login** — the disclosed mechanism (D-158) and, being signed out everywhere, the only reachable one (§12-33). The D-072 public web route feeds the same `PendingDeletion` state after Phase 2 identity verification.
+
+**During the grace period the domain is untouched** (D-148 — destructive effects only after it): rows, participations, capacity effects, and owned sessions all stand; the signed-out user simply acts on nothing. An owned session that runs during the grace period runs with an absent organizer — the price of a cancelable deletion (§12-34).
+
+Execution (sweeper at grace expiry; idempotent; one transaction per user; deliberately ordered):
+
+1. **Cancel owned sessions that have not started** (normal cancel transition: guest links revoked, join requests lapsed, participants notified). Owned in-progress sessions run to completion (§12-35 — canceling would yank live guests; their organizer-only commands go permanently unactionable, accepted); owned Completed sessions stay in history.
+2. **Expire owned `Polling`/`Closed` polls** (deletion-expiry transition, D-170 notifications, links → `ExpiredPoll`).
+3. **Remove self from others' content:** participations in **not-started** sessions → `Removed` (+ re-evaluate confirmation D-074, cancel pending reminders §9); in-progress participations are left to complete (§12-35); own open join requests → `Lapsed`; PollParticipant rows in others' non-finalized polls → `Removed` (a deleted user must not be mapped into a session finalized later — D-092).
+4. Delete all friendships, pending friend requests, and block rows in both directions.
+5. Delete availability series and blocks, `NotificationMute` rows, `PushSubscription`s, and `Notification` rows addressed to the user. The deleting user receives no notifications from steps 1–3 (recipient computation excludes them).
+6. **Tombstone** (§3): PII nulled, platform links deleted, friend code retired, username → registry `Reserved(+30 d)` with no owner reference (D-145 mechanism, §12-36); Completed history renders Anonymous User (D-092). Session titles/notes the user authored on retained Completed sessions survive as content (§12-37).
+7. Append `(user_id, executed_at)` to the deletion journal (A-017 — pseudonymous by design: the id is FK-stable to the tombstone, which is the property that makes restore-replay work).
+
+Steps 1–3 run before 4 so their notifications see the intact graph; notification rows are structured-only (§9), so nothing named survives the tombstone.
+
+## 12. Interpretation notes (spec-silent or spec-tension points this model resolves — ratify or veto)
+
+Where a note overrides or arbitrates spec text, that text is quoted.
+
+1. **Clearing max to unlimited is rejected while the waitlist is non-empty.** Three spec texts collide: D-091 ("no maximum ⇒ no waitlist"), spec §8.1 "Increasing maximum leaves waitlist promotion manual" (clearing is an increase), and spec §8.1 "The organizer … may clear maximum capacity for unlimited attendance". Auto-activating the waitlist violates the second; keeping a waitlist violates the first; the chosen rule conditions the third (clearing stays available — after the organizer disposes of the waitlist) rather than prohibiting it, and avoids an irreversible capacity ratchet.
+2. **The organizer has no capacity privilege outside D-119 finalization** — they can end up waitlisted in their own full session by two routes: voluntarily declining and re-RSVPing, or losing the post-reschedule RSVP race after a D-063 reset (§12-5). Spec grants organizer priority only at poll finalization; a reserved slot would let active occupancy exceed max. A Going-waitlisted organizer is an ordinary D-074 grace candidate — D-074 makes no candidate exception, and a full session pinned Confirmed below min by *any* Going-waitlisted candidate is D-074's stated behavior, not a defect.
+3. **Leave closes at session start.** D-055 ("Going and Maybe participants can leave") is unbounded, but spec §8.1/D-089 restrict in-progress changes to "between those attendance states" (Going↔Maybe). Post-start, the only waitlist exit is the organizer's reject.
+4. **A freed slot is not reserved** for the organizer's promotion choice ("the organizer chooses whom to promote", spec §7.1-9) — a faster RSVP may take it, and a waitlisted user may leave and re-RSVP into it pre-start, bypassing promotion. Accepted: the alternative (slot holds) contradicts D-084's "at capacity → waitlist" being the *only* waitlisting rule.
+5. **The D-063 reset revives `Declined` rows (a new time may work for them) but never `Removed`** — removal (block/deletion/waitlist-reject/guest-removal) is terminal; without the distinction, rescheduling resurrects blocked users into the blocker's roster. The organizer's own row resets too ("every participant").
+6. **Guest links are not slot reservations**; unclaimed links hold nothing, and a guest claiming at capacity waitlists (D-084).
+7. **Private → non-private flips are allowed silently** (D-123); D-099's invited-friend rule is creation-time only. The flip exposes roster/notes to inherited viewers with no signal to participants — a UI-disclosure concern, noted.
+8. **Invites close at session start** — a post-start invitee could never respond (D-081) yet would extend visibility; join requests (open to EndTime, D-173) are the in-progress entry path.
+9. **Pending poll join requests lapse at finalization** rather than transferring to the session (the session has its own request flow, D-173).
+10. **No finalization before the deadline** (D-079 "closes and waits") — an organizer whose voters all responded still waits. Visible product cost; flag if unwanted. From the deadline onward, selection is clock-valid regardless of sweeper lag (§6.1).
+11. **Poll option instants are bounded to creation + 1 year** — the D-130 ceiling's analogue; otherwise finalization mints sessions decades out that direct creation would refuse.
+12. **Options can be deleted down to zero** (D-080: "the organizer can delete any option" — no floor is inventable); a zero-option poll can only be canceled or expire.
+13. **`FirstResponseAt` = first *vote* submission** — suggesting an option or being approved as a voter does not set it (D-172 "first submitted poll response").
+14. **D-119 ties** break by ParticipantRef id after `FirstResponseAt` — deterministic under identical timestamps (forwarded guest links, D-126).
+15. **Poll mutes carry onto the finalized session** — the user muted the plan, not the artifact. Accepted composed consequence of write-time mute (§9): unmuting never backfills, and a user who muted a poll can acquire a Going roster row on the finalized session with zero notification records — D-090/D-113's "suppresses every notification" is taken literally.
+16. **"Option selected" fires in every finalization branch, including Expired** — the spec §8.4 push list has no branch exception, and D-170 already establishes that a dead poll is notification-worthy.
+17. **A poll participant whose every current vote is Unavailable does not extend visibility** — D-051 maps Unavailable to Declined, and D-018 excludes Declined from extending; a participant with no votes yet extends (pending-invitee analogue).
+18. **Rosters and voter lists render display name + avatar to anyone with access; D-068's username-only rule governs profile pages.** The alternative reading (username-only rosters for non-friends) treats D-068 ("Before a friendship is accepted, only the unique username is visible", spec §8.3 — an *accounts* rule) as overriding D-030/D-114's roster scope, and turns the Discover flow into bare-username lists. Product-visible either way; confirm.
+19. **DST arithmetic is wall-clock at both endpoints, on LocalDateTime** (midnight-crossing blocks never wrap); real duration varies on transition days; occurrences collapsed by a DST gap are dropped.
+20. **Series splits are week-granular** (at the ISO-week start of the selected occurrence) so a weekday change never orphans the selected week; a change may thereby also apply to an earlier weekday within that same week. Future-dated skip exceptions and materialized blocks are **dropped** at a split — the user is redefining the future.
+21. **Series deletion cascades** to skip exceptions and edit-one materialized blocks; an edit-one materialized block is an absolute instant, detached from D-061 zone migration (UI should disclose).
+22. **`Onboarding` users are invisible to lookup and cannot be friended** — D-127 sequences the profile after account creation; a half-built profile must not surface.
+23. **Friend-request rejection deletes the row with no cooldown** — re-request spam is bounded by API-layer rate limiting (Phase 2), not domain state.
+24. **Unblock restores nothing** — no friendship, no `Removed` resurrection on past sessions/polls; it only re-enables discovery and future interaction. Session-level removal is permanent for that session.
+25. **There is no organizer command to remove a registered participant** (spec provides none; D-044 is guests-only) — waitlist reject and blocking are the levers.
+26. **Polls are immutable after creation except options** — the spec defines no poll-edit surface; changing details/privacy mid-vote would invalidate cast votes.
+27. **Overlap queries beyond 92 days are rejected** — D-108 forbids limiting *results*, not the input range; unbounded ranges over until-deleted weekly series are unbounded work.
+28. **Overlap windows are subset-maximal intervals** (nested windows intended) — the only construction where "full and partial overlap windows" and the D-052 Available/Maybe ranking are both non-degenerate. Home's top-5 additionally require Available ≥ 2 — a singleton window is availability, not overlap.
+29. **Unknown tzdb ids** fall back to the owner's current zone at expansion.
+30. **Waitlisted participants get no reminder** — they are not attending; the reminder is D-090's exception for people who are.
+31. **State-change broadcasts include the acting user** — except cancellation, whose sole possible actor is the organizer and whose audience spec §8.1 defines as "every registered participant who still has access", i.e. everyone else; acknowledgment events (accept/reject/promotion) target only their subject. The confirmation/unconfirmation/reschedule rows stay *status*-scoped (attending-ish participants) while cancellation is *access*-scoped — the spec's "who still has access" wording is cancellation-specific, and a Declined invitee has no stake in a duration change of a session they aren't attending.
+32. **Steam-import match notifications go to the importer** (at import and on later registration of an imported friend) — notifying the matched side would disclose the importer's Steam friend list before any friend request exists.
+33. **Login is the only deletion-cancel path** (D-158's disclosed mechanism; the account is signed out everywhere by D-165, so no in-app cancel can be reached).
+34. **The grace period has no domain effects** — the user's rows stand and their owned sessions run (with an absent organizer) until execution; D-148 defers all destructive effects.
+35. **In-progress content is never disturbed by deletion execution** — owned in-progress sessions complete; participations in others' in-progress sessions complete; "future" (D-092) = not-started, uniformly.
+36. **Tombstoned usernames enter the 30-day reservation** (D-145 mechanism) via an owner-less registry row — no instant re-registration, no PII outliving the tombstone.
+37. **User-authored content on retained Completed sessions (titles, notes, free-text games) survives deletion** — D-092 anonymizes identity, not content; owned *future* sessions are canceled outright. Self-identifying prose in a title survives as a known residual (spec §8.6 accepts retained Completed history).
+
+## 13. Domain project layout
+
+```
+PartyUp.Domain/
+  Kernel/          — typed IDs, ParticipantRef, Duration15, text VOs, error types
+  Users/           — User, PlatformLink, username registry, deletion lifecycle
+  Friendships/     — Friendship, Block (+ block/unblock effect service)
+  Sessions/        — Session, Participation, JoinRequest, GuestIdentity, GuestLink,
+                     transition functions
+  Polls/           — Poll, PollOption, PollParticipant, PollVote, finalization
+  Availability/    — series, blocks, exceptions, expansion, overlap engine
+  Visibility/      — visibility engine, identity masking
+  Notifications/   — Notification, NotificationMute, PushSubscription shape,
+                     event contracts, recipient computation, reminder rules
+```
+
+Tests mirror the layout in `PartyUp.Domain.Tests`; every behavior above carries its D-number in at least one test name (ARCHITECTURE.md §4).
