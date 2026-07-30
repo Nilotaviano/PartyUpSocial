@@ -121,7 +121,7 @@ cd web && npm run lint && npm run build && npm test
 |---|---|---|
 | 0 | Walking skeleton — CI/CD, deploy stack, health, migrations | ✅ code complete |
 | 1 | Domain core — session/poll state machines, visibility & overlap engines, D-number test suite | 🔜 next |
-| 2 | Accounts, auth (email, magic link, Google, Apple, Steam), onboarding | ⬜ |
+| 2 | Accounts, auth (email, magic link, Google, Steam), onboarding | ⬜ |
 | 3 | Friends, blocking, Steam import | ⬜ |
 | 4 | Fixed-time sessions end-to-end, guest links | ⬜ |
 | 5 | Availability, recommendations, calendar views | ⬜ |

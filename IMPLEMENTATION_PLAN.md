@@ -39,16 +39,15 @@
 
 ## Phase 0 — Walking skeleton + risk spikes
 
-Goal: deploy pipeline live and the highest-risk unknowns de-risked before feature work.
+Goal: CI green and the highest-risk unknowns de-risked before feature work. The deploy pipeline is authored here but not executed — no VM exists until development is done (its go-live tasks live in Phase 9).
 
-- Repo scaffold, CI (build + test), CD (GitHub Actions → GHCR → SSH compose pull), VM provisioned, Caddy TLS, health endpoint, Postgres up, one EF migration applied on deploy, Data Protection keys on volume.
-- Backups: nightly pg_dump → offsite, 30-day retention purge, **one tested restore**, and a restore runbook that includes re-applying account deletions newer than the snapshot.
-- **Apple Developer account + Sign in with Apple service ID / domain verification started now** — external lead time that must not block Phase 2.
+- Repo scaffold, CI (build + test), CD authored and gated off (GitHub Actions → GHCR → SSH compose pull; fires only when `DEPLOY_ENABLED` + VM secrets exist — Phase 9), Caddy TLS config, health endpoint, Postgres compose, one EF migration applied on startup, Data Protection keys volume config.
+- Backups authored: nightly pg_dump sidecar with 30-day retention purge, backup + restore runbooks (restore includes re-applying account deletions newer than the snapshot). Offsite target and the tested restore are Phase 9 go-live tasks.
 - **Spike A — Accessible drag calendar.** Prototype week-grid drag-select in FullCalendar *and* a minimal custom grid. Pass criteria (falsifiable): create/edit/delete a block keyboard-only; screen-reader announcements for selection and result; touch-drag on a 390px viewport. Scorecard picks the foundation.
 - **Spike B — Steam only.** OpenID 2.0 login + GetFriendList/GetPlayerSummaries + app-catalog access. Must test a **private-friends-list profile** (Steam's default), since empty imports will be common. PS/Xbox catalogs are *not* spiked — no viable public APIs; they launch as free text (D-176).
 - **Spike C — Web Push.** VAPID subscribe + deliver on Chrome/Firefox/Android Chrome; service worker skeleton; permission-prompt flow per D-159.
 
-Exit criteria: `main` auto-deploys over TLS; restore drill done; spike scorecards recorded as decisions.
+Exit criteria: CI green on `main`; spike scorecards recorded as decisions.
 
 ## Phase 1 — Domain core (no UI)
 
@@ -66,7 +65,7 @@ Exit criteria: every **behavior-bearing** Confirmed decision (D-053..D-176) has 
 
 ## Phase 2 — Accounts, auth, onboarding
 
-- Identity, cookie-based: email+password, passwordless email (magic link), Google, Apple, Steam OpenID 2.0 (D-067). No token server; session cookie + antiforgery for the SPA (BFF-lite).
+- Identity, cookie-based: email+password, passwordless email (magic link), Google, Steam OpenID 2.0 (D-067). Sign in with Apple is deferred to the mobile phase — the paid Apple Developer account isn't opened until iOS publish (pending D-067 amendment). No token server; session cookie + antiforgery for the SPA (BFF-lite).
 - Transactional email provider selected; sending domain is **mail.partyup.social** (subdomain isolates root-domain reputation); **SPF/DKIM/DMARC configured and inbox-tested** — magic-link auth is dead if mail lands in spam.
 - Onboarding per D-127: age gate → auth → username → display name → avatar (emoji or platform) → time zone → optional linking → friends.
 - Username rules: uniqueness, case-insensitivity, 30-day change cooldown + 30-day reservation (D-128, D-145); stable friend code generation.
@@ -128,8 +127,9 @@ Emission already exists everywhere (principle 5). This phase is transport and pr
 - Security pass: authz review of every endpoint against the visibility engine, guest-link handling re-check, OWASP basics, dependency audit.
 - Load sanity on the VM (k6: RSVP burst, overlap calc with many friends/blocks, sweeper under load).
 
-## Phase 9 — Private beta → public launch
+## Phase 9 — Go live, private beta → public launch
 
+- **Go live, before the first beta invite:** VM provisioned + DNS, GHCR/SSH secrets + `DEPLOY_ENABLED=true`, first `main` auto-deploy over TLS, offsite backup target (rclone) live, restore drill against a real dump.
 - Private testing with the real friend group (allowed by D-163) behind an invite switch; public registration off until launch.
 - Bug triage, restore drill #2, uptime monitor, log review.
 - Public v1: everything labeled initial release, at once (D-163).
@@ -144,7 +144,7 @@ Emission already exists everywhere (principle 5). This phase is transport and pr
 
 ## Deferred by design (mobile phase, later)
 
-OIDC/token auth layer for native clients, FCM/APNs channel, store age-signal APIs (D-093), report/moderation tooling (D-097), store policy recheck (§8.6), Steam catalog sync details (§8.2 TBD).
+OIDC/token auth layer for native clients, FCM/APNs channel, store age-signal APIs (D-093), report/moderation tooling (D-097), store policy recheck (§8.6), Steam catalog sync details (§8.2 TBD), Apple Developer account + Sign in with Apple (account opened only at iOS publish; App Store guideline 4.8 makes SIWA mandatory once Google login ships in the app, so it lands with the mobile release).
 
 ## Sizing (solo, part-time — honest version)
 

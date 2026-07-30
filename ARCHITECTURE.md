@@ -106,7 +106,7 @@ Connection string default (dev): `Host=localhost;Port=5432;Database=partyup;User
 ## 7. CI/CD
 
 - **ci.yml** (push/PR to main): restore/build/test .NET (integration tests included — ubuntu runners have Docker), then web `npm ci && lint && build && test`.
-- **cd.yml** (`workflow_run` after CI succeeds on main): checkout pinned to the CI-validated sha, build multi-stage image (web dist baked into API `wwwroot`), push `ghcr.io/<owner>/partyup:{latest,<sha>}`, SSH to VM, `docker compose pull && docker compose up -d`. A red CI run never deploys. Gated off until repo variable `DEPLOY_ENABLED=true` and secrets `VM_SSH_KEY`, `VM_HOST`, `VM_USER` exist (VM provisioning is a Phase 0 operational task).
+- **cd.yml** (`workflow_run` after CI succeeds on main): checkout pinned to the CI-validated sha, build multi-stage image (web dist baked into API `wwwroot`), push `ghcr.io/<owner>/partyup:{latest,<sha>}`, SSH to VM, `docker compose pull && docker compose up -d`. A red CI run never deploys. Gated off until repo variable `DEPLOY_ENABLED=true` and secrets `VM_SSH_KEY`, `VM_HOST`, `VM_USER` exist (VM provisioning is a Phase 9 go-live task — no VM until development is done).
 - **Rollback:** images are immutably sha-tagged; roll back by pointing the VM's compose file at the previous sha and `docker compose up -d`. Data rollback, if a migration made the old code unrunnable, is the restore runbook.
 - **Migrations on deploy:** app container applies EF migrations on startup (§3). Single instance — no coordination needed.
 
@@ -153,10 +153,11 @@ Secrets at this scale are the VM's `.env` (mode 600, never committed — `.gitig
 
 ## 10. Deferred (tracked, not forgotten)
 
-- **Phase 0 exit criteria (plan):** VM provisioning + DNS + GHCR/SSH secrets, first deploy over TLS, **restore drill against a real dump**, offsite backup target (rclone, RUNBOOK-backup.md), Apple developer account started (external lead time). Spikes A/B/C are built and decided (A-018..A-020, code under `spikes/`); human confirmation passes remain: NVDA + real-device touch on the custom grid, real Steam login + API key outcomes, Firefox/Android Chrome push delivery.
+- **Phase 0 remainder:** spikes A/B/C are built and decided (A-018..A-020, code under `spikes/`); human confirmation passes remain: NVDA + real-device touch on the custom grid, real Steam login + API key outcomes, Firefox/Android Chrome push delivery.
+- **Phase 9 (go-live, before the first beta invite):** VM provisioning + DNS + GHCR/SSH secrets + `DEPLOY_ENABLED`, first deploy over TLS, offsite backup target (rclone, RUNBOOK-backup.md), **restore drill against a real dump**.
 - **Phase 1 opener:** aggregate/tombstone data-model design doc (A-014).
 - **Phase 2:** ASP.NET Identity + cookie BFF auth — with antiforgery, `HttpOnly`/`Secure`/`SameSite=Lax` cookies, and security-stamp-based sign-out-everywhere (deletion start invalidates all sessions, successful login cancels deletion — D-158/D-165); transactional email + mail.partyup.social DNS/SPF/DKIM/DMARC; deletion skeleton incl. deletion journal (A-017).
 - **Phase 4/6:** Hangfire wiring + sweeper jobs; guest-link security package (A-015 + plan Phase 4).
 - **Phase 5:** Playwright E2E + axe lane (§4).
 - **Phase 7:** Web Push/VAPID transport + send-log.
-- **Later:** Steam OpenID + Web API (Phase 2/3, Spike B), OpenAPI client staleness check in CI once real endpoints exist (A-011), uptime monitor + Hangfire dashboard auth-gated (Phase 9).
+- **Later:** Steam OpenID + Web API (Phase 2/3, Spike B), OpenAPI client staleness check in CI once real endpoints exist (A-011), uptime monitor + Hangfire dashboard auth-gated (Phase 9), Apple Developer account + Sign in with Apple (mobile phase — account opened only at iOS publish; pending D-067 amendment).

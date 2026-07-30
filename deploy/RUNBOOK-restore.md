@@ -1,9 +1,9 @@
 # Restore runbook
 
-> A restore drill using these exact steps is a Phase 0 exit criterion (IMPLEMENTATION_PLAN.md
-> Phase 0, ARCHITECTURE.md §10) — this runbook isn't done until someone has followed it against
-> a real dump and confirmed the app comes back up correctly. Update it with anything that
-> surprised you.
+> A restore drill using these exact steps is a Phase 9 go-live gate, before the first beta
+> invite (IMPLEMENTATION_PLAN.md Phase 9, ARCHITECTURE.md §10) — this runbook isn't done until
+> someone has followed it against a real dump and confirmed the app comes back up correctly.
+> Update it with anything that surprised you.
 
 Run all of this from the directory holding `compose.yaml` and `.env` on the VM (`/opt/partyup`);
 the bare `docker compose` calls below rely on that file being auto-discovered there.

@@ -45,8 +45,8 @@ open-ended audit.
 ## Offsite copy (rclone) — target TBD
 
 `/backups` currently only exists on the VM itself — a disk failure or VM loss takes the backups
-with it. This must be closed before Phase 0 exits. Setup, once a remote target (object storage
-provider) is chosen:
+with it. This must be closed at Phase 9 go-live, before the first beta invite. Setup, once a
+remote target (object storage provider) is chosen:
 
 1. Install `rclone` on the **host** (not in the `backup` container — it doesn't need docker-in-docker,
    and a host cron surviving container restarts is simpler than adding rclone to the image):
@@ -68,4 +68,4 @@ provider) is chosen:
 5. Verify: after the first successful run, confirm a `.dump` file is visible via `rclone ls offsite:partyup-backups`.
 
 Until this is done, treat the VM's local disk as the only copy of the database and weigh that risk
-accordingly — this is the gap the Phase 0 restore drill (`RUNBOOK-restore.md`) does not cover.
+accordingly — this is the gap the Phase 9 restore drill (`RUNBOOK-restore.md`) does not cover.
