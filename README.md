@@ -26,8 +26,17 @@ Everything below was verified end-to-end from a fully clean checkout (wiped `bin
 
 Local Postgres — needed for a healthy `/health` and for the integration test suite — comes from
 `docker compose -f deploy/compose.dev.yml up -d` (default connection string in ARCHITECTURE.md §6).
-Without Docker, skip that: `dotnet test --filter Category!=Integration` (used throughout below) runs
-clean with no database at all, since the integration project is excluded rather than failing.
+Docker inside WSL works too: `wsl -d <distro> -- docker compose -f /mnt/c/<path-to-repo>/deploy/compose.dev.yml up -d`
+— WSL2 forwards `localhost:5432` to Windows, so nothing else changes (keep a WSL session open or the
+VM may idle-stop and take the container with it). Without Docker at all, skip that:
+`dotnet test --filter Category!=Integration` (used throughout below) runs clean with no database,
+since the integration project is excluded rather than failing.
+
+First run against a fresh database, apply migrations:
+
+```sh
+dotnet dotnet-ef database update --project src/PartyUp.Infrastructure --startup-project src/PartyUp.Api
+```
 
 ### .NET (from the repo root)
 
@@ -41,7 +50,7 @@ dotnet test PartyUp.sln --filter "Category!=Integration"             # exit 0 (n
 dotnet test PartyUp.sln --no-build --filter "Category!=Integration"  # exit 0
 dotnet publish src/PartyUp.Api -c Release -o <outdir>                # emits PartyUp.Api.dll (Dockerfile ENTRYPOINT target)
 
-# Migrations are discoverable with zero database contact (never run `database update` locally):
+# Migrations are discoverable with zero database contact:
 dotnet dotnet-ef migrations list --project src/PartyUp.Infrastructure --startup-project src/PartyUp.Api --no-connect
 ```
 
@@ -61,7 +70,8 @@ npm run gen:api          # requires the API running on :5000; regenerates src/ap
 ```sh
 dotnet run --project src/PartyUp.Api   # http://localhost:5000 (launchSettings), matches the Vite proxy target
 #   GET /openapi/v1.json -> 200 application/json
-#   GET /health          -> 503 Unhealthy (no local Postgres; process stays up)
+#   GET /health/live     -> 200 (process liveness, no dependency checks)
+#   GET /health          -> 200 with dev Postgres up; 503 Unhealthy without it (process stays up)
 #   GET /api/v1/nope     -> 404
 #   GET /                -> 404 (no wwwroot in dev)
 ```
@@ -76,7 +86,7 @@ ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://localhost:8080 dotnet P
 #   GET /                    -> 200 text/html   (SPA index)
 #   GET /sessions/abc        -> 200 text/html   (client-side routing fallback)
 #   GET /assets/index-*.js   -> 200 text/javascript
-#   GET /api/v1/nope         -> 404, empty body (was 200 text/html before the fix)
+#   GET /api/v1/nope         -> 404, empty body (SPA fallback never captures /api/v1 routes)
 #   GET /health              -> 503 (no Postgres; process stays up)
 ```
 
@@ -99,6 +109,7 @@ global.json                    — pins the .NET SDK major version
 /web                             — React + TypeScript SPA
 /deploy                          — Dockerfile, compose files, Caddyfile, backup + restore runbooks
 /tests
+  Directory.Build.props          — test-only build settings
   PartyUp.Domain.Tests           — pure unit tests
   PartyUp.Application.Tests      — use-case tests with fakes
   PartyUp.Api.IntegrationTests   — WebApplicationFactory + Testcontainers (real Postgres)
