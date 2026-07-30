@@ -29,7 +29,7 @@ services:
       - internal
 
   app:
-    image: ghcr.io/OWNER/partyup:latest # replace OWNER with the GitHub org/user this repo lives under
+    image: ghcr.io/nilotaviano/partyup:latest
     logging: *default-logging
     environment:
       ConnectionStrings__Db: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
