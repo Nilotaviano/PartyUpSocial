@@ -38,7 +38,7 @@ PartyUp gives the whole friend group one place to **publish availability**, **pr
 - 🗣️ **Three languages** — English, Português (BR), Español, including notifications and emails
 - ♿ **WCAG 2.2 AA target** — keyboard-first drag alternatives, screen-reader announcements, reduced-motion support
 
-The complete behavior is specified before code in [PRODUCT_SPEC.md](PRODUCT_SPEC.md) — **176 numbered product decisions** (D-001…D-176), each one traceable to the test that proves it.
+The complete behavior is specified before code in [PRODUCT_SPEC.md](PRODUCT_SPEC.md) — **180 numbered product decisions** (D-001…D-180), each one traceable to the test that proves it.
 
 ## 🏗️ How it's built
 
@@ -110,7 +110,7 @@ cd web && npm run lint && npm run build && npm test
 
 | Document | What's inside |
 |---|---|
-| [PRODUCT_SPEC.md](PRODUCT_SPEC.md) | Full product behavior — 176 numbered, statused decisions |
+| [PRODUCT_SPEC.md](PRODUCT_SPEC.md) | Full product behavior — 180 numbered, statused decisions |
 | [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) | Phased delivery plan with honest sizing |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Technical foundation, conventions, decision record |
 | [deploy/](deploy/) | Dockerfile, compose files, Caddy config, backup & restore runbooks |

@@ -1,7 +1,7 @@
 # PartyUp — Domain Model (Phase 1 design)
 
 **Status:** v3 — the A-014 opening deliverable, hardened through two adversarial review rounds (six spec-slice reviewers, then fix-verification + two cold reviewers) against the full decision log.
-**Basis:** PRODUCT_SPEC.md (D-001..D-176), ARCHITECTURE.md §3, IMPLEMENTATION_PLAN.md Phase 1.
+**Basis:** PRODUCT_SPEC.md (D-001..D-180), ARCHITECTURE.md §3, IMPLEMENTATION_PLAN.md Phase 1.
 **Scope:** the domain layer — entity shapes, invariants, state machines, visibility rules, notification contracts, deletion lifecycle. EF mapping lands in Infrastructure; auth flows land in Phase 2. Spec-silent points this document resolves are collected in §12 for ratification. `spec §n` refers to PRODUCT_SPEC.md sections; bare `§n` refers to this document.
 
 ## 1. Cross-cutting rules
@@ -37,7 +37,7 @@ Cross-aggregate references are by ID. The visibility engine, identity-masking se
 - `UserId`, `Username`, `DisplayName`, `AvatarKind` (Emoji | Platform) + value (Platform points at a `PlatformLink`), `TimeZone` (`DateTimeZone`), `Locale`, `FriendCode` (stable, unique — D-031/D-144), `AgeGatePassed` + source (D-093; never a birth date), `ReminderDefault` ∈ {Off, 15 m, 30 m, 1 h, 3 h, 12 h, 24 h}, default 1 h (D-082).
 - `PlatformLink`: (`UserId`, `Platform`, `Handle` ≤64) — D-032's "linked gaming platforms and handles". Exactly one may be the avatar source when `AvatarKind = Platform` (D-050); unlinking the avatar-source platform falls the avatar back to emoji selection. (Auth-method linking/unlinking D-087/D-137 is Phase 2 identity, distinct from platform links.)
 - **Username registry:** one table owns the name space — rows (`NameCanonical` case-insensitive unique, `State`: Active(owner) | Reserved(freeAfter)). A change flips the old row to Reserved(+30 d) (D-128/D-145) and claims/creates the new one — a single constraint domain, so a reserved or tombstone-freed name is un-claimable at the DB level. Change cooldown: 30 days (`UsernameChangedAt`). Reservation rows carry the name only — no `UserId` after deletion execution (§11).
-- **Lifecycle:** `Onboarding` → `Active` → `PendingDeletion(GraceEndsAt)` → `Deleted` (tombstone). `Onboarding` exists because D-127 creates the account (post-auth) *before* username/display name/avatar/zone are chosen — profile fields are nullable in that state only; `Active` requires all of them. An `Onboarding` user is invisible to lookup and cannot be friended (§12-22).
+- **Lifecycle:** `Onboarding` → `Active` → `PendingDeletion(GraceEndsAt)` → `Deleted` (tombstone). Phase 2 adds `BannedAt?` (D-180), orthogonal to the lifecycle: a banned user joins the tombstone/onboarding lookup exclusions and may still request deletion; the optional content-removal path reuses §11's effect steps without the tombstone. `Onboarding` exists because D-127 creates the account (post-auth) *before* username/display name/avatar/zone are chosen — profile fields are nullable in that state only; `Active` requires all of them. An `Onboarding` user is invisible to lookup and cannot be friended (§12-22).
 - **Tombstone:** PII nulled (username → registry Reserved row per §11, display name, avatar; platform links deleted; friend code retired — code lookups fail), row and `UserId` FK-stable so history survives (D-092). Tombstoned users are excluded from every lookup surface and can neither send nor receive friend requests. Rendered as **Anonymous User** by the masking service.
 
 ## 4. Friendship and Block

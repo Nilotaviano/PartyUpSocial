@@ -449,6 +449,13 @@ The product and API should not unnecessarily prevent native mobile clients. Whet
 
 The initial product will be publicly available, open for direct registration, and free to use. Invitations are also supported.
 
+Administration (confirmed):
+
+- The product has an admin role assigned operationally (configuration/seed at deploy time); there is no in-app role management.
+- Admins see a usage dashboard: registrations, active users, sessions and polls created, confirmation rate, and 30-day repeat scheduling — the section 12 measures.
+- Admins see a user list with per-user stats (registered date, last activity, sessions organized and joined, friend count) and ban state.
+- Admins can ban and unban users. A ban immediately signs the account out on every device, blocks login, and hides the user from lookup and discovery; the user's content and history are otherwise untouched, and unban fully restores access. When banning, the admin may additionally choose to remove the user's content — cancel future owned sessions, expire owned polls, and remove future participation (the account-deletion effects without the tombstone); content removal is not reversed by a later unban. A banned user can still request account deletion through the public route.
+
 To be decided:
 
 - Whether monetization may be introduced later.
@@ -659,6 +666,10 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-174 | Canceling a session immediately revokes all of its guest links. | Confirmed |
 | D-175 | iOS Safari Web Push (home-screen PWA requirement) is not pursued; iOS web users get the in-app fallback until the native app. | Confirmed |
 | D-176 | PlayStation and Xbox game fields are free text at launch (no viable public catalog APIs); only Steam offers catalog selection, per the D-058 fallback. | Confirmed |
+| D-177 | An admin role exists, assigned operationally at deploy time; no in-app role management. | Confirmed |
+| D-178 | Admins see a usage dashboard covering registrations, active users, sessions/polls created, confirmation rate, and 30-day repeat scheduling. | Confirmed |
+| D-179 | Admins see a user list with per-user stats and ban state. | Confirmed |
+| D-180 | Admins can ban/unban. Ban = sign-out everywhere + login blocked + hidden from lookup/discovery, content untouched, unban restores; the admin may optionally also remove the user's content (the D-092 effects without the tombstone), which unban does not reverse. | Confirmed |
 
 ## 15. Open questions
 

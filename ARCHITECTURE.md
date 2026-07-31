@@ -1,7 +1,7 @@
 # PartyUp — Architecture Foundation
 
 **Status:** v1 — foundation for Phase 0/1 implementation
-**Basis:** PRODUCT_SPEC.md (D-001..D-176), IMPLEMENTATION_PLAN.md
+**Basis:** PRODUCT_SPEC.md (D-001..D-180), IMPLEMENTATION_PLAN.md
 **Scope:** Repository structure, technology baseline, and cross-cutting conventions. Product behavior lives in PRODUCT_SPEC.md; phasing lives in IMPLEMENTATION_PLAN.md.
 
 ## 1. System shape
@@ -56,7 +56,7 @@ Domain references NodaTime and nothing else. Application references abstractions
 - **Database mapping:** `timestamptz` ↔ `Instant` via `Npgsql...NodaTime`; snake_case tables/columns via `EFCore.NamingConventions`. Migrations live in Infrastructure; forward-only from Phase 2 on.
 - **Migrations at runtime:** `Database.Migrate()` on startup when `Database:MigrateOnStartup=true` (single instance — no concurrent migrators; flag off in tests that manage schema themselves). Failure semantics: EF wraps each migration in a transaction on Postgres, and a failed migration aborts startup — the app crash-loops rather than serving a half-migrated schema. Recovery: fix forward, or roll back by deploying the previous commit-sha image tag (every CD image is immutably sha-tagged). Avoid long-lock migrations (e.g., non-concurrent index builds on hot tables) once real data exists.
 - **Use cases:** plain application-service classes registered in DI. No MediatR — one first-party client and a solo maintainer don't need pipeline indirection. Domain events are plain records collected on aggregates. Anything that must survive a crash — above all the in-app notification records the spec requires — is written **in the same transaction as the state change** (A-016). Post-commit dispatch exists only for transports (Web Push later), which are idempotent via the Phase 7 send-log and tolerate loss/lateness by spec.
-- **Endpoints:** minimal APIs in feature-grouped files under `PartyUp.Api/Endpoints/`, mapped onto a single `/api/v1` route group. No versioning library — the prefix constant is the version until a second API version actually exists.
+- **Endpoints:** minimal APIs in feature-grouped files under `PartyUp.Api/Endpoints/`, mapped onto a single `/api/v1` route group. No versioning library — the prefix constant is the version until a second API version actually exists. Admin endpoints (D-177..D-180) live role-gated under `/api/v1/admin` — operator surface, not part of the mobile-contract promise the rest of the document makes.
 - **OpenAPI:** `Microsoft.AspNetCore.OpenApi`; document served at `/openapi/v1.json` in every environment — it is the public API contract (mobile clients consume it later) and contains nothing secret. The web client's types are generated from it (§5). No web-only conveniences in endpoints.
 - **Logging:** Serilog, console sink, compact JSON in production, human-readable in dev. Container log rotation is configured in compose (json-file, capped) so the VM disk can't fill.
 - **Health:** `/health/live` — process-only liveness (no dependency checks); `/health` — readiness including Postgres. Both outside `/api/v1`. Ops checks that must distinguish "app dead" from "DB down" use live; "safe to serve traffic" uses ready.
@@ -156,7 +156,7 @@ Secrets at this scale are the VM's `.env` (mode 600, never committed — `.gitig
 - **Phase 0 remainder:** spikes A/B/C are built and decided (A-018..A-020, code under `spikes/`); human confirmation passes remain: NVDA + real-device touch on the custom grid, real Steam login + API key outcomes, Firefox/Android Chrome push delivery.
 - **Phase 9 (go-live, before the first beta invite):** VM + DNS + secrets + `DEPLOY_ENABLED=true` and the first TLS auto-deploy done 2026-07-30 (CI+CD green, `https://partyup.social/health` → 200; provisioned early, during Phase 1). Still open: offsite backup target (rclone, RUNBOOK-backup.md), **restore drill against a real dump**.
 - **Phase 1 opener:** aggregate/tombstone data-model design doc (A-014) — done: DOMAIN_MODEL.md; its §12 interpretation notes await ratification.
-- **Phase 2:** ASP.NET Identity + cookie BFF auth — with antiforgery, `HttpOnly`/`Secure`/`SameSite=Lax` cookies, and security-stamp-based sign-out-everywhere (deletion start invalidates all sessions, successful login cancels deletion — D-158/D-165); transactional email + mail.partyup.social DNS/SPF/DKIM/DMARC; deletion skeleton incl. deletion journal (A-017).
+- **Phase 2:** ASP.NET Identity + cookie BFF auth — with antiforgery, `HttpOnly`/`Secure`/`SameSite=Lax` cookies, and security-stamp-based sign-out-everywhere (deletion start invalidates all sessions, successful login cancels deletion — D-158/D-165); transactional email + mail.partyup.social DNS/SPF/DKIM/DMARC; deletion skeleton incl. deletion journal (A-017); admin foundations (D-177/D-180: seeded role, `BannedAt`, ban/unban on the same security-stamp machinery).
 - **Phase 4/6:** Hangfire wiring + sweeper jobs; guest-link security package (A-015 + plan Phase 4).
 - **Phase 5:** Playwright E2E + axe lane (§4).
 - **Phase 7:** Web Push/VAPID transport + send-log.

@@ -6,7 +6,7 @@ amount of written-down intent — reading the docs before coding will save you a
 ## Before you write code
 
 1. **Read the relevant part of [PRODUCT_SPEC.md](PRODUCT_SPEC.md).** Product behavior is
-   decided there (176 numbered decisions). PRs that contradict a Confirmed decision will
+   decided there (180 numbered decisions). PRs that contradict a Confirmed decision will
    be declined unless the spec discussion happens first — open an issue proposing the
    decision change instead.
 2. **Read [ARCHITECTURE.md](ARCHITECTURE.md).** The dependency rule, time-handling rules
