@@ -106,6 +106,43 @@ dotnet test PartyUp.sln                                    # + integration tests
 cd web && npm run lint && npm run build && npm test
 ```
 
+## Pre-push test gate
+
+Pushing runs the **full test suite, integration tests included** — the repo rule
+is that no push may skip them. The hook lives in `.githooks/pre-push` and is
+versioned with the repo, but git only uses it after a one-time step per clone:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+### What it does
+
+- **Windows**: integration tests need Docker, which lives inside WSL, not on the
+  host — the hook routes the run through WSL:
+  `wsl -d Ubuntu-24.04 -e bash -lc "cd /mnt/c/<repo> && dotnet test PartyUp.sln -p:ArtifactsPath=/tmp/partyup-artifacts"`
+  (the `ArtifactsPath` redirect keeps build output off the slow `/mnt/c` mount).
+- **Linux/macOS**: runs `dotnet test PartyUp.sln` directly and expects the
+  .NET SDK plus a reachable Docker daemon (Testcontainers) on the host.
+
+A failing test — or an unreachable WSL distro / Docker daemon — blocks the
+push. That is intended: fix the environment or the tests, don't skip the gate.
+
+### Prerequisites
+
+- **Windows**: WSL distro `Ubuntu-24.04` with the .NET 10 SDK and Docker
+  running inside it.
+- **Linux/macOS**: .NET 10 SDK and a running Docker daemon.
+
+The run takes a few minutes (~1100+ unit tests plus the integration lane
+against real Postgres via Testcontainers).
+
+### Bypassing
+
+`git push --no-verify` skips the hook. Emergencies only — CI runs the same
+suite and will fail the push anyway, so bypassing locally only defers the
+failure.
+
 ## 📚 Documentation
 
 | Document | What's inside |

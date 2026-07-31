@@ -1,0 +1,18 @@
+#!/bin/sh
+set -e
+
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    # Windows host: Docker lives in WSL, so the full suite must run there.
+    repo_win=$(git rev-parse --show-toplevel)                     # /c/Users/...
+    repo_wsl=$(echo "$repo_win" | sed 's|^/\([a-z]\)/|/mnt/\1/|') # /mnt/c/Users/...
+    echo "pre-push: full test suite in WSL (takes a few minutes)..."
+    wsl.exe -d Ubuntu-24.04 -e bash -lc "cd '$repo_wsl' && dotnet test PartyUp.sln -p:ArtifactsPath=/tmp/partyup-artifacts"
+    ;;
+  *)
+    # Linux/macOS host: dotnet + Docker daemon assumed local.
+    echo "pre-push: full test suite (takes a few minutes)..."
+    cd "$(git rev-parse --show-toplevel)"
+    dotnet test PartyUp.sln
+    ;;
+esac
