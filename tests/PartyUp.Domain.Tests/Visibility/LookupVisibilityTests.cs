@@ -102,6 +102,17 @@ public class LookupVisibilityTests
     }
 
     [Fact]
+    public void IsListed_ExcludesABannedUser_D180()
+    {
+        FakeClock clock = TestUsers.Clock();
+        User candidate = TestUsers.Active(clock, "alex");
+        candidate.Ban(clock);
+
+        Assert.True(candidate.IsDiscoverable);
+        Assert.False(LookupVisibility.IsListed(candidate));
+    }
+
+    [Fact]
     public void CanSurface_RejectsNullArguments_D065()
     {
         FakeClock clock = TestUsers.Clock();

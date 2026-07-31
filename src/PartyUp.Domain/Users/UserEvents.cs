@@ -14,3 +14,7 @@ public sealed record UserDeletionRequested(UserId UserId, Instant GraceEndsAt) :
 public sealed record UserDeletionCanceled(UserId UserId) : IDomainEvent;
 
 public sealed record UserTombstoned(UserId UserId, Instant DeletedAt) : IDomainEvent;
+
+public sealed record UserBanned(UserId UserId, Instant BannedAt) : IDomainEvent;
+
+public sealed record UserUnbanned(UserId UserId) : IDomainEvent;

@@ -4,9 +4,9 @@ using PartyUp.Domain.Kernel;
 namespace PartyUp.Domain.Users;
 
 /// <summary>
-/// The account aggregate (DOMAIN_MODEL §3). Lifecycle is
-/// <c>Onboarding → Active → PendingDeletion → Deleted</c>; profile fields are nullable in
-/// <c>Onboarding</c> and in the <c>Deleted</c> tombstone only.
+/// The account aggregate (DOMAIN_MODEL §3). Both <c>Onboarding</c> and <c>Active</c> may enter
+/// <c>PendingDeletion</c>, and an elapsed grace ends in <c>Deleted</c>. Profile fields are nullable
+/// in <c>Onboarding</c> and in the <c>Deleted</c> tombstone only.
 /// </summary>
 public sealed class User : AggregateRoot
 {
@@ -67,6 +67,9 @@ public sealed class User : AggregateRoot
 
     public Instant? DeletedAt { get; private set; }
 
+    /// <summary>D-180: orthogonal to the lifecycle. A banned user keeps their content and history.</summary>
+    public Instant? BannedAt { get; private set; }
+
     public IReadOnlyList<PlatformLink> PlatformLinks => _platformLinks;
 
     public bool IsOnboarding => Lifecycle == UserLifecycle.Onboarding;
@@ -77,6 +80,8 @@ public sealed class User : AggregateRoot
 
     public bool IsTombstoned => Lifecycle == UserLifecycle.Deleted;
 
+    public bool IsBanned => BannedAt is not null;
+
     /// <summary>
     /// DOMAIN_MODEL §12-22 and §3: an <c>Onboarding</c> user's half-built profile must not surface,
     /// and a tombstone is excluded from every lookup surface. The grace period has no domain
@@ -85,7 +90,7 @@ public sealed class User : AggregateRoot
     public bool IsDiscoverable => Lifecycle is UserLifecycle.Active or UserLifecycle.PendingDeletion;
 
     /// <summary>Same set as <see cref="IsDiscoverable"/>: an invisible user cannot be friended.</summary>
-    public bool CanBeFriended => IsDiscoverable;
+    public bool CanBeFriended => IsDiscoverable && !IsBanned;
 
     public bool IsProfileComplete =>
         Username.HasValue && DisplayName.HasValue && Avatar.HasValue && TimeZone is not null && Locale.HasValue;
@@ -271,16 +276,56 @@ public sealed class User : AggregateRoot
         }
     }
 
+    /// <summary>D-180: bans preserve lifecycle, content and history while disabling account access.</summary>
+    public void Ban(IClock clock)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+
+        if (IsTombstoned)
+        {
+            throw new DomainException(
+                DomainError.InvalidTransition,
+                "A tombstoned user cannot be banned.");
+        }
+
+        if (IsBanned)
+        {
+            return;
+        }
+
+        BannedAt = clock.GetCurrentInstant();
+        Raise(new UserBanned(Id, BannedAt.Value));
+    }
+
+    public void Unban()
+    {
+        if (IsTombstoned)
+        {
+            throw new DomainException(
+                DomainError.InvalidTransition,
+                "A tombstoned user cannot be unbanned.");
+        }
+
+        if (!IsBanned)
+        {
+            return;
+        }
+
+        BannedAt = null;
+        Raise(new UserUnbanned(Id));
+    }
+
     /// <summary>D-148: a seven-day cancelable grace period; nothing destructive happens yet.</summary>
     public void RequestDeletion(IClock clock)
     {
         ArgumentNullException.ThrowIfNull(clock);
 
-        if (!IsActive)
+        if (Lifecycle is not (UserLifecycle.Onboarding or UserLifecycle.Active))
         {
             throw new DomainException(
                 DomainError.InvalidTransition,
-                FormattableString.Invariant($"Deletion can only be requested by an Active user, but the user is {Lifecycle}."));
+                FormattableString.Invariant(
+                    $"Deletion can only be requested by an Onboarding or Active user, but the user is {Lifecycle}."));
         }
 
         Instant now = clock.GetCurrentInstant();
@@ -313,7 +358,7 @@ public sealed class User : AggregateRoot
         }
 
         GraceEndsAt = null;
-        Lifecycle = UserLifecycle.Active;
+        Lifecycle = IsProfileComplete ? UserLifecycle.Active : UserLifecycle.Onboarding;
 
         Raise(new UserDeletionCanceled(Id));
     }

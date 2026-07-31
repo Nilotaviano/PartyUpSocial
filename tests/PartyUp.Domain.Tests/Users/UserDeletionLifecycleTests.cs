@@ -69,17 +69,6 @@ public class UserDeletionLifecycleTests
     }
 
     [Fact]
-    public void RequestDeletion_IsRejectedWhileOnboarding_D148()
-    {
-        FakeClock clock = TestUsers.Clock();
-        User user = TestUsers.Onboarding(clock);
-
-        Assert.Equal(
-            DomainError.InvalidTransition,
-            Assert.Throws<DomainException>(() => user.RequestDeletion(clock)).Error);
-    }
-
-    [Fact]
     public void CancelDeletion_RestoresActiveAndClearsTheGrace_D158()
     {
         FakeClock clock = TestUsers.Clock();

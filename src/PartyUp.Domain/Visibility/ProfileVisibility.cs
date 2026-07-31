@@ -7,7 +7,7 @@ namespace PartyUp.Domain.Visibility;
 /// <summary>How much of a profile page one viewer may see (D-068, §12-18).</summary>
 public enum ProfileDisclosure
 {
-    /// <summary>Fail-closed: a blocked counterpart, a tombstone or an Onboarding account.</summary>
+    /// <summary>Fail-closed: a blocked counterpart, an undiscoverable account, or a banned non-friend.</summary>
     Hidden = 0,
 
     /// <summary>D-068: before a friendship is accepted, a profile exposes only its unique username.</summary>
@@ -37,6 +37,13 @@ public static class ProfileVisibility
         if (subject.Id == viewer.Id)
         {
             return ProfileDisclosure.Full;
+        }
+
+        if (subject.IsBanned)
+        {
+            return viewer.IsFriendOf(subject.Id)
+                ? ProfileDisclosure.Full
+                : ProfileDisclosure.Hidden;
         }
 
         if (!LookupVisibility.IsListed(subject))

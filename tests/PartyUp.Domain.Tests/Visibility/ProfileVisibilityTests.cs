@@ -89,6 +89,36 @@ public class ProfileVisibilityTests
     }
 
     [Fact]
+    public void For_KeepsABannedUsersProfileVisibleToAnExistingFriend_D180()
+    {
+        FakeClock clock = TestUsers.Clock();
+        User subject = TestUsers.Active(clock, "alex", "Alex");
+        subject.Ban(clock);
+
+        Assert.Equal(ProfileDisclosure.Full, ProfileVisibility.For(subject, TestViewers.FriendOf(subject.Id)));
+    }
+
+    [Fact]
+    public void For_HidesABannedUserFromANonFriend_D180()
+    {
+        FakeClock clock = TestUsers.Clock();
+        User subject = TestUsers.Active(clock, "alex", "Alex");
+        subject.Ban(clock);
+
+        Assert.Equal(ProfileDisclosure.Hidden, ProfileVisibility.For(subject, TestViewers.Stranger()));
+    }
+
+    [Fact]
+    public void For_KeepsABannedUsersOwnProfileVisibleToThemselves_D180()
+    {
+        FakeClock clock = TestUsers.Clock();
+        User subject = TestUsers.Active(clock, "alex", "Alex");
+        subject.Ban(clock);
+
+        Assert.Equal(ProfileDisclosure.Full, ProfileVisibility.For(subject, TestViewers.Of(subject.Id)));
+    }
+
+    [Fact]
     public void For_RejectsNullArguments_D068()
     {
         FakeClock clock = TestUsers.Clock();

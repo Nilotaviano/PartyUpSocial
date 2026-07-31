@@ -233,6 +233,20 @@ public class IdentityMaskingTests
     }
 
     [Fact]
+    public void ForUser_DoesNotMaskABannedUser_D180()
+    {
+        FakeClock clock = TestUsers.Clock();
+        User subject = TestUsers.Active(clock, "alex", "Alex");
+        subject.Ban(clock);
+
+        MaskedIdentity rendered = IdentityMasking.ForUser(subject, TestViewers.Stranger());
+
+        Assert.False(rendered.IsAnonymous);
+        Assert.Equal(DisplayName.Create("Alex"), rendered.DisplayName);
+        Assert.Equal(subject.Avatar, rendered.Avatar);
+    }
+
+    [Fact]
     public void ForUser_RejectsNullArguments_D076()
     {
         FakeClock clock = TestUsers.Clock();
