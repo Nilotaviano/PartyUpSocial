@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Serilog.Core;
@@ -8,6 +9,7 @@ using Serilog.Events;
 namespace PartyUp.Api.IntegrationTests;
 
 [Trait("Category", "Integration")]
+[Collection(RequestLoggingTestGroup.Name)]
 public sealed class RequestLoggingTests : IAsyncLifetime, IDisposable
 {
     private readonly PartyUpApiFactory _factory = new();
@@ -23,21 +25,28 @@ public sealed class RequestLoggingTests : IAsyncLifetime, IDisposable
     {
         var sink = new CapturingSink();
         await using var factory = _factory.WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services => services.AddSerilog((_, logger) => logger
-                .MinimumLevel.Information()
+            builder.ConfigureServices(services => services.AddSerilog((provider, logger) => logger
+                .ReadFrom.Configuration(provider.GetRequiredService<IConfiguration>())
                 .WriteTo.Sink(sink))));
         using HttpClient client = factory.CreateClient();
 
         _ = await client.GetAsync("/auth/magic?token=x");
 
-        LogEvent requestLog = Assert.Single(sink.Events, logEvent =>
+        LogEvent[] requestLogs = sink.Events.Where(logEvent =>
+            logEvent.Properties.TryGetValue("SourceContext", out LogEventPropertyValue? source) &&
+            source is ScalarValue { Value: "Serilog.AspNetCore.RequestLoggingMiddleware" } &&
             logEvent.Properties.TryGetValue("RequestPath", out LogEventPropertyValue? path) &&
-            path is ScalarValue { Value: "/auth/magic" });
-        Assert.DoesNotContain(
-            "token=x",
-            requestLog.RenderMessage(CultureInfo.InvariantCulture),
-            StringComparison.Ordinal);
-        Assert.DoesNotContain("?", requestLog.Properties["RequestPath"].ToString(), StringComparison.Ordinal);
+            path is ScalarValue { Value: "/auth/magic" }).ToArray();
+        Assert.NotEmpty(requestLogs);
+        Assert.DoesNotContain(sink.Events, logEvent =>
+            logEvent.RenderMessage(CultureInfo.InvariantCulture).Contains(
+                "token=x",
+                StringComparison.Ordinal));
+        Assert.All(requestLogs, requestLog =>
+            Assert.DoesNotContain(
+                "?",
+                requestLog.Properties["RequestPath"].ToString(),
+                StringComparison.Ordinal));
     }
 
     private sealed class CapturingSink : ILogEventSink
@@ -48,4 +57,10 @@ public sealed class RequestLoggingTests : IAsyncLifetime, IDisposable
 
         public void Emit(LogEvent logEvent) => _events.Enqueue(logEvent);
     }
+}
+
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class RequestLoggingTestGroup
+{
+    public const string Name = "Request logging";
 }

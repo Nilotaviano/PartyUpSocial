@@ -294,7 +294,7 @@ public sealed class SecurityTokenService(AppDbContext context, IClock clock) : I
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         };
         options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
-        options.MakeReadOnly();
+        options.MakeReadOnly(populateMissingResolver: true);
         return options;
     }
 }

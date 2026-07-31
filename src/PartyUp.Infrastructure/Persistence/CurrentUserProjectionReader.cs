@@ -9,26 +9,54 @@ namespace PartyUp.Infrastructure.Persistence;
 public sealed class CurrentUserProjectionReader(AppDbContext context)
     : ICurrentUserProjectionReader
 {
-    public Task<CurrentUserProjection?> ReadAsync(
+    public async Task<CurrentUserProjection?> ReadAsync(
         UserId id,
-        CancellationToken cancellationToken) =>
-        (
-            from user in context.DomainUsers.AsNoTracking()
-            join authUser in context.AuthUsers.AsNoTracking() on user.Id.Value equals authUser.Id
-            let isAdmin =
-                (from userRole in context.Set<IdentityUserRole<Guid>>()
-                 join role in context.Set<AuthRole>() on userRole.RoleId equals role.Id
-                 where userRole.UserId == authUser.Id && role.NormalizedName == "ADMIN"
-                 select role.Id).Any()
-            where user.Id == id
-            select new CurrentUserProjection(
+        CancellationToken cancellationToken)
+    {
+        var user = await context.DomainUsers
+            .AsNoTracking()
+            .Where(user => user.Id == id)
+            .Select(user => new
+            {
                 user.Id,
                 user.Lifecycle,
-                user.BannedAt != null,
+                IsBanned = user.BannedAt != null,
                 user.GraceEndsAt,
-                isAdmin,
-                user.Username != null,
+                HasUsername = user.Username != null,
                 user.Locale,
-                authUser.SecurityStamp ?? string.Empty))
-        .SingleOrDefaultAsync(cancellationToken);
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (user is null)
+        {
+            return null;
+        }
+
+        var authUser = await context.AuthUsers
+            .AsNoTracking()
+            .Where(authUser => authUser.Id == id.Value)
+            .Select(authUser => new
+            {
+                authUser.SecurityStamp,
+                IsAdmin =
+                    (from userRole in context.Set<IdentityUserRole<Guid>>()
+                     join role in context.Set<AuthRole>() on userRole.RoleId equals role.Id
+                     where userRole.UserId == authUser.Id && role.NormalizedName == "ADMIN"
+                     select role.Id).Any(),
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (authUser is null)
+        {
+            return null;
+        }
+
+        return new CurrentUserProjection(
+            user.Id,
+            user.Lifecycle,
+            user.IsBanned,
+            user.GraceEndsAt,
+            authUser.IsAdmin,
+            user.HasUsername,
+            user.Locale,
+            authUser.SecurityStamp ?? string.Empty);
+    }
 }

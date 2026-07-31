@@ -11,10 +11,13 @@ public sealed class UserRepository(AppDbContext context) : IUserRepository
     public Task<User?> FindAsync(UserId id, CancellationToken cancellationToken) =>
         context.DomainUsers.SingleOrDefaultAsync(user => user.Id == id, cancellationToken);
 
-    public Task<User?> FindForUpdateAsync(UserId id, CancellationToken cancellationToken) =>
-        context.DomainUsers
-            .FromSqlInterpolated($"SELECT * FROM users WHERE id = {id.Value} FOR UPDATE")
-            .SingleOrDefaultAsync(cancellationToken);
+    public async Task<User?> FindForUpdateAsync(UserId id, CancellationToken cancellationToken)
+    {
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM users WHERE id = {id.Value} FOR UPDATE",
+            cancellationToken);
+        return await FindAsync(id, cancellationToken);
+    }
 
     public async Task<IReadOnlyList<UserId>> FindDueForDeletionAsync(
         Instant now,

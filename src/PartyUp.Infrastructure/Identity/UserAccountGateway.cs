@@ -1,13 +1,15 @@
 using Microsoft.AspNetCore.Identity;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Kernel;
+using PartyUp.Infrastructure.Persistence;
 
 namespace PartyUp.Infrastructure.Identity;
 
 public sealed class UserAccountGateway(
     UserManager<AuthUser> userManager,
     RoleManager<AuthRole> roleManager,
-    IPasswordHasher<AuthUser> passwordHasher) : IUserAccountGateway
+    IPasswordHasher<AuthUser> passwordHasher,
+    AppDbContext context) : IUserAccountGateway
 {
     private const string DummyPasswordHash =
         "AQAAAAIAAYagAAAAEAABAgMEBQYHCAkKCwwNDg9flsNYvey4/acBwIXpga+/6h/XAg/rj3e7bLGM5ZnPNg==";
@@ -52,6 +54,7 @@ public sealed class UserAccountGateway(
             LockoutEnabled = true,
         };
 
+        await context.SaveChangesAsync(cancellationToken);
         IdentityResult result = password is null
             ? await userManager.CreateAsync(user)
             : await userManager.CreateAsync(user, password);
