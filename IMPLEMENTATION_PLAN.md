@@ -129,7 +129,7 @@ Emission already exists everywhere (principle 5). This phase is transport and pr
 
 ## Phase 9 — Go live, private beta → public launch
 
-- **Go live, before the first beta invite.** Done 2026-07-30 (early, during Phase 1): Hetzner VM provisioned (Ubuntu 26.04, Docker + compose, ufw 80/443 tcp + 443/udp, fail2ban, SSH hardened, 2G swap, `partyup` deploy user, `/opt/partyup` with deploy files + `.env`), DNS A record for partyup.social, GHCR login on the VM, repo secrets `VM_HOST`/`VM_USER`/`VM_SSH_KEY`, `DEPLOY_ENABLED=true`. Still open: first `main` auto-deploy over TLS (fires on the next push), offsite backup target (rclone) live, restore drill against a real dump.
+- **Go live, before the first beta invite.** Done 2026-07-30 (early, during Phase 1): Hetzner VM provisioned (Ubuntu 26.04, Docker + compose, ufw 80/443 tcp + 443/udp, fail2ban, SSH hardened, 2G swap, `partyup` deploy user, `/opt/partyup` with deploy files + `.env`), DNS A record for partyup.social, GHCR login on the VM, repo secrets `VM_HOST`/`VM_USER`/`VM_SSH_KEY`, `DEPLOY_ENABLED=true`. First `main` auto-deploy over TLS verified 2026-07-30 (CI+CD green, `https://partyup.social/health` → 200). Still open: offsite backup target (rclone) live, restore drill against a real dump.
 - Private testing with the real friend group (allowed by D-163) behind an invite switch; public registration off until launch.
 - Bug triage, restore drill #2, uptime monitor, log review.
 - Public v1: everything labeled initial release, at once (D-163).
