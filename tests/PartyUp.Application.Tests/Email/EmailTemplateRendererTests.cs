@@ -36,7 +36,6 @@ public sealed class EmailTemplateRendererTests
             RenderedEmail graceStarted = _renderer.Render(
                 CreateMessage(EmailTemplate.DeletionRequested, locale));
             string graceOutput = $"{graceStarted.Subject}\n{graceStarted.TextBody}\n{graceStarted.HtmlBody}";
-            Assert.Contains("August 7, 2026 at 12:00", graceOutput, StringComparison.Ordinal);
             Assert.DoesNotContain("raw-token", graceOutput, StringComparison.Ordinal);
             Assert.DoesNotContain("account-deletion/confirm", graceOutput, StringComparison.Ordinal);
         }
@@ -94,7 +93,7 @@ public sealed class EmailTemplateRendererTests
             {
                 ["PublicBaseUrl"] = "https://partyup.social",
                 ["Token"] = "raw-token",
-                ["GraceEndsAt"] = "August 7, 2026 at 12:00",
+                ["GraceEndsAt"] = "localized-grace-end",
                 ["NewEmail"] = "new@example.test",
                 ["Method"] = "<Steam>",
             });

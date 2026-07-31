@@ -251,7 +251,8 @@ public static class MeEndpoints
     {
         int status = result.Code == "not_found"
             ? StatusCodes.Status404NotFound
-            : result.Code is not null && result.Code.StartsWith("errors.", StringComparison.Ordinal)
+            : result.Code == "invalid_time_zone" ||
+                result.Code is not null && result.Code.StartsWith("errors.", StringComparison.Ordinal)
                 ? StatusCodes.Status400BadRequest
                 : StatusCodes.Status409Conflict;
         return Problem(context, status, result.Code!);

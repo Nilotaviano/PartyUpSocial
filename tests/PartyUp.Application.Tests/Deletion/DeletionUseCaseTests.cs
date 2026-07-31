@@ -53,6 +53,38 @@ public sealed class RequestAccountDeletionUseCaseTests
         Assert.Equal("AsTyped@Example.test", message.ToAddress);
     }
 
+    [Theory]
+    [InlineData(
+        "en",
+        "America/New_York",
+        "August 7, 2026 at 08:00 America/New_York")]
+    [InlineData(
+        "pt-BR",
+        "America/Fortaleza",
+        "7 de agosto de 2026 \u00e0s 09:00 America/Fortaleza")]
+    [InlineData(
+        "es",
+        "Europe/Madrid",
+        "7 de agosto de 2026 a las 14:00 Europe/Madrid")]
+    public async Task Execute_FormatsGraceEndInTheRecipientsZoneAndLocale_D060(
+        string locale,
+        string timeZoneId,
+        string expected)
+    {
+        TestContext context = Create(
+            active: true,
+            locale,
+            DateTimeZoneProviders.Tzdb[timeZoneId]);
+
+        await context.UseCase.ExecuteAsync(
+            new RequestAccountDeletionCommand(context.User.Id, true),
+            default);
+
+        EmailMessage message = Assert.Single(context.Email.Messages);
+        Assert.Equal(locale, message.Locale.Value);
+        Assert.Equal(expected, message.Model["GraceEndsAt"]);
+    }
+
     [Fact]
     public async Task Execute_RequiresReauthentication_D165()
     {
@@ -81,7 +113,10 @@ public sealed class RequestAccountDeletionUseCaseTests
         Assert.False(context.User.IsProfileComplete);
     }
 
-    private static TestContext Create(bool active)
+    private static TestContext Create(
+        bool active,
+        string locale = "en",
+        DateTimeZone? timeZone = null)
     {
         var clock = new MutableClock(Instant.FromUtc(2026, 7, 31, 12, 0));
         User user = User.BeginOnboarding(
@@ -91,7 +126,11 @@ public sealed class RequestAccountDeletionUseCaseTests
             clock);
         if (active)
         {
-            Complete(user, clock);
+            Complete(
+                user,
+                clock,
+                timeZone ?? DateTimeZoneProviders.Tzdb["America/Fortaleza"],
+                Locale.Create(locale));
         }
 
         var users = new FakeUserRepository();
@@ -120,12 +159,23 @@ public sealed class RequestAccountDeletionUseCaseTests
         MutableClock Clock);
 
     internal static void Complete(User user, IClock clock) =>
+        Complete(
+            user,
+            clock,
+            DateTimeZoneProviders.Tzdb["America/Fortaleza"],
+            Locale.Create("en"));
+
+    private static void Complete(
+        User user,
+        IClock clock,
+        DateTimeZone timeZone,
+        Locale locale) =>
         user.CompleteOnboarding(
             Username.Create("player"),
             DisplayName.Create("Player"),
             Avatar.FromEmoji("🎮"),
-            DateTimeZoneProviders.Tzdb["America/Fortaleza"],
-            Locale.Create("en"),
+            timeZone,
+            locale,
             clock);
 }
 

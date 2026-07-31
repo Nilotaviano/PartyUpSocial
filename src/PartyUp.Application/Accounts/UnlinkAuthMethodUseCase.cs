@@ -18,6 +18,11 @@ public sealed class UnlinkAuthMethodUseCase(
         CancellationToken cancellationToken)
     {
         string kind = Canonicalize(command.Kind);
+        if (!command.Reauthenticated)
+        {
+            return UnlinkAuthMethodResult.Failed("reauth_required");
+        }
+
         if (kind == "magicLink")
         {
             return UnlinkAuthMethodResult.Failed("method_not_removable");
@@ -26,11 +31,6 @@ public sealed class UnlinkAuthMethodUseCase(
         if (kind is not ("password" or "google" or "steam"))
         {
             return UnlinkAuthMethodResult.Failed("invalid_request");
-        }
-
-        if (!command.Reauthenticated)
-        {
-            return UnlinkAuthMethodResult.Failed("reauth_required");
         }
 
         if (kind == "steam")

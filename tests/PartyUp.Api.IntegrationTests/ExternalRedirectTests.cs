@@ -6,11 +6,16 @@ using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Net.Http.Headers;
 using PartyUp.Api.Endpoints;
+using PartyUp.Application.Abstractions;
+using PartyUp.Application.Accounts;
 using PartyUp.Domain.Kernel;
 using PartyUp.Infrastructure.Identity;
+using PartyUp.Infrastructure.Steam;
 
 namespace PartyUp.Api.IntegrationTests;
 
@@ -52,6 +57,7 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
     [InlineData("link")]
     [InlineData("reauth")]
     [InlineData("refusal")]
+    [InlineData("deletion")]
     public async Task NoRedirectLocationFromAnExternalLegContainsARawTokenInItsQuery(
         string completionKind)
     {
@@ -61,6 +67,7 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
         string query = location.Split('#', 2)[0];
         Assert.DoesNotContain("reauth=", query, StringComparison.Ordinal);
         Assert.DoesNotContain("intent=", query, StringComparison.Ordinal);
+        Assert.DoesNotContain("token=", query, StringComparison.Ordinal);
         if (completionKind == "reauth")
         {
             Assert.Contains("#reauth=", location, StringComparison.Ordinal);
@@ -69,6 +76,11 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
         {
             Assert.DoesNotContain("#reauth=", location, StringComparison.Ordinal);
         }
+
+        if (completionKind == "deletion")
+        {
+            Assert.Contains("#token=", location, StringComparison.Ordinal);
+        }
     }
 
     [Theory]
@@ -76,12 +88,16 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
     [InlineData("link")]
     [InlineData("reauth")]
     [InlineData("refusal")]
+    [InlineData("deletion")]
     public async Task EveryCompletionLandsOnTheHashClearingCallbackRoute(string completionKind)
     {
         ExternalCompletion completion = await CompleteAsync(completionKind);
 
         string location = completion.Response.Headers.Location!.OriginalString;
-        Assert.StartsWith("/auth/callback?", location, StringComparison.Ordinal);
+        string expected = completionKind == "deletion"
+            ? "/account-deletion/confirm#token="
+            : "/auth/callback?";
+        Assert.StartsWith(expected, location, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -180,12 +196,58 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
                     "login",
                     email,
                     includeEmailVerifiedClaim: false);
+            case "deletion":
+                return await CompleteDeletionAsync();
             default:
                 throw new ArgumentOutOfRangeException(
                     nameof(completionKind),
                     completionKind,
                     "Unknown completion kind.");
         }
+    }
+
+    private async Task<ExternalCompletion> CompleteDeletionAsync()
+    {
+        const string steamId = "76561198000000000";
+        UserId userId = await _factory.SeedUserAsync(email: null);
+        await using (AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IUserAccountGateway>()
+                .AddLoginAsync(
+                    userId,
+                    ExternalProviderPolicy.Steam,
+                    steamId,
+                    default);
+        }
+
+        var verifier = new AcceptingSteamVerifier(steamId);
+        await using WebApplicationFactory<Program> deletionFactory =
+            _factory.WithWebHostBuilder(builder =>
+                builder.ConfigureTestServices(services =>
+                {
+                    services.RemoveAll<ISteamOpenIdVerifier>();
+                    services.AddSingleton<ISteamOpenIdVerifier>(verifier);
+                }));
+        using HttpClient client = Slice5HttpTest.CreateClient(deletionFactory);
+        HttpResponseMessage start = await client.GetAsync(
+            "/api/v1/account-deletion-requests/steam/start");
+        Assert.Equal(HttpStatusCode.Redirect, start.StatusCode);
+        string stateCookie = Cookie(
+            start,
+            cookie => cookie.Name.Value == "pu.extdel");
+        string returnTo = QueryHelpers.ParseQuery(start.Headers.Location!.Query)
+            ["openid.return_to"]!;
+        string nonce = QueryHelpers.ParseQuery(new Uri(returnTo).Query)["n"]!;
+        using var callback = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/api/v1/account-deletion-requests/steam/callback?n={Uri.EscapeDataString(nonce)}");
+        callback.Headers.Add(HeaderNames.Cookie, stateCookie);
+
+        HttpResponseMessage response = await client.SendAsync(callback);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(1, verifier.Calls);
+        return new ExternalCompletion(response);
     }
 
     private async Task<ExternalCompletion> CompleteGoogleAsync(
@@ -342,6 +404,20 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
             .Select(value => SetCookieHeaderValue.Parse(value))
             .Single(predicate);
         return $"{cookie.Name.Value}={cookie.Value.Value}";
+    }
+
+    private sealed class AcceptingSteamVerifier(string steamId) : ISteamOpenIdVerifier
+    {
+        public int Calls { get; private set; }
+
+        public Task<SteamOpenIdVerification> VerifyAsync(
+            IReadOnlyDictionary<string, string> assertion,
+            string expectedReturnTo,
+            CancellationToken cancellationToken)
+        {
+            Calls++;
+            return Task.FromResult(new SteamOpenIdVerification(true, steamId));
+        }
     }
 
     private sealed record MintedIntent(string Intent, string BinderCookie);

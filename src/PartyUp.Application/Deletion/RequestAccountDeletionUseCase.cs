@@ -1,3 +1,4 @@
+using System.Globalization;
 using NodaTime;
 using NodaTime.Text;
 using PartyUp.Application.Abstractions;
@@ -47,7 +48,11 @@ public sealed class RequestAccountDeletionUseCase(
         user.RequestDeletion(clock);
         await sessions.SignOutEverywhereAsync(userId, cancellationToken);
         AccountEmailInfo? email = await accounts.GetEmailAsync(userId, cancellationToken);
-        return DeletionStart.Completed(user.GraceEndsAt!.Value, email, user.Locale);
+        return DeletionStart.Completed(
+            user.GraceEndsAt!.Value,
+            email,
+            user.Locale,
+            user.TimeZone);
     }
 
     internal async Task DispatchNotificationAsync(
@@ -59,16 +64,39 @@ public sealed class RequestAccountDeletionUseCase(
             return;
         }
 
+        Locale locale = start.Locale ?? AccountInput.Locale(null);
         await emailDispatcher.DispatchAsync(
             new EmailMessage(
                 email.Email,
-                start.Locale ?? AccountInput.Locale(null),
+                locale,
                 EmailTemplate.DeletionRequested,
                 new Dictionary<string, string>(StringComparer.Ordinal)
                 {
-                    ["GraceEndsAt"] = InstantPattern.ExtendedIso.Format(start.GraceEndsAt!.Value),
+                    ["GraceEndsAt"] = FormatGraceEndsAt(
+                        start.GraceEndsAt!.Value,
+                        start.TimeZone ?? DateTimeZone.Utc,
+                        locale),
                 }),
             cancellationToken);
+    }
+
+    private static string FormatGraceEndsAt(
+        Instant graceEndsAt,
+        DateTimeZone timeZone,
+        Locale locale)
+    {
+        string canonicalLocale = EmbeddedEmailTemplateRenderer.CanonicalizeLocale(locale.Value);
+        (string cultureName, string patternText) = canonicalLocale switch
+        {
+            "pt-BR" => ("pt-BR", "d 'de' MMMM 'de' yyyy '\u00e0s' HH:mm z"),
+            "es" => ("es", "d 'de' MMMM 'de' yyyy 'a las' HH:mm z"),
+            _ => ("en-US", "MMMM d, yyyy 'at' HH:mm z"),
+        };
+        ZonedDateTimePattern pattern = ZonedDateTimePattern.CreateWithInvariantCulture(
+            patternText,
+            DateTimeZoneProviders.Tzdb)
+            .WithCulture(CultureInfo.GetCultureInfo(cultureName));
+        return pattern.Format(graceEndsAt.InZone(timeZone));
     }
 }
 
@@ -87,12 +115,14 @@ internal sealed record DeletionStart(
     string? Code,
     Instant? GraceEndsAt,
     AccountEmailInfo? Email,
-    Locale? Locale)
+    Locale? Locale,
+    DateTimeZone? TimeZone)
 {
     public static DeletionStart Completed(
         Instant graceEndsAt,
         AccountEmailInfo? email,
-        Locale? locale) => new(true, null, graceEndsAt, email, locale);
+        Locale? locale,
+        DateTimeZone? timeZone) => new(true, null, graceEndsAt, email, locale, timeZone);
 
-    public static DeletionStart Failed(string code) => new(false, code, null, null, null);
+    public static DeletionStart Failed(string code) => new(false, code, null, null, null, null);
 }

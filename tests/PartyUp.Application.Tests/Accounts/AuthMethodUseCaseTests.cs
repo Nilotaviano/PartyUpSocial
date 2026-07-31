@@ -66,7 +66,7 @@ public sealed class UnlinkAuthMethodUseCaseTests
         TestContext context = Create(confirmedEmail: true);
 
         UnlinkAuthMethodResult result = await context.UseCase.ExecuteAsync(
-            new UnlinkAuthMethodCommand(context.User.Id, "magicLink", false),
+            new UnlinkAuthMethodCommand(context.User.Id, "magicLink", true),
             default);
 
         Assert.Equal("method_not_removable", result.Code);
