@@ -76,8 +76,12 @@ builder.Services.AddScoped<AuthenticateAndSignIn>();
 builder.Services.AddPartyUpCookieAuthentication(builder.Environment);
 builder.Services.AddPartyUpAuthorization();
 builder.Services.AddSingleton<ProviderCapabilities>();
+builder.Services.AddExceptionHandler<RequestBindingExceptionMapper>();
 builder.Services.AddExceptionHandler<DomainExceptionMapper>();
 builder.Services.AddProblemDetails();
+// Outside Development, binding failures short-circuit an empty 400 that never
+// reaches the exception handlers; throwing keeps the JSON problem shape uniform.
+builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-CSRF-TOKEN";

@@ -1,6 +1,9 @@
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using PartyUp.Api.Auth;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Onboarding;
+using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Users;
 
 namespace PartyUp.Api.Endpoints;
@@ -51,9 +54,23 @@ public static class OnboardingEndpoints
         HttpContext context,
         CancellationToken cancellationToken)
     {
-        OnboardingCompletionResult result = await useCase.ExecuteAsync(
-            request,
-            cancellationToken);
+        OnboardingCompletionResult result;
+        try
+        {
+            result = await useCase.ExecuteAsync(request, cancellationToken);
+        }
+        catch (DbUpdateException exception) when (
+            exception.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.UniqueViolation,
+                ConstraintName: "pk_username_registry",
+            })
+        {
+            throw new DomainException(
+                DomainError.Duplicate,
+                "The username is already taken.");
+        }
+
         if (!result.Succeeded)
         {
             int status = result.Code == "validation_failed"

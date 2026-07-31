@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
@@ -90,6 +91,7 @@ public static class AuthEndpoints
             .WithName(ApiOperationIds.RequestEmailVerification)
             .RequireAuthorization(AuthorizationPolicies.RequireAuthenticated)
             .Produces(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         auth.MapPost("/email/verify", VerifyEmailAsync)
@@ -108,13 +110,10 @@ public static class AuthEndpoints
             .WithName(ApiOperationIds.ReauthenticateByEmail)
             .RequireAuthorization(AuthorizationPolicies.RequireAuthenticated)
             .Produces(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
-        auth.MapPost("/logout", async (HttpContext context) =>
-            {
-                await context.SignOutAsync(IdentityConstants.ApplicationScheme);
-                return TypedResults.NoContent();
-            })
+        auth.MapPost("/logout", LogoutAsync)
             .WithName(ApiOperationIds.Logout)
             .RequireAuthorization(AuthorizationPolicies.RequireAuthenticated)
             .Produces(StatusCodes.Status204NoContent)
@@ -362,6 +361,14 @@ public static class AuthEndpoints
         HttpContext context,
         CancellationToken cancellationToken)
     {
+        IResult? malformedBody = await ValidateOptionalJsonBodyAsync(
+            context,
+            cancellationToken);
+        if (malformedBody is not null)
+        {
+            return malformedBody;
+        }
+
         CurrentUser? caller = await currentUser.GetAsync(cancellationToken);
         if (caller is null)
         {
@@ -468,6 +475,14 @@ public static class AuthEndpoints
         HttpContext context,
         CancellationToken cancellationToken)
     {
+        IResult? malformedBody = await ValidateOptionalJsonBodyAsync(
+            context,
+            cancellationToken);
+        if (malformedBody is not null)
+        {
+            return malformedBody;
+        }
+
         CurrentUser? caller = await currentUser.GetAsync(cancellationToken);
         if (caller is null)
         {
@@ -480,6 +495,44 @@ public static class AuthEndpoints
         return result.Succeeded
             ? Results.Accepted(value: new StatusResponse("confirmation_sent"))
             : Problem(context, StatusCodes.Status409Conflict, result.Code!);
+    }
+
+    private static async Task<IResult> LogoutAsync(
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        IResult? malformedBody = await ValidateOptionalJsonBodyAsync(
+            context,
+            cancellationToken);
+        if (malformedBody is not null)
+        {
+            return malformedBody;
+        }
+
+        await context.SignOutAsync(IdentityConstants.ApplicationScheme);
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<IResult?> ValidateOptionalJsonBodyAsync(
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        if (!context.Request.HasJsonContentType())
+        {
+            return null;
+        }
+
+        try
+        {
+            using JsonDocument _ = await JsonDocument.ParseAsync(
+                context.Request.Body,
+                cancellationToken: cancellationToken);
+            return null;
+        }
+        catch (JsonException)
+        {
+            return Problem(context, StatusCodes.Status400BadRequest, "invalid_request");
+        }
     }
 
     private static async Task<Ok<SessionResponse>> GetSessionAsync(

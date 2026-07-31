@@ -13,6 +13,8 @@ public sealed class UserAccountGateway(
     IPasswordHasher<AuthUser> passwordHasher,
     AppDbContext context) : IUserAccountGateway
 {
+    private const int AccessFailureRetryLimit = 5;
+
     private const string DummyPasswordHash =
         "AQAAAAIAAYagAAAAEAABAgMEBQYHCAkKCwwNDg9flsNYvey4/acBwIXpga+/6h/XAg/rj3e7bLGM5ZnPNg==";
 
@@ -99,7 +101,7 @@ public sealed class UserAccountGateway(
             return new PasswordCheckResult(true, false, true);
         }
 
-        ThrowIfFailed(await userManager.AccessFailedAsync(user), "record an access failure");
+        await RecordAccessFailureAsync(user, cancellationToken);
         bool isLockedOut = await userManager.IsLockedOutAsync(user);
         return new PasswordCheckResult(false, isLockedOut, hashVerified);
     }
@@ -251,6 +253,45 @@ public sealed class UserAccountGateway(
         cancellationToken.ThrowIfCancellationRequested();
         AuthUser? user = await userManager.FindByIdAsync(id.Value.ToString("D"));
         return user ?? throw new DomainException(DomainError.NotFound, "The identity account was not found.");
+    }
+
+    private async Task RecordAccessFailureAsync(
+        AuthUser user,
+        CancellationToken cancellationToken)
+    {
+        for (int attempt = 1; attempt <= AccessFailureRetryLimit; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            IdentityResult result;
+            try
+            {
+                result = await userManager.AccessFailedAsync(user);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                await context.Entry(user).ReloadAsync(cancellationToken);
+                if (attempt < AccessFailureRetryLimit)
+                {
+                    continue;
+                }
+
+                return;
+            }
+
+            if (result.Succeeded)
+            {
+                return;
+            }
+
+            bool isConcurrencyFailure = result.Errors.Any(error =>
+                string.Equals(error.Code, "ConcurrencyFailure", StringComparison.Ordinal));
+            if (!isConcurrencyFailure)
+            {
+                ThrowIfFailed(result, "record an access failure");
+            }
+
+            await context.Entry(user).ReloadAsync(cancellationToken);
+        }
     }
 
     private static void ThrowIfFailed(IdentityResult result, string operation)
