@@ -119,16 +119,16 @@ cd web && npm run lint && npm run build && npm test
 
 | Phase | Scope | Status |
 |---|---|---|
-| 0 | Walking skeleton — CI/CD, deploy stack, health, migrations | ✅ code complete |
-| 1 | Domain core — session/poll state machines, visibility & overlap engines, D-number test suite | 🔜 next |
-| 2 | Accounts, auth (email, magic link, Google, Steam), onboarding | ⬜ |
+| 0 | Walking skeleton — CI/CD, deploy stack, health, migrations; spikes A/B/C decided (A-018..A-020) | ✅ |
+| 1 | Domain core — session/poll state machines, visibility & overlap engines, D-number test suite (DOMAIN_MODEL.md + TRACEABILITY.md, 1033 tests) | ✅ |
+| 2 | Accounts, auth (email, magic link, Google, Steam), onboarding, admin foundations | 🔜 next |
 | 3 | Friends, blocking, Steam import | ⬜ |
 | 4 | Fixed-time sessions end-to-end, guest links | ⬜ |
 | 5 | Availability, recommendations, calendar views | ⬜ |
 | 6 | Scheduling polls | ⬜ |
 | 7 | Notification transports & preferences | ⬜ |
-| 8 | Localization, WCAG 2.2 AA audit, hardening | ⬜ |
-| 9 | Private beta → public launch | ⬜ |
+| 8 | Localization, WCAG 2.2 AA audit, hardening, admin area | ⬜ |
+| 9 | Go-live (VM + first TLS deploy done 2026-07-30; rclone + restore drill open), private beta → public launch | ⬜ |
 
 Everything ships together in one public v1 — no stripped-down beta ([D-163](PRODUCT_SPEC.md#14-decisions)).
 

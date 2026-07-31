@@ -1,6 +1,6 @@
 # PartyUp — Domain Model (Phase 1 design)
 
-**Status:** v3 — the A-014 opening deliverable, hardened through two adversarial review rounds (six spec-slice reviewers, then fix-verification + two cold reviewers) against the full decision log.
+**Status:** ratified and implemented — the A-014 deliverable, hardened through three adversarial review rounds plus an external (Codex) design review, then implemented as the Phase 1 domain code (see TRACEABILITY.md). The §12 interpretation notes are ratified; changing one is a design change, not a cleanup.
 **Basis:** PRODUCT_SPEC.md (D-001..D-180), ARCHITECTURE.md §3, IMPLEMENTATION_PLAN.md Phase 1.
 **Scope:** the domain layer — entity shapes, invariants, state machines, visibility rules, notification contracts, deletion lifecycle. EF mapping lands in Infrastructure; auth flows land in Phase 2. Spec-silent points this document resolves are collected in §12 for ratification. `spec §n` refers to PRODUCT_SPEC.md sections; bare `§n` refers to this document.
 
