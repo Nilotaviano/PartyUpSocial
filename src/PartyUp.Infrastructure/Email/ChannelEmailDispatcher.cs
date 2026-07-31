@@ -17,7 +17,7 @@ public sealed class ChannelEmailDispatcher : IEmailDispatcher
     public async Task DispatchAsync(EmailMessage message, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
-        await _channel.Writer.WriteAsync(message, cancellationToken);
+        await _channel.Writer.WriteAsync(message, CancellationToken.None);
     }
 
     public IAsyncEnumerable<EmailMessage> ReadAllAsync(CancellationToken cancellationToken) =>

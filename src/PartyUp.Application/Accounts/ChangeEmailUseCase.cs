@@ -47,7 +47,8 @@ public sealed class ChangeEmailUseCase(
                         AuthTokenPurpose.EmailChange,
                         userId,
                         AccountInput.NormalizeEmail(address),
-                        ChangeTtl),
+                        ChangeTtl,
+                        Email: address),
                     ct);
                 return AccountMutationResult.Success;
             },
@@ -91,17 +92,18 @@ public sealed class ChangeEmailUseCase(
                     ct);
                 if (!redemption.Succeeded ||
                     redemption.UserId is not { } userId ||
-                    redemption.EmailNormalized is not { } address)
+                    redemption.EmailNormalized is not { } normalizedAddress)
                 {
                     return AccountMutationResult.Failed("invalid_or_expired_token");
                 }
 
-                UserId? owner = await accounts.FindUserIdByEmailAsync(address, ct);
+                UserId? owner = await accounts.FindUserIdByEmailAsync(normalizedAddress, ct);
                 if (owner is not null && owner != userId)
                 {
                     return AccountMutationResult.Failed("email_unavailable");
                 }
 
+                string address = redemption.Email ?? normalizedAddress.ToLowerInvariant();
                 await accounts.SetEmailAsync(userId, address, confirmed: true, ct);
                 await sessions.SignOutEverywhereAsync(userId, ct);
                 return AccountMutationResult.Success;

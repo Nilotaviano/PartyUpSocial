@@ -63,8 +63,11 @@ public sealed class TextPolicyTests
                 Locale.Create("en"))),
             users,
             usernames,
-            new ValidateProfileDraftUseCase(new ProfanityFilter()),
+            new ValidateProfileDraftUseCase(
+                new ProfanityFilter(),
+                DateTimeZoneProviders.Tzdb),
             new FakeUnitOfWork(),
+            DateTimeZoneProviders.Tzdb,
             clock);
 
         OnboardingCompletionResult result = await useCase.ExecuteAsync(

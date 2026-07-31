@@ -25,6 +25,17 @@ public sealed class ConsumeMagicLinkUseCaseTests
     }
 
     [Fact]
+    public async Task Execute_PreservesTheMailboxAddressCaseWhenCreatingTheAccount()
+    {
+        TestContext context = Create(
+            Success(null, "PLAYER@CORP.EXAMPLE", "Player@corp.example"));
+
+        await context.UseCase.ExecuteAsync("token", true, default);
+
+        Assert.Equal("Player@corp.example", Assert.Single(context.Accounts.Created).Email);
+    }
+
+    [Fact]
     public async Task Execute_RejectsAReusedToken_D067()
     {
         UserId id = UserId.New();
@@ -122,16 +133,20 @@ public sealed class ConsumeMagicLinkUseCaseTests
         return new TestContext(useCase, accounts, users, tokens);
     }
 
-    private static TokenRedemption Success(UserId? id, string email) =>
+    private static TokenRedemption Success(
+        UserId? id,
+        string emailNormalized,
+        string? email = null) =>
         new(
             true,
             null,
             AuthTokenPurpose.MagicLink,
             id,
-            email,
+            emailNormalized,
             new PendingRegistration("en", false),
             null,
-            Now);
+            Now,
+            email);
 
     private static TokenRedemption Failed(TokenRedemptionFailure failure) =>
         new(
@@ -149,4 +164,28 @@ public sealed class ConsumeMagicLinkUseCaseTests
         FakeAccountGateway Accounts,
         FakeUserRepository Users,
         FakeTokenService Tokens);
+}
+
+public sealed class RequestMagicLinkUseCaseTests
+{
+    [Fact]
+    public async Task Execute_PreservesTheMailboxAddressCaseInTheTokenAndMessage()
+    {
+        var accounts = new FakeAccountGateway();
+        var tokens = new FakeTokenService();
+        var email = new FakeEmailDispatcher();
+        var useCase = new RequestMagicLinkUseCase(
+            accounts,
+            tokens,
+            new FakeUnitOfWork(),
+            email,
+            new AccountEmailOptions("https://partyup.social"));
+
+        await useCase.ExecuteAsync("Player@corp.example", "en", default);
+
+        IssueTokenRequest issue = Assert.Single(tokens.Issues);
+        Assert.Equal("PLAYER@CORP.EXAMPLE", issue.EmailNormalized);
+        Assert.Equal("Player@corp.example", issue.Email);
+        Assert.Equal("Player@corp.example", Assert.Single(email.Messages).ToAddress);
+    }
 }

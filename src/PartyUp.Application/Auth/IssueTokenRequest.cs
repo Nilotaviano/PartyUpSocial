@@ -10,4 +10,5 @@ public sealed record IssueTokenRequest(
     Duration Ttl,
     PendingRegistration? Pending = null,
     ExternalIntentPayload? Intent = null,
-    byte[]? RequestIpHash = null);
+    byte[]? RequestIpHash = null,
+    string? Email = null);

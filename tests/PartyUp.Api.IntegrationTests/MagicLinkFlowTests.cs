@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using PartyUp.Application.Email;
+using PartyUp.Infrastructure.Persistence;
 
 namespace PartyUp.Api.IntegrationTests;
 
@@ -49,6 +52,32 @@ public sealed class MagicLinkFlowTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, second.StatusCode);
+    }
+
+    [Fact]
+    public async Task RequestThenConsume_PreservesTheMailboxAddressCase()
+    {
+        using HttpClient client = Slice5HttpTest.CreateClient(_factory);
+        const string email = "Magic.Flow@Example.Test";
+        string token = await RequestAsync(client, email);
+
+        HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
+            client,
+            "/api/v1/auth/magic-link/consume",
+            JsonContent.Create(new { token, ageGateAttested = true }));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        EmailMessage outbound = await _factory.EmailSender.WaitForAsync(
+            message => message.ToAddress == email &&
+                message.Template == EmailTemplate.MagicLink);
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        string stored = await context.AuthUsers
+            .Where(user => user.NormalizedEmail == "MAGIC.FLOW@EXAMPLE.TEST")
+            .Select(user => user.Email!)
+            .SingleAsync();
+        Assert.Equal(email, stored);
+        Assert.Equal(email, outbound.ToAddress);
     }
 
     private async Task<string> RequestAsync(HttpClient client, string email)

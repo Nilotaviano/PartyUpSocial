@@ -210,7 +210,7 @@ public sealed class ChangeEmailUseCaseTests
     }
 
     [Fact]
-    public async Task Execute_ConfirmsTheTokensAddressNotTheRowsAddress_D067()
+    public async Task Execute_ConfirmsTheTokensTypedAddressNotTheRowsAddress_D067()
     {
         TestContext context = Create(hasPreviousAddress: true, validPassword: true);
         context.Tokens.RedemptionResults.Enqueue(new TokenRedemption(
@@ -221,12 +221,51 @@ public sealed class ChangeEmailUseCaseTests
             "TOKEN@EXAMPLE.TEST",
             null,
             null,
-            Instant.FromUtc(2026, 7, 31, 12, 0)));
+            Instant.FromUtc(2026, 7, 31, 12, 0),
+            "Token@Example.Test"));
 
         AccountMutationResult result = await context.UseCase.VerifyAsync("token", default);
 
         Assert.True(result.Succeeded);
-        Assert.Equal("TOKEN@EXAMPLE.TEST", context.Accounts.Emails[context.UserId]!.Email);
+        Assert.Equal("Token@Example.Test", context.Accounts.Emails[context.UserId]!.Email);
+    }
+
+    [Fact]
+    public async Task Execute_PreservesTheMailboxAddressCaseThroughRequestAndVerification()
+    {
+        TestContext context = Create(hasPreviousAddress: true, validPassword: true);
+
+        await context.UseCase.RequestAsync(
+            context.UserId,
+            "NewAddress@corp.example",
+            "correct",
+            null,
+            default);
+
+        IssueTokenRequest issue = Assert.Single(context.Tokens.Issues);
+        Assert.Equal("NEWADDRESS@CORP.EXAMPLE", issue.EmailNormalized);
+        Assert.Equal("NewAddress@corp.example", issue.Email);
+        Assert.Contains(
+            context.Email.Messages,
+            message => message.Template == EmailTemplate.EmailChangeVerification &&
+                message.ToAddress == "NewAddress@corp.example");
+
+        context.Tokens.RedemptionResults.Enqueue(new TokenRedemption(
+            true,
+            null,
+            AuthTokenPurpose.EmailChange,
+            context.UserId,
+            issue.EmailNormalized,
+            null,
+            null,
+            Instant.FromUtc(2026, 7, 31, 12, 0),
+            issue.Email));
+
+        await context.UseCase.VerifyAsync("token", default);
+
+        Assert.Equal(
+            "NewAddress@corp.example",
+            context.Accounts.Emails[context.UserId]!.Email);
     }
 
     [Fact]

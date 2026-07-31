@@ -34,7 +34,8 @@ public sealed class RequestMagicLinkUseCase(
                     MagicLinkTtl,
                     userId is null
                         ? new PendingRegistration(recipientLocale.Value, false)
-                        : null),
+                        : null,
+                    Email: address),
                 ct),
             cancellationToken);
 

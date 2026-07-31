@@ -11,4 +11,5 @@ public sealed record TokenRedemption(
     string? EmailNormalized,
     PendingRegistration? Pending,
     ExternalIntentPayload? Intent,
-    Instant ConsumedAt);
+    Instant ConsumedAt,
+    string? Email = null);

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Auth;
 using PartyUp.Application.Email;
@@ -50,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<IFriendCodeGenerator, FriendCodeGenerator>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ISecurityTokenService, SecurityTokenService>();
+        services.AddSingleton<IDateTimeZoneProvider>(DateTimeZoneProviders.Tzdb);
         services.AddSingleton<IEmailTemplateRenderer, EmbeddedEmailTemplateRenderer>();
         services.AddSingleton<ChannelEmailDispatcher>();
         services.AddSingleton<IEmailDispatcher>(services =>

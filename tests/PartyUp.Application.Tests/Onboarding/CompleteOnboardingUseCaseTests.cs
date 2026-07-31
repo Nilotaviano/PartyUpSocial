@@ -63,13 +63,16 @@ public sealed class CompleteOnboardingUseCaseTests
             false,
             false,
             Locale.Create("en"));
-        var validator = new ValidateProfileDraftUseCase(new ProfanityFilter());
+        var validator = new ValidateProfileDraftUseCase(
+            new ProfanityFilter(),
+            DateTimeZoneProviders.Tzdb);
         var useCase = new CompleteOnboardingUseCase(
             new FakeCurrentUserAccessor(current),
             users,
             usernames,
             validator,
             new FakeUnitOfWork(),
+            DateTimeZoneProviders.Tzdb,
             clock);
         return new TestContext(useCase, user, usernames);
     }
@@ -113,8 +116,11 @@ public sealed class SocialOnlyAccountTests
                 null)),
             users,
             new FakeUsernameRepository(),
-            new ValidateProfileDraftUseCase(new ProfanityFilter()),
+            new ValidateProfileDraftUseCase(
+                new ProfanityFilter(),
+                DateTimeZoneProviders.Tzdb),
             new FakeUnitOfWork(),
+            DateTimeZoneProviders.Tzdb,
             clock);
 
         OnboardingCompletionResult result = await useCase.ExecuteAsync(

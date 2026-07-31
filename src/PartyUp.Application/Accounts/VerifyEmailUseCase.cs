@@ -17,6 +17,7 @@ public sealed class VerifyEmailUseCase(
     public Task<EmailVerificationResult> ExecuteAsync(
         string token,
         string? password,
+        bool ageGateAttested,
         CancellationToken cancellationToken)
     {
         if (password is not null)
@@ -30,7 +31,7 @@ public sealed class VerifyEmailUseCase(
                     new RedeemTokenRequest(
                         AuthTokenPurpose.EmailVerification,
                         token,
-                        AgeGateAttested: false),
+                        AgeGateAttested: ageGateAttested),
                     ct);
                 if (!redemption.Succeeded)
                 {
@@ -45,7 +46,7 @@ public sealed class VerifyEmailUseCase(
                     return EmailVerificationResult.Confirmed(existingSubject);
                 }
 
-                if (redemption.EmailNormalized is not { } address)
+                if (redemption.EmailNormalized is not { } normalizedAddress)
                 {
                     return EmailVerificationResult.Failed("invalid_or_expired_token");
                 }
@@ -55,7 +56,7 @@ public sealed class VerifyEmailUseCase(
                     return EmailVerificationResult.Failed("password_required");
                 }
 
-                UserId? appeared = await accounts.FindUserIdByEmailAsync(address, ct);
+                UserId? appeared = await accounts.FindUserIdByEmailAsync(normalizedAddress, ct);
                 if (appeared is not null)
                 {
                     return EmailVerificationResult.Existing;
@@ -71,7 +72,7 @@ public sealed class VerifyEmailUseCase(
                 users.Add(user);
                 await accounts.CreateAccountAsync(
                     createdId,
-                    address,
+                    redemption.Email ?? normalizedAddress.ToLowerInvariant(),
                     emailConfirmed: true,
                     password,
                     ct);

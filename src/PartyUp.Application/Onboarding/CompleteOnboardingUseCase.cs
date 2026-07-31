@@ -11,6 +11,7 @@ public sealed class CompleteOnboardingUseCase(
     IUsernameRegistryRepository usernames,
     ValidateProfileDraftUseCase validator,
     IUnitOfWork unitOfWork,
+    IDateTimeZoneProvider timeZones,
     IClock clock)
 {
     public Task<OnboardingCompletionResult> ExecuteAsync(
@@ -40,7 +41,7 @@ public sealed class CompleteOnboardingUseCase(
         Username username = Username.Create(draft.Username);
         DisplayName displayName = DisplayName.Create(draft.DisplayName);
         Avatar avatar = ValidateProfileDraftUseCase.ToAvatar(draft.Avatar);
-        DateTimeZone timeZone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(draft.TimeZone)
+        DateTimeZone timeZone = timeZones.GetZoneOrNull(draft.TimeZone)
             ?? throw new DomainException(DomainError.ValidationFailed, "The time zone is invalid.");
         Locale locale = ValidateProfileDraftUseCase.ToLocale(draft.Locale);
 

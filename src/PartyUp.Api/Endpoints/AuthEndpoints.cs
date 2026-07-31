@@ -381,7 +381,8 @@ public static class AuthEndpoints
                         AuthTokenPurpose.EmailVerification,
                         caller.Id,
                         AccountInput.NormalizeEmail(email.Email),
-                        Duration.FromHours(24)),
+                        Duration.FromHours(24),
+                        Email: email.Email),
                     ct),
                 cancellationToken);
             Locale locale = (await users.FindAsync(caller.Id, cancellationToken))?.Locale
@@ -411,6 +412,7 @@ public static class AuthEndpoints
         EmailVerificationResult result = await useCase.ExecuteAsync(
             request.Token,
             request.Password,
+            request.AgeGateAttested == true,
             cancellationToken);
         if (!result.Succeeded)
         {
@@ -615,7 +617,10 @@ public sealed record ChangeEmailRequest(
     string? CurrentPassword,
     string? ReauthToken);
 
-public sealed record VerifyEmailRequest(string Token, string? Password);
+public sealed record VerifyEmailRequest(
+    string Token,
+    string? Password,
+    bool? AgeGateAttested);
 
 public sealed record ReauthenticateRequest(string CurrentPassword);
 

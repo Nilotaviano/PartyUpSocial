@@ -36,9 +36,11 @@ public sealed class SecurityTokenService(AppDbContext context, IClock clock) : I
         Instant expiresAt = now + request.Ttl;
         bool consumeOutstanding = request.Purpose is
             AuthTokenPurpose.EmailChange or AuthTokenPurpose.Reauthentication;
-        string? payload = request.Intent is null
-            ? null
-            : JsonSerializer.Serialize(request.Intent, PayloadJsonOptions);
+        string? payload = request.Intent is not null
+            ? JsonSerializer.Serialize(request.Intent, PayloadJsonOptions)
+            : request.Email is not null
+                ? JsonSerializer.Serialize(new EmailTokenPayload(request.Email), PayloadJsonOptions)
+                : null;
 
         const string sql = """
             WITH consumed AS (
@@ -168,9 +170,14 @@ public sealed class SecurityTokenService(AppDbContext context, IClock clock) : I
             var pending = pendingLocale is null
                 ? null
                 : new PendingRegistration(pendingLocale, pendingAgeGate);
-            ExternalIntentPayload? intent = payload is null
+            ExternalIntentPayload? intent =
+                payload is null || purpose != AuthTokenPurpose.ExternalStartIntent
                 ? null
                 : JsonSerializer.Deserialize<ExternalIntentPayload>(payload, PayloadJsonOptions);
+            string? emailAddress =
+                payload is null || purpose == AuthTokenPurpose.ExternalStartIntent
+                ? null
+                : JsonSerializer.Deserialize<EmailTokenPayload>(payload, PayloadJsonOptions)?.Email;
 
             if (!redeemed)
             {
@@ -184,7 +191,8 @@ public sealed class SecurityTokenService(AppDbContext context, IClock clock) : I
                         email,
                         pending,
                         intent,
-                        default);
+                        default,
+                        emailAddress);
             }
 
             return new TokenRedemption(
@@ -195,7 +203,8 @@ public sealed class SecurityTokenService(AppDbContext context, IClock clock) : I
                 email,
                 pending,
                 intent,
-                now);
+                now,
+                emailAddress);
         }
         finally
         {
@@ -297,6 +306,8 @@ public sealed class SecurityTokenService(AppDbContext context, IClock clock) : I
         options.MakeReadOnly(populateMissingResolver: true);
         return options;
     }
+
+    private sealed record EmailTokenPayload(string Email);
 }
 
 internal sealed class AuthToken

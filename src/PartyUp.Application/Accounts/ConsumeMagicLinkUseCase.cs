@@ -35,9 +35,9 @@ public sealed class ConsumeMagicLinkUseCase(
                 }
 
                 UserId? userId = redemption.UserId;
-                if (userId is null && redemption.EmailNormalized is { } address)
+                if (userId is null && redemption.EmailNormalized is { } normalizedAddress)
                 {
-                    userId = await accounts.FindUserIdByEmailAsync(address, ct);
+                    userId = await accounts.FindUserIdByEmailAsync(normalizedAddress, ct);
                     if (userId is null)
                     {
                         UserId createdId = UserId.New();
@@ -50,7 +50,7 @@ public sealed class ConsumeMagicLinkUseCase(
                         users.Add(user);
                         await accounts.CreateAccountAsync(
                             createdId,
-                            address,
+                            redemption.Email ?? normalizedAddress.ToLowerInvariant(),
                             emailConfirmed: true,
                             password: null,
                             ct);

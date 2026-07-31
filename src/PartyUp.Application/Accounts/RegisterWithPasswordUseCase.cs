@@ -41,7 +41,8 @@ public sealed class RegisterWithPasswordUseCase(
                     VerificationTtl,
                     existingId is null
                         ? new PendingRegistration(locale.Value, true)
-                        : null),
+                        : null,
+                    Email: address),
                 ct),
             cancellationToken);
 

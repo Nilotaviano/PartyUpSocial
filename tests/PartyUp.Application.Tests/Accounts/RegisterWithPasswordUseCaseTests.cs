@@ -21,6 +21,23 @@ public sealed class RegisterWithPasswordUseCaseTests
     }
 
     [Fact]
+    public async Task Execute_PreservesTheMailboxAddressCaseInTheTokenAndMessage_D016()
+    {
+        TestContext context = Create();
+
+        await context.UseCase.ExecuteAsync(
+            new RegisterWithPasswordCommand("Player@corp.example", true, "en"),
+            default);
+
+        IssueTokenRequest issue = Assert.Single(context.Tokens.Issues);
+        Assert.Equal("PLAYER@CORP.EXAMPLE", issue.EmailNormalized);
+        Assert.Equal("Player@corp.example", issue.Email);
+        Assert.Equal(
+            "Player@corp.example",
+            Assert.Single(context.Email.Messages).ToAddress);
+    }
+
+    [Fact]
     public async Task Execute_RejectsAnUnattestedAgeGate_D083()
     {
         TestContext context = Create();

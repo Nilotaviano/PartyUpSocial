@@ -6,7 +6,9 @@ using PartyUp.Domain.Users;
 
 namespace PartyUp.Application.Onboarding;
 
-public sealed class ValidateProfileDraftUseCase(ITextPolicy textPolicy)
+public sealed class ValidateProfileDraftUseCase(
+    ITextPolicy textPolicy,
+    IDateTimeZoneProvider timeZones)
 {
     public ProfileDraftValidation Execute(ProfileDraft draft)
     {
@@ -39,7 +41,7 @@ public sealed class ValidateProfileDraftUseCase(ITextPolicy textPolicy)
         }
 
         if (draft.TimeZone is not null &&
-            DateTimeZoneProviders.Tzdb.GetZoneOrNull(draft.TimeZone) is null)
+            timeZones.GetZoneOrNull(draft.TimeZone) is null)
         {
             errors["timeZone"] = ["errors.timeZone.invalid"];
         }
