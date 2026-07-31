@@ -1,6 +1,7 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Onboarding;
+using PartyUp.Application.Profile;
 using PartyUp.Application.Text;
 using PartyUp.Application.Tests.Onboarding;
 using PartyUp.Domain.Kernel;
@@ -79,22 +80,39 @@ public sealed class TextPolicyTests
     }
 
     [Fact]
-    public void Check_RunsBeforeAGamingHandleReachesTheDomain_D096()
+    public async Task Check_RunsBeforeAGamingHandleReachesTheDomain_D096()
     {
-        var policy = new ProfanityFilter();
-        int domainCalls = 0;
+        User user = User.BeginOnboarding(
+            UserId.New(),
+            FriendCode.Create("ABCDEFGHJK"),
+            AgeGateSource.SelfAttested,
+            new TestClock(Instant.FromUtc(2026, 7, 31, 12, 0)));
+        var users = new FakeUserRepository();
+        users.Users[user.Id] = user;
+        var useCase = new LinkPlatformUseCase(
+            users,
+            new FakeUnitOfWork(),
+            new ProfanityFilter());
 
-        TextPolicyResult result = policy.Check(
-            "sh1tter",
-            TextField.GamingHandle,
-            Locale.Create("pt-BR"));
-        if (result.IsAllowed)
-        {
-            _ = GamingHandle.Create(result.NormalizedValue);
-            domainCalls++;
-        }
+        PlatformLinkMutationResult linkResult = await useCase.ExecuteAsync(
+            new LinkPlatformCommand(user.Id, Platform.Xbox, "sh1tter"),
+            default);
 
-        Assert.False(result.IsAllowed);
-        Assert.Equal(0, domainCalls);
+        Assert.False(linkResult.Succeeded);
+        Assert.Equal("errors.text.profanity", linkResult.Code);
+
+        PlatformLink link = user.LinkPlatform(Platform.Xbox, GamingHandle.Create("OriginalHandle"));
+        var changeUseCase = new ChangePlatformHandleUseCase(
+            users,
+            new FakeUnitOfWork(),
+            new ProfanityFilter());
+        PlatformLinkMutationResult changeResult = await changeUseCase.ExecuteAsync(
+            new ChangePlatformHandleCommand(user.Id, link.Id, "sh1tter"),
+            default);
+
+        Assert.False(changeResult.Succeeded);
+        Assert.Equal("errors.text.profanity", changeResult.Code);
+        Assert.Equal("OriginalHandle", link.Handle.Value);
+        Assert.Single(user.PlatformLinks);
     }
 }

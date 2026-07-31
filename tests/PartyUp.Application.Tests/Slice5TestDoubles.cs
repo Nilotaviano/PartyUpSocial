@@ -24,6 +24,17 @@ internal sealed class FakeAccountGateway : IUserAccountGateway
 
     internal List<(UserId Id, string Provider, string ProviderKey)> Logins { get; } = [];
 
+    internal Dictionary<UserId, List<string>> LoginProviders { get; } = [];
+
+    internal List<(UserId Id, string Provider)> RemovedLogins { get; } = [];
+
+    internal HashSet<UserId> PasswordUsers { get; } = [];
+
+    internal List<(UserId Id, string SteamId64, string PersonaName, string? AvatarUrl, Instant FetchedAt)>
+        SteamIdentities { get; } = [];
+
+    internal List<UserId> RemovedSteamIdentities { get; } = [];
+
     internal int RealVerifies { get; private set; }
 
     internal int DummyVerifies { get; private set; }
@@ -134,13 +145,42 @@ internal sealed class FakeAccountGateway : IUserAccountGateway
     public Task RemoveLoginAsync(
         UserId id,
         string provider,
-        CancellationToken cancellationToken) =>
-        Task.CompletedTask;
+        CancellationToken cancellationToken)
+    {
+        RemovedLogins.Add((id, provider));
+        Logins.RemoveAll(login => login.Id == id && login.Provider == provider);
+        LoginProviders.GetValueOrDefault(id)?.RemoveAll(value => value == provider);
+        return Task.CompletedTask;
+    }
 
     public Task<IReadOnlyList<string>> ListLoginProvidersAsync(
         UserId id,
         CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<string>>([]);
+        Task.FromResult<IReadOnlyList<string>>(
+            LoginProviders.TryGetValue(id, out List<string>? providers) ? providers : []);
+
+    public Task<bool> HasPasswordAsync(UserId id, CancellationToken cancellationToken) =>
+        Task.FromResult(PasswordUsers.Contains(id));
+
+    public Task UpsertSteamIdentityAsync(
+        UserId id,
+        string steamId64,
+        string personaName,
+        string? avatarUrl,
+        Instant fetchedAt,
+        CancellationToken cancellationToken)
+    {
+        SteamIdentities.RemoveAll(identity => identity.Id == id);
+        SteamIdentities.Add((id, steamId64, personaName, avatarUrl, fetchedAt));
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveSteamIdentityAsync(UserId id, CancellationToken cancellationToken)
+    {
+        RemovedSteamIdentities.Add(id);
+        SteamIdentities.RemoveAll(identity => identity.Id == id);
+        return Task.CompletedTask;
+    }
 
     public Task PurgeCredentialsAsync(UserId id, CancellationToken cancellationToken) =>
         Task.CompletedTask;
@@ -246,6 +286,16 @@ internal sealed class FakeFriendCodeGenerator : IFriendCodeGenerator
 {
     public Task<FriendCode> NextAsync(CancellationToken cancellationToken) =>
         Task.FromResult(FriendCode.Create("ABCDEFGHJK"));
+}
+
+internal sealed class FakeSteamProfileClient : ISteamProfileClient
+{
+    internal SteamProfile? Profile { get; set; }
+
+    public Task<SteamProfile?> GetProfileAsync(
+        string steamId64,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(Profile);
 }
 
 internal sealed class FakeAccountSessionService : IAccountSessionService

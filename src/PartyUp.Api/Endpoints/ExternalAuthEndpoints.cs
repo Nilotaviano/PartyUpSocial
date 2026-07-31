@@ -1,15 +1,18 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.WebUtilities;
 using PartyUp.Api.Auth;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Accounts;
 using PartyUp.Application.Auth;
 using PartyUp.Domain.Kernel;
+using PartyUp.Infrastructure.Steam;
 
 namespace PartyUp.Api.Endpoints;
 
@@ -19,6 +22,9 @@ public static class ExternalAuthEndpoints
     private const string IntentProtectorPurpose = "PartyUp.IntentBinder";
     private const string IntentCookiePath = "/api/v1/auth/external";
     private const int MaximumBinders = 5;
+    private const string SteamStateCookieName = "pu.ext";
+    private const string SteamStateCookiePath = "/api/v1/auth/external/steam";
+    private const string SteamStateProtectorPurpose = "PartyUp.SteamState.Auth";
 
     private const string PropertyProvider = "partyup.provider";
     private const string PropertyMode = "partyup.mode";
@@ -29,6 +35,7 @@ public static class ExternalAuthEndpoints
     public static RouteGroupBuilder MapExternalAuthEndpoints(
         this RouteGroupBuilder api,
         bool googleEnabled,
+        bool steamEnabled,
         IHostEnvironment environment)
     {
         RouteGroupBuilder external = api.MapGroup("/auth/external");
@@ -62,6 +69,19 @@ public static class ExternalAuthEndpoints
             external.MapGet("/complete", CompleteAsync)
                 .WithName("CompleteExternalAuthentication")
                 .Produces(StatusCodes.Status302Found);
+        }
+
+        if (steamEnabled)
+        {
+            external.MapGet("/steam/start", StartSteamAsync)
+                .WithName("StartSteamExternal")
+                .Produces(StatusCodes.Status302Found)
+                .ProducesProblem(StatusCodes.Status400BadRequest);
+            external.MapGet("/steam/callback", CompleteSteamAsync)
+                .WithName("CompleteSteamExternal")
+                .Produces(StatusCodes.Status302Found)
+                .ProducesProblem(StatusCodes.Status400BadRequest)
+                .ProducesProblem(StatusCodes.Status401Unauthorized);
         }
 
         return api;
@@ -131,49 +151,21 @@ public static class ExternalAuthEndpoints
         IHostEnvironment environment,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(intent))
+        IntentRedemption? started = await RedeemIntentAsync(
+            ExternalProviderPolicy.Google,
+            intent,
+            context,
+            dataProtection,
+            tokens,
+            environment,
+            cancellationToken);
+        if (started is null)
         {
             return Problem(context, StatusCodes.Status400BadRequest, "intent_required");
         }
 
-        IDataProtector protector = dataProtection.CreateProtector(IntentProtectorPurpose);
-        List<string> binders = ReadBinders(context.Request.Cookies[IntentCookieName], protector);
-        if (binders.Count == 0)
-        {
-            return Problem(context, StatusCodes.Status400BadRequest, "intent_required");
-        }
-
-        TokenRedemption? redemption = null;
-        int usedBinderIndex = -1;
-        for (int index = 0; index < binders.Count; index++)
-        {
-            if (!IntentBinder.TryDecode(binders[index], out byte[] binder))
-            {
-                continue;
-            }
-
-            TokenRedemption candidate = await tokens.RedeemAsync(
-                new RedeemTokenRequest(
-                    AuthTokenPurpose.ExternalStartIntent,
-                    intent,
-                    BinderHash: IntentBinder.Hash(binder)),
-                cancellationToken);
-            if (candidate.Succeeded)
-            {
-                redemption = candidate;
-                usedBinderIndex = index;
-                break;
-            }
-        }
-
-        if (redemption?.Intent is not { } payload ||
-            payload.Provider != ExternalProviderPolicy.Google)
-        {
-            return Problem(context, StatusCodes.Status400BadRequest, "intent_required");
-        }
-
-        binders.RemoveAt(usedBinderIndex);
-        WriteBinders(context.Response, binders, protector, environment);
+        TokenRedemption redemption = started.Redemption;
+        ExternalIntentPayload payload = started.Payload;
 
         var properties = new AuthenticationProperties
         {
@@ -189,6 +181,173 @@ public static class ExternalAuthEndpoints
         }
 
         return Results.Challenge(properties, [GoogleDefaults.AuthenticationScheme]);
+    }
+
+    private static async Task<IntentRedemption?> RedeemIntentAsync(
+        string provider,
+        string? intent,
+        HttpContext context,
+        IDataProtectionProvider dataProtection,
+        ISecurityTokenService tokens,
+        IHostEnvironment environment,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(intent))
+        {
+            return null;
+        }
+
+        IDataProtector protector = dataProtection.CreateProtector(IntentProtectorPurpose);
+        List<string> binders = ReadBinders(context.Request.Cookies[IntentCookieName], protector);
+        for (int index = 0; index < binders.Count; index++)
+        {
+            if (!IntentBinder.TryDecode(binders[index], out byte[] binder))
+            {
+                continue;
+            }
+
+            TokenRedemption redemption = await tokens.RedeemAsync(
+                new RedeemTokenRequest(
+                    AuthTokenPurpose.ExternalStartIntent,
+                    intent,
+                    BinderHash: IntentBinder.Hash(binder)),
+                cancellationToken);
+            if (!redemption.Succeeded ||
+                redemption.Intent is not { } payload ||
+                !string.Equals(payload.Provider, provider, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            binders.RemoveAt(index);
+            WriteBinders(context.Response, binders, protector, environment);
+            return new IntentRedemption(redemption, payload);
+        }
+
+        return null;
+    }
+
+    private static async Task<IResult> StartSteamAsync(
+        string? intent,
+        HttpContext context,
+        IDataProtectionProvider dataProtection,
+        ISecurityTokenService tokens,
+        IConfiguration configuration,
+        IHostEnvironment environment,
+        CancellationToken cancellationToken)
+    {
+        IntentRedemption? started = await RedeemIntentAsync(
+            ExternalProviderPolicy.Steam,
+            intent,
+            context,
+            dataProtection,
+            tokens,
+            environment,
+            cancellationToken);
+        if (started is null)
+        {
+            return Problem(context, StatusCodes.Status400BadRequest, "intent_required");
+        }
+
+        string nonce = IntentBinder.Encode(IntentBinder.Create());
+        string callback = SteamCallbackUrl(configuration, nonce);
+        var state = new SteamAuthState(
+            "auth",
+            nonce,
+            started.Payload.Mode,
+            started.Payload.ReturnTo,
+            started.Redemption.UserId?.Value,
+            started.Payload.AgeGateAttested);
+        IDataProtector protector = dataProtection.CreateProtector(SteamStateProtectorPurpose);
+        context.Response.Cookies.Append(
+            SteamStateCookieName,
+            protector.Protect(JsonSerializer.Serialize(state)),
+            SteamStateCookieOptions(environment));
+
+        string realm = SteamRealm(configuration);
+        var parameters = new Dictionary<string, string?>
+        {
+            ["openid.ns"] = SteamOpenIdVerifier.OpenIdNamespace,
+            ["openid.mode"] = "checkid_setup",
+            ["openid.identity"] = SteamOpenIdVerifier.OpenIdNamespace + "/identifier_select",
+            ["openid.claimed_id"] = SteamOpenIdVerifier.OpenIdNamespace + "/identifier_select",
+            ["openid.return_to"] = callback,
+            ["openid.realm"] = realm,
+        };
+        return Results.Redirect(QueryHelpers.AddQueryString(
+            SteamOpenIdVerifier.ProviderEndpoint,
+            parameters));
+    }
+
+    private static async Task<IResult> CompleteSteamAsync(
+        HttpContext context,
+        IDataProtectionProvider dataProtection,
+        SteamOpenIdVerifier verifier,
+        ICurrentUserAccessor currentUser,
+        CompleteExternalSignInUseCase useCase,
+        AuthenticateAndSignIn signIn,
+        IConfiguration configuration,
+        IHostEnvironment environment,
+        CancellationToken cancellationToken)
+    {
+        string? protectedState = context.Request.Cookies[SteamStateCookieName];
+        context.Response.Cookies.Delete(
+            SteamStateCookieName,
+            SteamStateCookieOptions(environment));
+        if (!TryReadSteamState(protectedState, dataProtection, out SteamAuthState state) ||
+            !string.Equals(state.Flow, "auth", StringComparison.Ordinal) ||
+            !context.Request.Query.TryGetValue("n", out var suppliedNonce) ||
+            suppliedNonce.Count != 1 ||
+            !FixedTimeEquals(state.Nonce, suppliedNonce[0]))
+        {
+            return Problem(context, StatusCodes.Status400BadRequest, "state_mismatch");
+        }
+
+        var assertion = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach ((string key, var values) in context.Request.Query)
+        {
+            if (key.StartsWith("openid.", StringComparison.Ordinal))
+            {
+                if (values.Count != 1)
+                {
+                    return Problem(context, StatusCodes.Status401Unauthorized, "steam_assertion_invalid");
+                }
+
+                assertion[key] = values[0]!;
+            }
+        }
+
+        SteamOpenIdVerification verification;
+        try
+        {
+            verification = await verifier.VerifyAsync(
+                assertion,
+                SteamCallbackUrl(configuration, state.Nonce),
+                cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            verification = SteamOpenIdVerification.Invalid;
+        }
+
+        if (!verification.Succeeded || verification.SteamId64 is not { } steamId64)
+        {
+            return Problem(context, StatusCodes.Status401Unauthorized, "steam_assertion_invalid");
+        }
+
+        CurrentUser? caller = await currentUser.GetAsync(cancellationToken);
+        ExternalSignInResult result = await useCase.ExecuteAsync(
+            new CompleteExternalSignInCommand(
+                ExternalProviderPolicy.Steam,
+                steamId64,
+                null,
+                false,
+                state.Mode,
+                state.AgeGateAttested,
+                state.BoundUserId is { } bound ? UserId.From(bound) : null,
+                caller?.Id),
+            cancellationToken);
+        return await FinishExternalResultAsync(result, signIn, state.ReturnTo, cancellationToken);
     }
 
     private static async Task<IResult> CompleteAsync(
@@ -235,38 +394,49 @@ public static class ExternalAuthEndpoints
                     caller?.Id),
                 cancellationToken);
 
-            if (!result.Succeeded)
-            {
-                bool ageGate = result.Code == "age_gate_required";
-                return Redirect(result.Code!, isError: !ageGate, returnTo);
-            }
-
-            if (result.ShouldSignIn && result.UserId is { } userId)
-            {
-                PostAuthenticationResult gate = await signIn.ExecuteAsync(
-                    userId,
-                    cancellationToken);
-                if (gate is PostAuthenticationResult.Refused refused)
-                {
-                    return Redirect(refused.Code, isError: true, returnTo);
-                }
-            }
-
-            if (result.ReauthenticationToken is { } proof)
-            {
-                return Redirect(
-                    "reauth_ok",
-                    isError: false,
-                    returnTo,
-                    $"reauth={Uri.EscapeDataString(proof)}");
-            }
-
-            return Redirect(result.MethodLinked ? "linked" : "signed_in", false, returnTo);
+            return await FinishExternalResultAsync(
+                result,
+                signIn,
+                returnTo,
+                cancellationToken);
         }
         finally
         {
             await context.SignOutAsync(IdentityConstants.ExternalScheme);
         }
+    }
+
+    private static async Task<IResult> FinishExternalResultAsync(
+        ExternalSignInResult result,
+        AuthenticateAndSignIn signIn,
+        string returnTo,
+        CancellationToken cancellationToken)
+    {
+        if (!result.Succeeded)
+        {
+            bool ageGate = result.Code == "age_gate_required";
+            return Redirect(result.Code!, isError: !ageGate, returnTo);
+        }
+
+        if (result.ShouldSignIn && result.UserId is { } userId)
+        {
+            PostAuthenticationResult gate = await signIn.ExecuteAsync(userId, cancellationToken);
+            if (gate is PostAuthenticationResult.Refused refused)
+            {
+                return Redirect(refused.Code, isError: true, returnTo);
+            }
+        }
+
+        if (result.ReauthenticationToken is { } proof)
+        {
+            return Redirect(
+                "reauth_ok",
+                isError: false,
+                returnTo,
+                $"reauth={Uri.EscapeDataString(proof)}");
+        }
+
+        return Redirect(result.MethodLinked ? "linked" : "signed_in", false, returnTo);
     }
 
     private static bool TryReadFlow(
@@ -320,6 +490,86 @@ public static class ExternalAuthEndpoints
         }
 
         return Results.Redirect(location);
+    }
+
+    private static bool TryReadSteamState(
+        string? protectedState,
+        IDataProtectionProvider dataProtection,
+        out SteamAuthState state)
+    {
+        state = new SteamAuthState(string.Empty, string.Empty, default, "/app", null, false);
+        if (string.IsNullOrWhiteSpace(protectedState))
+        {
+            return false;
+        }
+
+        try
+        {
+            IDataProtector protector = dataProtection.CreateProtector(SteamStateProtectorPurpose);
+            SteamAuthState? parsed = JsonSerializer.Deserialize<SteamAuthState>(
+                protector.Unprotect(protectedState));
+            if (parsed is null)
+            {
+                return false;
+            }
+
+            state = parsed;
+            return true;
+        }
+        catch (Exception exception) when (
+            exception is CryptographicException or JsonException or FormatException)
+        {
+            return false;
+        }
+    }
+
+    private static CookieOptions SteamStateCookieOptions(IHostEnvironment environment) =>
+        new()
+        {
+            HttpOnly = true,
+            Secure = !environment.IsDevelopment(),
+            SameSite = SameSiteMode.Lax,
+            Path = SteamStateCookiePath,
+            MaxAge = TimeSpan.FromMinutes(10),
+        };
+
+    private static string SteamCallbackUrl(IConfiguration configuration, string nonce) =>
+        QueryHelpers.AddQueryString(
+            PublicOrigin(configuration) + SteamStateCookiePath + "/callback",
+            "n",
+            nonce);
+
+    private static string SteamRealm(IConfiguration configuration)
+    {
+        string? configured = configuration["Steam:Realm"];
+        return string.IsNullOrWhiteSpace(configured)
+            ? PublicOrigin(configuration)
+            : configured.TrimEnd('/');
+    }
+
+    private static string PublicOrigin(IConfiguration configuration)
+    {
+        string configured = configuration["PublicBaseUrl"] ?? "http://localhost:5173";
+        if (!Uri.TryCreate(configured, UriKind.Absolute, out Uri? uri) ||
+            uri.Scheme is not ("http" or "https"))
+        {
+            throw new InvalidOperationException("PublicBaseUrl must be an absolute HTTP(S) URL.");
+        }
+
+        return uri.GetLeftPart(UriPartial.Authority);
+    }
+
+    private static bool FixedTimeEquals(string expected, string? actual)
+    {
+        if (actual is null)
+        {
+            return false;
+        }
+
+        byte[] expectedBytes = Encoding.UTF8.GetBytes(expected);
+        byte[] actualBytes = Encoding.UTF8.GetBytes(actual);
+        return expectedBytes.Length == actualBytes.Length &&
+            CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
     }
 
     private static List<string> ReadBinders(string? protectedValue, IDataProtector protector)
@@ -393,6 +643,18 @@ public static class ExternalAuthEndpoints
         ExternalStartMode Mode,
         bool AgeGateAttested,
         UserId? BoundUserId);
+
+    private sealed record IntentRedemption(
+        TokenRedemption Redemption,
+        ExternalIntentPayload Payload);
+
+    private sealed record SteamAuthState(
+        string Flow,
+        string Nonce,
+        ExternalStartMode Mode,
+        string ReturnTo,
+        Guid? BoundUserId,
+        bool AgeGateAttested);
 }
 
 public sealed record ExternalIntentRequest(

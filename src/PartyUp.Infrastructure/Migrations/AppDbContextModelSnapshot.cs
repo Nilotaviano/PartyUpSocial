@@ -500,6 +500,43 @@ namespace PartyUp.Infrastructure.Migrations
                     b.ToTable("auth_users", (string)null);
                 });
 
+            modelBuilder.Entity("PartyUp.Infrastructure.Steam.SteamIdentity", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("AvatarUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("avatar_url");
+
+                    b.Property<Instant>("FetchedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fetched_at");
+
+                    b.Property<string>("PersonaName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("persona_name");
+
+                    b.Property<string>("SteamId64")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("steam_id64");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_steam_identities");
+
+                    b.HasIndex("SteamId64")
+                        .IsUnique()
+                        .HasDatabaseName("ux_steam_identities_steam_id64");
+
+                    b.ToTable("steam_identities", (string)null);
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.HasOne("PartyUp.Infrastructure.Identity.AuthRole", null)
@@ -583,6 +620,16 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("fk_auth_tokens_users_user_id");
+                });
+
+            modelBuilder.Entity("PartyUp.Infrastructure.Steam.SteamIdentity", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithOne()
+                        .HasForeignKey("PartyUp.Infrastructure.Steam.SteamIdentity", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_steam_identities_users_user_id");
                 });
 
             modelBuilder.Entity("PartyUp.Domain.Users.User", b =>

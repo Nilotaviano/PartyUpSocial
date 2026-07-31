@@ -15,6 +15,7 @@ public sealed class CompleteExternalSignInUseCase(
     ISecurityTokenService tokens,
     IUnitOfWork unitOfWork,
     IEmailDispatcher emailDispatcher,
+    ISteamProfileClient steamProfiles,
     IClock clock)
 {
     private static readonly Duration ReauthenticationTtl = Duration.FromMinutes(5);
@@ -40,8 +41,12 @@ public sealed class CompleteExternalSignInUseCase(
 
         if (command.Mode == ExternalStartMode.Link)
         {
+            SteamProfileData? steamProfile = provider == ExternalProviderPolicy.Steam
+                ? await ReadSteamProfileAsync(command.ProviderKey, cancellationToken)
+                : null;
             return await CompleteLinkAsync(
                 command with { Provider = provider },
+                steamProfile,
                 cancellationToken);
         }
 
@@ -56,6 +61,20 @@ public sealed class CompleteExternalSignInUseCase(
             cancellationToken);
         if (loginOwner is not null)
         {
+            if (provider == ExternalProviderPolicy.Steam)
+            {
+                SteamProfileData profile = await ReadSteamProfileAsync(
+                    command.ProviderKey,
+                    cancellationToken);
+                await unitOfWork.ExecuteAsync(
+                    async ct =>
+                    {
+                        await UpsertSteamFactsAsync(loginOwner.Value, command.ProviderKey, profile, ct);
+                        return true;
+                    },
+                    cancellationToken);
+            }
+
             return ExternalSignInResult.SignedIn(loginOwner.Value);
         }
 
@@ -64,7 +83,10 @@ public sealed class CompleteExternalSignInUseCase(
             return await CompleteGoogleLoginAsync(command, cancellationToken);
         }
 
-        return await CreateAccountAsync(command, email: null, cancellationToken);
+        SteamProfileData steam = await ReadSteamProfileAsync(
+            command.ProviderKey,
+            cancellationToken);
+        return await CreateAccountAsync(command, email: null, steam, cancellationToken);
     }
 
     private async Task<ExternalSignInResult> CompleteReauthenticationAsync(
@@ -100,6 +122,7 @@ public sealed class CompleteExternalSignInUseCase(
 
     private async Task<ExternalSignInResult> CompleteLinkAsync(
         CompleteExternalSignInCommand command,
+        SteamProfileData? steamProfile,
         CancellationToken cancellationToken)
     {
         if (command.BoundUserId is not { } boundUserId ||
@@ -138,6 +161,14 @@ public sealed class CompleteExternalSignInUseCase(
                             command.Provider,
                             command.ProviderKey,
                             ct);
+                        if (steamProfile is not null)
+                        {
+                            await UpsertSteamFactsAsync(
+                                boundUserId,
+                                command.ProviderKey,
+                                steamProfile,
+                                ct);
+                        }
                         await sessions.SignOutEverywhereAsync(boundUserId, ct);
                         return (true, true);
                     }
@@ -208,12 +239,13 @@ public sealed class CompleteExternalSignInUseCase(
             return ExternalSignInResult.SignedIn(emailOwner.Value);
         }
 
-        return await CreateAccountAsync(command, address, cancellationToken);
+        return await CreateAccountAsync(command, address, steamProfile: null, cancellationToken);
     }
 
     private async Task<ExternalSignInResult> CreateAccountAsync(
         CompleteExternalSignInCommand command,
         string? email,
+        SteamProfileData? steamProfile,
         CancellationToken cancellationToken)
     {
         if (!command.AgeGateAttested)
@@ -270,6 +302,14 @@ public sealed class CompleteExternalSignInUseCase(
                         command.Provider,
                         command.ProviderKey,
                         ct);
+                    if (steamProfile is not null)
+                    {
+                        await UpsertSteamFactsAsync(
+                            user,
+                            command.ProviderKey,
+                            steamProfile,
+                            ct);
+                    }
                     return ExternalSignInResult.SignedIn(createdId);
                 },
                 cancellationToken);
@@ -278,6 +318,67 @@ public sealed class CompleteExternalSignInUseCase(
         {
             return ExternalSignInResult.Failed("email_unavailable");
         }
+    }
+
+    private async Task<SteamProfileData> ReadSteamProfileAsync(
+        string steamId64,
+        CancellationToken cancellationToken)
+    {
+        SteamProfile? profile = await steamProfiles.GetProfileAsync(steamId64, cancellationToken);
+        string fallback = $"Steam {steamId64[^Math.Min(4, steamId64.Length)..]}";
+        string displayName = string.IsNullOrWhiteSpace(profile?.DisplayName)
+            ? fallback
+            : profile.DisplayName.Trim();
+        if (displayName.Length > GamingHandle.MaxLength)
+        {
+            displayName = displayName[..GamingHandle.MaxLength];
+        }
+
+        string? avatarUrl = profile?.AvatarUrl;
+        if (avatarUrl?.Length > 2048)
+        {
+            avatarUrl = null;
+        }
+
+        return new SteamProfileData(displayName, avatarUrl);
+    }
+
+    private async Task UpsertSteamFactsAsync(
+        UserId userId,
+        string steamId64,
+        SteamProfileData profile,
+        CancellationToken cancellationToken)
+    {
+        User user = await users.FindForUpdateAsync(userId, cancellationToken)
+            ?? throw new DomainException(DomainError.NotFound, "The user was not found.");
+        await UpsertSteamFactsAsync(user, steamId64, profile, cancellationToken);
+    }
+
+    private async Task UpsertSteamFactsAsync(
+        User user,
+        string steamId64,
+        SteamProfileData profile,
+        CancellationToken cancellationToken)
+    {
+        PlatformLink? link = user.PlatformLinks.SingleOrDefault(
+            value => value.Platform == Platform.Steam);
+        GamingHandle handle = GamingHandle.Create(profile.PersonaName);
+        if (link is null)
+        {
+            user.LinkPlatform(Platform.Steam, handle);
+        }
+        else
+        {
+            user.ChangePlatformHandle(link.Id, handle);
+        }
+
+        await accounts.UpsertSteamIdentityAsync(
+            user.Id,
+            steamId64,
+            profile.PersonaName,
+            profile.AvatarUrl,
+            clock.GetCurrentInstant(),
+            cancellationToken);
     }
 
     private async Task NotifyMethodAddedAsync(
@@ -301,6 +402,8 @@ public sealed class CompleteExternalSignInUseCase(
             cancellationToken);
     }
 }
+
+internal sealed record SteamProfileData(string PersonaName, string? AvatarUrl);
 
 public sealed record CompleteExternalSignInCommand(
     string Provider,

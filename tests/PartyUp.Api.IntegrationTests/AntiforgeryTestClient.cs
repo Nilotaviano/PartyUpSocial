@@ -12,9 +12,24 @@ internal static class AntiforgeryTestClient
         HttpContent? content,
         string? authenticationCookie = null,
         string? forwardedFor = null)
+        => await SendAsync(
+            client,
+            HttpMethod.Post,
+            requestUri,
+            content,
+            authenticationCookie,
+            forwardedFor);
+
+    internal static async Task<HttpResponseMessage> SendAsync(
+        HttpClient client,
+        HttpMethod method,
+        string requestUri,
+        HttpContent? content,
+        string? authenticationCookie = null,
+        string? forwardedFor = null)
     {
         AntiforgeryPair pair = await GetAsync(client, authenticationCookie);
-        using var request = new HttpRequestMessage(HttpMethod.Post, requestUri)
+        using var request = new HttpRequestMessage(method, requestUri)
         {
             Content = content,
         };

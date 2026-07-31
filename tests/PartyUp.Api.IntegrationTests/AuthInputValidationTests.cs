@@ -81,6 +81,7 @@ public sealed class AuthInputValidationTests : IAsyncLifetime, IDisposable
             JsonCase("/api/v1/auth/external/intent", new { provider = 42, mode = "login" }),
             MalformedCase("/api/v1/auth/reauth/email"),
             MalformedCase("/api/v1/auth/logout"),
+            JsonCase("/api/v1/me/platform-links", new { platform = 42, handle = "Player" }),
         ];
 
         string[] cookies = new string[cases.Length];
@@ -262,6 +263,15 @@ public sealed class AuthInputValidationTests : IAsyncLifetime, IDisposable
 
         public Task<IReadOnlyList<string>> ListLoginProvidersAsync(UserId id, CancellationToken cancellationToken) =>
             inner.ListLoginProvidersAsync(id, cancellationToken);
+
+        public Task<bool> HasPasswordAsync(UserId id, CancellationToken cancellationToken) =>
+            inner.HasPasswordAsync(id, cancellationToken);
+
+        public Task UpsertSteamIdentityAsync(UserId id, string steamId64, string personaName, string? avatarUrl, NodaTime.Instant fetchedAt, CancellationToken cancellationToken) =>
+            Mutate(() => inner.UpsertSteamIdentityAsync(id, steamId64, personaName, avatarUrl, fetchedAt, cancellationToken));
+
+        public Task RemoveSteamIdentityAsync(UserId id, CancellationToken cancellationToken) =>
+            Mutate(() => inner.RemoveSteamIdentityAsync(id, cancellationToken));
 
         public Task CreateAccountAsync(UserId id, string? email, bool emailConfirmed, string? password, CancellationToken cancellationToken) =>
             Mutate(() => inner.CreateAccountAsync(id, email, emailConfirmed, password, cancellationToken));

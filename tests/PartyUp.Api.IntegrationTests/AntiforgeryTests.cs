@@ -95,6 +95,11 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                     timeZone = "America/Fortaleza",
                     locale = "en",
                 })),
+            ["POST /api/v1/me/platform-links"] = Protected(() =>
+                JsonContent.Create(new { platform = "PlayStation", handle = "Player" })),
+            ["PATCH /api/v1/me/platform-links/{id:guid}"] = Protected(() =>
+                JsonContent.Create(new { handle = "Player" })),
+            ["DELETE /api/v1/me/platform-links/{id:guid}"] = Protected(() => null),
         };
 
     private readonly PartyUpApiFactory _factory = new();
@@ -161,11 +166,27 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task EveryUnsafeRoute_RequiresAntiforgeryAndItsDocumentedAuthorization()
     {
-        UserId userId = await _factory.SeedUserAsync(
-            email: "antiforgery-matrix@example.test",
-            password: "current-password");
         using HttpClient client = CreateClient();
-        string authCookie = await SignInAsync(client, userId);
+
+        // One user per authorized route: several probed operations share the
+        // user-partitioned reauth dimension (5 per 15 min), so a single shared
+        // user overflows it and the matrix would measure the limiter instead
+        // of antiforgery.
+        var authCookies = new Dictionary<string, string>();
+        int routeIndex = 0;
+        foreach ((string key, UnsafeRouteCase route) in UnsafeRoutes)
+        {
+            routeIndex++;
+            if (!route.RequiresAuthorization)
+            {
+                continue;
+            }
+
+            UserId routeUser = await _factory.SeedUserAsync(
+                email: $"antiforgery-matrix-{routeIndex}@example.test",
+                password: "current-password");
+            authCookies[key] = await SignInAsync(client, routeUser);
+        }
 
         IReadOnlyDictionary<string, RouteEndpoint> mapped = MappedUnsafeRoutes();
         Assert.Equal(UnsafeRoutes.Keys.Order(), mapped.Keys.Order());
@@ -183,7 +204,7 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             using HttpRequestMessage request = CreateRequest(key, route.CreateBody());
             if (route.RequiresAuthorization)
             {
-                request.Headers.Add(HeaderNames.Cookie, authCookie);
+                request.Headers.Add(HeaderNames.Cookie, authCookies[key]);
             }
 
             HttpResponseMessage response = await client.SendAsync(request);
@@ -197,8 +218,9 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
 
         foreach ((string key, UnsafeRouteCase route) in UnsafeRoutes)
         {
-            HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
+            HttpResponseMessage response = await AntiforgeryTestClient.SendAsync(
                 client,
+                MethodFromKey(key),
                 RouteFromKey(key),
                 route.CreateBody());
             string body = await response.Content.ReadAsStringAsync();
@@ -253,12 +275,17 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
     }
 
     private static HttpRequestMessage CreateRequest(string key, HttpContent? body) =>
-        new(HttpMethod.Post, RouteFromKey(key))
+        new(MethodFromKey(key), RouteFromKey(key))
         {
             Content = body,
         };
 
-    private static string RouteFromKey(string key) => key[(key.IndexOf(' ') + 1)..];
+    private static string RouteFromKey(string key) =>
+        key[(key.IndexOf(' ') + 1)..]
+            .Replace("{id:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal);
+
+    private static HttpMethod MethodFromKey(string key) =>
+        new(key[..key.IndexOf(' ')]);
 
     private static async Task<string> SignInAsync(HttpClient client, UserId userId)
     {

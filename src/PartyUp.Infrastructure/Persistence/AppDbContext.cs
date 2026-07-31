@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Identity;
 using PartyUp.Infrastructure.Persistence.Configurations;
+using PartyUp.Infrastructure.Steam;
 
 namespace PartyUp.Infrastructure.Persistence;
 
@@ -16,6 +17,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<PlatformLink> PlatformLinks => Set<PlatformLink>();
 
+    public DbSet<SteamIdentity> SteamIdentities => Set<SteamIdentity>();
+
     public DbSet<UsernameRegistryEntry> UsernameRegistry => Set<UsernameRegistryEntry>();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -26,7 +29,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.ApplyConfiguration(new AuthTokenConfiguration());
         builder.ApplyConfiguration(new UserConfiguration());
         builder.ApplyConfiguration(new PlatformLinkConfiguration());
+        builder.ApplyConfiguration(new SteamIdentityConfiguration());
         builder.ApplyConfiguration(new UsernameRegistryEntryConfiguration());
+        builder.Entity<User>().Navigation(user => user.PlatformLinks).AutoInclude();
 
         builder.Entity<AuthRole>().ToTable("auth_roles");
         builder.Entity<IdentityUserRole<Guid>>().ToTable("auth_user_roles");

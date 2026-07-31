@@ -27,15 +27,18 @@ public sealed class ExternalIntentTests : IAsyncLifetime, IDisposable
     public void Dispose() => _factory.Dispose();
 
     [Theory]
-    [InlineData("login")]
-    [InlineData("link")]
-    [InlineData("reauth")]
-    public async Task Start_WithoutAnIntent_IsRejected_InEveryMode(string mode)
+    [InlineData("google", "login")]
+    [InlineData("google", "link")]
+    [InlineData("google", "reauth")]
+    [InlineData("steam", "login")]
+    [InlineData("steam", "link")]
+    [InlineData("steam", "reauth")]
+    public async Task Start_WithoutAnIntent_IsRejected_InEveryMode(string provider, string mode)
     {
         using HttpClient client = Slice5HttpTest.CreateClient(_factory);
 
         HttpResponseMessage response = await client.GetAsync(
-            $"/api/v1/auth/external/google/start?mode={mode}");
+            $"/api/v1/auth/external/{provider}/start?mode={mode}");
 
         await AssertIntentRequiredAsync(response);
     }

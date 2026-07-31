@@ -148,6 +148,28 @@ public sealed class CompleteExternalSignInUseCaseTests
         Assert.Null(Assert.Single(context.Accounts.Created).Email);
     }
 
+    [Fact]
+    public async Task Execute_CreatesAPlatformLinkAlongsideTheSteamAuthMethod_D032()
+    {
+        TestContext context = Create();
+
+        ExternalSignInResult result = await context.UseCase.ExecuteAsync(
+            LoginCommand(provider: ExternalProviderPolicy.Steam, email: null, emailVerified: false),
+            default);
+
+        Assert.True(result.Succeeded);
+        User user = Assert.Single(context.Users.Added);
+        PlatformLink link = Assert.Single(user.PlatformLinks);
+        Assert.Equal(Platform.Steam, link.Platform);
+        Assert.Equal("Steam Player", link.Handle.Value);
+        var identity = Assert.Single(context.Accounts.SteamIdentities);
+        Assert.Equal("provider-key", identity.SteamId64);
+        Assert.Equal("Steam Player", identity.PersonaName);
+        Assert.Contains(
+            context.Accounts.Logins,
+            login => login.Id == user.Id && login.Provider == ExternalProviderPolicy.Steam);
+    }
+
     [Theory]
     [MemberData(nameof(SupportedProviderDeletionCases))]
     public async Task Execute_NeverCreatesAnAddresslessAccountForAProviderWithNoPublicDeletionLeg_D072(
@@ -231,6 +253,10 @@ public sealed class CompleteExternalSignInUseCaseTests
             new FakeTokenService(),
             new FakeUnitOfWork(),
             email,
+            new FakeSteamProfileClient
+            {
+                Profile = new SteamProfile("Steam Player", "https://cdn.example/avatar.jpg"),
+            },
             new TestClock(Instant.FromUtc(2026, 7, 31, 12, 0)));
         return new TestContext(useCase, accounts, users, email);
     }

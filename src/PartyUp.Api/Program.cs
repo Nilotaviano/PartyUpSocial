@@ -17,6 +17,7 @@ using PartyUp.Api.Security;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Accounts;
 using PartyUp.Application.Onboarding;
+using PartyUp.Application.Profile;
 using PartyUp.Infrastructure;
 using PartyUp.Infrastructure.Email;
 using PartyUp.Infrastructure.Persistence;
@@ -68,6 +69,10 @@ builder.Services.AddScoped<ChangeEmailUseCase>();
 builder.Services.AddScoped<ReauthenticateUseCase>();
 builder.Services.AddScoped<IssueExternalIntentUseCase>();
 builder.Services.AddScoped<CompleteExternalSignInUseCase>();
+builder.Services.AddScoped<UnlinkSteamUseCase>();
+builder.Services.AddScoped<LinkPlatformUseCase>();
+builder.Services.AddScoped<ChangePlatformHandleUseCase>();
+builder.Services.AddScoped<UnlinkPlatformUseCase>();
 builder.Services.AddScoped<GetOnboardingStateUseCase>();
 builder.Services.AddScoped<CheckUsernameAvailabilityUseCase>();
 builder.Services.AddScoped<ValidateProfileDraftUseCase>();
@@ -187,8 +192,10 @@ api.AddEndpointFilter<AntiforgeryFilter>();
 api.MapAuthEndpoints();
 api.MapExternalAuthEndpoints(
     !string.IsNullOrWhiteSpace(app.Configuration["Google:ClientId"]),
+    app.Configuration.GetValue("Steam:Enabled", true),
     app.Environment);
 api.MapOnboardingEndpoints();
+api.MapMeEndpoints();
 
 if (app.Environment.IsEnvironment("Testing"))
 {

@@ -25,6 +25,7 @@ namespace PartyUp.Api.IntegrationTests;
 internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
 {
     private readonly bool _googleEnabled;
+    private readonly bool? _steamEnabled;
     private readonly PostgreSqlContainer _postgres =
         new PostgreSqlBuilder("postgres:17-alpine").Build();
     private readonly CapturingEmailSender _emailSender = new();
@@ -41,9 +42,10 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
     internal PostAuthenticationGateProbe PostAuthenticationGateProbe =>
         _postAuthenticationGateProbe;
 
-    internal PartyUpApiFactory(bool googleEnabled = false)
+    internal PartyUpApiFactory(bool googleEnabled = false, bool? steamEnabled = null)
     {
         _googleEnabled = googleEnabled;
+        _steamEnabled = steamEnabled;
     }
 
     internal Task StartAsync() => _postgres.StartAsync();
@@ -138,6 +140,11 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
             {
                 settings["Google:ClientId"] = "test-google-client";
                 settings["Google:ClientSecret"] = "test-google-secret";
+            }
+
+            if (_steamEnabled is { } steamEnabled)
+            {
+                settings["Steam:Enabled"] = steamEnabled.ToString();
             }
 
             configuration.AddInMemoryCollection(settings);

@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using NodaTime;
 using Npgsql;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Kernel;
 using PartyUp.Infrastructure.Persistence;
+using PartyUp.Infrastructure.Steam;
 
 namespace PartyUp.Infrastructure.Identity;
 
@@ -182,15 +184,15 @@ public sealed partial class UserAccountGateway(
         string provider,
         CancellationToken cancellationToken)
     {
+        // Store-level removal, not UserManager.RemoveLoginAsync: the manager
+        // rotates the security stamp, and with ValidationInterval zero that
+        // signs out every live session — unlinking a platform must not.
         AuthUser user = await RequireUserAsync(id, cancellationToken);
-        IList<UserLoginInfo> logins = await userManager.GetLoginsAsync(user);
-
-        foreach (UserLoginInfo login in logins.Where(login => login.LoginProvider == provider))
-        {
-            ThrowIfFailed(
-                await userManager.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey),
-                "remove the external login");
-        }
+        List<IdentityUserLogin<Guid>> logins = await context.Set<IdentityUserLogin<Guid>>()
+            .Where(login => login.UserId == user.Id && login.LoginProvider == provider)
+            .ToListAsync(cancellationToken);
+        context.Set<IdentityUserLogin<Guid>>().RemoveRange(logins);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<string>> ListLoginProvidersAsync(
@@ -200,6 +202,58 @@ public sealed partial class UserAccountGateway(
         AuthUser user = await RequireUserAsync(id, cancellationToken);
         IList<UserLoginInfo> logins = await userManager.GetLoginsAsync(user);
         return logins.Select(login => login.LoginProvider).Distinct(StringComparer.Ordinal).ToArray();
+    }
+
+    public async Task<bool> HasPasswordAsync(
+        UserId id,
+        CancellationToken cancellationToken) =>
+        (await RequireUserAsync(id, cancellationToken)).PasswordHash is not null;
+
+    public async Task UpsertSteamIdentityAsync(
+        UserId id,
+        string steamId64,
+        string personaName,
+        string? avatarUrl,
+        Instant fetchedAt,
+        CancellationToken cancellationToken)
+    {
+        SteamIdentity? identity = await context.SteamIdentities.FindAsync([id], cancellationToken);
+        if (identity is null)
+        {
+            context.SteamIdentities.Add(
+                new SteamIdentity(id, steamId64, personaName, avatarUrl, fetchedAt));
+        }
+        else
+        {
+            identity.Update(steamId64, personaName, avatarUrl, fetchedAt);
+        }
+
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (
+            exception.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.UniqueViolation,
+                ConstraintName: "ux_steam_identities_steam_id64",
+            })
+        {
+            throw new DomainException(
+                DomainError.Duplicate,
+                "That Steam identity is already linked to another account.");
+        }
+    }
+
+    public async Task RemoveSteamIdentityAsync(
+        UserId id,
+        CancellationToken cancellationToken)
+    {
+        SteamIdentity? identity = await context.SteamIdentities.FindAsync([id], cancellationToken);
+        if (identity is not null)
+        {
+            context.SteamIdentities.Remove(identity);
+        }
     }
 
     public async Task PurgeCredentialsAsync(UserId id, CancellationToken cancellationToken)

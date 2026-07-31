@@ -1,3 +1,4 @@
+using NodaTime;
 using PartyUp.Domain.Kernel;
 
 namespace PartyUp.Application.Abstractions;
@@ -50,6 +51,18 @@ public interface IUserAccountGateway
     Task<IReadOnlyList<string>> ListLoginProvidersAsync(
         UserId id,
         CancellationToken cancellationToken);
+
+    Task<bool> HasPasswordAsync(UserId id, CancellationToken cancellationToken);
+
+    Task UpsertSteamIdentityAsync(
+        UserId id,
+        string steamId64,
+        string personaName,
+        string? avatarUrl,
+        Instant fetchedAt,
+        CancellationToken cancellationToken);
+
+    Task RemoveSteamIdentityAsync(UserId id, CancellationToken cancellationToken);
 
     Task PurgeCredentialsAsync(UserId id, CancellationToken cancellationToken);
 

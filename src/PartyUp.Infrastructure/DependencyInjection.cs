@@ -14,6 +14,7 @@ using PartyUp.Infrastructure.Email;
 using PartyUp.Infrastructure.Identity;
 using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Persistence.Repositories;
+using PartyUp.Infrastructure.Steam;
 
 namespace PartyUp.Infrastructure;
 
@@ -51,6 +52,13 @@ public static class DependencyInjection
         services.AddScoped<IFriendCodeGenerator, FriendCodeGenerator>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ISecurityTokenService, SecurityTokenService>();
+        services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(15) });
+        services.AddSingleton<SteamOpenIdVerifier>();
+        services.AddSingleton<SteamApiClient>();
+        services.AddSingleton<ISteamProfileClient>(provider =>
+            new SteamProfileClient(
+                provider.GetRequiredService<SteamApiClient>(),
+                configuration["Steam:ApiKey"]));
         services.AddSingleton<IDateTimeZoneProvider>(DateTimeZoneProviders.Tzdb);
         services.AddSingleton<IEmailTemplateRenderer, EmbeddedEmailTemplateRenderer>();
         services.AddSingleton<ChannelEmailDispatcher>();
