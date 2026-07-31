@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Kernel;
@@ -7,11 +8,12 @@ using PartyUp.Infrastructure.Persistence;
 
 namespace PartyUp.Infrastructure.Identity;
 
-public sealed class UserAccountGateway(
+public sealed partial class UserAccountGateway(
     UserManager<AuthUser> userManager,
     RoleManager<AuthRole> roleManager,
     IPasswordHasher<AuthUser> passwordHasher,
-    AppDbContext context) : IUserAccountGateway
+    AppDbContext context,
+    ILogger<UserAccountGateway> logger) : IUserAccountGateway
 {
     private const int AccessFailureRetryLimit = 5;
 
@@ -97,7 +99,7 @@ public sealed class UserAccountGateway(
 
         if (succeeded)
         {
-            ThrowIfFailed(await userManager.ResetAccessFailedCountAsync(user), "reset access failures");
+            await ResetAccessFailedCountAsync(user, cancellationToken);
             return new PasswordCheckResult(true, false, true);
         }
 
@@ -275,6 +277,7 @@ public sealed class UserAccountGateway(
                     continue;
                 }
 
+                LogConcurrencyRetryExhausted("record an access failure", user);
                 return;
             }
 
@@ -292,7 +295,69 @@ public sealed class UserAccountGateway(
 
             await context.Entry(user).ReloadAsync(cancellationToken);
         }
+
+        LogConcurrencyRetryExhausted("record an access failure", user);
     }
+
+    private async Task ResetAccessFailedCountAsync(
+        AuthUser user,
+        CancellationToken cancellationToken)
+    {
+        for (int attempt = 1; attempt <= AccessFailureRetryLimit; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            IdentityResult result;
+            try
+            {
+                result = await userManager.ResetAccessFailedCountAsync(user);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                await context.Entry(user).ReloadAsync(cancellationToken);
+                if (attempt < AccessFailureRetryLimit)
+                {
+                    continue;
+                }
+
+                LogConcurrencyRetryExhausted("reset access failures", user);
+                return;
+            }
+
+            if (result.Succeeded)
+            {
+                return;
+            }
+
+            bool isConcurrencyFailure = result.Errors.Any(error =>
+                string.Equals(error.Code, "ConcurrencyFailure", StringComparison.Ordinal));
+            if (!isConcurrencyFailure)
+            {
+                ThrowIfFailed(result, "reset access failures");
+            }
+
+            await context.Entry(user).ReloadAsync(cancellationToken);
+        }
+
+        LogConcurrencyRetryExhausted("reset access failures", user);
+    }
+
+    private void LogConcurrencyRetryExhausted(string operation, AuthUser user)
+    {
+        LogConcurrencyRetryExhausted(
+            logger,
+            operation,
+            AccessFailureRetryLimit,
+            user.Id);
+    }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Identity operation {Operation} exhausted {RetryLimit} concurrency retries for user {UserId}.")]
+    private static partial void LogConcurrencyRetryExhausted(
+        ILogger logger,
+        string operation,
+        int retryLimit,
+        Guid userId);
 
     private static void ThrowIfFailed(IdentityResult result, string operation)
     {

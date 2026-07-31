@@ -68,7 +68,8 @@ public static class OnboardingEndpoints
         {
             throw new DomainException(
                 DomainError.Duplicate,
-                "The username is already taken.");
+                FormattableString.Invariant(
+                    $"Username '{UsernameRegistry.Canonicalize(request.Username)}' is already taken."));
         }
 
         if (!result.Succeeded)

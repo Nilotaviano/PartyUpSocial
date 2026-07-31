@@ -524,8 +524,16 @@ public static class AuthEndpoints
 
         try
         {
+            using var body = new MemoryStream();
+            await context.Request.Body.CopyToAsync(body, cancellationToken);
+            if (body.Length == 0)
+            {
+                return null;
+            }
+
+            body.Position = 0;
             using JsonDocument _ = await JsonDocument.ParseAsync(
-                context.Request.Body,
+                body,
                 cancellationToken: cancellationToken);
             return null;
         }

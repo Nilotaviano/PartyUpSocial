@@ -110,6 +110,37 @@ public sealed class AuthInputValidationTests : IAsyncLifetime, IDisposable
             value => value.StartsWith("pu.auth=", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task BodylessAuthRoutes_EmptyJsonBodiesProceedToSuccess(
+        bool includeContentLength)
+    {
+        UserId userId = await _factory.SeedUserAsync(
+            email: $"empty-json-{includeContentLength}@example.test",
+            password: Password);
+        using HttpClient client = Slice5HttpTest.CreateClient(_factory);
+        string cookie = await SignInAsync(client, userId);
+        (string Route, HttpStatusCode Status)[] cases =
+        [
+            ("/api/v1/auth/email/verify/request", HttpStatusCode.Accepted),
+            ("/api/v1/auth/reauth/email", HttpStatusCode.Accepted),
+            ("/api/v1/auth/logout", HttpStatusCode.NoContent),
+        ];
+
+        foreach ((string route, HttpStatusCode status) in cases)
+        {
+            using HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
+                client,
+                route,
+                new EmptyJsonContent(includeContentLength),
+                cookie);
+            Assert.True(
+                response.StatusCode == status,
+                $"{route} returned {(int)response.StatusCode} instead of {(int)status}.");
+        }
+    }
+
     private static InvalidCase JsonCase(string route, object body) =>
         new(route, () => JsonContent.Create(body));
 
@@ -129,6 +160,27 @@ public sealed class AuthInputValidationTests : IAsyncLifetime, IDisposable
     }
 
     private sealed record InvalidCase(string Route, Func<HttpContent> Content);
+
+    private sealed class EmptyJsonContent : HttpContent
+    {
+        private readonly bool _includeContentLength;
+
+        internal EmptyJsonContent(bool includeContentLength)
+        {
+            _includeContentLength = includeContentLength;
+            Headers.ContentType = new("application/json");
+        }
+
+        protected override Task SerializeToStreamAsync(
+            Stream stream,
+            TransportContext? context) => Task.CompletedTask;
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return _includeContentLength;
+        }
+    }
 
     private sealed class MutationProbe
     {
