@@ -27,6 +27,7 @@ public sealed class PostAuthenticationGateRouteTests : IAsyncLifetime, IDisposab
     {
         using HttpClient client = Slice5HttpTest.CreateClient(_factory);
 
+        await AssertActivePasswordLoginSucceedsAsync(client);
         await AssertBannedPasswordLoginIsRefusedAsync(client);
         await AssertBannedTokenCredentialIsRefusedAsync(
             client,
@@ -52,6 +53,23 @@ public sealed class PostAuthenticationGateRouteTests : IAsyncLifetime, IDisposab
             token => new { token, newPassword = "replacement-password" });
 
         await AssertPreAccountVerificationUsesTheSessionDoorAsync(client);
+    }
+
+    private async Task AssertActivePasswordLoginSucceedsAsync(HttpClient client)
+    {
+        const string email = "active-login@example.test";
+        UserId userId = await _factory.SeedUserAsync(email: email, password: Password);
+
+        _factory.PostAuthenticationGateProbe.Reset();
+        HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
+            client,
+            "/api/v1/auth/login",
+            JsonContent.Create(new { email, password = Password }));
+
+        Assert.Equal(1, _factory.PostAuthenticationGateProbe.Entries);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        AssertAuthCookie(response);
+        await AssertActiveAsync(userId);
     }
 
     private async Task AssertBannedPasswordLoginIsRefusedAsync(HttpClient client)

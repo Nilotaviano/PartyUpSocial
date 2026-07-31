@@ -62,6 +62,23 @@ public sealed class ReauthenticationTests : IAsyncLifetime, IDisposable
             .SetEquals(Slice5HttpTest.HeaderNames(correctReauth)));
         Assert.True(Slice5HttpTest.HeaderNames(firstLogin)
             .SetEquals(Slice5HttpTest.HeaderNames(correctLogin)));
+
+        _factory.Clock.Advance(Duration.FromMinutes(16));
+        using (IServiceScope scope = _factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<AuthUser>>();
+            AuthUser account = (await users.FindByIdAsync(userId.Value.ToString("D")))!;
+            Assert.True((await users.SetLockoutEndDateAsync(
+                account,
+                DateTimeOffset.UtcNow.AddSeconds(-1))).Succeeded);
+        }
+
+        HttpResponseMessage afterExpiry = await LoginAsync(client, email, Password);
+        Assert.Equal(HttpStatusCode.OK, afterExpiry.StatusCode);
+        Assert.True(afterExpiry.Headers.TryGetValues(
+            HeaderNames.SetCookie,
+            out IEnumerable<string>? cookies));
+        Assert.Contains(cookies, value => value.StartsWith("pu.auth=", StringComparison.Ordinal));
     }
 
     [Fact]

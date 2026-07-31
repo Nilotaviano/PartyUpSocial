@@ -88,6 +88,37 @@ public sealed class ConsumeMagicLinkUseCaseTests
     }
 
     [Fact]
+    public async Task Execute_RejectsAnUnattestedAgeGateWithoutCreatingEitherAccountRow_D083()
+    {
+        TestContext context = Create(
+            Failed(TokenRedemptionFailure.RequiresAgeGate),
+            Success(null, "NEW@EXAMPLE.TEST"));
+
+        MagicLinkConsumptionResult refused = await context.UseCase.ExecuteAsync(
+            "token",
+            false,
+            default);
+
+        Assert.False(refused.Succeeded);
+        Assert.Equal("age_gate_required", refused.Code);
+        Assert.Empty(context.Users.Added);
+        Assert.Empty(context.Accounts.Created);
+        Assert.Equal(0, context.Accounts.Confirmations);
+        Assert.False(Assert.Single(context.Tokens.Redeems).AgeGateAttested);
+
+        MagicLinkConsumptionResult retried = await context.UseCase.ExecuteAsync(
+            "token",
+            true,
+            default);
+
+        Assert.True(retried.Succeeded);
+        Assert.Single(context.Users.Added);
+        Assert.Single(context.Accounts.Created);
+        Assert.Equal(1, context.Accounts.Confirmations);
+        Assert.True(context.Tokens.Redeems[1].AgeGateAttested);
+    }
+
+    [Fact]
     public async Task Execute_RecordsTheAgeGateSourceWithoutABirthDate_D093()
     {
         TestContext context = Create(Success(null, "NEW@EXAMPLE.TEST"));

@@ -258,10 +258,12 @@ public sealed class SecurityTokenServiceTests : IAsyncLifetime, IDisposable
             Assert.Single(results, result => result.Succeeded);
             TokenRedemption loser = Assert.Single(results, result => !result.Succeeded);
             Assert.Equal(TokenRedemptionFailure.NotFound, loser.Failure);
+            Instant consumedAt = await ConsumedAtAsync(issued.TokenId);
+            _factory.Clock.Advance(Duration.FromSeconds(1));
             Assert.Equal(
                 TokenRedemptionFailure.NotFound,
                 (await RedeemAsync(CreateRedeemRequest(purpose, issued.RawToken))).Failure);
-            Assert.Equal(1, await ConsumedRowCountAsync(issued.TokenId));
+            Assert.Equal(consumedAt, await ConsumedAtAsync(issued.TokenId));
         }
     }
 
@@ -356,16 +358,15 @@ public sealed class SecurityTokenServiceTests : IAsyncLifetime, IDisposable
                     ? true
                     : null);
 
-    private async Task<int> ConsumedRowCountAsync(Guid tokenId)
+    private async Task<Instant> ConsumedAtAsync(Guid tokenId)
     {
         await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
         AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await context.Database.SqlQueryRaw<int>(
+        return await context.Database.SqlQueryRaw<Instant>(
                 """
-                SELECT count(*)::int AS "Value"
+                SELECT consumed_at AS "Value"
                   FROM auth_tokens
                  WHERE id = {0}
-                   AND consumed_at IS NOT NULL
                 """,
                 tokenId)
             .SingleAsync();

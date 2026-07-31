@@ -3,12 +3,17 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
 using PartyUp.Application.Abstractions;
+using PartyUp.Api.Auth;
 using PartyUp.Api.Endpoints;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Users;
@@ -197,6 +202,56 @@ public sealed class SecurityStampTests : IAsyncLifetime, IDisposable
         Assert.Equal(1, reader.ReadCount);
     }
 
+    [Fact]
+    public async Task MissingProjection_FailsClosedForEveryAuthorizationPolicy()
+    {
+        var executions = new HandlerExecutionProbe();
+        await using WebApplication application = await CreatePolicyProbeAsync(executions);
+        using IServiceScope scope = application.Services.CreateScope();
+        CookieAuthenticationOptions cookieOptions = scope.ServiceProvider
+            .GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
+            .Get(IdentityConstants.ApplicationScheme);
+        IdentityOptions identityOptions = scope.ServiceProvider
+            .GetRequiredService<IOptions<IdentityOptions>>()
+            .Value;
+        var identity = new ClaimsIdentity(IdentityConstants.ApplicationScheme);
+        identity.AddClaim(new Claim(
+            identityOptions.ClaimsIdentity.UserIdClaimType,
+            Guid.NewGuid().ToString("D")));
+        identity.AddClaim(new Claim(
+            identityOptions.ClaimsIdentity.SecurityStampClaimType,
+            "validly-protected-but-missing-subject"));
+        string ticket = cookieOptions.TicketDataFormat.Protect(new AuthenticationTicket(
+            new ClaimsPrincipal(identity),
+            new AuthenticationProperties
+            {
+                IssuedUtc = DateTimeOffset.UtcNow,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddDays(30),
+                IsPersistent = true,
+            },
+            IdentityConstants.ApplicationScheme));
+        using HttpClient client = application.GetTestClient();
+
+        (string Path, HttpStatusCode Status)[] probes =
+        [
+            ("/authenticated", HttpStatusCode.Unauthorized),
+            ("/onboarded", HttpStatusCode.Unauthorized),
+            ("/admin", HttpStatusCode.NotFound),
+        ];
+        foreach ((string path, HttpStatusCode status) in probes)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, path);
+            request.Headers.Add(HeaderNames.Cookie, $"pu.auth={ticket}");
+            HttpResponseMessage response = await client.SendAsync(request);
+            Assert.Equal(status, response.StatusCode);
+            Assert.Contains(
+                response.Headers.GetValues(HeaderNames.SetCookie),
+                value => value.StartsWith("pu.auth=;", StringComparison.Ordinal));
+        }
+
+        Assert.Equal(0, executions.Count);
+    }
+
     private HttpClient CreateClient() => _factory.CreateClient(
         new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
         {
@@ -216,6 +271,42 @@ public sealed class SecurityStampTests : IAsyncLifetime, IDisposable
             .Split(';', 2)[0];
     }
 
+    private static async Task<WebApplication> CreatePolicyProbeAsync(
+        HandlerExecutionProbe executions)
+    {
+        WebApplicationBuilder builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = "Testing",
+        });
+        builder.WebHost.UseTestServer();
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.AddSingleton<NodaTime.IClock>(
+            new MutableClock(NodaTime.Instant.FromUtc(2026, 7, 31, 12, 0)));
+        builder.Services.AddSingleton<ICurrentUserProjectionReader, NullProjectionReader>();
+        builder.Services.AddScoped<CurrentUserAccessor>();
+        builder.Services.AddScoped<ICurrentUserAccessor>(provider =>
+            provider.GetRequiredService<CurrentUserAccessor>());
+        builder.Services.AddPartyUpCookieAuthentication(builder.Environment);
+        builder.Services.AddPartyUpAuthorization();
+        WebApplication application = builder.Build();
+        application.UseAuthentication();
+        application.UseAuthorization();
+        application.MapGet(
+                "/authenticated",
+                () => executions.Executed())
+            .RequireAuthorization(AuthorizationPolicies.RequireAuthenticated);
+        application.MapGet(
+                "/onboarded",
+                () => executions.Executed())
+            .RequireAuthorization(AuthorizationPolicies.RequireOnboarded);
+        application.MapGet(
+                "/admin",
+                () => executions.Executed())
+            .RequireAuthorization(AuthorizationPolicies.RequireAdmin);
+        await application.StartAsync();
+        return application;
+    }
+
     private sealed class RecordingProjectionReader(CurrentUserProjection projection)
         : ICurrentUserProjectionReader
     {
@@ -230,6 +321,27 @@ public sealed class SecurityStampTests : IAsyncLifetime, IDisposable
             ReadCount++;
             RequestedUserId = id;
             return Task.FromResult<CurrentUserProjection?>(projection);
+        }
+    }
+
+    private sealed class NullProjectionReader : ICurrentUserProjectionReader
+    {
+        public Task<CurrentUserProjection?> ReadAsync(
+            UserId id,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<CurrentUserProjection?>(null);
+    }
+
+    private sealed class HandlerExecutionProbe
+    {
+        private int _count;
+
+        internal int Count => Volatile.Read(ref _count);
+
+        internal IResult Executed()
+        {
+            Interlocked.Increment(ref _count);
+            return Results.NoContent();
         }
     }
 }

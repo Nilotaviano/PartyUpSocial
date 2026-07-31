@@ -92,6 +92,7 @@ public sealed class RequestLoggingTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new { token = "not-the-query-token", ageGateAttested = true }));
 
         Assert.NotEmpty(sink.Events);
+        Assert.Contains(sink.Events, logEvent => logEvent.Exception is not null);
         foreach (LogEvent logEvent in sink.Events)
         {
             AssertContainsNoSecret(

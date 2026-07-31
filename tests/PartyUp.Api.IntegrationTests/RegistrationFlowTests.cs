@@ -216,6 +216,7 @@ public sealed class RegistrationFlowTests : IAsyncLifetime, IDisposable
             .Where(user => user.NormalizedEmail == normalizedEmail)
             .Select(user => user.Id)
             .SingleAsync();
+        Assert.Equal(1, await context.DomainUsers.CountAsync());
         Assert.Single(
             await context.DomainUsers
                 .Where(user => user.Id == UserId.From(accountId))
