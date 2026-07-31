@@ -31,7 +31,7 @@ public sealed class UsernameUniquenessTests : IAsyncLifetime
                 Username.Create("CaseVariant"),
                 firstOwner.Id);
 
-            firstContext.Users.Add(firstOwner);
+            firstContext.DomainUsers.Add(firstOwner);
             firstContext.UsernameRegistry.Add(firstClaim);
             await firstContext.SaveChangesAsync();
         }
@@ -46,7 +46,7 @@ public sealed class UsernameUniquenessTests : IAsyncLifetime
             Username.Create("casevariant"),
             secondOwner.Id);
 
-        secondContext.Users.Add(secondOwner);
+        secondContext.DomainUsers.Add(secondOwner);
         secondContext.UsernameRegistry.Add(caseVariant);
 
         await Assert.ThrowsAsync<DbUpdateException>(() => secondContext.SaveChangesAsync());
