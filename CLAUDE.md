@@ -14,7 +14,7 @@ PartyUp (partyup.social) — friends scheduling multiplayer game sessions. Four 
 ## Commands
 
 ```sh
-# Environment Check: Requires .NET 9 SDK and Node.js v20+ LTS. 
+# Environment Check: Requires .NET 10 SDK and Node.js v20+ LTS. 
 # Ensure local Postgres container is running via compose before writing/testing schema.
 
 dotnet build PartyUp.sln                                   # must be 0 warnings (TreatWarningsAsErrors)
