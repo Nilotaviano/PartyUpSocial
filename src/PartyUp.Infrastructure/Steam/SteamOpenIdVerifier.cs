@@ -5,7 +5,15 @@ using System.Text.RegularExpressions;
 
 namespace PartyUp.Infrastructure.Steam;
 
-public sealed partial class SteamOpenIdVerifier(HttpClient httpClient)
+public interface ISteamOpenIdVerifier
+{
+    Task<SteamOpenIdVerification> VerifyAsync(
+        IReadOnlyDictionary<string, string> assertion,
+        string expectedReturnTo,
+        CancellationToken cancellationToken);
+}
+
+public sealed partial class SteamOpenIdVerifier(HttpClient httpClient) : ISteamOpenIdVerifier
 {
     private const int MaximumRememberedNonces = 4096;
 
@@ -17,6 +25,7 @@ public sealed partial class SteamOpenIdVerifier(HttpClient httpClient)
         "claimed_id", "identity", "return_to", "response_nonce", "assoc_handle", "op_endpoint",
     ];
 
+    // The replay cache is process-local because production runs one app container.
     private readonly ConcurrentDictionary<string, byte> _acceptedResponseNonces =
         new(StringComparer.Ordinal);
     private readonly ConcurrentQueue<string> _acceptedNonceOrder = new();
@@ -102,7 +111,7 @@ public sealed partial class SteamOpenIdVerifier(HttpClient httpClient)
         assertion.TryGetValue(key, out string? actual) &&
         string.Equals(actual, expected, StringComparison.Ordinal);
 
-    [GeneratedRegex("^https://steamcommunity\\.com/openid/id/(\\d{17})$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^https://steamcommunity\\.com/openid/id/([0-9]{17})$", RegexOptions.CultureInvariant)]
     private static partial Regex SteamClaimedId();
 }
 

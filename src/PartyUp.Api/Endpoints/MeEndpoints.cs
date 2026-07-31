@@ -123,6 +123,7 @@ public static class MeEndpoints
         Guid id,
         HttpContext context,
         ICurrentUserAccessor currentUser,
+        IUserRepository users,
         UnlinkPlatformUseCase unlinkPlatform,
         UnlinkSteamUseCase unlinkSteam,
         ReauthenticateUseCase reauthenticate,
@@ -145,18 +146,22 @@ public static class MeEndpoints
         }
 
         PlatformLinkId linkId = PlatformLinkId.From(id);
-        UnlinkPlatformResult platformResult = await unlinkPlatform.ExecuteAsync(
-            caller.Id,
-            linkId,
-            cancellationToken);
-        if (platformResult == UnlinkPlatformResult.NotFound)
+        User? user = await users.FindAsync(caller.Id, cancellationToken);
+        PlatformLink? link = user?.PlatformLinks.SingleOrDefault(value => value.Id == linkId);
+        if (link is null)
         {
             return Problem(context, StatusCodes.Status404NotFound, "not_found");
         }
 
-        if (platformResult == UnlinkPlatformResult.Removed)
+        if (link.Platform != Platform.Steam)
         {
-            return Results.NoContent();
+            UnlinkPlatformResult platformResult = await unlinkPlatform.ExecuteAsync(
+                caller.Id,
+                linkId,
+                cancellationToken);
+            return platformResult == UnlinkPlatformResult.Removed
+                ? Results.NoContent()
+                : Problem(context, StatusCodes.Status404NotFound, "not_found");
         }
 
         bool proven = await reauthenticate.ValidateProofAsync(

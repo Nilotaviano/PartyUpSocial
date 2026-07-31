@@ -232,7 +232,7 @@ public static class ExternalAuthEndpoints
         HttpContext context,
         IDataProtectionProvider dataProtection,
         ISecurityTokenService tokens,
-        IConfiguration configuration,
+        ExternalAuthOriginOptions origins,
         IHostEnvironment environment,
         CancellationToken cancellationToken)
     {
@@ -250,7 +250,7 @@ public static class ExternalAuthEndpoints
         }
 
         string nonce = IntentBinder.Encode(IntentBinder.Create());
-        string callback = SteamCallbackUrl(configuration, nonce);
+        string callback = SteamCallbackUrl(origins, nonce);
         var state = new SteamAuthState(
             "auth",
             nonce,
@@ -264,7 +264,6 @@ public static class ExternalAuthEndpoints
             protector.Protect(JsonSerializer.Serialize(state)),
             SteamStateCookieOptions(environment));
 
-        string realm = SteamRealm(configuration);
         var parameters = new Dictionary<string, string?>
         {
             ["openid.ns"] = SteamOpenIdVerifier.OpenIdNamespace,
@@ -272,7 +271,7 @@ public static class ExternalAuthEndpoints
             ["openid.identity"] = SteamOpenIdVerifier.OpenIdNamespace + "/identifier_select",
             ["openid.claimed_id"] = SteamOpenIdVerifier.OpenIdNamespace + "/identifier_select",
             ["openid.return_to"] = callback,
-            ["openid.realm"] = realm,
+            ["openid.realm"] = origins.SteamRealm,
         };
         return Results.Redirect(QueryHelpers.AddQueryString(
             SteamOpenIdVerifier.ProviderEndpoint,
@@ -282,11 +281,11 @@ public static class ExternalAuthEndpoints
     private static async Task<IResult> CompleteSteamAsync(
         HttpContext context,
         IDataProtectionProvider dataProtection,
-        SteamOpenIdVerifier verifier,
+        ISteamOpenIdVerifier verifier,
         ICurrentUserAccessor currentUser,
         CompleteExternalSignInUseCase useCase,
         AuthenticateAndSignIn signIn,
-        IConfiguration configuration,
+        ExternalAuthOriginOptions origins,
         IHostEnvironment environment,
         CancellationToken cancellationToken)
     {
@@ -322,7 +321,7 @@ public static class ExternalAuthEndpoints
         {
             verification = await verifier.VerifyAsync(
                 assertion,
-                SteamCallbackUrl(configuration, state.Nonce),
+                SteamCallbackUrl(origins, state.Nonce),
                 cancellationToken);
         }
         catch (HttpRequestException)
@@ -533,31 +532,11 @@ public static class ExternalAuthEndpoints
             MaxAge = TimeSpan.FromMinutes(10),
         };
 
-    private static string SteamCallbackUrl(IConfiguration configuration, string nonce) =>
+    private static string SteamCallbackUrl(ExternalAuthOriginOptions origins, string nonce) =>
         QueryHelpers.AddQueryString(
-            PublicOrigin(configuration) + SteamStateCookiePath + "/callback",
+            origins.PublicOrigin + SteamStateCookiePath + "/callback",
             "n",
             nonce);
-
-    private static string SteamRealm(IConfiguration configuration)
-    {
-        string? configured = configuration["Steam:Realm"];
-        return string.IsNullOrWhiteSpace(configured)
-            ? PublicOrigin(configuration)
-            : configured.TrimEnd('/');
-    }
-
-    private static string PublicOrigin(IConfiguration configuration)
-    {
-        string configured = configuration["PublicBaseUrl"] ?? "http://localhost:5173";
-        if (!Uri.TryCreate(configured, UriKind.Absolute, out Uri? uri) ||
-            uri.Scheme is not ("http" or "https"))
-        {
-            throw new InvalidOperationException("PublicBaseUrl must be an absolute HTTP(S) URL.");
-        }
-
-        return uri.GetLeftPart(UriPartial.Authority);
-    }
 
     private static bool FixedTimeEquals(string expected, string? actual)
     {

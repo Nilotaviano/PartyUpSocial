@@ -1,11 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Net.Http.Headers;
 using PartyUp.Api.Endpoints;
+using PartyUp.Application.Auth;
 
 namespace PartyUp.Api.IntegrationTests;
 
@@ -52,14 +52,30 @@ public sealed class ExternalStateTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
-    public void AuthStateCookie_IsRejectedByTheDeletionCallback()
+    public async Task AuthPurposeCookie_ForTheDeletionFlow_IsRejectedByTheAuthCallback()
     {
         IDataProtectionProvider protection =
             _factory.Services.GetRequiredService<IDataProtectionProvider>();
         string value = protection.CreateProtector("PartyUp.SteamState.Auth")
-            .Protect("auth-state");
+            .Protect(JsonSerializer.Serialize(new
+            {
+                Flow = "deletion",
+                Nonce = "nonce",
+                Mode = ExternalStartMode.Login,
+                ReturnTo = "/app",
+                BoundUserId = (Guid?)null,
+                AgeGateAttested = true,
+            }));
+        using HttpClient client = Slice5HttpTest.CreateClient(_factory);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            "/api/v1/auth/external/steam/callback?n=nonce");
+        request.Headers.Add(HeaderNames.Cookie, $"pu.ext={value}");
 
-        Assert.Throws<CryptographicException>(() =>
-            protection.CreateProtector("PartyUp.SteamState.Deletion").Unprotect(value));
+        HttpResponseMessage response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        AuthProblem problem = (await response.Content.ReadFromJsonAsync<AuthProblem>())!;
+        Assert.Equal("state_mismatch", problem.Code);
     }
 }

@@ -170,6 +170,30 @@ public sealed class CompleteExternalSignInUseCaseTests
             login => login.Id == user.Id && login.Provider == ExternalProviderPolicy.Steam);
     }
 
+    [Fact]
+    public async Task Execute_UsesTheSteamIdSuffixWhenTheProfileIsUnavailable()
+    {
+        TestContext context = Create(steamProfileAvailable: false);
+
+        ExternalSignInResult result = await context.UseCase.ExecuteAsync(
+            LoginCommand(
+                provider: ExternalProviderPolicy.Steam,
+                providerKey: "76561198000001234",
+                email: null,
+                emailVerified: false),
+            default);
+
+        Assert.True(result.Succeeded);
+        User user = Assert.Single(context.Users.Added);
+        Assert.Equal("Steam 1234", Assert.Single(user.PlatformLinks).Handle.Value);
+        var identity = Assert.Single(context.Accounts.SteamIdentities);
+        Assert.Equal("Steam 1234", identity.PersonaName);
+        Assert.Null(identity.AvatarUrl);
+        Assert.Contains(
+            context.Accounts.Logins,
+            login => login.Id == user.Id && login.Provider == ExternalProviderPolicy.Steam);
+    }
+
     [Theory]
     [MemberData(nameof(SupportedProviderDeletionCases))]
     public async Task Execute_NeverCreatesAnAddresslessAccountForAProviderWithNoPublicDeletionLeg_D072(
@@ -227,12 +251,13 @@ public sealed class CompleteExternalSignInUseCaseTests
 
     private static CompleteExternalSignInCommand LoginCommand(
         string provider = ExternalProviderPolicy.Google,
+        string providerKey = "provider-key",
         string? email = "Player@Example.test",
         bool emailVerified = true,
         bool ageGateAttested = true) =>
         new(
             provider,
-            "provider-key",
+            providerKey,
             email,
             emailVerified,
             ExternalStartMode.Login,
@@ -240,7 +265,7 @@ public sealed class CompleteExternalSignInUseCaseTests
             null,
             null);
 
-    private static TestContext Create()
+    private static TestContext Create(bool steamProfileAvailable = true)
     {
         var accounts = new FakeAccountGateway();
         var users = new FakeUserRepository();
@@ -255,7 +280,9 @@ public sealed class CompleteExternalSignInUseCaseTests
             email,
             new FakeSteamProfileClient
             {
-                Profile = new SteamProfile("Steam Player", "https://cdn.example/avatar.jpg"),
+                Profile = steamProfileAvailable
+                    ? new SteamProfile("Steam Player", "https://cdn.example/avatar.jpg")
+                    : null,
             },
             new TestClock(Instant.FromUtc(2026, 7, 31, 12, 0)));
         return new TestContext(useCase, accounts, users, email);

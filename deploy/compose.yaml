@@ -35,6 +35,7 @@ services:
       ConnectionStrings__Db: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
       Database__MigrateOnStartup: "true"
       ASPNETCORE_ENVIRONMENT: "Production"
+      PublicBaseUrl: "https://partyup.social"
       Steam__ApiKey: "${STEAM_API_KEY:-}"
       Steam__Realm: "https://partyup.social"
     volumes:

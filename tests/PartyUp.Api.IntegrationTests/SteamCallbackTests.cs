@@ -1,4 +1,14 @@
 using System.Net;
+using System.Net.Http.Json;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Net.Http.Headers;
+using PartyUp.Api.Endpoints;
+using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Steam;
 
 namespace PartyUp.Api.IntegrationTests;
@@ -106,4 +116,183 @@ public sealed class SteamCallbackTests
             });
         }
     }
+}
+
+[Trait("Category", "Integration")]
+public sealed class SteamCallbackRouteTests : IAsyncLifetime, IDisposable
+{
+    private readonly PartyUpApiFactory _factory = new();
+
+    public Task InitializeAsync() => _factory.StartAsync();
+    public Task DisposeAsync() => _factory.StopAsync();
+    public void Dispose() => _factory.Dispose();
+
+    [Fact]
+    public async Task Start_WithOnlyPublicBaseUrlConfigured_UsesOneOriginForRealmAndReturnTo()
+    {
+        await using var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureAppConfiguration((_, configuration) =>
+                configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["PublicBaseUrl"] = "https://signin.example.test/app",
+                    ["Steam:Realm"] = string.Empty,
+                })));
+        using HttpClient client = Slice5HttpTest.CreateClient(factory);
+
+        StartedSteamFlow flow = await StartSteamAsync(client);
+        var query = QueryHelpers.ParseQuery(flow.ProviderRedirect.Query);
+        string realm = query["openid.realm"].ToString();
+        string returnTo = query["openid.return_to"].ToString();
+
+        Assert.Equal("https://signin.example.test", realm);
+        Assert.Equal(
+            new Uri(realm).GetLeftPart(UriPartial.Authority),
+            new Uri(returnTo).GetLeftPart(UriPartial.Authority));
+        Assert.True(flow.StateSetCookie.HttpOnly);
+        Assert.Equal("/api/v1/auth/external/steam", flow.StateSetCookie.Path.Value);
+    }
+
+    [Fact]
+    public async Task Callback_WithAForgedAssertion_IsRejectedWithoutSessionOrAccount()
+    {
+        using HttpClient client = Slice5HttpTest.CreateClient(_factory);
+        StartedSteamFlow flow = await StartSteamAsync(client);
+
+        HttpResponseMessage response = await SendCallbackAsync(client, flow);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        AuthProblem problem = (await response.Content.ReadFromJsonAsync<AuthProblem>())!;
+        Assert.Equal("steam_assertion_invalid", problem.Code);
+        AssertNoAuthCookie(response);
+        AssertStateCookieDeleted(response);
+        await AssertNoAccountAsync();
+    }
+
+    [Fact]
+    public async Task Callback_InvokesTheRegisteredVerifierOnceAndHonorsANegativeVerdict()
+    {
+        var verifier = new RecordingVerifier();
+        await using var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<ISteamOpenIdVerifier>();
+                services.AddSingleton<ISteamOpenIdVerifier>(verifier);
+            }));
+        using HttpClient client = Slice5HttpTest.CreateClient(factory);
+        StartedSteamFlow flow = await StartSteamAsync(client);
+
+        HttpResponseMessage response = await SendCallbackAsync(
+            client,
+            flow,
+            "&openid.mode=id_res");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(1, verifier.Calls);
+        AssertNoAuthCookie(response);
+        await AssertNoAccountAsync();
+    }
+
+    private async Task AssertNoAccountAsync()
+    {
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Empty(await context.AuthUsers.ToListAsync());
+        Assert.Empty(await context.DomainUsers.ToListAsync());
+    }
+
+    private static async Task<StartedSteamFlow> StartSteamAsync(HttpClient client)
+    {
+        HttpResponseMessage mint = await AntiforgeryTestClient.PostAsync(
+            client,
+            "/api/v1/auth/external/intent",
+            JsonContent.Create(new
+            {
+                provider = "steam",
+                mode = "login",
+                returnTo = "/app",
+                ageGateAttested = true,
+            }));
+        mint.EnsureSuccessStatusCode();
+        ExternalIntentResponse body =
+            (await mint.Content.ReadFromJsonAsync<ExternalIntentResponse>())!;
+        string intentCookie = ReadCookiePair(mint, "pu.intent");
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/api/v1/auth/external/steam/start?intent={Uri.EscapeDataString(body.Intent)}");
+        request.Headers.Add(HeaderNames.Cookie, intentCookie);
+        HttpResponseMessage start = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Redirect, start.StatusCode);
+        Uri providerRedirect = start.Headers.Location!;
+        SetCookieHeaderValue stateSetCookie = ReadSetCookie(start, "pu.ext");
+        string returnTo = QueryHelpers.ParseQuery(providerRedirect.Query)["openid.return_to"].ToString();
+        string nonce = QueryHelpers.ParseQuery(new Uri(returnTo).Query)["n"].ToString();
+        return new StartedSteamFlow(
+            $"{stateSetCookie.Name.Value}={stateSetCookie.Value.Value}",
+            nonce,
+            providerRedirect,
+            stateSetCookie);
+    }
+
+    private static async Task<HttpResponseMessage> SendCallbackAsync(
+        HttpClient client,
+        StartedSteamFlow flow,
+        string extraQuery = "")
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/api/v1/auth/external/steam/callback?n={Uri.EscapeDataString(flow.Nonce)}{extraQuery}");
+        request.Headers.Add(HeaderNames.Cookie, flow.StateCookie);
+        return await client.SendAsync(request);
+    }
+
+    private static SetCookieHeaderValue ReadSetCookie(
+        HttpResponseMessage response,
+        string name) =>
+        response.Headers.GetValues(HeaderNames.SetCookie)
+            .Select(value => SetCookieHeaderValue.Parse(value))
+            .Single(cookie => cookie.Name.Value == name);
+
+    private static string ReadCookiePair(HttpResponseMessage response, string name)
+    {
+        SetCookieHeaderValue cookie = ReadSetCookie(response, name);
+        return $"{cookie.Name.Value}={cookie.Value.Value}";
+    }
+
+    private static void AssertStateCookieDeleted(HttpResponseMessage response)
+    {
+        SetCookieHeaderValue cookie = ReadSetCookie(response, "pu.ext");
+        Assert.Equal("/api/v1/auth/external/steam", cookie.Path.Value);
+        Assert.Equal(DateTimeOffset.UnixEpoch, cookie.Expires);
+    }
+
+    private static void AssertNoAuthCookie(HttpResponseMessage response)
+    {
+        Assert.DoesNotContain(
+            response.Headers.GetValues(HeaderNames.SetCookie),
+            value => value.StartsWith("pu.auth=", StringComparison.Ordinal));
+    }
+
+    private sealed class RecordingVerifier : ISteamOpenIdVerifier
+    {
+        private int _calls;
+
+        internal int Calls => Volatile.Read(ref _calls);
+
+        public Task<SteamOpenIdVerification> VerifyAsync(
+            IReadOnlyDictionary<string, string> assertion,
+            string expectedReturnTo,
+            CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _calls);
+            return Task.FromResult(SteamOpenIdVerification.Invalid);
+        }
+    }
+
+    private sealed record StartedSteamFlow(
+        string StateCookie,
+        string Nonce,
+        Uri ProviderRedirect,
+        SetCookieHeaderValue StateSetCookie);
 }

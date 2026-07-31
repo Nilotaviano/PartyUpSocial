@@ -21,6 +21,7 @@ using PartyUp.Application.Profile;
 using PartyUp.Infrastructure;
 using PartyUp.Infrastructure.Email;
 using PartyUp.Infrastructure.Persistence;
+using PartyUp.Infrastructure.Steam;
 using Serilog;
 using Serilog.Formatting.Compact;
 
@@ -49,6 +50,8 @@ builder.Services.AddSingleton(new LoggingEmailSenderEnvironment(
     builder.Environment.IsDevelopment(),
     builder.Environment.ContentRootPath));
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddSingleton<ISteamOpenIdVerifier>(services =>
+    services.GetRequiredService<SteamOpenIdVerifier>());
 builder.Services.AddHostedService<EmailDispatchHostedService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<IClock>(NodaTime.SystemClock.Instance);
@@ -77,6 +80,7 @@ builder.Services.AddScoped<GetOnboardingStateUseCase>();
 builder.Services.AddScoped<CheckUsernameAvailabilityUseCase>();
 builder.Services.AddScoped<ValidateProfileDraftUseCase>();
 builder.Services.AddScoped<CompleteOnboardingUseCase>();
+builder.Services.AddSingleton<ExternalAuthOriginOptions>();
 builder.Services.AddSingleton(new AccountEmailOptions(
     builder.Configuration["PublicBaseUrl"] ?? "http://localhost:5173"));
 builder.Services.AddScoped<AuthenticateAndSignIn>();
@@ -161,6 +165,7 @@ if (Directory.Exists(DataProtectionKeyPath))
 }
 
 var app = builder.Build();
+_ = app.Services.GetRequiredService<ExternalAuthOriginOptions>();
 
 if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {

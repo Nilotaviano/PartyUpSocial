@@ -33,16 +33,18 @@ public sealed class PlatformLinkRouteTests : IAsyncLifetime, IDisposable
         using HttpClient client = Slice5HttpTest.CreateClient(_factory);
         string authCookie = await SignInAsync(client, userId);
 
-        HttpResponseMessage nonSteamRemoved = await DeleteAsync(
-            client,
-            nonSteamLinkId,
-            authCookie,
-            content: null);
+        _factory.PostAuthenticationGateProbe.Reset();
         HttpResponseMessage refused = await DeleteAsync(
             client,
             linkId,
             authCookie,
             new StringContent(string.Empty, Encoding.UTF8, "application/json"));
+        Assert.Equal(0, _factory.PostAuthenticationGateProbe.Entries);
+        HttpResponseMessage nonSteamRemoved = await DeleteAsync(
+            client,
+            nonSteamLinkId,
+            authCookie,
+            content: null);
         HttpResponseMessage removed = await DeleteAsync(
             client,
             linkId,
@@ -74,6 +76,29 @@ public sealed class PlatformLinkRouteTests : IAsyncLifetime, IDisposable
             authCookie,
             content: null);
         Assert.Equal(HttpStatusCode.Unauthorized, rotatedOut.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_ForSteam_ReturnsTheExternalFlowRequiredConflict()
+    {
+        UserId userId = await _factory.SeedUserAsync();
+        using HttpClient client = Slice5HttpTest.CreateClient(_factory);
+        string authCookie = await SignInAsync(client, userId);
+        AntiforgeryPair pair = await AntiforgeryTestClient.GetAsync(client, authCookie);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            "/api/v1/me/platform-links")
+        {
+            Content = JsonContent.Create(new { platform = "steam", handle = "Steam Player" }),
+        };
+        request.Headers.Add("X-CSRF-TOKEN", pair.Token);
+        request.Headers.Add(HeaderNames.Cookie, $"{authCookie}; {pair.Cookie}");
+
+        HttpResponseMessage response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        AuthProblem problem = (await response.Content.ReadFromJsonAsync<AuthProblem>())!;
+        Assert.Equal("steam_external_flow_required", problem.Code);
     }
 
     private async Task<(PlatformLinkId Steam, PlatformLinkId NonSteam)> SeedLinksAsync(

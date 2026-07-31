@@ -185,8 +185,10 @@ public sealed partial class UserAccountGateway(
         CancellationToken cancellationToken)
     {
         // Store-level removal, not UserManager.RemoveLoginAsync: the manager
-        // rotates the security stamp, and with ValidationInterval zero that
-        // signs out every live session — unlinking a platform must not.
+        // would rotate the security stamp as a hidden side effect. A-049 does
+        // require rotation on unlink, but the use case performs it explicitly
+        // via SignOutEverywhereAsync so it happens exactly once, at the layer
+        // that owns the decision — callers of this method must rotate.
         AuthUser user = await RequireUserAsync(id, cancellationToken);
         List<IdentityUserLogin<Guid>> logins = await context.Set<IdentityUserLogin<Guid>>()
             .Where(login => login.UserId == user.Id && login.LoginProvider == provider)
