@@ -9,6 +9,8 @@ public sealed class PartyUpUserClaimsPrincipalFactory(
     IOptions<IdentityOptions> identityOptions)
     : IUserClaimsPrincipalFactory<AuthUser>
 {
+    // Infrastructure has no ASP.NET FrameworkReference, so this literal cannot use IdentityConstants;
+    // it must remain equal to IdentityConstants.ApplicationScheme configured in PartyUp.Api.
     private const string ApplicationScheme = "Identity.Application";
 
     private readonly IdentityOptions _identityOptions = identityOptions.Value;

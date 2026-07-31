@@ -67,8 +67,7 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 }
 
 app.UseSerilogRequestLogging(options =>
-    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
-        diagnosticContext.Set("RequestPath", httpContext.Request.Path.Value ?? string.Empty));
+    options.IncludeQueryInRequestPath = false);
 
 app.UseAuthentication();
 app.UseAuthorization();

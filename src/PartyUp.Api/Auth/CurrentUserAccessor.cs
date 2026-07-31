@@ -40,10 +40,16 @@ public sealed class CurrentUserAccessor(
         string? subject = httpContextAccessor.HttpContext?.User
             .FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-        _projection = Guid.TryParse(subject, out Guid value)
-            ? projectionReader.ReadAsync(UserId.From(value), cancellationToken)
+        return Guid.TryParse(subject, out Guid value)
+            ? GetProjectionAsync(UserId.From(value), cancellationToken)
             : Task.FromResult<CurrentUserProjection?>(null);
+    }
 
+    internal Task<CurrentUserProjection?> GetProjectionAsync(
+        UserId subject,
+        CancellationToken cancellationToken)
+    {
+        _projection ??= projectionReader.ReadAsync(subject, cancellationToken);
         return _projection;
     }
 

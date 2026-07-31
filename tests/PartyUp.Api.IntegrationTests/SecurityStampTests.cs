@@ -4,9 +4,12 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
+using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Users;
 
 namespace PartyUp.Api.IntegrationTests;
 
@@ -34,6 +37,64 @@ public sealed class SecurityStampTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         Assert.False(response.Headers.Contains(HeaderNames.SetCookie));
+    }
+
+    [Fact]
+    public async Task Validator_ReadsItsContextPrincipal_AndSeedsTheRequestProjectionCacheOnce()
+    {
+        UserId userId = UserId.New();
+        const string SecurityStamp = "matching-stamp";
+        var reader = new RecordingProjectionReader(new CurrentUserProjection(
+            userId,
+            UserLifecycle.Active,
+            IsBanned: false,
+            GraceEndsAt: null,
+            IsAdmin: false,
+            IsProfileComplete: true,
+            Locale.Create("en"),
+            SecurityStamp));
+        await using var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ICurrentUserProjectionReader>();
+                services.AddSingleton<ICurrentUserProjectionReader>(reader);
+            }));
+        using IServiceScope scope = factory.Services.CreateScope();
+        var cookieOptions = scope.ServiceProvider
+            .GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
+            .Get(IdentityConstants.ApplicationScheme);
+        var identityOptions = scope.ServiceProvider
+            .GetRequiredService<IOptions<IdentityOptions>>()
+            .Value;
+        var identity = new ClaimsIdentity(IdentityConstants.ApplicationScheme);
+        identity.AddClaim(new Claim(
+            identityOptions.ClaimsIdentity.UserIdClaimType,
+            userId.Value.ToString("D")));
+        identity.AddClaim(new Claim(
+            identityOptions.ClaimsIdentity.SecurityStampClaimType,
+            SecurityStamp));
+        string protectedTicket = cookieOptions.TicketDataFormat.Protect(new AuthenticationTicket(
+            new ClaimsPrincipal(identity),
+            new AuthenticationProperties
+            {
+                IssuedUtc = DateTimeOffset.UtcNow,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddDays(30),
+            },
+            IdentityConstants.ApplicationScheme));
+        using HttpClient client = factory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false,
+                HandleCookies = false,
+            });
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/_slice2/authenticated");
+        request.Headers.Add(HeaderNames.Cookie, $"pu.auth={protectedTicket}");
+
+        HttpResponseMessage response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(1, reader.ReadCount);
+        Assert.Equal(userId, reader.RequestedUserId);
     }
 
     [Fact]
@@ -89,5 +150,22 @@ public sealed class SecurityStampTests : IAsyncLifetime, IDisposable
         return response.Headers.GetValues(HeaderNames.SetCookie)
             .Single(value => value.StartsWith("pu.auth=", StringComparison.Ordinal))
             .Split(';', 2)[0];
+    }
+
+    private sealed class RecordingProjectionReader(CurrentUserProjection projection)
+        : ICurrentUserProjectionReader
+    {
+        public int ReadCount { get; private set; }
+
+        public UserId? RequestedUserId { get; private set; }
+
+        public Task<CurrentUserProjection?> ReadAsync(
+            UserId id,
+            CancellationToken cancellationToken)
+        {
+            ReadCount++;
+            RequestedUserId = id;
+            return Task.FromResult<CurrentUserProjection?>(projection);
+        }
     }
 }
