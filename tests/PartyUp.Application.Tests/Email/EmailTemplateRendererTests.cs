@@ -36,6 +36,7 @@ public sealed class EmailTemplateRendererTests
             RenderedEmail graceStarted = _renderer.Render(
                 CreateMessage(EmailTemplate.DeletionRequested, locale));
             string graceOutput = $"{graceStarted.Subject}\n{graceStarted.TextBody}\n{graceStarted.HtmlBody}";
+            Assert.Contains("localized-grace-end", graceOutput, StringComparison.Ordinal);
             Assert.DoesNotContain("raw-token", graceOutput, StringComparison.Ordinal);
             Assert.DoesNotContain("account-deletion/confirm", graceOutput, StringComparison.Ordinal);
         }
