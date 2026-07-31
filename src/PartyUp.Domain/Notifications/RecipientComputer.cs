@@ -312,8 +312,9 @@ public static class RecipientComputer
     }
 
     /// <summary>
-    /// D-120: the organizer only — voters are never told about each other's suggestions. The subject
-    /// carries the suggested instant so the row renders without a denormalized time string (§9).
+    /// D-120: the organizer only — voters are never told about each other's suggestions, and the
+    /// organizer suggesting their own option is silent. The subject carries the suggested instant
+    /// so the row renders without a denormalized time string (§9).
     /// </summary>
     public static IReadOnlyList<NotificationRequest> OptionSuggested(
         Poll poll,
@@ -322,6 +323,11 @@ public static class RecipientComputer
     {
         ArgumentNullException.ThrowIfNull(poll);
         ArgumentNullException.ThrowIfNull(domainEvent);
+
+        if (domainEvent.SuggestedBy.UserId == poll.OrganizerId)
+        {
+            return [];
+        }
 
         return ExplicitTarget(
             poll.OrganizerId,

@@ -71,6 +71,22 @@ public class PollRecipientTests
         Assert.Null(requests[0].Subject.ActorUserId);
     }
 
+    [Fact]
+    public void OptionSuggested_IsSilentWhenTheOrganizerSuggests_D120()
+    {
+        FakeClock clock = TestPolls.Clock();
+        PollUnderTest fixture = TestPolls.New(clock);
+        _ = fixture.Drain();
+
+        _ = fixture.Poll.SuggestOption(fixture.OrganizerRef, TestPolls.Hours(120), clock);
+
+        PollOptionSuggested domainEvent = TestNotifications.Single<PollOptionSuggested>(fixture.Drain());
+        IReadOnlyList<NotificationRequest> requests =
+            RecipientComputer.OptionSuggested(fixture.Poll, domainEvent, RecipientFilter.None);
+
+        Assert.Empty(requests);
+    }
+
     // ---- §10: poll broadcasts ---------------------------------------------------------------------
 
     [Fact]

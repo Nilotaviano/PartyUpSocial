@@ -211,7 +211,7 @@ Recipients are defined per event — some legitimate recipients hold no Particip
 | Join request received / waitlist vacancy | organizer |
 | Join request accepted / rejected | the requester (explicit target) |
 | Added to / promoted from / rejected from waitlist | the affected participant (explicit target — reaches the rejected participant even though their row just became `Removed`) |
-| Poll: voter-suggested option | organizer only (D-120) |
+| Poll: voter-suggested option | organizer only (D-120); silent when the organizer is the suggester |
 | Poll: deadline approaching | all Active registered poll participants + organizer, at Deadline − 1 h (D-120); skipped if the poll has left `Polling` by then; scheduled event, not a transition |
 | Poll: closed awaiting selection / expired / canceled / option selected | all Active registered poll participants + organizer (D-120/D-170/D-166); option-selected fires in every finalization branch (§6.4-8) |
 | Friend request received | the target user (D-105; acceptance, removal, blocking: silent) |
