@@ -154,7 +154,7 @@ Secrets at this scale are the VM's `.env` (mode 600, never committed — `.gitig
 ## 10. Deferred (tracked, not forgotten)
 
 - **Phase 0 remainder:** spikes A/B/C are built and decided (A-018..A-020, code under `spikes/`); human confirmation passes remain: NVDA + real-device touch on the custom grid, real Steam login + API key outcomes, Firefox/Android Chrome push delivery.
-- **Phase 9 (go-live, before the first beta invite):** VM provisioning + DNS + GHCR/SSH secrets + `DEPLOY_ENABLED`, first deploy over TLS, offsite backup target (rclone, RUNBOOK-backup.md), **restore drill against a real dump**.
+- **Phase 9 (go-live, before the first beta invite):** VM + DNS + GHCR/SSH secrets + `DEPLOY_ENABLED=true` done 2026-07-30 (provisioned early, during Phase 1). Still open: first deploy over TLS (fires on next push to `main`), offsite backup target (rclone, RUNBOOK-backup.md), **restore drill against a real dump**.
 - **Phase 1 opener:** aggregate/tombstone data-model design doc (A-014) — done: DOMAIN_MODEL.md; its §12 interpretation notes await ratification.
 - **Phase 2:** ASP.NET Identity + cookie BFF auth — with antiforgery, `HttpOnly`/`Secure`/`SameSite=Lax` cookies, and security-stamp-based sign-out-everywhere (deletion start invalidates all sessions, successful login cancels deletion — D-158/D-165); transactional email + mail.partyup.social DNS/SPF/DKIM/DMARC; deletion skeleton incl. deletion journal (A-017).
 - **Phase 4/6:** Hangfire wiring + sweeper jobs; guest-link security package (A-015 + plan Phase 4).
