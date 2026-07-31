@@ -1,12 +1,16 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Net.Http.Headers;
 using PartyUp.Api.Endpoints;
+using PartyUp.Application.Abstractions;
 using PartyUp.Application.Accounts;
 using PartyUp.Application.Auth;
 using PartyUp.Domain.Kernel;
+using PartyUp.Infrastructure.Auth;
 using PartyUp.Infrastructure.Identity;
 
 namespace PartyUp.Api.IntegrationTests;
@@ -34,6 +38,31 @@ public sealed class ExternalIntentTests : IAsyncLifetime, IDisposable
             $"/api/v1/auth/external/google/start?mode={mode}");
 
         await AssertIntentRequiredAsync(response);
+    }
+
+    [Theory]
+    [InlineData("https://evil.example/phish")]
+    [InlineData("//evil.example/path")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("/\\evil.example")]
+    public async Task Intent_HostileReturnToIsSanitizedBeforeTokenIssuance(string returnTo)
+    {
+        var probe = new TokenIssueProbe();
+        await using var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<ISecurityTokenService>();
+                services.AddScoped<SecurityTokenService>();
+                services.AddScoped<ISecurityTokenService>(provider =>
+                    new CapturingTokenService(
+                        provider.GetRequiredService<SecurityTokenService>(),
+                        probe));
+            }));
+        using HttpClient client = Slice5HttpTest.CreateClient(factory);
+
+        await MintAsync(client, returnTo: returnTo);
+
+        Assert.Equal("/app", probe.Single().Intent!.ReturnTo);
     }
 
     [Fact]
@@ -242,6 +271,51 @@ public sealed class ExternalIntentTests : IAsyncLifetime, IDisposable
         AuthProblem problem = (await response.Content.ReadFromJsonAsync<AuthProblem>())!;
         Assert.Equal("intent_required", problem.Code);
         Assert.Null(response.Headers.Location);
+    }
+
+    private sealed class TokenIssueProbe
+    {
+        private readonly object _gate = new();
+        private IssueTokenRequest? _issue;
+
+        internal void Record(IssueTokenRequest issue)
+        {
+            lock (_gate)
+            {
+                if (_issue is not null)
+                {
+                    throw new InvalidOperationException("Expected exactly one issued token.");
+                }
+
+                _issue = issue;
+            }
+        }
+
+        internal IssueTokenRequest Single()
+        {
+            lock (_gate)
+            {
+                return _issue ?? throw new InvalidOperationException("No token was issued.");
+            }
+        }
+    }
+
+    private sealed class CapturingTokenService(
+        SecurityTokenService inner,
+        TokenIssueProbe probe) : ISecurityTokenService
+    {
+        public Task<IssuedToken> IssueAsync(
+            IssueTokenRequest request,
+            CancellationToken cancellationToken)
+        {
+            probe.Record(request);
+            return inner.IssueAsync(request, cancellationToken);
+        }
+
+        public Task<TokenRedemption> RedeemAsync(
+            RedeemTokenRequest request,
+            CancellationToken cancellationToken) =>
+            inner.RedeemAsync(request, cancellationToken);
     }
 
     private sealed record MintedIntent(string Intent, string? Cookie);

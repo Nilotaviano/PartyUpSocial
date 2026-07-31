@@ -1,3 +1,4 @@
+using System.Reflection;
 using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Accounts;
@@ -148,8 +149,7 @@ public sealed class CompleteExternalSignInUseCaseTests
     }
 
     [Theory]
-    [InlineData(ExternalProviderPolicy.Google, false)]
-    [InlineData(ExternalProviderPolicy.Steam, true)]
+    [MemberData(nameof(SupportedProviderDeletionCases))]
     public async Task Execute_NeverCreatesAnAddresslessAccountForAProviderWithNoPublicDeletionLeg_D072(
         string provider,
         bool hasPublicDeletionLeg)
@@ -162,6 +162,30 @@ public sealed class CompleteExternalSignInUseCaseTests
 
         bool createdWithoutAddress = context.Accounts.Created.Any(created => created.Email is null);
         Assert.Equal(hasPublicDeletionLeg, createdWithoutAddress);
+    }
+
+    public static IEnumerable<object[]> SupportedProviderDeletionCases()
+    {
+        IEnumerable<string> providers = typeof(ExternalProviderPolicy)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(field =>
+                field.IsLiteral &&
+                !field.IsInitOnly &&
+                field.FieldType == typeof(string))
+            .Select(field => (string)field.GetRawConstantValue()!);
+
+        foreach (string provider in providers)
+        {
+            bool hasPublicDeletionLeg = provider switch
+            {
+                ExternalProviderPolicy.Google => false,
+                ExternalProviderPolicy.Steam => true,
+                _ => throw new InvalidOperationException(
+                    $"Classify provider '{provider}' before enabling account creation."),
+            };
+
+            yield return [provider, hasPublicDeletionLeg];
+        }
     }
 
     private static async Task<ExternalSignInResult> ExecuteGoogleAsync(

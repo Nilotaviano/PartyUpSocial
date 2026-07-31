@@ -17,6 +17,7 @@ namespace PartyUp.Api.IntegrationTests;
 [Trait("Category", "Integration")]
 public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
 {
+    private const string Password = "external-flow-password";
     private readonly PartyUpApiFactory _factory = new(googleEnabled: true);
 
     public Task InitializeAsync() => _factory.StartAsync();
@@ -46,35 +47,171 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
             value => value.Contains("SameSite=None", StringComparison.OrdinalIgnoreCase));
     }
 
-    [Fact]
-    public async Task NoRedirectLocationFromAnExternalLegContainsARawTokenInItsQuery()
+    [Theory]
+    [InlineData("login")]
+    [InlineData("link")]
+    [InlineData("reauth")]
+    [InlineData("refusal")]
+    public async Task NoRedirectLocationFromAnExternalLegContainsARawTokenInItsQuery(
+        string completionKind)
     {
-        ExternalCompletion completion = await CompleteReauthAsync("raw-token-query-check");
+        ExternalCompletion completion = await CompleteAsync(completionKind);
 
         string location = completion.Response.Headers.Location!.OriginalString;
         string query = location.Split('#', 2)[0];
         Assert.DoesNotContain("reauth=", query, StringComparison.Ordinal);
-        Assert.Contains("#reauth=", location, StringComparison.Ordinal);
+        Assert.DoesNotContain("intent=", query, StringComparison.Ordinal);
+        if (completionKind == "reauth")
+        {
+            Assert.Contains("#reauth=", location, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.DoesNotContain("#reauth=", location, StringComparison.Ordinal);
+        }
     }
 
-    [Fact]
-    public async Task EveryCompletionLandsOnTheHashClearingCallbackRoute()
+    [Theory]
+    [InlineData("login")]
+    [InlineData("link")]
+    [InlineData("reauth")]
+    [InlineData("refusal")]
+    public async Task EveryCompletionLandsOnTheHashClearingCallbackRoute(string completionKind)
     {
-        ExternalCompletion completion = await CompleteReauthAsync("callback-route-check");
+        ExternalCompletion completion = await CompleteAsync(completionKind);
 
         string location = completion.Response.Headers.Location!.OriginalString;
         Assert.StartsWith("/auth/callback?", location, StringComparison.Ordinal);
     }
 
-    private async Task<ExternalCompletion> CompleteReauthAsync(string providerKey)
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Complete_WithoutEmailVerifiedClaimRefusesBindingOrCreation_D067(
+        bool matchingAccountExists)
     {
-        UserId userId = await _factory.SeedUserAsync();
-        await AddGoogleLoginAsync(userId, providerKey);
+        const string email = "absent-verified-claim@example.test";
+        UserId? existingUserId = matchingAccountExists
+            ? await _factory.SeedUserAsync(email: email)
+            : null;
+
+        ExternalCompletion completion = await CompleteGoogleAsync(
+            "absent-verified-claim-key",
+            "login",
+            email,
+            includeEmailVerifiedClaim: false);
+
+        Assert.Contains(
+            "error=link_required",
+            completion.Response.Headers.Location!.OriginalString,
+            StringComparison.Ordinal);
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<AuthUser>>();
+        AuthUser? account = await users.FindByEmailAsync(email);
+        if (existingUserId is { } expectedId)
+        {
+            Assert.NotNull(account);
+            Assert.Equal(expectedId.Value, account.Id);
+            Assert.Empty(await users.GetLoginsAsync(account));
+        }
+        else
+        {
+            Assert.Null(account);
+        }
+    }
+
+    [Fact]
+    public async Task Complete_WithALinkFlowMissingItsBoundUser_LinksNothingAtHttpLayer_D087()
+    {
+        const string email = "missing-bound-user@example.test";
+        UserId userId = await _factory.SeedUserAsync(email: email, password: Password);
+
+        ExternalCompletion completion = await CompleteGoogleAsync(
+            "missing-bound-user-key",
+            "link",
+            email,
+            userId,
+            Password,
+            mutateFlow: properties => properties.Items.Remove("partyup.boundUserId"));
+
+        Assert.Contains(
+            "error=intent_mode_mismatch",
+            completion.Response.Headers.Location!.OriginalString,
+            StringComparison.Ordinal);
+        Assert.Equal(0, await LoginCountAsync(userId));
+    }
+
+    private async Task<ExternalCompletion> CompleteAsync(string completionKind)
+    {
+        string providerKey = $"{completionKind}-completion-key";
+        string email = $"{completionKind}-completion@example.test";
+
+        switch (completionKind)
+        {
+            case "login":
+            {
+                UserId userId = await _factory.SeedUserAsync(email: email);
+                await AddGoogleLoginAsync(userId, providerKey);
+                return await CompleteGoogleAsync(providerKey, "login", email);
+            }
+            case "link":
+            {
+                UserId userId = await _factory.SeedUserAsync(email: email, password: Password);
+                return await CompleteGoogleAsync(
+                    providerKey,
+                    "link",
+                    email,
+                    userId,
+                    Password);
+            }
+            case "reauth":
+            {
+                UserId userId = await _factory.SeedUserAsync(email: email);
+                await AddGoogleLoginAsync(userId, providerKey);
+                return await CompleteGoogleAsync(
+                    providerKey,
+                    "reauth",
+                    email,
+                    userId);
+            }
+            case "refusal":
+                return await CompleteGoogleAsync(
+                    providerKey,
+                    "login",
+                    email,
+                    includeEmailVerifiedClaim: false);
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(completionKind),
+                    completionKind,
+                    "Unknown completion kind.");
+        }
+    }
+
+    private async Task<ExternalCompletion> CompleteGoogleAsync(
+        string providerKey,
+        string mode,
+        string email,
+        UserId? authenticatedUserId = null,
+        string? currentPassword = null,
+        bool includeEmailVerifiedClaim = true,
+        Action<AuthenticationProperties>? mutateFlow = null)
+    {
         await using WebApplicationFactory<Program> googleFactory =
-            CreateGoogleFactory(providerKey);
+            CreateGoogleFactory(
+                providerKey,
+                email,
+                includeEmailVerifiedClaim,
+                mutateFlow);
         using HttpClient client = Slice5HttpTest.CreateClient(googleFactory);
-        string authCookie = await SignInAsync(client, userId);
-        MintedIntent minted = await MintAsync(client, "reauth", authCookie);
+        string? authCookie = authenticatedUserId is { } userId
+            ? await SignInAsync(client, userId)
+            : null;
+        MintedIntent minted = await MintAsync(
+            client,
+            mode,
+            authCookie,
+            currentPassword);
         HttpResponseMessage challenge = await StartAsync(client, minted, authCookie);
         string externalCookie = Cookie(
             challenge,
@@ -85,13 +222,19 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
         using var complete = new HttpRequestMessage(
             HttpMethod.Get,
             "/api/v1/auth/external/complete");
-        complete.Headers.Add(HeaderNames.Cookie, $"{authCookie}; {externalCookie}");
+        complete.Headers.Add(
+            HeaderNames.Cookie,
+            authCookie is null ? externalCookie : $"{authCookie}; {externalCookie}");
         HttpResponseMessage response = await client.SendAsync(complete);
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         return new ExternalCompletion(response);
     }
 
-    private WebApplicationFactory<Program> CreateGoogleFactory(string providerKey) =>
+    private WebApplicationFactory<Program> CreateGoogleFactory(
+        string providerKey,
+        string email,
+        bool includeEmailVerifiedClaim = true,
+        Action<AuthenticationProperties>? mutateFlow = null) =>
         _factory.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
                 services.PostConfigure<GoogleOptions>(
@@ -100,12 +243,20 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
                     {
                         options.Events.OnRedirectToAuthorizationEndpoint = async context =>
                         {
+                            var claims = new List<Claim>
+                            {
+                                new(ClaimTypes.NameIdentifier, providerKey),
+                                new(ClaimTypes.Email, email),
+                            };
+                            if (includeEmailVerifiedClaim)
+                            {
+                                claims.Add(new Claim("email_verified", "true"));
+                            }
+
+                            mutateFlow?.Invoke(context.Properties);
                             var identity = new ClaimsIdentity(
-                            [
-                                new Claim(ClaimTypes.NameIdentifier, providerKey),
-                                new Claim(ClaimTypes.Email, "provider@example.test"),
-                                new Claim("email_verified", "true"),
-                            ], GoogleDefaults.AuthenticationScheme);
+                                claims,
+                                GoogleDefaults.AuthenticationScheme);
                             await context.HttpContext.SignInAsync(
                                 IdentityConstants.ExternalScheme,
                                 new ClaimsPrincipal(identity),
@@ -124,6 +275,14 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
             new UserLoginInfo("google", providerKey, "google"))).Succeeded);
     }
 
+    private async Task<int> LoginCountAsync(UserId userId)
+    {
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<AuthUser>>();
+        AuthUser user = (await users.FindByIdAsync(userId.Value.ToString("D")))!;
+        return (await users.GetLoginsAsync(user)).Count;
+    }
+
     private static async Task<string> SignInAsync(HttpClient client, UserId userId)
     {
         HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
@@ -137,7 +296,8 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
     private static async Task<MintedIntent> MintAsync(
         HttpClient client,
         string mode,
-        string? authCookie = null)
+        string? authCookie = null,
+        string? currentPassword = null)
     {
         HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
             client,
@@ -148,6 +308,7 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
                 mode,
                 returnTo = "/settings/account",
                 ageGateAttested = true,
+                currentPassword,
             }),
             authCookie);
         response.EnsureSuccessStatusCode();
