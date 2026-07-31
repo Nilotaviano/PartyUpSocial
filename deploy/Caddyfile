@@ -8,9 +8,11 @@ partyup.social {
 		format filter {
 			wrap json
 			fields {
-				request>uri query {
-					delete *
-				}
+				# The query filter's wildcard-looking form reads the asterisk
+				# as a literal parameter name and scrubs nothing; this regexp
+				# is the form proven to strip the whole query string against
+				# the pinned caddy:2 image.
+				request>uri regexp "\?.*" ""
 			}
 		}
 	}

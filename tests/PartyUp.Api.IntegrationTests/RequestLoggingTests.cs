@@ -115,9 +115,15 @@ public sealed class RequestLoggingTests : IAsyncLifetime, IDisposable
             }
         }
 
+        // Static text check only: the query filter's wildcard-looking form
+        // silently no-ops (Caddy reads the asterisk as a literal parameter
+        // name), so the assertions pin the regexp form that was empirically
+        // proven to scrub against the pinned caddy:2 image, and reject any
+        // reappearance of the no-op form.
         string caddyfile = File.ReadAllText(FindRepositoryFile(["deploy", "Caddyfile"]));
-        Assert.Contains("request>uri query", caddyfile, StringComparison.Ordinal);
-        Assert.Contains("delete *", caddyfile, StringComparison.Ordinal);
+        Assert.Contains("request>uri regexp", caddyfile, StringComparison.Ordinal);
+        Assert.Contains(@"""\?.*""", caddyfile, StringComparison.Ordinal);
+        Assert.DoesNotContain("delete *", caddyfile, StringComparison.Ordinal);
     }
 
     private static IEnumerable<string> Flatten(LogEventPropertyValue value)
