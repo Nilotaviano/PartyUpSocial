@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Kernel;
 using PartyUp.Infrastructure.Persistence;
@@ -55,9 +57,24 @@ public sealed class UserAccountGateway(
         };
 
         await context.SaveChangesAsync(cancellationToken);
-        IdentityResult result = password is null
-            ? await userManager.CreateAsync(user)
-            : await userManager.CreateAsync(user, password);
+        IdentityResult result;
+        try
+        {
+            result = password is null
+                ? await userManager.CreateAsync(user)
+                : await userManager.CreateAsync(user, password);
+        }
+        catch (DbUpdateException exception) when (
+            exception.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.UniqueViolation,
+                ConstraintName: "ux_auth_users_normalized_email",
+            })
+        {
+            throw new DomainException(
+                DomainError.Duplicate,
+                "An account already exists for this email address.");
+        }
         ThrowIfFailed(result, "create the identity account");
     }
 

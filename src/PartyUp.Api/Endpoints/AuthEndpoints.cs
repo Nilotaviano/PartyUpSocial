@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -551,7 +552,9 @@ public static class AuthEndpoints
                 status == StatusCodes.Status409Conflict ? "Conflict" : "Bad Request",
                 status,
                 code,
-                context.TraceIdentifier),
+                code is "invalid_credentials" or "reauth_required"
+                    ? null
+                    : context.TraceIdentifier),
             statusCode: status,
             contentType: "application/problem+json");
 
@@ -633,7 +636,7 @@ public sealed record AuthProblem(
     string Title,
     int Status,
     string Code,
-    string TraceId);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TraceId);
 
 public sealed class ProviderCapabilities
 {

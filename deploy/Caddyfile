@@ -5,7 +5,14 @@ partyup.social {
 
 	log {
 		output stdout
-		format json
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					delete *
+				}
+			}
+		}
 	}
 
 	# Phase 4 adds guest links (bearer-token URLs, ARCHITECTURE.md §10). Once those
