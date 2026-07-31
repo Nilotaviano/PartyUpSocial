@@ -22,8 +22,8 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
         using HttpClient client = CreateClient();
 
         HttpResponseMessage response = await client.PostAsJsonAsync(
-            "/api/v1/_slice3/rate-limit/login",
-            new { email = "player@example.test" });
+            "/api/v1/auth/login",
+            new { email = "player@example.test", password = "wrong-password" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         string body = await response.Content.ReadAsStringAsync();
@@ -37,10 +37,18 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
 
         HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
             client,
-            "/api/v1/_slice3/rate-limit/login",
-            JsonContent.Create(new { email = "player@example.test" }));
+            "/api/v1/auth/login",
+            JsonContent.Create(new
+            {
+                email = "player@example.test",
+                password = "wrong-password",
+            }));
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.DoesNotContain(
+            "antiforgery_failed",
+            await response.Content.ReadAsStringAsync(),
+            StringComparison.Ordinal);
     }
 
     [Fact]

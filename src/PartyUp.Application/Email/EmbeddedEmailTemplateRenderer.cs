@@ -14,9 +14,7 @@ public sealed partial class EmbeddedEmailTemplateRenderer : IEmailTemplateRender
     {
         ArgumentNullException.ThrowIfNull(message);
 
-        string locale = IsSupported(message.Locale.Value)
-            ? message.Locale.Value
-            : FallbackLocale;
+        string locale = CanonicalizeLocale(message.Locale.Value);
 
         string subject = Substitute(
             ReadResource(message.Template, locale, "subject.txt"),
@@ -34,8 +32,29 @@ public sealed partial class EmbeddedEmailTemplateRenderer : IEmailTemplateRender
         return new RenderedEmail(subject.Trim(), text.Trim(), html.Trim());
     }
 
-    private static bool IsSupported(string locale) =>
-        locale is "en" or "pt-BR" or "es";
+    public static string CanonicalizeLocale(string? locale)
+    {
+        string candidate = locale?.Trim() ?? string.Empty;
+        if (candidate.Equals("pt", StringComparison.OrdinalIgnoreCase) ||
+            candidate.StartsWith("pt-", StringComparison.OrdinalIgnoreCase))
+        {
+            return "pt-BR";
+        }
+
+        if (candidate.Equals("es", StringComparison.OrdinalIgnoreCase) ||
+            candidate.StartsWith("es-", StringComparison.OrdinalIgnoreCase))
+        {
+            return "es";
+        }
+
+        if (candidate.Equals("en", StringComparison.OrdinalIgnoreCase) ||
+            candidate.StartsWith("en-", StringComparison.OrdinalIgnoreCase))
+        {
+            return "en";
+        }
+
+        return FallbackLocale;
+    }
 
     private static string ReadResource(EmailTemplate template, string locale, string part)
     {

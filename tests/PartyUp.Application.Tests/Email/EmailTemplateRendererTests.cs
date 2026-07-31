@@ -37,6 +37,24 @@ public sealed class EmailTemplateRendererTests
         Assert.Equal("Your PartyUp magic link", rendered.Subject);
     }
 
+    [Theory]
+    [InlineData("pt-br", "pt-BR")]
+    [InlineData("PT-BR", "pt-BR")]
+    [InlineData("pt-PT", "pt-BR")]
+    [InlineData("es-ES", "es")]
+    [InlineData("EN-us", "en")]
+    public void Render_MatchesLocaleCaseAndLanguageSubtags_D146(
+        string requested,
+        string expected)
+    {
+        Assert.Equal(
+            expected,
+            EmbeddedEmailTemplateRenderer.CanonicalizeLocale(requested));
+        RenderedEmail rendered = _renderer.Render(
+            CreateMessage(EmailTemplate.MagicLink, requested));
+        Assert.False(string.IsNullOrWhiteSpace(rendered.Subject));
+    }
+
     [Fact]
     public void Render_PutsTheTokenInTheFragment_D067()
     {

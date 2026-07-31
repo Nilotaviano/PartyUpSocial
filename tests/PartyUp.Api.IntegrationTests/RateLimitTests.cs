@@ -83,14 +83,14 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
                 client,
                 $"one-{index}@example.test",
                 "192.0.2.10");
-            Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, allowed.StatusCode);
         }
 
         Assert.Equal(
             HttpStatusCode.TooManyRequests,
             (await PostLoginProbeAsync(client, "blocked@example.test", "192.0.2.10")).StatusCode);
         Assert.Equal(
-            HttpStatusCode.OK,
+            HttpStatusCode.Unauthorized,
             (await PostLoginProbeAsync(client, "other@example.test", "192.0.2.11")).StatusCode);
 
         for (int index = 0; index < 20; index++)
@@ -99,7 +99,7 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
                 client,
                 $"spoof-{index}@example.test",
                 $"203.0.113.{index + 1}, 192.0.2.12");
-            Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, allowed.StatusCode);
         }
 
         Assert.Equal(
@@ -119,7 +119,7 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
         for (int index = 0; index < 10; index++)
         {
             Assert.Equal(
-                HttpStatusCode.OK,
+                HttpStatusCode.Unauthorized,
                 (await PostLoginProbeAsync(
                     client,
                     "same@example.test",
@@ -133,7 +133,7 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
                 "same@example.test",
                 "192.0.2.20")).StatusCode);
         Assert.Equal(
-            HttpStatusCode.OK,
+            HttpStatusCode.Unauthorized,
             (await PostLoginProbeAsync(
                 client,
                 "different@example.test",
@@ -142,7 +142,7 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
         for (int index = 0; index < 20; index++)
         {
             Assert.Equal(
-                HttpStatusCode.OK,
+                HttpStatusCode.Unauthorized,
                 (await PostLoginProbeAsync(
                     client,
                     $"many-{index}@example.test",
@@ -186,8 +186,8 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
         string forwardedFor) =>
         AntiforgeryTestClient.PostAsync(
             client,
-            "/api/v1/_slice3/rate-limit/login",
-            JsonContent.Create(new { email }),
+            "/api/v1/auth/login",
+            JsonContent.Create(new { email, password = "not-the-password" }),
             forwardedFor: forwardedFor);
 
     private sealed class RemoteIpStartupFilter(IPAddress proxyAddress) : IStartupFilter

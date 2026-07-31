@@ -1,0 +1,102 @@
+using NodaTime;
+using PartyUp.Application.Abstractions;
+using PartyUp.Application.Auth;
+using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Users;
+
+namespace PartyUp.Application.Accounts;
+
+public sealed class VerifyEmailUseCase(
+    IUserAccountGateway accounts,
+    IUserRepository users,
+    IFriendCodeGenerator friendCodes,
+    ISecurityTokenService tokens,
+    IUnitOfWork unitOfWork,
+    IClock clock)
+{
+    public Task<EmailVerificationResult> ExecuteAsync(
+        string token,
+        string? password,
+        CancellationToken cancellationToken)
+    {
+        if (password is not null)
+        {
+            AccountInput.RequirePassword(password);
+        }
+        return unitOfWork.ExecuteAsync(
+            async ct =>
+            {
+                TokenRedemption redemption = await tokens.RedeemAsync(
+                    new RedeemTokenRequest(
+                        AuthTokenPurpose.EmailVerification,
+                        token,
+                        AgeGateAttested: false),
+                    ct);
+                if (!redemption.Succeeded)
+                {
+                    return redemption.Failure == TokenRedemptionFailure.RequiresAgeGate
+                        ? EmailVerificationResult.Failed("age_gate_required")
+                        : EmailVerificationResult.Failed("invalid_or_expired_token");
+                }
+
+                if (redemption.UserId is { } existingSubject)
+                {
+                    await accounts.ConfirmEmailAsync(existingSubject, ct);
+                    return EmailVerificationResult.Confirmed(existingSubject);
+                }
+
+                if (redemption.EmailNormalized is not { } address)
+                {
+                    return EmailVerificationResult.Failed("invalid_or_expired_token");
+                }
+
+                if (password is null)
+                {
+                    return EmailVerificationResult.Failed("password_required");
+                }
+
+                UserId? appeared = await accounts.FindUserIdByEmailAsync(address, ct);
+                if (appeared is not null)
+                {
+                    return EmailVerificationResult.Existing;
+                }
+
+                UserId createdId = UserId.New();
+                FriendCode friendCode = await friendCodes.NextAsync(ct);
+                User user = User.BeginOnboarding(
+                    createdId,
+                    friendCode,
+                    AgeGateSource.SelfAttested,
+                    clock);
+                users.Add(user);
+                await accounts.CreateAccountAsync(
+                    createdId,
+                    address,
+                    emailConfirmed: true,
+                    password,
+                    ct);
+                return EmailVerificationResult.Created(createdId);
+            },
+            cancellationToken);
+    }
+}
+
+public sealed record EmailVerificationResult(
+    bool Succeeded,
+    UserId? UserId,
+    bool ShouldSignIn,
+    bool AccountAlreadyExisted,
+    string? Code)
+{
+    public static EmailVerificationResult Created(UserId userId) =>
+        new(true, userId, true, false, null);
+
+    public static EmailVerificationResult Confirmed(UserId userId) =>
+        new(true, userId, false, false, null);
+
+    public static EmailVerificationResult Existing { get; } =
+        new(true, null, false, true, null);
+
+    public static EmailVerificationResult Failed(string code) =>
+        new(false, null, false, false, code);
+}

@@ -16,6 +16,7 @@ using PartyUp.Api.Hosting;
 using PartyUp.Api.Security;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Accounts;
+using PartyUp.Application.Onboarding;
 using PartyUp.Infrastructure;
 using PartyUp.Infrastructure.Email;
 using PartyUp.Infrastructure.Persistence;
@@ -54,6 +55,23 @@ builder.Services.AddScoped<CurrentUserAccessor>();
 builder.Services.AddScoped<ICurrentUserAccessor>(services =>
     services.GetRequiredService<CurrentUserAccessor>());
 builder.Services.AddScoped<PostAuthenticationGateUseCase>();
+builder.Services.AddScoped<RegisterWithPasswordUseCase>();
+builder.Services.AddScoped<VerifyEmailUseCase>();
+builder.Services.AddScoped<SignInWithPasswordUseCase>();
+builder.Services.AddScoped<RequestMagicLinkUseCase>();
+builder.Services.AddScoped<ConsumeMagicLinkUseCase>();
+builder.Services.AddScoped<RequestPasswordResetUseCase>();
+builder.Services.AddScoped<ResetPasswordUseCase>();
+builder.Services.AddScoped<ChangePasswordUseCase>();
+builder.Services.AddScoped<SetPasswordUseCase>();
+builder.Services.AddScoped<ChangeEmailUseCase>();
+builder.Services.AddScoped<ReauthenticateUseCase>();
+builder.Services.AddScoped<GetOnboardingStateUseCase>();
+builder.Services.AddScoped<CheckUsernameAvailabilityUseCase>();
+builder.Services.AddScoped<ValidateProfileDraftUseCase>();
+builder.Services.AddScoped<CompleteOnboardingUseCase>();
+builder.Services.AddSingleton(new AccountEmailOptions(
+    builder.Configuration["PublicBaseUrl"] ?? "http://localhost:5173"));
 builder.Services.AddScoped<AuthenticateAndSignIn>();
 builder.Services.AddPartyUpCookieAuthentication(builder.Environment);
 builder.Services.AddPartyUpAuthorization();
@@ -158,6 +176,7 @@ app.MapOpenApi();
 var api = app.MapGroup(ApiRoutes.V1);
 api.AddEndpointFilter<AntiforgeryFilter>();
 api.MapAuthEndpoints();
+api.MapOnboardingEndpoints();
 
 if (app.Environment.IsEnvironment("Testing"))
 {
@@ -184,9 +203,6 @@ if (app.Environment.IsEnvironment("Testing"))
         await context.SignOutAsync(IdentityConstants.ApplicationScheme);
         return Results.NoContent();
     }).WithName("Slice2SignOut");
-    api.MapPost("/_slice3/rate-limit/login", (HttpContext context) =>
-            Results.Ok(new { clientIp = context.Connection.RemoteIpAddress?.ToString() }))
-        .WithName(ApiOperationIds.Login);
 }
 
 // The SPA fallback below is a catch-all, so without an API-scoped fallback an unmatched

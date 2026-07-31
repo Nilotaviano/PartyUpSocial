@@ -9,22 +9,15 @@ public sealed class ChannelEmailDispatcher : IEmailDispatcher
     private readonly Channel<EmailMessage> _channel = Channel.CreateBounded<EmailMessage>(
         new BoundedChannelOptions(Capacity)
         {
-            FullMode = BoundedChannelFullMode.DropOldest,
+            FullMode = BoundedChannelFullMode.Wait,
             SingleReader = true,
             SingleWriter = false,
         });
 
-    public Task DispatchAsync(EmailMessage message, CancellationToken cancellationToken)
+    public async Task DispatchAsync(EmailMessage message, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (!_channel.Writer.TryWrite(message))
-        {
-            throw new InvalidOperationException("The email dispatch channel is closed.");
-        }
-
-        return Task.CompletedTask;
+        await _channel.Writer.WriteAsync(message, cancellationToken);
     }
 
     public IAsyncEnumerable<EmailMessage> ReadAllAsync(CancellationToken cancellationToken) =>
