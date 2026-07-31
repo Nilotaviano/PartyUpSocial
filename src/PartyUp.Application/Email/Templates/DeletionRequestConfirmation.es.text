@@ -1,0 +1,5 @@
+Confirma que quieres iniciar el período de cancelación de la eliminación de tu cuenta de PartyUp:
+
+{{PublicBaseUrl}}/account-deletion/confirm#token={{Token}}
+
+Si no hiciste esta solicitud, ignora este mensaje. La eliminación todavía no ha comenzado.

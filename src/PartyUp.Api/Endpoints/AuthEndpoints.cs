@@ -113,6 +113,19 @@ public static class AuthEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        auth.MapGet("/methods", ListAuthMethodsAsync)
+            .WithName("GetAuthMethods")
+            .RequireAuthorization(AuthorizationPolicies.RequireAuthenticated)
+            .Produces<AuthMethodsResponse>();
+
+        auth.MapDelete("/methods/{kind}", UnlinkAuthMethodAsync)
+            .WithName(ApiOperationIds.DeleteAuthMethod)
+            .RequireAuthorization(AuthorizationPolicies.RequireAuthenticated)
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         auth.MapPost("/logout", LogoutAsync)
             .WithName(ApiOperationIds.Logout)
             .RequireAuthorization(AuthorizationPolicies.RequireAuthenticated)
@@ -513,7 +526,72 @@ public static class AuthEndpoints
         return TypedResults.NoContent();
     }
 
-    private static async Task<IResult?> ValidateOptionalJsonBodyAsync(
+    private static async Task<IResult> ListAuthMethodsAsync(
+        ICurrentUserAccessor currentUser,
+        ListAuthMethodsUseCase useCase,
+        CancellationToken cancellationToken)
+    {
+        CurrentUser? caller = await currentUser.GetAsync(cancellationToken);
+        if (caller is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        AuthMethodsResult result = await useCase.ExecuteAsync(caller.Id, cancellationToken);
+        return Results.Ok(new AuthMethodsResponse(
+            result.Methods.Select(method => new AuthMethodResponse(
+                method.Kind,
+                method.Linked,
+                method.Removable,
+                method.Detail)).ToArray()));
+    }
+
+    private static async Task<IResult> UnlinkAuthMethodAsync(
+        string kind,
+        HttpContext context,
+        ICurrentUserAccessor currentUser,
+        ReauthenticateUseCase reauthenticate,
+        UnlinkAuthMethodUseCase useCase,
+        CancellationToken cancellationToken)
+    {
+        IResult? malformedBody = await ValidateOptionalJsonBodyAsync(context, cancellationToken);
+        if (malformedBody is not null)
+        {
+            return malformedBody;
+        }
+
+        AuthMethodProofRequest? proof = await ReadOptionalBodyAsync<AuthMethodProofRequest>(
+            context,
+            cancellationToken);
+        CurrentUser? caller = await currentUser.GetAsync(cancellationToken);
+        if (caller is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        bool proven = await reauthenticate.ValidateProofAsync(
+            caller.Id,
+            proof?.CurrentPassword,
+            proof?.ReauthToken,
+            cancellationToken);
+        UnlinkAuthMethodResult result = await useCase.ExecuteAsync(
+            new UnlinkAuthMethodCommand(caller.Id, kind, proven),
+            cancellationToken);
+        if (result.Succeeded)
+        {
+            return Results.NoContent();
+        }
+
+        int status = result.Code switch
+        {
+            "method_not_removable" or "invalid_request" => StatusCodes.Status400BadRequest,
+            "not_found" => StatusCodes.Status404NotFound,
+            _ => StatusCodes.Status409Conflict,
+        };
+        return Problem(context, status, result.Code!);
+    }
+
+    internal static async Task<IResult?> ValidateOptionalJsonBodyAsync(
         HttpContext context,
         CancellationToken cancellationToken)
     {
@@ -522,6 +600,8 @@ public static class AuthEndpoints
             return null;
         }
 
+        context.Request.EnableBuffering();
+        long initialPosition = context.Request.Body.Position;
         try
         {
             using var body = new MemoryStream();
@@ -540,6 +620,39 @@ public static class AuthEndpoints
         catch (JsonException)
         {
             return Problem(context, StatusCodes.Status400BadRequest, "invalid_request");
+        }
+        finally
+        {
+            context.Request.Body.Position = initialPosition;
+        }
+    }
+
+    internal static async Task<T?> ReadOptionalBodyAsync<T>(
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        if (!context.Request.HasJsonContentType())
+        {
+            return default;
+        }
+
+        context.Request.EnableBuffering();
+        if (context.Request.Body.Length == 0)
+        {
+            return default;
+        }
+
+        long initialPosition = context.Request.Body.Position;
+        try
+        {
+            return await JsonSerializer.DeserializeAsync<T>(
+                context.Request.Body,
+                JsonSerializerOptions.Web,
+                cancellationToken);
+        }
+        finally
+        {
+            context.Request.Body.Position = initialPosition;
         }
     }
 
@@ -689,6 +802,16 @@ public sealed record VerifyEmailRequest(
 public sealed record ReauthenticateRequest(string CurrentPassword);
 
 public sealed record ReauthenticationTokenResponse(string ReauthToken);
+
+public sealed record AuthMethodProofRequest(string? CurrentPassword, string? ReauthToken);
+
+public sealed record AuthMethodResponse(
+    string Kind,
+    bool Linked,
+    bool Removable,
+    string? Detail);
+
+public sealed record AuthMethodsResponse(IReadOnlyList<AuthMethodResponse> Methods);
 
 public sealed record StatusResponse(string Status);
 

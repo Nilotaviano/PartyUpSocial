@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Identity;
+using PartyUp.Infrastructure.Deletion;
 using PartyUp.Infrastructure.Persistence.Configurations;
 using PartyUp.Infrastructure.Steam;
 
@@ -21,12 +22,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<UsernameRegistryEntry> UsernameRegistry => Set<UsernameRegistryEntry>();
 
+    public DbSet<DeletionJournalRecord> DeletionJournal => Set<DeletionJournalRecord>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
 
         builder.ApplyConfiguration(new AuthUserConfiguration());
         builder.ApplyConfiguration(new AuthTokenConfiguration());
+        builder.ApplyConfiguration(new DeletionJournalConfiguration());
         builder.ApplyConfiguration(new UserConfiguration());
         builder.ApplyConfiguration(new PlatformLinkConfiguration());
         builder.ApplyConfiguration(new SteamIdentityConfiguration());

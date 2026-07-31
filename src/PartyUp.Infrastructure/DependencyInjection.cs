@@ -11,6 +11,7 @@ using PartyUp.Application.Text;
 using PartyUp.Infrastructure.Accounts;
 using PartyUp.Infrastructure.Auth;
 using PartyUp.Infrastructure.Email;
+using PartyUp.Infrastructure.Deletion;
 using PartyUp.Infrastructure.Identity;
 using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Persistence.Repositories;
@@ -51,7 +52,16 @@ public static class DependencyInjection
         services.AddScoped<IUsernameRegistryRepository, UsernameRegistryRepository>();
         services.AddScoped<IFriendCodeGenerator, FriendCodeGenerator>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
-        services.AddScoped<ISecurityTokenService, SecurityTokenService>();
+        services.AddScoped<SecurityTokenService>();
+        services.AddScoped<ISecurityTokenService>(provider =>
+            provider.GetRequiredService<SecurityTokenService>());
+        services.AddScoped<IAuthTokenRetentionPurger>(provider =>
+            provider.GetRequiredService<SecurityTokenService>());
+        services.AddScoped<IDeletionScopeProvider, DeletionScopeProvider>();
+        services.AddScoped<IDeletionJournal, DeletionJournal>();
+        services.AddScoped<IDeletionJournalShipper, FileDeletionJournalShipper>();
+        services.AddSingleton(new DeletionJournalOptions(
+            configuration["Deletion:JournalPath"] ?? "/data/deletion-journal"));
         services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(15) });
         services.AddSingleton<SteamOpenIdVerifier>();
         services.AddSingleton<SteamApiClient>();

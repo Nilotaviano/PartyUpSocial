@@ -16,6 +16,7 @@ using PartyUp.Api.Hosting;
 using PartyUp.Api.Security;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Accounts;
+using PartyUp.Application.Deletion;
 using PartyUp.Application.Onboarding;
 using PartyUp.Application.Profile;
 using PartyUp.Infrastructure;
@@ -73,9 +74,25 @@ builder.Services.AddScoped<ReauthenticateUseCase>();
 builder.Services.AddScoped<IssueExternalIntentUseCase>();
 builder.Services.AddScoped<CompleteExternalSignInUseCase>();
 builder.Services.AddScoped<UnlinkSteamUseCase>();
+builder.Services.AddScoped<ListAuthMethodsUseCase>();
+builder.Services.AddScoped<UnlinkAuthMethodUseCase>();
 builder.Services.AddScoped<LinkPlatformUseCase>();
 builder.Services.AddScoped<ChangePlatformHandleUseCase>();
 builder.Services.AddScoped<UnlinkPlatformUseCase>();
+builder.Services.AddScoped<GetMyProfileUseCase>();
+builder.Services.AddScoped<ChangeUsernameUseCase>();
+builder.Services.AddScoped<ChangeDisplayNameUseCase>();
+builder.Services.AddScoped<ChangeAvatarUseCase>();
+builder.Services.AddScoped<ChangeTimeZoneUseCase>();
+builder.Services.AddScoped<ChangeLocaleUseCase>();
+builder.Services.AddScoped<SetReminderDefaultUseCase>();
+builder.Services.AddScoped<RequestAccountDeletionUseCase>();
+builder.Services.AddScoped<RequestPublicDeletionUseCase>();
+builder.Services.AddScoped<IssueSteamDeletionConfirmationUseCase>();
+builder.Services.AddScoped<ConfirmPublicDeletionUseCase>();
+builder.Services.AddScoped<ExecuteDeletionForUserUseCase>();
+builder.Services.AddScoped<ExecuteDueDeletionsUseCase>();
+builder.Services.AddScoped<PurgeExpiredAuthTokensUseCase>();
 builder.Services.AddScoped<GetOnboardingStateUseCase>();
 builder.Services.AddScoped<CheckUsernameAvailabilityUseCase>();
 builder.Services.AddScoped<ValidateProfileDraftUseCase>();
@@ -83,6 +100,24 @@ builder.Services.AddScoped<CompleteOnboardingUseCase>();
 builder.Services.AddSingleton<ExternalAuthOriginOptions>();
 builder.Services.AddSingleton(new AccountEmailOptions(
     builder.Configuration["PublicBaseUrl"] ?? "http://localhost:5173"));
+TimeSpan tokenRetention = ReadTimeSpan(
+    builder.Configuration,
+    "Auth:TokenRetention",
+    "30.00:00:00");
+builder.Services.AddSingleton(new AuthTokenRetentionOptions(
+    Duration.FromTimeSpan(tokenRetention)));
+builder.Services.AddSingleton(new DeletionSweepOptions(
+    builder.Configuration.GetValue("Deletion:SweepEnabled", true),
+    ReadTimeSpan(builder.Configuration, "Deletion:SweepInterval", "00:15:00"),
+    Math.Max(1, builder.Configuration.GetValue("Deletion:SweepBatchSize", 50))));
+builder.Services.AddSingleton<ScopedDeletionUserExecutor>();
+builder.Services.AddSingleton<IDeletionUserExecutor>(services =>
+    services.GetRequiredService<ScopedDeletionUserExecutor>());
+builder.Services.AddSingleton<DeletionSweepHostedService>();
+builder.Services.AddSingleton<IDeletionExecutionScheduler>(services =>
+    services.GetRequiredService<DeletionSweepHostedService>());
+builder.Services.AddHostedService(services =>
+    services.GetRequiredService<DeletionSweepHostedService>());
 builder.Services.AddScoped<AuthenticateAndSignIn>();
 builder.Services.AddPartyUpCookieAuthentication(builder.Environment);
 builder.Services.AddPartyUpGoogleAuthentication(
@@ -199,8 +234,12 @@ api.MapExternalAuthEndpoints(
     !string.IsNullOrWhiteSpace(app.Configuration["Google:ClientId"]),
     app.Configuration.GetValue("Steam:Enabled", true),
     app.Environment);
+api.MapAccountDeletionEndpoints(
+    app.Configuration.GetValue("Steam:Enabled", true),
+    app.Environment);
 api.MapOnboardingEndpoints();
 api.MapMeEndpoints();
+api.MapAdminMaintenanceEndpoints();
 
 if (app.Environment.IsEnvironment("Testing"))
 {
@@ -240,5 +279,23 @@ if (Directory.Exists(Path.Combine(app.Environment.ContentRootPath, "wwwroot")))
 }
 
 app.Run();
+
+static TimeSpan ReadTimeSpan(
+    IConfiguration configuration,
+    string key,
+    string fallback)
+{
+    string configured = configuration[key] ?? fallback;
+    if (!TimeSpan.TryParse(
+            configured,
+            CultureInfo.InvariantCulture,
+            out TimeSpan value) ||
+        value < TimeSpan.Zero)
+    {
+        throw new InvalidOperationException($"Configuration value '{key}' is not a non-negative duration.");
+    }
+
+    return value;
+}
 
 public partial class Program;

@@ -5,6 +5,7 @@ using NodaTime;
 using Npgsql;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Kernel;
+using PartyUp.Infrastructure.Auth;
 using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Steam;
 
@@ -261,6 +262,12 @@ public sealed partial class UserAccountGateway(
     public async Task PurgeCredentialsAsync(UserId id, CancellationToken cancellationToken)
     {
         AuthUser user = await RequireUserAsync(id, cancellationToken);
+        string? normalizedEmail = user.NormalizedEmail;
+        await context.Set<AuthToken>()
+            .Where(token =>
+                token.UserId == id ||
+                normalizedEmail != null && token.EmailNormalized == normalizedEmail)
+            .ExecuteDeleteAsync(cancellationToken);
         IList<UserLoginInfo> logins = await userManager.GetLoginsAsync(user);
 
         foreach (UserLoginInfo login in logins)
@@ -270,6 +277,13 @@ public sealed partial class UserAccountGateway(
                 "purge an external login");
         }
 
+        await context.Set<IdentityUserToken<Guid>>()
+            .Where(token => token.UserId == user.Id)
+            .ExecuteDeleteAsync(cancellationToken);
+        await context.SteamIdentities
+            .Where(identity => identity.UserId == id)
+            .ExecuteDeleteAsync(cancellationToken);
+
         user.Email = null;
         user.NormalizedEmail = null;
         user.EmailConfirmed = false;
@@ -277,6 +291,7 @@ public sealed partial class UserAccountGateway(
         user.PhoneNumber = null;
         user.PhoneNumberConfirmed = false;
         user.TwoFactorEnabled = false;
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
         ThrowIfFailed(await userManager.UpdateAsync(user), "purge identity credentials");
     }
 

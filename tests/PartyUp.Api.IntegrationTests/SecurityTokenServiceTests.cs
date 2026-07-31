@@ -80,6 +80,41 @@ public sealed class SecurityTokenServiceTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task Issue_DoesNotConsumeAnotherPartysOutstandingDeletionConfirmation_D072()
+    {
+        UserId userId = await _factory.SeedUserAsync(email: "deletion-token@example.test");
+        IssuedToken emailLeg = await IssueAsync(new IssueTokenRequest(
+            AuthTokenPurpose.DeletionRequestConfirmation,
+            userId,
+            "DELETION-TOKEN@EXAMPLE.TEST",
+            Duration.FromHours(1)));
+        IssuedToken repeatedRequest = await IssueAsync(new IssueTokenRequest(
+            AuthTokenPurpose.DeletionRequestConfirmation,
+            userId,
+            "DELETION-TOKEN@EXAMPLE.TEST",
+            Duration.FromHours(1)));
+        IssuedToken steamLeg = await IssueAsync(new IssueTokenRequest(
+            AuthTokenPurpose.DeletionRequestConfirmation,
+            userId,
+            null,
+            Duration.FromMinutes(10)));
+
+        TokenRedemption first = await RedeemAsync(new RedeemTokenRequest(
+            AuthTokenPurpose.DeletionRequestConfirmation,
+            emailLeg.RawToken));
+        TokenRedemption second = await RedeemAsync(new RedeemTokenRequest(
+            AuthTokenPurpose.DeletionRequestConfirmation,
+            repeatedRequest.RawToken));
+        TokenRedemption third = await RedeemAsync(new RedeemTokenRequest(
+            AuthTokenPurpose.DeletionRequestConfirmation,
+            steamLeg.RawToken));
+
+        Assert.True(first.Succeeded);
+        Assert.True(second.Succeeded);
+        Assert.True(third.Succeeded);
+    }
+
+    [Fact]
     public async Task Redeem_RefusesATokenOfAnotherPurpose_D067()
     {
         IssuedToken magicLink = await IssueAsync(new IssueTokenRequest(

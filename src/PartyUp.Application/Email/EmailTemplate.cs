@@ -15,4 +15,5 @@ public enum EmailTemplate
     PasswordResetNoAccount = 10,
     DeletionRequestNoAccount = 11,
     ReauthenticationRequested = 12,
+    DeletionRequestConfirmation = 13,
 }

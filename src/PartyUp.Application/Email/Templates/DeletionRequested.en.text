@@ -1,3 +1,3 @@
-Your deletion grace period ends at {{GraceEndsAt}}. Signing in before then cancels deletion. Confirm:
+Your PartyUp account is scheduled for deletion after {{GraceEndsAt}}.
 
-{{PublicBaseUrl}}/account-deletion/confirm#token={{Token}}
+To cancel, sign in successfully before that time. There is no separate cancellation button.

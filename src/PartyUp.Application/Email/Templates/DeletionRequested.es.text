@@ -1,3 +1,3 @@
-Tu período de cancelación termina el {{GraceEndsAt}}. Iniciar sesión antes cancela la eliminación. Confirma:
+Tu cuenta de PartyUp está programada para eliminarse después de {{GraceEndsAt}}.
 
-{{PublicBaseUrl}}/account-deletion/confirm#token={{Token}}
+Para cancelar, inicia sesión correctamente antes de ese momento. No hay un botón de cancelación independiente.

@@ -8,12 +8,14 @@ namespace PartyUp.Application.Accounts;
 public sealed class PostAuthenticationGateUseCase(
     IUserRepository users,
     IUnitOfWork unitOfWork,
+    IDeletionExecutionScheduler deletionScheduler,
     IClock clock)
 {
-    public Task<PostAuthenticationResult> ExecuteAsync(
+    public async Task<PostAuthenticationResult> ExecuteAsync(
         UserId userId,
-        CancellationToken cancellationToken) =>
-        unitOfWork.ExecuteAsync<PostAuthenticationResult>(
+        CancellationToken cancellationToken)
+    {
+        PostAuthenticationResult result = await unitOfWork.ExecuteAsync<PostAuthenticationResult>(
             async ct =>
             {
                 User? user = await users.FindForUpdateAsync(userId, ct);
@@ -42,4 +44,12 @@ public sealed class PostAuthenticationGateUseCase(
                 return new PostAuthenticationResult.Admitted(user.Id, true);
             },
             cancellationToken);
+
+        if (result is PostAuthenticationResult.Refused { Code: "account_pending_removal" })
+        {
+            await deletionScheduler.ScheduleAsync(userId, cancellationToken);
+        }
+
+        return result;
+    }
 }

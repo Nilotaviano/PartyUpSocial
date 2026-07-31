@@ -26,6 +26,20 @@ public sealed class EmailTemplateRendererTests
         Assert.Equal("Seu link mágico do PartyUp", portuguese.Subject);
         Assert.Contains("&lt;Steam&gt;", _renderer.Render(
             CreateMessage(EmailTemplate.AuthMethodAdded, "en")).HtmlBody);
+
+        foreach (string locale in new[] { "en", "pt-BR", "es" })
+        {
+            RenderedEmail confirmation = _renderer.Render(
+                CreateMessage(EmailTemplate.DeletionRequestConfirmation, locale));
+            Assert.Contains("#token=raw-token", confirmation.TextBody, StringComparison.Ordinal);
+
+            RenderedEmail graceStarted = _renderer.Render(
+                CreateMessage(EmailTemplate.DeletionRequested, locale));
+            string graceOutput = $"{graceStarted.Subject}\n{graceStarted.TextBody}\n{graceStarted.HtmlBody}";
+            Assert.Contains("August 7, 2026 at 12:00", graceOutput, StringComparison.Ordinal);
+            Assert.DoesNotContain("raw-token", graceOutput, StringComparison.Ordinal);
+            Assert.DoesNotContain("account-deletion/confirm", graceOutput, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

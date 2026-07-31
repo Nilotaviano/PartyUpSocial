@@ -87,6 +87,24 @@ public sealed class ReauthenticationTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task RequestDeletion_WithoutProof_Returns409_D165()
+    {
+        UserId userId = await _factory.SeedUserAsync(password: Password);
+        using HttpClient client = Slice5HttpTest.CreateClient(_factory);
+        string cookie = await SignInAsync(client, userId);
+
+        HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
+            client,
+            "/api/v1/me/deletion",
+            JsonContent.Create(new { }),
+            cookie);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        AuthProblem problem = (await response.Content.ReadFromJsonAsync<AuthProblem>())!;
+        Assert.Equal("reauth_required", problem.Code);
+    }
+
+    [Fact]
     public async Task ReauthToken_ReplayedByAnotherUser_IsRejected_D067()
     {
         UserId owner = await _factory.SeedUserAsync(

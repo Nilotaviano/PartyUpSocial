@@ -9,12 +9,14 @@ using NodaTime;
 using Npgsql;
 using NpgsqlTypes;
 using PartyUp.Application.Auth;
+using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Kernel;
 using PartyUp.Infrastructure.Persistence;
 
 namespace PartyUp.Infrastructure.Auth;
 
-public sealed class SecurityTokenService(AppDbContext context, IClock clock) : ISecurityTokenService
+public sealed class SecurityTokenService(AppDbContext context, IClock clock)
+    : ISecurityTokenService, IAuthTokenRetentionPurger
 {
     private static readonly JsonSerializerOptions PayloadJsonOptions = CreatePayloadJsonOptions();
 
@@ -214,6 +216,16 @@ public sealed class SecurityTokenService(AppDbContext context, IClock clock) : I
             }
         }
     }
+
+    public Task<int> PurgeAsync(
+        Instant now,
+        Duration retention,
+        CancellationToken cancellationToken) =>
+        context.Set<AuthToken>()
+            .Where(token =>
+                token.ExpiresAt < now - retention ||
+                token.ConsumedAt != null && token.ConsumedAt < now - retention)
+            .ExecuteDeleteAsync(cancellationToken);
 
     private async Task ExecuteNonQueryAsync(
         string sql,

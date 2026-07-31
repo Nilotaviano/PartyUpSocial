@@ -52,6 +52,34 @@ public sealed class ExternalStateTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task AuthStateCookie_IsRejectedByTheDeletionCallback()
+    {
+        IDataProtectionProvider protection =
+            _factory.Services.GetRequiredService<IDataProtectionProvider>();
+        string value = protection.CreateProtector("PartyUp.SteamState.Auth")
+            .Protect(JsonSerializer.Serialize(new
+            {
+                Flow = "auth",
+                Nonce = "nonce",
+                Mode = ExternalStartMode.Login,
+                ReturnTo = "/app",
+                BoundUserId = (Guid?)null,
+                AgeGateAttested = true,
+            }));
+        using HttpClient client = Slice5HttpTest.CreateClient(_factory);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            "/api/v1/account-deletion-requests/steam/callback?n=nonce");
+        request.Headers.Add(HeaderNames.Cookie, $"pu.extdel={value}");
+
+        HttpResponseMessage response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        AuthProblem problem = (await response.Content.ReadFromJsonAsync<AuthProblem>())!;
+        Assert.Equal("state_mismatch", problem.Code);
+    }
+
+    [Fact]
     public async Task AuthPurposeCookie_ForTheDeletionFlow_IsRejectedByTheAuthCallback()
     {
         IDataProtectionProvider protection =

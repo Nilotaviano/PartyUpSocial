@@ -385,6 +385,30 @@ namespace PartyUp.Infrastructure.Migrations
                     b.ToTable("auth_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("PartyUp.Infrastructure.Deletion.DeletionJournalRecord", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Instant>("ExecutedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("executed_at");
+
+                    b.Property<Instant?>("ShippedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("shipped_at");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_deletion_journal");
+
+                    b.HasIndex("ShippedAt")
+                        .HasDatabaseName("ix_deletion_journal_unshipped")
+                        .HasFilter("shipped_at IS NULL");
+
+                    b.ToTable("deletion_journal", (string)null);
+                });
+
             modelBuilder.Entity("PartyUp.Infrastructure.Identity.AuthRole", b =>
                 {
                     b.Property<Guid>("Id")

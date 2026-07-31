@@ -35,6 +35,8 @@ internal sealed class FakeAccountGateway : IUserAccountGateway
 
     internal List<UserId> RemovedSteamIdentities { get; } = [];
 
+    internal List<UserId> PurgedCredentials { get; } = [];
+
     internal int RealVerifies { get; private set; }
 
     internal int DummyVerifies { get; private set; }
@@ -106,8 +108,11 @@ internal sealed class FakeAccountGateway : IUserAccountGateway
         return Task.CompletedTask;
     }
 
-    public Task RemovePasswordAsync(UserId id, CancellationToken cancellationToken) =>
-        Task.CompletedTask;
+    public Task RemovePasswordAsync(UserId id, CancellationToken cancellationToken)
+    {
+        PasswordUsers.Remove(id);
+        return Task.CompletedTask;
+    }
 
     public Task SetEmailAsync(
         UserId id,
@@ -182,8 +187,11 @@ internal sealed class FakeAccountGateway : IUserAccountGateway
         return Task.CompletedTask;
     }
 
-    public Task PurgeCredentialsAsync(UserId id, CancellationToken cancellationToken) =>
-        Task.CompletedTask;
+    public Task PurgeCredentialsAsync(UserId id, CancellationToken cancellationToken)
+    {
+        PurgedCredentials.Add(id);
+        return Task.CompletedTask;
+    }
 
     public Task EnsureRoleExistsAsync(string role, CancellationToken cancellationToken) =>
         Task.CompletedTask;

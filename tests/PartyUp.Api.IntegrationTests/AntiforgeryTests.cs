@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Net.Http.Headers;
+using PartyUp.Api.Auth;
 using PartyUp.Api.Endpoints;
 using PartyUp.Domain.Kernel;
 using PartyUp.Infrastructure.Persistence;
@@ -43,19 +44,19 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 token = "invalid",
                 newPassword = "replacement-password",
             })),
-            ["POST /api/v1/auth/password/change"] = Protected(() =>
+            ["POST /api/v1/auth/password/change"] = Authenticated(() =>
                 JsonContent.Create(new
                 {
                     currentPassword = "current-password",
                     newPassword = "replacement-password",
                 })),
-            ["POST /api/v1/auth/password/set"] = Protected(() =>
+            ["POST /api/v1/auth/password/set"] = Authenticated(() =>
                 JsonContent.Create(new
                 {
                     newPassword = "replacement-password",
                     currentPassword = "current-password",
                 })),
-            ["POST /api/v1/auth/email/change"] = Protected(() =>
+            ["POST /api/v1/auth/email/change"] = Authenticated(() =>
                 JsonContent.Create(new
                 {
                     email = "new-address@example.test",
@@ -63,7 +64,7 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 })),
             ["POST /api/v1/auth/email/change/verify"] = Public(() =>
                 JsonContent.Create(new { token = "invalid" })),
-            ["POST /api/v1/auth/email/verify/request"] = Protected(() =>
+            ["POST /api/v1/auth/email/verify/request"] = Authenticated(() =>
                 JsonContent.Create(new { })),
             ["POST /api/v1/auth/email/verify"] = Public(() => JsonContent.Create(new
             {
@@ -71,7 +72,7 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 password = "replacement-password",
                 ageGateAttested = true,
             })),
-            ["POST /api/v1/auth/reauth"] = Protected(() =>
+            ["POST /api/v1/auth/reauth"] = Authenticated(() =>
                 JsonContent.Create(new { currentPassword = "current-password" })),
             ["POST /api/v1/auth/external/intent"] = Public(() =>
                 JsonContent.Create(new
@@ -81,12 +82,14 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                     returnTo = "/app",
                     ageGateAttested = true,
                 })),
-            ["POST /api/v1/auth/reauth/email"] = Protected(() =>
+            ["POST /api/v1/auth/reauth/email"] = Authenticated(() =>
                 JsonContent.Create(new { })),
-            ["POST /api/v1/auth/logout"] = Protected(() => null),
-            ["POST /api/v1/onboarding/validate"] = Protected(() =>
+            ["DELETE /api/v1/auth/methods/{kind}"] = Authenticated(() =>
+                JsonContent.Create(new { currentPassword = "current-password" })),
+            ["POST /api/v1/auth/logout"] = Authenticated(() => null),
+            ["POST /api/v1/onboarding/validate"] = Authenticated(() =>
                 JsonContent.Create(new { })),
-            ["POST /api/v1/onboarding/complete"] = Protected(() =>
+            ["POST /api/v1/onboarding/complete"] = Authenticated(() =>
                 JsonContent.Create(new
                 {
                     username = "MatrixPlayer",
@@ -95,11 +98,30 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                     timeZone = "America/Fortaleza",
                     locale = "en",
                 })),
-            ["POST /api/v1/me/platform-links"] = Protected(() =>
+            ["PUT /api/v1/me/username"] = Onboarded(() =>
+                JsonContent.Create(new { username = "MatrixPlayerUpdated" })),
+            ["PUT /api/v1/me/display-name"] = Onboarded(() =>
+                JsonContent.Create(new { displayName = "Matrix Player" })),
+            ["PUT /api/v1/me/avatar"] = Onboarded(() =>
+                JsonContent.Create(new { kind = "emoji", emoji = "\U0001F642" })),
+            ["PUT /api/v1/me/time-zone"] = Onboarded(() =>
+                JsonContent.Create(new { timeZone = "America/Fortaleza" })),
+            ["PUT /api/v1/me/locale"] = Onboarded(() =>
+                JsonContent.Create(new { locale = "en" })),
+            ["PUT /api/v1/me/reminder-default"] = Onboarded(() =>
+                JsonContent.Create(new { reminderDefault = "Min15" })),
+            ["POST /api/v1/me/deletion"] = Authenticated(() =>
+                JsonContent.Create(new { currentPassword = "current-password" })),
+            ["POST /api/v1/me/platform-links"] = Authenticated(() =>
                 JsonContent.Create(new { platform = "PlayStation", handle = "Player" })),
-            ["PATCH /api/v1/me/platform-links/{id:guid}"] = Protected(() =>
+            ["PATCH /api/v1/me/platform-links/{id:guid}"] = Authenticated(() =>
                 JsonContent.Create(new { handle = "Player" })),
-            ["DELETE /api/v1/me/platform-links/{id:guid}"] = Protected(() => null),
+            ["DELETE /api/v1/me/platform-links/{id:guid}"] = Authenticated(() => null),
+            ["POST /api/v1/account-deletion-requests"] = Public(() =>
+                JsonContent.Create(new { email = "not-an-email" })),
+            ["POST /api/v1/account-deletion-requests/confirm"] = Public(() =>
+                JsonContent.Create(new { token = "invalid" })),
+            ["POST /api/v1/admin/maintenance/deletion-sweep"] = Admin(() => null),
         };
 
     private readonly PartyUpApiFactory _factory = new();
@@ -183,6 +205,7 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             }
 
             UserId routeUser = await _factory.SeedUserAsync(
+                admin: route.AuthorizationPolicy == AuthorizationPolicies.RequireAdmin,
                 email: $"antiforgery-matrix-{routeIndex}@example.test",
                 password: "current-password");
             authCookies[key] = await SignInAsync(client, routeUser);
@@ -192,10 +215,14 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
         Assert.Equal(UnsafeRoutes.Keys.Order(), mapped.Keys.Order());
         foreach ((string key, UnsafeRouteCase route) in UnsafeRoutes)
         {
-            bool hasAuthorization = mapped[key].Metadata
+            string?[] actualPolicies = mapped[key].Metadata
                 .GetOrderedMetadata<IAuthorizeData>()
-                .Count > 0;
-            Assert.Equal(route.RequiresAuthorization, hasAuthorization);
+                .Select(metadata => metadata.Policy)
+                .ToArray();
+            string?[] expectedPolicies = route.AuthorizationPolicy is null
+                ? []
+                : [route.AuthorizationPolicy];
+            Assert.Equal(expectedPolicies, actualPolicies);
         }
 
         SideEffectSnapshot baseline = await SnapshotAsync();
@@ -227,8 +254,15 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             Assert.DoesNotContain("antiforgery_failed", body, StringComparison.Ordinal);
             if (route.RequiresAuthorization)
             {
-                Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-                Assert.Contains("unauthorized", body, StringComparison.Ordinal);
+                HttpStatusCode expectedStatus = route.AuthorizationPolicy ==
+                    AuthorizationPolicies.RequireAdmin
+                        ? HttpStatusCode.NotFound
+                        : HttpStatusCode.Unauthorized;
+                Assert.Equal(expectedStatus, response.StatusCode);
+                if (expectedStatus == HttpStatusCode.Unauthorized)
+                {
+                    Assert.Contains("unauthorized", body, StringComparison.Ordinal);
+                }
             }
             else
             {
@@ -282,7 +316,8 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
 
     private static string RouteFromKey(string key) =>
         key[(key.IndexOf(' ') + 1)..]
-            .Replace("{id:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal);
+            .Replace("{id:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
+            .Replace("{kind}", "password", StringComparison.Ordinal);
 
     private static HttpMethod MethodFromKey(string key) =>
         new(key[..key.IndexOf(' ')]);
@@ -311,13 +346,23 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             _factory.EmailSender.Messages.Count);
     }
 
-    private static UnsafeRouteCase Public(Func<HttpContent?> body) => new(false, body);
+    private static UnsafeRouteCase Public(Func<HttpContent?> body) => new(null, body);
 
-    private static UnsafeRouteCase Protected(Func<HttpContent?> body) => new(true, body);
+    private static UnsafeRouteCase Authenticated(Func<HttpContent?> body) =>
+        new(AuthorizationPolicies.RequireAuthenticated, body);
+
+    private static UnsafeRouteCase Onboarded(Func<HttpContent?> body) =>
+        new(AuthorizationPolicies.RequireOnboarded, body);
+
+    private static UnsafeRouteCase Admin(Func<HttpContent?> body) =>
+        new(AuthorizationPolicies.RequireAdmin, body);
 
     private sealed record UnsafeRouteCase(
-        bool RequiresAuthorization,
-        Func<HttpContent?> CreateBody);
+        string? AuthorizationPolicy,
+        Func<HttpContent?> CreateBody)
+    {
+        public bool RequiresAuthorization => AuthorizationPolicy is not null;
+    }
 
     private sealed record SideEffectSnapshot(
         int DomainUsers,

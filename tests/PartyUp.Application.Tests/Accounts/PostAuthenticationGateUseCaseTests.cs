@@ -34,13 +34,14 @@ public sealed class PostAuthenticationGateUseCaseTests
         User user = ActiveUser(clock);
         user.RequestDeletion(clock);
         clock.Advance(User.DeletionGracePeriod);
-        var useCase = Create(user, clock, out _);
+        var useCase = Create(user, clock, out _, out FakeDeletionExecutionScheduler scheduler);
 
         PostAuthenticationResult result = await useCase.ExecuteAsync(user.Id, default);
 
         var refused = Assert.IsType<PostAuthenticationResult.Refused>(result);
         Assert.Equal("account_pending_removal", refused.Code);
         Assert.True(user.IsPendingDeletion);
+        Assert.Equal([user.Id], scheduler.Scheduled);
     }
 
     [Fact]
@@ -93,10 +94,21 @@ public sealed class PostAuthenticationGateUseCaseTests
         IClock clock,
         out FakeUnitOfWork unitOfWork)
     {
+        return Create(user, clock, out unitOfWork, out _);
+    }
+
+    private static PostAuthenticationGateUseCase Create(
+        User user,
+        IClock clock,
+        out FakeUnitOfWork unitOfWork,
+        out FakeDeletionExecutionScheduler scheduler)
+    {
         unitOfWork = new FakeUnitOfWork();
+        scheduler = new FakeDeletionExecutionScheduler();
         return new PostAuthenticationGateUseCase(
             new FakeUserRepository(user),
             unitOfWork,
+            scheduler,
             clock);
     }
 
@@ -154,6 +166,17 @@ public sealed class PostAuthenticationGateUseCaseTests
         {
             ExecutionCount++;
             return work(cancellationToken);
+        }
+    }
+
+    private sealed class FakeDeletionExecutionScheduler : IDeletionExecutionScheduler
+    {
+        public List<UserId> Scheduled { get; } = [];
+
+        public ValueTask ScheduleAsync(UserId id, CancellationToken cancellationToken)
+        {
+            Scheduled.Add(id);
+            return ValueTask.CompletedTask;
         }
     }
 }

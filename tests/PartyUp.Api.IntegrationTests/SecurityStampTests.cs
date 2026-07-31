@@ -47,6 +47,30 @@ public sealed class SecurityStampTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task RequestDeletion_InvalidatesAnExistingCookie_D165()
+    {
+        const string password = "correct-password";
+        UserId userId = await _factory.SeedUserAsync(password: password);
+        using HttpClient client = CreateClient();
+        string cookie = await SignInAsync(client, userId);
+
+        HttpResponseMessage deletion = await AntiforgeryTestClient.PostAsync(
+            client,
+            "/api/v1/me/deletion",
+            JsonContent.Create(new { currentPassword = password }),
+            cookie);
+        Assert.Equal(HttpStatusCode.Accepted, deletion.StatusCode);
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            "/api/v1/_slice2/authenticated");
+        request.Headers.Add(HeaderNames.Cookie, cookie);
+        HttpResponseMessage rejected = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, rejected.StatusCode);
+    }
+
+    [Fact]
     public async Task Validator_ReadsItsContextPrincipal_AndSeedsTheRequestProjectionCacheOnce()
     {
         UserId userId = UserId.New();
