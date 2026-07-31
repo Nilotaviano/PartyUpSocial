@@ -26,7 +26,8 @@ public sealed class AuthCookieTests : IAsyncLifetime, IDisposable
         UserId userId = await _factory.SeedUserAsync();
         using HttpClient client = CreateClient();
 
-        HttpResponseMessage response = await client.PostAsync(
+        HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
+            client,
             $"/api/v1/_slice2/sign-in/{userId.Value:D}",
             content: null);
 
@@ -41,14 +42,16 @@ public sealed class AuthCookieTests : IAsyncLifetime, IDisposable
     {
         UserId userId = await _factory.SeedUserAsync();
         using HttpClient client = CreateClient();
-        HttpResponseMessage login = await client.PostAsync(
+        HttpResponseMessage login = await AntiforgeryTestClient.PostAsync(
+            client,
             $"/api/v1/_slice2/sign-in/{userId.Value:D}",
             content: null);
         string cookiePair = CookiePair(AuthCookie(login));
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/_slice2/sign-out");
-        request.Headers.Add(HeaderNames.Cookie, cookiePair);
-
-        HttpResponseMessage response = await client.SendAsync(request);
+        HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
+            client,
+            "/api/v1/_slice2/sign-out",
+            content: null,
+            cookiePair);
 
         SetCookieHeaderValue cleared = AuthCookie(response);
         Assert.Equal(string.Empty, cleared.Value.Value);
@@ -60,7 +63,8 @@ public sealed class AuthCookieTests : IAsyncLifetime, IDisposable
     {
         UserId userId = await _factory.SeedUserAsync(admin: true);
         using HttpClient client = CreateClient();
-        HttpResponseMessage response = await client.PostAsync(
+        HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
+            client,
             $"/api/v1/_slice2/sign-in/{userId.Value:D}",
             content: null);
         SetCookieHeaderValue cookie = AuthCookie(response);
@@ -90,6 +94,7 @@ public sealed class AuthCookieTests : IAsyncLifetime, IDisposable
         new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
+            BaseAddress = new Uri("https://localhost"),
             HandleCookies = false,
         });
 

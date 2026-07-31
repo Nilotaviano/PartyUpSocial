@@ -40,12 +40,14 @@ public sealed class OnboardingGuardTests : IAsyncLifetime, IDisposable
     private async Task<HttpResponseMessage> RequestOnboardedEndpointAsync(UserId userId)
     {
         using HttpClient client = _factory.CreateClient(
-            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-            {
-                AllowAutoRedirect = false,
-                HandleCookies = false,
-            });
-        HttpResponseMessage login = await client.PostAsync(
+        new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            BaseAddress = new Uri("https://localhost"),
+            HandleCookies = false,
+        });
+        HttpResponseMessage login = await AntiforgeryTestClient.PostAsync(
+            client,
             $"/api/v1/_slice2/sign-in/{userId.Value:D}",
             content: null);
         string setCookie = login.Headers.GetValues(HeaderNames.SetCookie)

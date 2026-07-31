@@ -32,6 +32,7 @@ public sealed class PartyUpSecurityStampValidator(
         }
 
         context.RejectPrincipal();
+        currentUserAccessor.InvalidateProjection();
         await context.HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
     }
 }

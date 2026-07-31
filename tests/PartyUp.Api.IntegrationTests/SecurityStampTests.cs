@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
 using PartyUp.Application.Abstractions;
+using PartyUp.Api.Endpoints;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Users;
 
@@ -85,6 +87,7 @@ public sealed class SecurityStampTests : IAsyncLifetime, IDisposable
             new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
             {
                 AllowAutoRedirect = false,
+                BaseAddress = new Uri("https://localhost"),
                 HandleCookies = false,
             });
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/_slice2/authenticated");
@@ -135,16 +138,77 @@ public sealed class SecurityStampTests : IAsyncLifetime, IDisposable
             value => value.StartsWith("pu.auth=;", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Session_AfterARejectedPrincipal_IsAnonymous()
+    {
+        UserId userId = UserId.New();
+        var reader = new RecordingProjectionReader(new CurrentUserProjection(
+            userId,
+            UserLifecycle.Active,
+            IsBanned: false,
+            GraceEndsAt: null,
+            IsAdmin: false,
+            IsProfileComplete: true,
+            Locale.Create("en"),
+            SecurityStamp: "current-stamp"));
+        await using var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ICurrentUserProjectionReader>();
+                services.AddSingleton<ICurrentUserProjectionReader>(reader);
+            }));
+        using IServiceScope scope = factory.Services.CreateScope();
+        var cookieOptions = scope.ServiceProvider
+            .GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
+            .Get(IdentityConstants.ApplicationScheme);
+        var identityOptions = scope.ServiceProvider
+            .GetRequiredService<IOptions<IdentityOptions>>()
+            .Value;
+        var identity = new ClaimsIdentity(IdentityConstants.ApplicationScheme);
+        identity.AddClaim(new Claim(
+            identityOptions.ClaimsIdentity.UserIdClaimType,
+            userId.Value.ToString("D")));
+        identity.AddClaim(new Claim(
+            identityOptions.ClaimsIdentity.SecurityStampClaimType,
+            "stale-stamp"));
+        string protectedTicket = cookieOptions.TicketDataFormat.Protect(new AuthenticationTicket(
+            new ClaimsPrincipal(identity),
+            new AuthenticationProperties
+            {
+                IssuedUtc = DateTimeOffset.UtcNow,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddDays(30),
+            },
+            IdentityConstants.ApplicationScheme));
+        using HttpClient client = factory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false,
+                BaseAddress = new Uri("https://localhost"),
+                HandleCookies = false,
+            });
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/session");
+        request.Headers.Add(HeaderNames.Cookie, $"pu.auth={protectedTicket}");
+
+        HttpResponseMessage response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        SessionResponse session = (await response.Content.ReadFromJsonAsync<SessionResponse>())!;
+        Assert.False(session.Authenticated);
+        Assert.Equal(1, reader.ReadCount);
+    }
+
     private HttpClient CreateClient() => _factory.CreateClient(
         new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
+            BaseAddress = new Uri("https://localhost"),
             HandleCookies = false,
         });
 
     private static async Task<string> SignInAsync(HttpClient client, UserId userId)
     {
-        HttpResponseMessage response = await client.PostAsync(
+        HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
+            client,
             $"/api/v1/_slice2/sign-in/{userId.Value:D}",
             content: null);
         return response.Headers.GetValues(HeaderNames.SetCookie)
