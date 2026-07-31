@@ -313,6 +313,78 @@ namespace PartyUp.Infrastructure.Migrations
                     b.ToTable("username_registry", (string)null);
                 });
 
+            modelBuilder.Entity("PartyUp.Infrastructure.Auth.AuthToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EmailNormalized")
+                        .HasColumnType("text")
+                        .HasColumnName("email_normalized");
+
+                    b.Property<Instant>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Payload")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<bool>("PendingAgeGate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("pending_age_gate");
+
+                    b.Property<string>("PendingLocale")
+                        .HasColumnType("text")
+                        .HasColumnName("pending_locale");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("integer")
+                        .HasColumnName("purpose");
+
+                    b.Property<byte[]>("RequestIpHash")
+                        .HasColumnType("bytea")
+                        .HasColumnName("request_ip_hash");
+
+                    b.Property<byte[]>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("token_hash");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_auth_tokens");
+
+                    b.HasIndex("EmailNormalized")
+                        .HasDatabaseName("ix_auth_tokens_email_normalized");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_auth_tokens_expires_at");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_auth_tokens_token_hash");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_auth_tokens_user_id");
+
+                    b.ToTable("auth_tokens", (string)null);
+                });
+
             modelBuilder.Entity("PartyUp.Infrastructure.Identity.AuthRole", b =>
                 {
                     b.Property<Guid>("Id")
@@ -502,6 +574,15 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_username_registry_users_owner_id");
+                });
+
+            modelBuilder.Entity("PartyUp.Infrastructure.Auth.AuthToken", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_auth_tokens_users_user_id");
                 });
 
             modelBuilder.Entity("PartyUp.Domain.Users.User", b =>

@@ -4,4 +4,10 @@
     <ProjectReference Include="..\PartyUp.Domain\PartyUp.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Email\Templates\*">
+      <LogicalName>PartyUp.Application.Email.Templates.%(Filename)%(Extension)</LogicalName>
+      <WithCulture>false</WithCulture>
+    </EmbeddedResource>
+  </ItemGroup>
 </Project>

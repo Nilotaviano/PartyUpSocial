@@ -1,0 +1,3 @@
+Confirme sua identidade para continuar:
+
+{{PublicBaseUrl}}/auth/confirm-identity#token={{Token}}

@@ -4,6 +4,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Auth;
+using PartyUp.Application.Email;
+using PartyUp.Infrastructure.Auth;
+using PartyUp.Infrastructure.Email;
 using PartyUp.Infrastructure.Identity;
 using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Persistence.Repositories;
@@ -36,6 +40,12 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserProjectionReader, CurrentUserProjectionReader>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<ISecurityTokenService, SecurityTokenService>();
+        services.AddSingleton<IEmailTemplateRenderer, EmbeddedEmailTemplateRenderer>();
+        services.AddSingleton<ChannelEmailDispatcher>();
+        services.AddSingleton<IEmailDispatcher>(services =>
+            services.GetRequiredService<ChannelEmailDispatcher>());
+        services.AddSingleton<IEmailSender, LoggingEmailSender>();
 
         return services;
     }

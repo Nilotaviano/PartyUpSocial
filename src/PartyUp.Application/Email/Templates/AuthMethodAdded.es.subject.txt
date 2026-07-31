@@ -1,0 +1,1 @@
+Se añadió un método de acceso a PartyUp

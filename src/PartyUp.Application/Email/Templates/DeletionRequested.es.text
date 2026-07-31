@@ -1,0 +1,3 @@
+Tu período de cancelación termina el {{GraceEndsAt}}. Iniciar sesión antes cancela la eliminación. Confirma:
+
+{{PublicBaseUrl}}/account-deletion/confirm#token={{Token}}

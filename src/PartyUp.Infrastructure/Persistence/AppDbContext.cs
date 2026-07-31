@@ -23,6 +23,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         base.OnModelCreating(builder);
 
         builder.ApplyConfiguration(new AuthUserConfiguration());
+        builder.ApplyConfiguration(new AuthTokenConfiguration());
         builder.ApplyConfiguration(new UserConfiguration());
         builder.ApplyConfiguration(new PlatformLinkConfiguration());
         builder.ApplyConfiguration(new UsernameRegistryEntryConfiguration());

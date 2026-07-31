@@ -17,6 +17,7 @@ using PartyUp.Api.Security;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Accounts;
 using PartyUp.Infrastructure;
+using PartyUp.Infrastructure.Email;
 using PartyUp.Infrastructure.Persistence;
 using Serilog;
 using Serilog.Formatting.Compact;
@@ -42,7 +43,11 @@ builder.Services.AddSerilog((services, logger) =>
     }
 });
 
+builder.Services.AddSingleton(new LoggingEmailSenderEnvironment(
+    builder.Environment.IsDevelopment(),
+    builder.Environment.ContentRootPath));
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddHostedService<EmailDispatchHostedService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<IClock>(NodaTime.SystemClock.Instance);
 builder.Services.AddScoped<CurrentUserAccessor>();

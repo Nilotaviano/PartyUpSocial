@@ -47,6 +47,10 @@ public sealed class MigrationTests : IAsyncLifetime
             "auth_role_claims",
             "auth_user_tokens",
             "ux_auth_users_normalized_email",
+            "auth_tokens",
+            "ux_auth_tokens_token_hash",
+            "ix_auth_tokens_expires_at",
+            "ix_auth_tokens_email_normalized",
         ];
 
         foreach (string relation in relations)
@@ -58,6 +62,7 @@ public sealed class MigrationTests : IAsyncLifetime
         await AssertConstraintExistsAsync(context, "fk_username_registry_users_owner_id");
         await AssertConstraintExistsAsync(context, "fk_users_platform_links_avatar_source_platform_link_id");
         await AssertConstraintExistsAsync(context, "fk_auth_users_users_id");
+        await AssertConstraintExistsAsync(context, "fk_auth_tokens_users_user_id");
     }
 
     [Fact]

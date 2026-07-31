@@ -1,0 +1,3 @@
+Verify this new email address:
+
+{{PublicBaseUrl}}/auth/email-change#token={{Token}}

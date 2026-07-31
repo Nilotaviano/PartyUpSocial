@@ -1,0 +1,3 @@
+Seu período de cancelamento termina em {{GraceEndsAt}}. Entrar antes disso cancela a exclusão. Confirme:
+
+{{PublicBaseUrl}}/account-deletion/confirm#token={{Token}}

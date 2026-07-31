@@ -1,0 +1,3 @@
+Verifique este novo endereço de e-mail:
+
+{{PublicBaseUrl}}/auth/email-change#token={{Token}}

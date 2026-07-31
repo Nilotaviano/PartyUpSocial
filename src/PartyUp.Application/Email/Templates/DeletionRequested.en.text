@@ -1,0 +1,3 @@
+Your deletion grace period ends at {{GraceEndsAt}}. Signing in before then cancels deletion. Confirm:
+
+{{PublicBaseUrl}}/account-deletion/confirm#token={{Token}}

@@ -1,0 +1,3 @@
+Verifica tu correo para continuar:
+
+{{PublicBaseUrl}}/auth/verify-email#token={{Token}}
