@@ -1,6 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
 using PartyUp.Application.Auth;
+using PartyUp.Domain.Kernel;
+using PartyUp.Infrastructure.Persistence;
 
 namespace PartyUp.Api.IntegrationTests;
 
@@ -232,6 +235,36 @@ public sealed class SecurityTokenServiceTests : IAsyncLifetime, IDisposable
         Assert.True(rowAttestedResult.Pending?.AgeGateAttested);
     }
 
+    [Fact]
+    public async Task Redeem_TwoConcurrentRequestsHaveExactlyOneWinner_D067()
+    {
+        UserId userId = await _factory.SeedUserAsync(
+            email: "token-race@example.test",
+            password: "correct-password");
+        AuthTokenPurpose[] purposes = Enum.GetValues<AuthTokenPurpose>();
+
+        foreach (AuthTokenPurpose purpose in purposes)
+        {
+            IssuedToken issued = await IssueAsync(CreateIssueRequest(purpose, userId));
+            var barrier = new AsyncBarrier(2);
+
+            Task<TokenRedemption>[] attempts =
+            [
+                RedeemAfterBarrierAsync(CreateRedeemRequest(purpose, issued.RawToken), barrier),
+                RedeemAfterBarrierAsync(CreateRedeemRequest(purpose, issued.RawToken), barrier),
+            ];
+            TokenRedemption[] results = await Task.WhenAll(attempts);
+
+            Assert.Single(results, result => result.Succeeded);
+            TokenRedemption loser = Assert.Single(results, result => !result.Succeeded);
+            Assert.Equal(TokenRedemptionFailure.NotFound, loser.Failure);
+            Assert.Equal(
+                TokenRedemptionFailure.NotFound,
+                (await RedeemAsync(CreateRedeemRequest(purpose, issued.RawToken))).Failure);
+            Assert.Equal(1, await ConsumedRowCountAsync(issued.TokenId));
+        }
+    }
+
     private async Task<IssuedToken> IssueAsync(IssueTokenRequest request)
     {
         await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
@@ -244,5 +277,114 @@ public sealed class SecurityTokenServiceTests : IAsyncLifetime, IDisposable
         await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
         var service = scope.ServiceProvider.GetRequiredService<ISecurityTokenService>();
         return await service.RedeemAsync(request, default);
+    }
+
+    private async Task<TokenRedemption> RedeemAfterBarrierAsync(
+        RedeemTokenRequest request,
+        AsyncBarrier barrier)
+    {
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        var service = scope.ServiceProvider.GetRequiredService<ISecurityTokenService>();
+        await barrier.SignalAndWaitAsync();
+        return await service.RedeemAsync(request, default);
+    }
+
+    private static IssueTokenRequest CreateIssueRequest(
+        AuthTokenPurpose purpose,
+        UserId userId) =>
+        purpose switch
+        {
+            AuthTokenPurpose.MagicLink => new(
+                purpose,
+                userId,
+                "TOKEN-RACE@EXAMPLE.TEST",
+                Duration.FromMinutes(15),
+                Email: "token-race@example.test"),
+            AuthTokenPurpose.PasswordReset => new(
+                purpose,
+                userId,
+                "TOKEN-RACE@EXAMPLE.TEST",
+                Duration.FromHours(1),
+                Email: "token-race@example.test"),
+            AuthTokenPurpose.EmailVerification => new(
+                purpose,
+                userId,
+                "TOKEN-RACE@EXAMPLE.TEST",
+                Duration.FromHours(24),
+                Email: "token-race@example.test"),
+            AuthTokenPurpose.EmailChange => new(
+                purpose,
+                userId,
+                "CHANGED-TOKEN-RACE@EXAMPLE.TEST",
+                Duration.FromHours(1),
+                Email: "changed-token-race@example.test"),
+            AuthTokenPurpose.DeletionRequestConfirmation => new(
+                purpose,
+                userId,
+                "TOKEN-RACE@EXAMPLE.TEST",
+                Duration.FromHours(1)),
+            AuthTokenPurpose.ExternalStartIntent => new(
+                purpose,
+                null,
+                null,
+                Duration.FromMinutes(10),
+                Intent: new ExternalIntentPayload(
+                    "google",
+                    ExternalStartMode.Login,
+                    "/app",
+                    false,
+                    "race-binder-hash")),
+            AuthTokenPurpose.Reauthentication => new(
+                purpose,
+                userId,
+                null,
+                Duration.FromMinutes(5)),
+            _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null),
+        };
+
+    private static RedeemTokenRequest CreateRedeemRequest(
+        AuthTokenPurpose purpose,
+        string rawToken) =>
+        new(
+            purpose,
+            rawToken,
+            BinderHash: purpose == AuthTokenPurpose.ExternalStartIntent
+                ? "race-binder-hash"
+                : null,
+            AgeGateAttested: purpose is
+                AuthTokenPurpose.MagicLink or AuthTokenPurpose.EmailVerification
+                    ? true
+                    : null);
+
+    private async Task<int> ConsumedRowCountAsync(Guid tokenId)
+    {
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await context.Database.SqlQueryRaw<int>(
+                """
+                SELECT count(*)::int AS "Value"
+                  FROM auth_tokens
+                 WHERE id = {0}
+                   AND consumed_at IS NOT NULL
+                """,
+                tokenId)
+            .SingleAsync();
+    }
+
+    private sealed class AsyncBarrier(int participants)
+    {
+        private readonly TaskCompletionSource _release =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _arrived;
+
+        internal Task SignalAndWaitAsync()
+        {
+            if (Interlocked.Increment(ref _arrived) == participants)
+            {
+                _release.TrySetResult();
+            }
+
+            return _release.Task;
+        }
     }
 }

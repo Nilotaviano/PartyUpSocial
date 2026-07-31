@@ -74,7 +74,7 @@ public sealed class VerifyEmailUseCaseTests
     }
 
     [Fact]
-    public async Task Execute_UnattestedAgeGateLeavesTheTokenLive_D083()
+    public async Task Execute_UnattestedAgeGateReturnsAgeGateRequired_D083()
     {
         TestContext context = Create(
             Failed(TokenRedemptionFailure.RequiresAgeGate),

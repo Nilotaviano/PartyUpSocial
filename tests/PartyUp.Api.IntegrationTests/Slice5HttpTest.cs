@@ -4,7 +4,8 @@ namespace PartyUp.Api.IntegrationTests;
 
 internal static class Slice5HttpTest
 {
-    internal static HttpClient CreateClient(PartyUpApiFactory factory) =>
+    internal static HttpClient CreateClient(
+        Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory) =>
         factory.CreateClient(
             new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
             {

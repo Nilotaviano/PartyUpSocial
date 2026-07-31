@@ -1,7 +1,12 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Net.Http.Json;
+using System.Runtime.CompilerServices;
+using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using PartyUp.Application.Auth;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -49,6 +54,167 @@ public sealed class RequestLoggingTests : IAsyncLifetime, IDisposable
                 StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Log_NoStructuredPropertyContainsAnyQueryStringOrRawToken()
+    {
+        const string ApiSecret = "api-query-token-a044";
+        const string SpaSecret = "spa-query-token-a044";
+        const string MalformedSecret = "malformed-query-token-a044";
+        const string ExceptionSecret = "exception-query-token-a044";
+        string[] secrets = [ApiSecret, SpaSecret, MalformedSecret, ExceptionSecret];
+        var sink = new CapturingSink();
+        await using var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ISecurityTokenService>();
+                services.AddScoped<ISecurityTokenService, ThrowingTokenService>();
+                services.AddSerilog((provider, logger) => logger
+                    .ReadFrom.Configuration(provider.GetRequiredService<IConfiguration>())
+                    .WriteTo.Sink(sink));
+            }));
+        using HttpClient client = factory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false,
+                BaseAddress = new Uri("https://localhost"),
+                HandleCookies = false,
+            });
+
+        _ = await client.GetAsync($"/api/v1/auth/session?token={ApiSecret}");
+        _ = await client.GetAsync($"/auth/magic?token={SpaSecret}");
+        _ = await AntiforgeryTestClient.PostAsync(
+            client,
+            $"/api/v1/auth/login?token={MalformedSecret}",
+            new StringContent("{", Encoding.UTF8, "application/json"));
+        _ = await AntiforgeryTestClient.PostAsync(
+            client,
+            $"/api/v1/auth/magic-link/consume?token={ExceptionSecret}",
+            JsonContent.Create(new { token = "not-the-query-token", ageGateAttested = true }));
+
+        Assert.NotEmpty(sink.Events);
+        foreach (LogEvent logEvent in sink.Events)
+        {
+            AssertContainsNoSecret(
+                logEvent.RenderMessage(CultureInfo.InvariantCulture),
+                secrets);
+            foreach ((string name, LogEventPropertyValue value) in logEvent.Properties)
+            {
+                AssertContainsNoSecret(name, secrets);
+                foreach (string propertyValue in Flatten(value))
+                {
+                    AssertContainsNoSecret(propertyValue, secrets);
+                }
+            }
+
+            if (logEvent.Exception is not null)
+            {
+                foreach (string exceptionValue in Flatten(logEvent.Exception))
+                {
+                    AssertContainsNoSecret(exceptionValue, secrets);
+                }
+            }
+        }
+
+        string caddyfile = File.ReadAllText(FindRepositoryFile(["deploy", "Caddyfile"]));
+        Assert.Contains("request>uri query", caddyfile, StringComparison.Ordinal);
+        Assert.Contains("delete *", caddyfile, StringComparison.Ordinal);
+    }
+
+    private static IEnumerable<string> Flatten(LogEventPropertyValue value)
+    {
+        switch (value)
+        {
+            case ScalarValue scalar:
+                yield return Convert.ToString(
+                    scalar.Value,
+                    CultureInfo.InvariantCulture) ?? string.Empty;
+                break;
+            case SequenceValue sequence:
+                foreach (LogEventPropertyValue element in sequence.Elements)
+                {
+                    foreach (string nested in Flatten(element))
+                    {
+                        yield return nested;
+                    }
+                }
+                break;
+            case StructureValue structure:
+                if (structure.TypeTag is not null)
+                {
+                    yield return structure.TypeTag;
+                }
+                foreach (LogEventProperty property in structure.Properties)
+                {
+                    yield return property.Name;
+                    foreach (string nested in Flatten(property.Value))
+                    {
+                        yield return nested;
+                    }
+                }
+                break;
+            case DictionaryValue dictionary:
+                foreach (KeyValuePair<ScalarValue, LogEventPropertyValue> pair in dictionary.Elements)
+                {
+                    foreach (string key in Flatten(pair.Key))
+                    {
+                        yield return key;
+                    }
+                    foreach (string nested in Flatten(pair.Value))
+                    {
+                        yield return nested;
+                    }
+                }
+                break;
+        }
+    }
+
+    private static IEnumerable<string> Flatten(Exception exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            yield return current.Message;
+            yield return current.StackTrace ?? string.Empty;
+            yield return current.Source ?? string.Empty;
+            foreach (System.Collections.DictionaryEntry entry in current.Data)
+            {
+                yield return Convert.ToString(
+                    entry.Key,
+                    CultureInfo.InvariantCulture) ?? string.Empty;
+                yield return Convert.ToString(
+                    entry.Value,
+                    CultureInfo.InvariantCulture) ?? string.Empty;
+            }
+        }
+    }
+
+    private static void AssertContainsNoSecret(string value, IEnumerable<string> secrets)
+    {
+        foreach (string secret in secrets)
+        {
+            Assert.DoesNotContain(secret, value, StringComparison.Ordinal);
+        }
+    }
+
+    private static string FindRepositoryFile(
+        IReadOnlyList<string> segments,
+        [CallerFilePath] string sourceFilePath = "")
+    {
+        DirectoryInfo? directory = new(Path.GetDirectoryName(sourceFilePath)!);
+        while (directory is not null)
+        {
+            string candidate = Path.Combine([directory.FullName, .. segments]);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new FileNotFoundException(
+            $"Could not find repository file {Path.Combine([.. segments])}.");
+    }
+
     private sealed class CapturingSink : ILogEventSink
     {
         private readonly ConcurrentQueue<LogEvent> _events = new();
@@ -56,6 +222,21 @@ public sealed class RequestLoggingTests : IAsyncLifetime, IDisposable
         public IReadOnlyCollection<LogEvent> Events => _events;
 
         public void Emit(LogEvent logEvent) => _events.Enqueue(logEvent);
+    }
+
+    private sealed class ThrowingTokenService : ISecurityTokenService
+    {
+        public Task<IssuedToken> IssueAsync(
+            IssueTokenRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromException<IssuedToken>(
+                new InvalidOperationException("Synthetic token-service failure."));
+
+        public Task<TokenRedemption> RedeemAsync(
+            RedeemTokenRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromException<TokenRedemption>(
+                new InvalidOperationException("Synthetic token-service failure."));
     }
 }
 

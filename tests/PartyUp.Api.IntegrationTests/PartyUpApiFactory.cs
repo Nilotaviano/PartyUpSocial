@@ -7,11 +7,13 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NodaTime;
+using PartyUp.Application.Abstractions;
 using PartyUp.Application.Email;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Identity;
 using PartyUp.Infrastructure.Persistence;
+using PartyUp.Infrastructure.Persistence.Repositories;
 using Testcontainers.PostgreSql;
 using System.Threading.Channels;
 
@@ -22,11 +24,18 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
     private readonly PostgreSqlContainer _postgres =
         new PostgreSqlBuilder("postgres:17-alpine").Build();
     private readonly CapturingEmailSender _emailSender = new();
+    private readonly CountingPasswordHasher _passwordHasher = new();
+    private readonly PostAuthenticationGateProbe _postAuthenticationGateProbe = new();
 
     internal MutableClock Clock { get; } =
         new(Instant.FromUtc(2026, 7, 31, 12, 0));
 
     internal CapturingEmailSender EmailSender => _emailSender;
+
+    internal CountingPasswordHasher PasswordHasher => _passwordHasher;
+
+    internal PostAuthenticationGateProbe PostAuthenticationGateProbe =>
+        _postAuthenticationGateProbe;
 
     internal Task StartAsync() => _postgres.StartAsync();
 
@@ -35,6 +44,7 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
     internal async Task<UserId> SeedUserAsync(
         bool completeProfile = true,
         bool pendingDeletion = false,
+        bool banned = false,
         bool admin = false,
         string? email = "player@example.test",
         string? password = null)
@@ -65,6 +75,11 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
         if (pendingDeletion)
         {
             user.RequestDeletion(Clock);
+        }
+
+        if (banned)
+        {
+            user.Ban(Clock);
         }
 
         context.DomainUsers.Add(user);
@@ -115,6 +130,14 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IClock>(Clock);
             services.RemoveAll<IEmailSender>();
             services.AddSingleton<IEmailSender>(_emailSender);
+            services.RemoveAll<IPasswordHasher<AuthUser>>();
+            services.AddSingleton<IPasswordHasher<AuthUser>>(_passwordHasher);
+            services.RemoveAll<IUserRepository>();
+            services.AddScoped<UserRepository>();
+            services.AddScoped<IUserRepository>(provider =>
+                new ProbingUserRepository(
+                    provider.GetRequiredService<UserRepository>(),
+                    _postAuthenticationGateProbe));
         });
     }
 }
@@ -124,6 +147,59 @@ internal sealed class MutableClock(Instant current) : IClock
     public Instant GetCurrentInstant() => current;
 
     public void Advance(Duration duration) => current += duration;
+}
+
+internal sealed class CountingPasswordHasher : IPasswordHasher<AuthUser>
+{
+    private readonly PasswordHasher<AuthUser> _inner = new();
+    private int _verifications;
+
+    internal int Verifications => Volatile.Read(ref _verifications);
+
+    public string HashPassword(AuthUser user, string password) =>
+        _inner.HashPassword(user, password);
+
+    public PasswordVerificationResult VerifyHashedPassword(
+        AuthUser user,
+        string hashedPassword,
+        string providedPassword)
+    {
+        Interlocked.Increment(ref _verifications);
+        return _inner.VerifyHashedPassword(user, hashedPassword, providedPassword);
+    }
+}
+
+internal sealed class PostAuthenticationGateProbe
+{
+    private int _entries;
+
+    internal int Entries => Volatile.Read(ref _entries);
+
+    internal void Reset() => Volatile.Write(ref _entries, 0);
+
+    internal void RecordEntry() => Interlocked.Increment(ref _entries);
+}
+
+internal sealed class ProbingUserRepository(
+    UserRepository inner,
+    PostAuthenticationGateProbe probe) : IUserRepository
+{
+    public Task<User?> FindAsync(UserId id, CancellationToken cancellationToken) =>
+        inner.FindAsync(id, cancellationToken);
+
+    public Task<User?> FindForUpdateAsync(UserId id, CancellationToken cancellationToken)
+    {
+        probe.RecordEntry();
+        return inner.FindForUpdateAsync(id, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<UserId>> FindDueForDeletionAsync(
+        Instant now,
+        int max,
+        CancellationToken cancellationToken) =>
+        inner.FindDueForDeletionAsync(now, max, cancellationToken);
+
+    public void Add(User user) => inner.Add(user);
 }
 
 internal sealed class CapturingEmailSender : IEmailSender
@@ -166,6 +242,28 @@ internal sealed class CapturingEmailSender : IEmailSender
             {
                 EmailMessage? found = _messages.LastOrDefault(predicate);
                 if (found is not null)
+                {
+                    return found;
+                }
+            }
+
+            await _signal.Reader.ReadAsync(timeout.Token);
+        }
+    }
+
+    internal async Task<IReadOnlyList<EmailMessage>> WaitForCountAsync(
+        Func<EmailMessage, bool> predicate,
+        int count,
+        CancellationToken cancellationToken = default)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        while (true)
+        {
+            lock (_gate)
+            {
+                EmailMessage[] found = _messages.Where(predicate).ToArray();
+                if (found.Length >= count)
                 {
                     return found;
                 }
