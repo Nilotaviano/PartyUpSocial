@@ -121,7 +121,7 @@ cd web && npm run lint && npm run build && npm test
 |---|---|---|
 | 0 | Walking skeleton — CI/CD, deploy stack, health, migrations; spikes A/B/C decided (A-018..A-020) | ✅ |
 | 1 | Domain core — session/poll state machines, visibility & overlap engines, D-number test suite (DOMAIN_MODEL.md + TRACEABILITY.md, 1033 tests) | ✅ |
-| 2 | Accounts, auth (email, magic link, Google, Steam), onboarding, admin foundations | 🔜 next |
+| 2 | Accounts, auth (email, magic link, Google, Steam), onboarding, admin foundations ([PHASE2_DESIGN.md](PHASE2_DESIGN.md)) | 🚧 in progress — backend slices 1–5 of 9 shipped |
 | 3 | Friends, blocking, Steam import | ⬜ |
 | 4 | Fixed-time sessions end-to-end, guest links | ⬜ |
 | 5 | Availability, recommendations, calendar views | ⬜ |

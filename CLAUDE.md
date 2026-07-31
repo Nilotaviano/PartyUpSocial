@@ -16,7 +16,11 @@ PartyUp (partyup.social) — friends scheduling multiplayer game sessions. Four 
 ```sh
 dotnet build PartyUp.sln                                   # must be 0 warnings (TreatWarningsAsErrors)
 dotnet test PartyUp.sln --filter "Category!=Integration"   # unit tests, no Docker needed
-dotnet test PartyUp.sln                                    # + integration tests (needs Docker; CI always runs them)
+dotnet test PartyUp.sln                                    # + integration tests (needs a reachable Docker daemon; CI always runs them)
+
+# Full suite incl. integration tests locally (Docker lives in WSL, not the Windows host).
+# MANDATORY before any push — never push integration tests that have not run:
+wsl -d Ubuntu-24.04 -e bash -lc "cd /mnt/c/Users/nilot/source/repos/PartyUpSocial && dotnet test PartyUp.sln -p:ArtifactsPath=/tmp/partyup-artifacts"
 dotnet test --filter "FullyQualifiedName~SomeTestName"     # single test
 dotnet run --project src/PartyUp.Api                       # API on http://localhost:5000
 
