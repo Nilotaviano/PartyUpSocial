@@ -14,6 +14,9 @@ PartyUp (partyup.social) — friends scheduling multiplayer game sessions. Four 
 ## Commands
 
 ```sh
+# Environment Check: Requires .NET 9 SDK and Node.js v20+ LTS. 
+# Ensure local Postgres container is running via compose before writing/testing schema.
+
 dotnet build PartyUp.sln                                   # must be 0 warnings (TreatWarningsAsErrors)
 dotnet test PartyUp.sln --filter "Category!=Integration"   # unit tests, no Docker needed
 dotnet test PartyUp.sln                                    # + integration tests (needs a reachable Docker daemon; CI always runs them)
@@ -21,10 +24,12 @@ dotnet test PartyUp.sln                                    # + integration tests
 # Full suite incl. integration tests locally (Docker lives in WSL, not the Windows host).
 # MANDATORY before any push — never push integration tests that have not run:
 wsl -d Ubuntu-24.04 -e bash -lc "cd /mnt/c/Users/nilot/source/repos/PartyUpSocial && dotnet test PartyUp.sln -p:ArtifactsPath=/tmp/partyup-artifacts"
+
 dotnet test --filter "FullyQualifiedName~SomeTestName"     # single test
 dotnet run --project src/PartyUp.Api                       # API on http://localhost:5000
 
 # Migrations (EF Core, from repo root; dotnet tool restore once)
+# Note: 'add' generates local code structures and does not require a live database connection.
 dotnet dotnet-ef migrations add <Name> --project src/PartyUp.Infrastructure --startup-project src/PartyUp.Api
 dotnet dotnet-ef migrations list --project src/PartyUp.Infrastructure --startup-project src/PartyUp.Api --no-connect
 
@@ -32,6 +37,8 @@ dotnet dotnet-ef migrations list --project src/PartyUp.Infrastructure --startup-
 npm run dev            # Vite on :5173, proxies /api /health /openapi to :5000
 npm run lint && npm run build && npm test
 npx vitest run src/App.test.tsx        # single test file
+
+# Codegen constraint: 'dotnet run' API project must be running concurrently in a separate background terminal first.
 npm run gen:api        # regenerates src/api/schema.d.ts from the RUNNING API's OpenAPI doc
 
 # Local Postgres
