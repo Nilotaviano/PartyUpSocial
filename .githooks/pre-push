@@ -4,8 +4,19 @@ set -e
 case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
     # Windows host: Docker lives in WSL, so the full suite must run there.
-    repo_win=$(git rev-parse --show-toplevel)                     # /c/Users/...
-    repo_wsl=$(echo "$repo_win" | sed 's|^/\([a-z]\)/|/mnt/\1/|') # /mnt/c/Users/...
+    # git may report the toplevel as either the MSYS form (/c/Users/...) or
+    # the Windows form (C:/Users/...) depending on which git invoked the
+    # hook, so both are translated to the WSL mount (/mnt/c/Users/...).
+    repo_win=$(git rev-parse --show-toplevel)
+    case "$repo_win" in
+      [A-Za-z]:/*)
+        drive=$(printf '%s' "${repo_win%%:*}" | tr '[:upper:]' '[:lower:]')
+        repo_wsl="/mnt/$drive/${repo_win#*:/}"
+        ;;
+      *)
+        repo_wsl=$(echo "$repo_win" | sed 's|^/\([a-z]\)/|/mnt/\1/|')
+        ;;
+    esac
     echo "pre-push: full test suite in WSL (takes a few minutes)..."
     wsl.exe -d Ubuntu-24.04 -e bash -lc "cd '$repo_wsl' && dotnet test PartyUp.sln -p:ArtifactsPath=/tmp/partyup-artifacts"
     ;;
