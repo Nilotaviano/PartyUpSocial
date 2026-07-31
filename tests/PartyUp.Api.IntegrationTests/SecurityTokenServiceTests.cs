@@ -154,6 +154,33 @@ public sealed class SecurityTokenServiceTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task Redeem_ExternalIntentReturnsOnlyTheIntentPayload_D067()
+    {
+        const string binderHash = "external-intent-payload-binder";
+        var expected = new ExternalIntentPayload(
+            "google",
+            ExternalStartMode.Login,
+            "/settings/account",
+            true,
+            binderHash);
+        IssuedToken issued = await IssueAsync(new IssueTokenRequest(
+            AuthTokenPurpose.ExternalStartIntent,
+            null,
+            null,
+            Duration.FromMinutes(10),
+            Intent: expected));
+
+        TokenRedemption redemption = await RedeemAsync(new RedeemTokenRequest(
+            AuthTokenPurpose.ExternalStartIntent,
+            issued.RawToken,
+            binderHash));
+
+        Assert.True(redemption.Succeeded);
+        Assert.Equal(expected, redemption.Intent);
+        Assert.Null(redemption.Email);
+    }
+
+    [Fact]
     public async Task Redeem_ForAPreAccountTokenWithoutAttestation_RefusesWithoutConsuming_D083()
     {
         IssuedToken magicLink = await IssueAsync(new IssueTokenRequest(

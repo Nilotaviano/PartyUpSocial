@@ -16,7 +16,13 @@ internal sealed class FakeAccountGateway : IUserAccountGateway
 
     internal Dictionary<UserId, AccountEmailInfo?> Emails { get; } = [];
 
+    internal Dictionary<(string Provider, string ProviderKey), UserId> LoginUsers { get; } = [];
+
+    internal Queue<UserId?> EmailLookupResults { get; } = [];
+
     internal List<(UserId Id, string? Email, bool Confirmed, string? Password)> Created { get; } = [];
+
+    internal List<(UserId Id, string Provider, string ProviderKey)> Logins { get; } = [];
 
     internal int RealVerifies { get; private set; }
 
@@ -29,13 +35,17 @@ internal sealed class FakeAccountGateway : IUserAccountGateway
     public Task<UserId?> FindUserIdByEmailAsync(
         string email,
         CancellationToken cancellationToken) =>
-        Task.FromResult(EmailUsers.TryGetValue(email, out UserId id) ? (UserId?)id : null);
+        Task.FromResult(EmailLookupResults.Count > 0
+            ? EmailLookupResults.Dequeue()
+            : EmailUsers.TryGetValue(email, out UserId id) ? (UserId?)id : null);
 
     public Task<UserId?> FindUserIdByLoginAsync(
         string provider,
         string providerKey,
         CancellationToken cancellationToken) =>
-        Task.FromResult<UserId?>(null);
+        Task.FromResult(LoginUsers.TryGetValue((provider, providerKey), out UserId id)
+            ? (UserId?)id
+            : null);
 
     public Task CreateAccountAsync(
         UserId id,
@@ -114,8 +124,12 @@ internal sealed class FakeAccountGateway : IUserAccountGateway
         UserId id,
         string provider,
         string providerKey,
-        CancellationToken cancellationToken) =>
-        Task.CompletedTask;
+        CancellationToken cancellationToken)
+    {
+        Logins.Add((id, provider, providerKey));
+        LoginUsers[(provider, providerKey)] = id;
+        return Task.CompletedTask;
+    }
 
     public Task RemoveLoginAsync(
         UserId id,

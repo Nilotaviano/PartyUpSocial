@@ -66,6 +66,8 @@ builder.Services.AddScoped<ChangePasswordUseCase>();
 builder.Services.AddScoped<SetPasswordUseCase>();
 builder.Services.AddScoped<ChangeEmailUseCase>();
 builder.Services.AddScoped<ReauthenticateUseCase>();
+builder.Services.AddScoped<IssueExternalIntentUseCase>();
+builder.Services.AddScoped<CompleteExternalSignInUseCase>();
 builder.Services.AddScoped<GetOnboardingStateUseCase>();
 builder.Services.AddScoped<CheckUsernameAvailabilityUseCase>();
 builder.Services.AddScoped<ValidateProfileDraftUseCase>();
@@ -74,6 +76,9 @@ builder.Services.AddSingleton(new AccountEmailOptions(
     builder.Configuration["PublicBaseUrl"] ?? "http://localhost:5173"));
 builder.Services.AddScoped<AuthenticateAndSignIn>();
 builder.Services.AddPartyUpCookieAuthentication(builder.Environment);
+builder.Services.AddPartyUpGoogleAuthentication(
+    builder.Configuration,
+    builder.Environment);
 builder.Services.AddPartyUpAuthorization();
 builder.Services.AddSingleton<ProviderCapabilities>();
 builder.Services.AddExceptionHandler<RequestBindingExceptionMapper>();
@@ -180,6 +185,9 @@ app.MapOpenApi();
 var api = app.MapGroup(ApiRoutes.V1);
 api.AddEndpointFilter<AntiforgeryFilter>();
 api.MapAuthEndpoints();
+api.MapExternalAuthEndpoints(
+    !string.IsNullOrWhiteSpace(app.Configuration["Google:ClientId"]),
+    app.Environment);
 api.MapOnboardingEndpoints();
 
 if (app.Environment.IsEnvironment("Testing"))

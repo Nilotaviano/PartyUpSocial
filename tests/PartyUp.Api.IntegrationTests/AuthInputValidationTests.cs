@@ -2,7 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Net.Http.Headers;
@@ -34,6 +37,15 @@ public sealed class AuthInputValidationTests : IAsyncLifetime, IDisposable
         var accountProbe = new MutationProbe();
         var tokenProbe = new MutationProbe();
         await using var factory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureAppConfiguration((_, configuration) =>
+                configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Network:TrustedProxies:0"] = "10.0.0.2",
+                }));
+            builder.ConfigureServices(services =>
+                services.AddSingleton<IStartupFilter>(new RemoteIpStartupFilter(
+                    IPAddress.Parse("10.0.0.2"))));
             builder.ConfigureTestServices(services =>
             {
                 services.RemoveAll<IUserAccountGateway>();
@@ -48,12 +60,9 @@ public sealed class AuthInputValidationTests : IAsyncLifetime, IDisposable
                     new ProbingTokenService(
                         provider.GetRequiredService<SecurityTokenService>(),
                         tokenProbe));
-            }));
+            });
+        });
         using HttpClient client = Slice5HttpTest.CreateClient(factory);
-        string cookie = await SignInAsync(client, userId);
-        accountProbe.Reset();
-        tokenProbe.Reset();
-        int messagesBefore = _factory.EmailSender.Messages.Count;
         InvalidCase[] cases =
         [
             JsonCase("/api/v1/auth/register", new { email = "not-an-email", ageGateAttested = true, locale = "en" }),
@@ -69,20 +78,38 @@ public sealed class AuthInputValidationTests : IAsyncLifetime, IDisposable
             MalformedCase("/api/v1/auth/email/verify/request"),
             JsonCase("/api/v1/auth/email/verify", new { token = 42, password = Password }),
             JsonCase("/api/v1/auth/reauth", new { currentPassword = 42 }),
+            JsonCase("/api/v1/auth/external/intent", new { provider = 42, mode = "login" }),
             MalformedCase("/api/v1/auth/reauth/email"),
             MalformedCase("/api/v1/auth/logout"),
         ];
 
-        var responses = new List<(string Route, HttpResponseMessage Response)>();
-        foreach (InvalidCase invalid in cases)
+        string[] cookies = new string[cases.Length];
+        for (int index = 0; index < cases.Length; index++)
         {
+            UserId caseUserId = index == 0
+                ? userId
+                : await _factory.SeedUserAsync(
+                    email: $"validation-user-{index}@example.test",
+                    password: Password);
+            cookies[index] = await SignInAsync(client, caseUserId);
+        }
+
+        accountProbe.Reset();
+        tokenProbe.Reset();
+        int messagesBefore = _factory.EmailSender.Messages.Count;
+
+        var responses = new List<(string Route, HttpResponseMessage Response)>();
+        for (int index = 0; index < cases.Length; index++)
+        {
+            InvalidCase invalid = cases[index];
             responses.Add((
                 invalid.Route,
                 await AntiforgeryTestClient.PostAsync(
                     client,
                     invalid.Route,
                     invalid.Content(),
-                    cookie)));
+                    cookies[index],
+                    $"192.0.2.{index + 1}")));
         }
 
         foreach ((string route, HttpResponseMessage response) in responses)
@@ -274,5 +301,19 @@ public sealed class AuthInputValidationTests : IAsyncLifetime, IDisposable
             probe.Record();
             return mutation();
         }
+    }
+
+    private sealed class RemoteIpStartupFilter(IPAddress proxyAddress) : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) =>
+            application =>
+            {
+                application.Use(async (context, following) =>
+                {
+                    context.Connection.RemoteIpAddress = proxyAddress;
+                    await following(context);
+                });
+                next(application);
+            };
     }
 }

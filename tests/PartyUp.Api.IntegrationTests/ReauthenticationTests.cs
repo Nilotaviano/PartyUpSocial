@@ -1,6 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Net.Http.Headers;
 using NodaTime;
@@ -15,7 +20,7 @@ namespace PartyUp.Api.IntegrationTests;
 public sealed class ReauthenticationTests : IAsyncLifetime, IDisposable
 {
     private const string Password = "correct-password";
-    private readonly PartyUpApiFactory _factory = new();
+    private readonly PartyUpApiFactory _factory = new(googleEnabled: true);
 
     public Task InitializeAsync() => _factory.StartAsync();
 
@@ -135,6 +140,64 @@ public sealed class ReauthenticationTests : IAsyncLifetime, IDisposable
             (await RedeemProofAsync(emailProof.RawToken)).Failure);
     }
 
+    [Fact]
+    public async Task ExternalReauth_WithAnUnlinkedProviderIdentity_MintsNoToken_D067()
+    {
+        UserId victim = await _factory.SeedUserAsync(
+            email: "external-reauth-victim@example.test",
+            password: Password);
+        await using WebApplicationFactory<Program> googleFactory =
+            CreateGoogleFactory("unlinked-google-key");
+        using HttpClient client = Slice5HttpTest.CreateClient(googleFactory);
+        string victimCookie = await SignInAsync(client, victim);
+
+        HttpResponseMessage completion = await CompleteExternalReauthAsync(
+            client,
+            victimCookie,
+            victimCookie);
+
+        Assert.Contains(
+            "error=reauth_identity_mismatch",
+            completion.Headers.Location?.OriginalString,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "#reauth=",
+            completion.Headers.Location?.OriginalString,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExternalReauth_CompletedUnderAnotherUsersCookie_MintsNoToken_D067()
+    {
+        UserId owner = await _factory.SeedUserAsync(
+            email: "external-reauth-owner@example.test",
+            password: Password);
+        UserId other = await _factory.SeedUserAsync(
+            email: "external-reauth-other@example.test",
+            password: Password);
+        const string providerKey = "owners-google-key";
+        await AddGoogleLoginAsync(owner, providerKey);
+        await using WebApplicationFactory<Program> googleFactory =
+            CreateGoogleFactory(providerKey);
+        using HttpClient client = Slice5HttpTest.CreateClient(googleFactory);
+        string ownerCookie = await SignInAsync(client, owner);
+        string otherCookie = await SignInAsync(client, other);
+
+        HttpResponseMessage completion = await CompleteExternalReauthAsync(
+            client,
+            ownerCookie,
+            otherCookie);
+
+        Assert.Contains(
+            "error=reauth_identity_mismatch",
+            completion.Headers.Location?.OriginalString,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "#reauth=",
+            completion.Headers.Location?.OriginalString,
+            StringComparison.Ordinal);
+    }
+
     private static async Task<string> SignInAsync(HttpClient client, UserId userId)
     {
         HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
@@ -145,6 +208,91 @@ public sealed class ReauthenticationTests : IAsyncLifetime, IDisposable
         return response.Headers.GetValues(HeaderNames.SetCookie)
             .Single(value => value.StartsWith("pu.auth=", StringComparison.Ordinal))
             .Split(';', 2)[0];
+    }
+
+    private WebApplicationFactory<Program> CreateGoogleFactory(string providerKey) =>
+        _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+                services.PostConfigure<GoogleOptions>(
+                    GoogleDefaults.AuthenticationScheme,
+                    options =>
+                    {
+                        options.Events.OnRedirectToAuthorizationEndpoint = async context =>
+                        {
+                            var identity = new ClaimsIdentity(
+                            [
+                                new Claim(ClaimTypes.NameIdentifier, providerKey),
+                                new Claim(ClaimTypes.Email, "provider@example.test"),
+                                new Claim("email_verified", "true"),
+                            ], GoogleDefaults.AuthenticationScheme);
+                            await context.HttpContext.SignInAsync(
+                                IdentityConstants.ExternalScheme,
+                                new ClaimsPrincipal(identity),
+                                context.Properties);
+                            context.Response.Redirect(context.Properties.RedirectUri!);
+                        };
+                    })));
+
+    private static async Task<HttpResponseMessage> CompleteExternalReauthAsync(
+        HttpClient client,
+        string mintingCookie,
+        string completionCookie)
+    {
+        HttpResponseMessage minted = await AntiforgeryTestClient.PostAsync(
+            client,
+            "/api/v1/auth/external/intent",
+            JsonContent.Create(new
+            {
+                provider = "google",
+                mode = "reauth",
+                returnTo = "/settings/account",
+            }),
+            mintingCookie);
+        minted.EnsureSuccessStatusCode();
+        ExternalIntentResponse intent =
+            (await minted.Content.ReadFromJsonAsync<ExternalIntentResponse>())!;
+        string binderCookie = Cookie(minted, value => value.Name.Value == "pu.intent");
+
+        using var start = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/api/v1/auth/external/google/start?intent={Uri.EscapeDataString(intent.Intent)}");
+        start.Headers.Add(HeaderNames.Cookie, $"{mintingCookie}; {binderCookie}");
+        HttpResponseMessage challenge = await client.SendAsync(start);
+        Assert.Equal(HttpStatusCode.Redirect, challenge.StatusCode);
+        string externalCookie = Cookie(
+            challenge,
+            value => value.Name.Value?.Contains(
+                "Identity.External",
+                StringComparison.Ordinal) == true);
+
+        using var complete = new HttpRequestMessage(
+            HttpMethod.Get,
+            "/api/v1/auth/external/complete");
+        complete.Headers.Add(
+            HeaderNames.Cookie,
+            $"{completionCookie}; {externalCookie}");
+        return await client.SendAsync(complete);
+    }
+
+    private async Task AddGoogleLoginAsync(UserId userId, string providerKey)
+    {
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<AuthUser>>();
+        AuthUser user = (await users.FindByIdAsync(userId.Value.ToString("D")))!;
+        Assert.True((await users.AddLoginAsync(
+            user,
+            new UserLoginInfo("google", providerKey, "google"))).Succeeded);
+    }
+
+    private static string Cookie(
+        HttpResponseMessage response,
+        Func<SetCookieHeaderValue, bool> predicate)
+    {
+        SetCookieHeaderValue cookie = response.Headers
+            .GetValues(HeaderNames.SetCookie)
+            .Select(value => SetCookieHeaderValue.Parse(value))
+            .Single(predicate);
+        return $"{cookie.Name.Value}={cookie.Value.Value}";
     }
 
     private static Task<HttpResponseMessage> ReauthAsync(

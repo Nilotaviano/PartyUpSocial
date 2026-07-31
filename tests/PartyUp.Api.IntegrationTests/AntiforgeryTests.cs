@@ -73,6 +73,14 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             })),
             ["POST /api/v1/auth/reauth"] = Protected(() =>
                 JsonContent.Create(new { currentPassword = "current-password" })),
+            ["POST /api/v1/auth/external/intent"] = Public(() =>
+                JsonContent.Create(new
+                {
+                    provider = "google",
+                    mode = "login",
+                    returnTo = "/app",
+                    ageGateAttested = true,
+                })),
             ["POST /api/v1/auth/reauth/email"] = Protected(() =>
                 JsonContent.Create(new { })),
             ["POST /api/v1/auth/logout"] = Protected(() => null),

@@ -48,7 +48,7 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
             ["default"] = [],
         };
 
-    private readonly PartyUpApiFactory _factory = new();
+    private readonly PartyUpApiFactory _factory = new(googleEnabled: true);
 
     public Task InitializeAsync() => _factory.StartAsync();
 
@@ -74,6 +74,40 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
         Assert.DoesNotContain(
             dataSources.SelectMany(source => source.Endpoints),
             endpoint => endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>() is not null);
+    }
+
+    [Fact]
+    public async Task AnonymousExternalIntent_IsBoundedByIntentIp()
+    {
+        using HttpClient client = Slice5HttpTest.CreateClient(_factory);
+
+        for (int attempt = 0; attempt < 30; attempt++)
+        {
+            HttpResponseMessage accepted = await AntiforgeryTestClient.PostAsync(
+                client,
+                "/api/v1/auth/external/intent",
+                JsonContent.Create(new
+                {
+                    provider = "google",
+                    mode = "login",
+                    returnTo = "/app",
+                    ageGateAttested = true,
+                }));
+            Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        }
+
+        HttpResponseMessage limited = await AntiforgeryTestClient.PostAsync(
+            client,
+            "/api/v1/auth/external/intent",
+            JsonContent.Create(new
+            {
+                provider = "google",
+                mode = "login",
+                returnTo = "/app",
+                ageGateAttested = true,
+            }));
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
     }
 
     [Fact]

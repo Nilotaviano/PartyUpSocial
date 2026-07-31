@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -6,7 +7,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using NodaTime;
+using PartyUp.Api.Auth;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Email;
 using PartyUp.Domain.Kernel;
@@ -21,6 +24,7 @@ namespace PartyUp.Api.IntegrationTests;
 
 internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
 {
+    private readonly bool _googleEnabled;
     private readonly PostgreSqlContainer _postgres =
         new PostgreSqlBuilder("postgres:17-alpine").Build();
     private readonly CapturingEmailSender _emailSender = new();
@@ -36,6 +40,11 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
 
     internal PostAuthenticationGateProbe PostAuthenticationGateProbe =>
         _postAuthenticationGateProbe;
+
+    internal PartyUpApiFactory(bool googleEnabled = false)
+    {
+        _googleEnabled = googleEnabled;
+    }
 
     internal Task StartAsync() => _postgres.StartAsync();
 
@@ -117,15 +126,38 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Testing");
         builder.ConfigureAppConfiguration((_, configuration) =>
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            var settings = new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Db"] = _postgres.GetConnectionString(),
                 ["Database:MigrateOnStartup"] = "true",
                 ["Deletion:SweepEnabled"] = "false",
                 ["Email:Provider"] = "log",
-            }));
+            };
+            if (_googleEnabled)
+            {
+                settings["Google:ClientId"] = "test-google-client";
+                settings["Google:ClientSecret"] = "test-google-secret";
+            }
+
+            configuration.AddInMemoryCollection(settings);
+        });
         builder.ConfigureTestServices(services =>
         {
+            if (_googleEnabled &&
+                !services.Any(descriptor =>
+                    descriptor.ServiceType == typeof(IConfigureOptions<GoogleOptions>)))
+            {
+                services.AddAuthentication()
+                    .AddGoogle(
+                        GoogleDefaults.AuthenticationScheme,
+                        options => GoogleAuthSetup.ConfigureOptions(
+                            options,
+                            "test-google-client",
+                            "test-google-secret",
+                            isDevelopment: false));
+            }
+
             services.RemoveAll<IClock>();
             services.AddSingleton<IClock>(Clock);
             services.RemoveAll<IEmailSender>();
