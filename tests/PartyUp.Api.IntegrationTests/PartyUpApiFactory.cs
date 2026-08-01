@@ -58,6 +58,7 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
         bool banned = false,
         bool admin = false,
         string? email = "player@example.test",
+        bool emailConfirmed = true,
         string? password = null)
     {
         await using AsyncServiceScope scope = Services.CreateAsyncScope();
@@ -103,7 +104,7 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
             UserName = identityName,
             NormalizedUserName = identityName,
             Email = email,
-            EmailConfirmed = email is not null,
+            EmailConfirmed = email is not null && emailConfirmed,
             LockoutEnabled = true,
         };
         IdentityResult createResult = password is null

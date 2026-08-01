@@ -121,6 +121,9 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 JsonContent.Create(new { email = "not-an-email" })),
             ["POST /api/v1/account-deletion-requests/confirm"] = Public(() =>
                 JsonContent.Create(new { token = "invalid" })),
+            ["POST /api/v1/admin/users/{id:guid}/ban"] = Admin(() =>
+                JsonContent.Create(new { removeContent = false })),
+            ["POST /api/v1/admin/users/{id:guid}/unban"] = Admin(() => null),
             ["POST /api/v1/admin/maintenance/deletion-sweep"] = Admin(() => null),
         };
 

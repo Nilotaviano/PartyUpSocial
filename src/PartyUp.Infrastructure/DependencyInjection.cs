@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<IUserAccountGateway, UserAccountGateway>();
         services.AddScoped<IAccountSessionService, AccountSessionService>();
         services.AddScoped<ICurrentUserProjectionReader, CurrentUserProjectionReader>();
+        services.AddScoped<IAdminUserReader, AdminUserReader>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUsernameRegistryRepository, UsernameRegistryRepository>();
         services.AddScoped<IFriendCodeGenerator, FriendCodeGenerator>();

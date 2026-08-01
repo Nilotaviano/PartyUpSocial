@@ -82,6 +82,8 @@ public sealed class AuthInputValidationTests : IAsyncLifetime, IDisposable
             MalformedCase("/api/v1/auth/reauth/email"),
             MalformedCase("/api/v1/auth/logout"),
             JsonCase("/api/v1/me/platform-links", new { platform = 42, handle = "Player" }),
+            JsonCase($"/api/v1/admin/users/{Guid.Empty:D}/ban", new { removeContent = "no" }),
+            MalformedCase($"/api/v1/admin/users/{Guid.Empty:D}/unban"),
         ];
 
         string[] cookies = new string[cases.Length];
@@ -90,6 +92,9 @@ public sealed class AuthInputValidationTests : IAsyncLifetime, IDisposable
             UserId caseUserId = index == 0
                 ? userId
                 : await _factory.SeedUserAsync(
+                    admin: cases[index].Route.StartsWith(
+                        "/api/v1/admin/",
+                        StringComparison.Ordinal),
                     email: $"validation-user-{index}@example.test",
                     password: Password);
             cookies[index] = await SignInAsync(client, caseUserId);
@@ -167,6 +172,21 @@ public sealed class AuthInputValidationTests : IAsyncLifetime, IDisposable
                 response.StatusCode == status,
                 $"{route} returned {(int)response.StatusCode} instead of {(int)status}.");
         }
+
+        UserId adminId = await _factory.SeedUserAsync(
+            admin: true,
+            email: $"empty-json-admin-{includeContentLength}@example.test",
+            password: Password);
+        UserId targetId = await _factory.SeedUserAsync(
+            email: $"empty-json-target-{includeContentLength}@example.test",
+            password: Password);
+        string adminCookie = await SignInAsync(client, adminId);
+        using HttpResponseMessage unban = await AntiforgeryTestClient.PostAsync(
+            client,
+            $"/api/v1/admin/users/{targetId.Value:D}/unban",
+            new EmptyJsonContent(includeContentLength),
+            adminCookie);
+        Assert.Equal(HttpStatusCode.OK, unban.StatusCode);
     }
 
     private static InvalidCase JsonCase(string route, object body) =>

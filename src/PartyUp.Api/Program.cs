@@ -16,6 +16,7 @@ using PartyUp.Api.Hosting;
 using PartyUp.Api.Security;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Accounts;
+using PartyUp.Application.Admin;
 using PartyUp.Application.Deletion;
 using PartyUp.Application.Onboarding;
 using PartyUp.Application.Profile;
@@ -93,6 +94,11 @@ builder.Services.AddScoped<ConfirmPublicDeletionUseCase>();
 builder.Services.AddScoped<ExecuteDeletionForUserUseCase>();
 builder.Services.AddScoped<ExecuteDueDeletionsUseCase>();
 builder.Services.AddScoped<PurgeExpiredAuthTokensUseCase>();
+builder.Services.AddScoped<ListUsersUseCase>();
+builder.Services.AddScoped<GetUserUseCase>();
+builder.Services.AddScoped<BanUserUseCase>();
+builder.Services.AddScoped<UnbanUserUseCase>();
+builder.Services.AddScoped<ReadDeletionJournalUseCase>();
 builder.Services.AddScoped<GetOnboardingStateUseCase>();
 builder.Services.AddScoped<CheckUsernameAvailabilityUseCase>();
 builder.Services.AddScoped<ValidateProfileDraftUseCase>();
@@ -118,6 +124,9 @@ builder.Services.AddSingleton<IDeletionExecutionScheduler>(services =>
     services.GetRequiredService<DeletionSweepHostedService>());
 builder.Services.AddHostedService(services =>
     services.GetRequiredService<DeletionSweepHostedService>());
+builder.Services.AddSingleton<AdminSeeder>();
+builder.Services.AddHostedService(services =>
+    services.GetRequiredService<AdminSeeder>());
 builder.Services.AddScoped<AuthenticateAndSignIn>();
 builder.Services.AddPartyUpCookieAuthentication(builder.Environment);
 builder.Services.AddPartyUpGoogleAuthentication(
