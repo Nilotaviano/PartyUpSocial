@@ -1,4 +1,6 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Npgsql;
 using PartyUp.Application.Abstractions;
 
 namespace PartyUp.Infrastructure.Persistence.Repositories;
@@ -23,6 +25,17 @@ public sealed class UnitOfWork(AppDbContext context) : IUnitOfWork
             await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return result;
+        }
+        catch (DbUpdateException exception) when (
+            exception.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.UniqueViolation,
+                ConstraintName: "ux_friendships_pair",
+            })
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            context.ChangeTracker.Clear();
+            throw new FriendshipPairUniqueConflictException(exception);
         }
         catch
         {

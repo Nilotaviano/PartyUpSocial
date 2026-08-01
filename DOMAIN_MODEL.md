@@ -46,6 +46,7 @@ Cross-aggregate references are by ID. The visibility engine, identity-masking se
 ## 4. Friendship and Block
 
 - `Friendship`: canonical unordered pair (`UserLoId` < `UserHiId`, DB unique), `RequestedBy`, `Status`: Pending | Accepted. Rejection and removal (D-105 names both) delete the row — a rejected requester may re-request (no domain cooldown; abuse is bounded by API-layer rate limiting, §12-23).
+- **Request actions:** the complete command set is send, accept, reject, and cancel-outgoing. Only the addressee accepts or rejects; only the requester cancels. Sending against an incoming Pending row is crossed-request acceptance, not a second row or notification. Reject and cancel delete silently. Either member may unfriend an Accepted row; unfriend deletes silently and has no session/poll/content effect. Only blocking invokes the content effects below (D-015/D-065/D-105).
 - `Block`: (`BlockerId`, `BlockedId`) unique ordered pair. Creating one, atomically:
   1. deletes any friendship (either status) between the pair (D-065);
   2. where either party organizes a **non-terminal, not-ended** session the other participates in: the non-organizer's `Participation` → `Removed` (§5.2), capacity freed, confirmation re-evaluated, their pending reminder canceled (D-077, D-074, §9). Completed rosters are frozen (D-095) — in history the pair coexists masked (D-076);
@@ -205,6 +206,8 @@ Written in the same transaction as the causing state change (A-016). **Mute is a
 **Reminders** target Going/Maybe registered participants, waitlisted included — D-090's exception reads "Going or Maybe users" with no waitlist qualifier, and D-084 makes Going/Maybe the waitlisted user's real status (§12-30). Recompute/cancel triggers: RSVP change, waitlist flag change (promotion/reject), start-time or duration change, cancel, **block-driven and deletion-driven removal** — a `Removed` participant's pending reminder must die with their access. A reminder whose computed instant is already past is skipped, never fired late (D-153 finalization can create such cases).
 
 Steam-import match notifications are first-observation-only per `(recipient importer, matched actor)`. The database enforces that ruling with partial unique index `ux_notifications_steam_match_once` on `(recipient_user_id, actor_user_id) WHERE type = 24`, so repeated observations cannot create notification spam.
+
+**Phase 3 request-notification closure:** a new Pending friend request and its one `FriendRequestReceived` row commit in the same A-016 transaction. Crossed acceptance, explicit acceptance, reject, cancel, and unfriend write no notification. The dedicated Friends surface is where incoming and outgoing requests remain actionable; these transactional rows do not substitute for it. Notification-center, unread, and transport behavior remains Phase 7-owned (D-105).
 
 ## 10. Event → recipient contracts (the spec §8.4 list, D-112)
 

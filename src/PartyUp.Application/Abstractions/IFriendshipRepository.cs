@@ -48,3 +48,11 @@ public sealed record PendingFriendProjection(
     User Counterpart,
     UserId RequestedBy,
     Instant RequestedAt);
+
+public sealed class FriendshipPairUniqueConflictException : Exception
+{
+    public FriendshipPairUniqueConflictException(Exception innerException)
+        : base(nameof(FriendshipPairUniqueConflictException), innerException)
+    {
+    }
+}

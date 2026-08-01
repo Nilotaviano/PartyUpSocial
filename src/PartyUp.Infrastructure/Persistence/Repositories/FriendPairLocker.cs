@@ -17,14 +17,17 @@ public sealed class FriendPairLocker(AppDbContext context) : IFriendPairLocker
             return null;
         }
 
+        await context.Database.ExecuteSqlInterpolatedAsync($"""
+            SELECT 1
+            FROM users
+            WHERE id IN ({first.Value}, {second.Value})
+            ORDER BY id
+            FOR UPDATE
+            """, cancellationToken);
+
         List<User> users = await context.DomainUsers
-            .FromSqlInterpolated($"""
-                SELECT *
-                FROM users
-                WHERE id IN ({first.Value}, {second.Value})
-                ORDER BY id
-                FOR UPDATE
-                """)
+            .Where(user => user.Id == first || user.Id == second)
+            .OrderBy(user => user.Id)
             .ToListAsync(cancellationToken);
 
         if (users.Count != 2)

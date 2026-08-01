@@ -7,6 +7,7 @@ using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Auth;
 using PartyUp.Application.Email;
+using PartyUp.Application.Friends;
 using PartyUp.Application.Text;
 using PartyUp.Infrastructure.Accounts;
 using PartyUp.Infrastructure.Auth;
@@ -60,6 +61,11 @@ public static class DependencyInjection
         services.AddScoped<IUserGraphResolver, UserGraphResolver>();
         services.AddScoped<IFriendCodeGenerator, FriendCodeGenerator>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<SendFriendRequestUseCase>();
+        services.AddScoped<AcceptFriendRequestUseCase>();
+        services.AddScoped<RejectFriendRequestUseCase>();
+        services.AddScoped<CancelFriendRequestUseCase>();
+        services.AddScoped<UnfriendUseCase>();
         services.AddSingleton<IPublicLinkBuilder>(new PublicLinkBuilder(
             configuration["PublicBaseUrl"] ?? "http://localhost:5173"));
         services.AddScoped<SecurityTokenService>();
