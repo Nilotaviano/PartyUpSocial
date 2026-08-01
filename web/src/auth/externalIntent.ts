@@ -1,6 +1,7 @@
 import { isApiError } from '../api/client'
+import type { components } from '../api/schema'
 
-type IntentResponse = { intent: string }
+type IntentResponse = components['schemas']['ExternalIntentResponse']
 
 export async function startExternalProviderWithRetry(
   mintIntent: () => Promise<IntentResponse>,

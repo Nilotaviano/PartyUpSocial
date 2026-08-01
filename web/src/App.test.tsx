@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import './i18n'
 import type { Session } from './api/client'
+import { RequireAuth } from './auth/RequireAuth'
+import { RequireOnboarded } from './auth/RequireOnboarded'
 import { useSession } from './auth/useSession'
 
 vi.mock('./auth/useSession', () => ({ useSession: vi.fn() }))
@@ -72,6 +74,22 @@ describe('route guards', () => {
     renderRoute('/app')
 
     expect(screen.queryByTestId('screen-app')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['RequireAuth', RequireAuth],
+    ['RequireOnboarded', RequireOnboarded],
+  ])('%s does not render children while the session is loading', (_name, Guard) => {
+    mockedUseSession.mockReturnValue({ data: undefined, isPending: true } as ReturnType<typeof useSession>)
+    render(
+      <MemoryRouter>
+        <Guard>
+          <div data-testid="guard-child" />
+        </Guard>
+      </MemoryRouter>,
+    )
+
+    expect(screen.queryByTestId('guard-child')).not.toBeInTheDocument()
   })
 
   it.each([

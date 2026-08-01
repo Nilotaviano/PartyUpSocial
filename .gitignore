@@ -55,3 +55,4 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 .foreman/
+src/PartyUp.Api/mail-drop/
