@@ -28,7 +28,7 @@ public sealed class GetProfileUseCase(IUserGraphResolver resolver)
 
 public sealed record UsernameProfileResolution(ProfileView Profile);
 
-public abstract record ProfileView(FriendRelationship Relationship)
+public abstract record ProfileView(string Disclosure, FriendRelationship Relationship)
 {
     public static ProfileView From(ResolvedUserGraph resolved)
     {
@@ -53,7 +53,7 @@ public abstract record ProfileView(FriendRelationship Relationship)
 public sealed record UsernameOnlyProfile(
     string Username,
     FriendRelationship Relationship)
-    : ProfileView(Relationship);
+    : ProfileView("username_only", Relationship);
 
 public sealed record FullProfile(
     string Username,
@@ -61,6 +61,6 @@ public sealed record FullProfile(
     Avatar Avatar,
     IReadOnlyList<PublicPlatform> Platforms,
     FriendRelationship Relationship)
-    : ProfileView(Relationship);
+    : ProfileView("full", Relationship);
 
 public sealed record PublicPlatform(Platform Platform, string Handle);
