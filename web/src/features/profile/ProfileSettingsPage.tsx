@@ -3,10 +3,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { client, isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { ReauthPrompt, type ReauthAction } from '../settings/ReauthPrompt'
+import { clearPendingSettingsAction } from '../settings/reauthAction'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 
 const profileQueryKey = ['my-profile'] as const
+const methodsQueryKey = ['auth-methods'] as const
 
 type ProfileEndpoint = '/api/v1/me/username' | '/api/v1/me/display-name' | '/api/v1/me/avatar' | '/api/v1/me/time-zone'
 
@@ -14,6 +17,12 @@ async function getProfile() {
   const { data } = await client.GET('/api/v1/me')
   if (!data) throw new Error('Profile response was empty.')
   return data
+}
+
+async function getAuthMethods() {
+  const { data } = await client.GET('/api/v1/auth/methods')
+  if (!data) throw new Error('Authentication methods response was empty.')
+  return data.methods
 }
 
 function ProfileError({ error }: { error: unknown }) {
@@ -27,8 +36,10 @@ export function ProfileSettingsPage() {
   const { t } = useTranslation('profile')
   const queryClient = useQueryClient()
   const { data: profile, isPending, error } = useQuery({ queryKey: profileQueryKey, queryFn: getProfile })
+  const { data: methods = [] } = useQuery({ queryKey: methodsQueryKey, queryFn: getAuthMethods })
   const [formError, setFormError] = useState<unknown>()
   const [saving, setSaving] = useState(false)
+  const [action, setAction] = useState<ReauthAction | null>(null)
 
   async function save(event: FormEvent<HTMLFormElement>, endpoint: ProfileEndpoint) {
     event.preventDefault()
@@ -53,6 +64,28 @@ export function ProfileSettingsPage() {
     }
   }
 
+  async function unlinkPlatform(id: string, proof?: { currentPassword?: string; reauthToken?: string }) {
+    setFormError(undefined)
+    try {
+      await client.DELETE('/api/v1/me/platform-links/{id}', {
+        params: { header: { 'X-CSRF-TOKEN': '' }, path: { id } },
+        body: proof ? { currentPassword: proof.currentPassword ?? null, reauthToken: proof.reauthToken ?? null } : undefined,
+      } as never)
+      clearPendingSettingsAction()
+      await queryClient.invalidateQueries({ queryKey: profileQueryKey })
+    } catch (caught) {
+      if (isApiError(caught) && caught.code === 'reauth_required' && !proof) {
+        setAction({ kind: 'unlinkPlatform', id })
+        return
+      }
+      setFormError(caught)
+      throw caught
+    }
+  }
+
+  async function confirmAction(proof: { currentPassword?: string; reauthToken?: string }) {
+    if (action?.kind === 'unlinkPlatform') await unlinkPlatform(action.id, proof)
+  }
   if (isPending) return <main data-testid="screen-settings-profile">{t('loading')}</main>
 
   return (
@@ -82,9 +115,14 @@ export function ProfileSettingsPage() {
       </form>
       <section aria-labelledby="platform-links-heading">
         <h2 id="platform-links-heading">{t('platformLinks.title')}</h2>
-        {profile?.platformLinks.length ? <ul>{profile.platformLinks.map((link) => <li key={link.id}>{t('platformLinks.item', { platform: link.platform, handle: link.handle })}</li>)}</ul> : <p>{t('platformLinks.empty')}</p>}
+        {profile?.platformLinks.length ? <ul>{profile.platformLinks.map((link) => <li key={link.id}>
+          <span>{t('platformLinks.item', { platform: link.platform, handle: link.handle })}</span>
+          {link.platform.toLowerCase() === 'steam' && <p>{t('platformLinks.steamUnlinkNotice')}</p>}
+          <Button onClick={() => void unlinkPlatform(link.id)}>{t('platformLinks.unlink', { platform: link.platform })}</Button>
+        </li>)}</ul> : <p>{t('platformLinks.empty')}</p>}
       </section>
       <ProfileError error={formError} />
+      <ReauthPrompt action={action} methods={methods} onOpenChange={(open) => { if (!open) { clearPendingSettingsAction(); setAction(null) } }} onConfirmed={confirmAction} />
     </main>
   )
 }

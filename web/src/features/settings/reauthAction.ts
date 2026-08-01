@@ -1,13 +1,37 @@
-import type { ReauthAction } from './ReauthPrompt'
+export type ReauthAction =
+  | { kind: 'deleteAccount' }
+  | { kind: 'unlinkAuthMethod'; method: string }
+  | { kind: 'unlinkPlatform'; id: string }
 
-let pendingAction: ReauthAction | null = null
+const pendingActionStorageKey = 'partyup.pending-reauth-action'
 
-export function setPendingSettingsAction(action: ReauthAction) {
-  pendingAction = action
+function isReauthAction(value: unknown): value is ReauthAction {
+  if (!value || typeof value !== 'object') return false
+  const action = value as Partial<ReauthAction>
+  return action.kind === 'deleteAccount' ||
+    action.kind === 'unlinkAuthMethod' && typeof action.method === 'string' ||
+    action.kind === 'unlinkPlatform' && typeof action.id === 'string'
 }
 
-export function consumePendingSettingsAction() {
-  const current = pendingAction
-  pendingAction = null
-  return current
+export function setPendingSettingsAction(action: ReauthAction) {
+  sessionStorage.setItem(pendingActionStorageKey, JSON.stringify(action))
+}
+
+export function getPendingSettingsAction() {
+  const value = sessionStorage.getItem(pendingActionStorageKey)
+  if (!value) return null
+
+  try {
+    const action: unknown = JSON.parse(value)
+    if (isReauthAction(action)) return action
+  } catch {
+    // Malformed storage is never a valid action.
+  }
+
+  sessionStorage.removeItem(pendingActionStorageKey)
+  return null
+}
+
+export function clearPendingSettingsAction() {
+  sessionStorage.removeItem(pendingActionStorageKey)
 }

@@ -1,18 +1,18 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { useLocation, useNavigate } from 'react-router'
-import { client, isApiError } from '../../api/client'
+
+import { ApiError, client, isApiError } from '../../api/client'
 import { useSession, sessionQueryKey } from '../../auth/useSession'
+import { startExternalProviderWithRetry } from '../../auth/externalIntent'
 import { Button } from '../../components/ui/button'
 import { Label } from '../../components/ui/label'
 import { Input } from '../../components/ui/input'
 import { Select } from '../../components/ui/select'
 import { ReauthPrompt, type ReauthAction } from './ReauthPrompt'
+import { clearPendingSettingsAction, getPendingSettingsAction } from './reauthAction'
 
 const methodsQueryKey = ['auth-methods'] as const
-
-type PendingLocationState = { pendingReauthAction?: ReauthAction }
 
 async function getAuthMethods() {
   const { data } = await client.GET('/api/v1/auth/methods')
@@ -32,15 +32,14 @@ function errorKey(error: unknown) {
 
 export function AccountSettingsPage() {
   const { t, i18n } = useTranslation(['settings', 'errors'])
-  const location = useLocation()
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { data: session } = useSession()
   const { data: methods = [], isPending } = useQuery({ queryKey: methodsQueryKey, queryFn: getAuthMethods })
   const [locale, setLocale] = useState(i18n.language)
-  const [action, setAction] = useState<ReauthAction | null>((location.state as PendingLocationState | null)?.pendingReauthAction ?? null)
+  const [action, setAction] = useState<ReauthAction | null>(null)
   const [error, setError] = useState<unknown>()
   const [saved, setSaved] = useState(false)
+  const [graceEndsAt, setGraceEndsAt] = useState<string | null>(null)
 
   useEffect(() => {
     const accountLocale = session?.profile?.locale
@@ -51,12 +50,9 @@ export function AccountSettingsPage() {
   }, [i18n, session?.profile?.locale])
 
   useEffect(() => {
-    const pendingAction = (location.state as PendingLocationState | null)?.pendingReauthAction
-    if (pendingAction) {
-      queueMicrotask(() => setAction(pendingAction))
-      navigate(location.pathname, { replace: true, state: null })
-    }
-  }, [location.pathname, location.state, navigate])
+    const pendingAction = getPendingSettingsAction()
+    if (pendingAction) queueMicrotask(() => setAction(pendingAction))
+  }, [])
 
   async function saveLocale(value: string) {
     setError(undefined)
@@ -85,26 +81,47 @@ export function AccountSettingsPage() {
   }
   async function confirmAction(proof: { currentPassword?: string; reauthToken?: string }) {
     setError(undefined)
-    if (action === 'delete-account') {
-      await client.POST('/api/v1/me/deletion', {
+    if (action?.kind === 'deleteAccount') {
+      const result = await client.POST('/api/v1/me/deletion', {
         params: { header: { 'X-CSRF-TOKEN': '' } },
         body: { currentPassword: proof.currentPassword ?? null, reauthToken: proof.reauthToken ?? null },
-      } as never)
+      } as never) as { data?: { graceEndsAt?: string } }
+      setGraceEndsAt(result.data?.graceEndsAt ?? null)
+      clearPendingSettingsAction()
       await queryClient.invalidateQueries({ queryKey: sessionQueryKey })
-      navigate('/welcome', { replace: true })
       return
     }
-    if (action?.startsWith('unlink:')) {
-      const kind = action.slice('unlink:'.length)
+    if (action?.kind === 'unlinkAuthMethod') {
       await client.DELETE('/api/v1/auth/methods/{kind}', {
-        params: { header: { 'X-CSRF-TOKEN': '' }, path: { kind } },
+        params: { header: { 'X-CSRF-TOKEN': '' }, path: { kind: action.method } },
         body: { currentPassword: proof.currentPassword ?? null, reauthToken: proof.reauthToken ?? null },
       } as never)
+      clearPendingSettingsAction()
       await queryClient.invalidateQueries({ queryKey: methodsQueryKey })
     }
   }
 
+  async function linkProvider(provider: string) {
+    setError(undefined)
+    try {
+      await startExternalProviderWithRetry(async () => {
+        const { data } = await client.POST('/api/v1/auth/external/intent', {
+          params: { header: { 'X-CSRF-TOKEN': '' } },
+          body: { provider, mode: 'link', returnTo: '/settings/account', ageGateAttested: null, currentPassword: null, reauthToken: null },
+        })
+        if (!data) throw new ApiError(500, 'request_failed')
+        return data
+      }, async (intent) => {
+        window.location.assign(`/api/v1/auth/external/${provider}/start?intent=${encodeURIComponent(intent)}`)
+      })
+    } catch (caught) {
+      setError(caught)
+    }
+  }
+
   const emailMethod = methods.find((method) => method.kind.toLowerCase().includes('magic'))
+  const configuredProviders = (session?.providers ?? []).filter((provider) => ['google', 'steam'].includes(provider.toLowerCase()))
+  const unlinkedProviders = configuredProviders.filter((provider) => !methods.some((method) => method.linked && method.kind.toLowerCase() === provider.toLowerCase()))
   const errorMessage = error ? t(errorKey(error), { ns: 'errors', defaultValue: t('generic', { ns: 'errors' }) }) : null
 
   return (
@@ -123,9 +140,13 @@ export function AccountSettingsPage() {
         {isPending ? <p>{t('loading')}</p> : <ul>{methods.map((method) => (
           <li key={method.kind}>
             <span>{method.detail ?? method.kind}</span>
-            {method.removable && <Button onClick={() => setAction(`unlink:${method.kind}`)}>{t('authMethods.unlink', { method: method.kind })}</Button>}
+            {method.removable && <Button onClick={() => setAction({ kind: 'unlinkAuthMethod', method: method.kind })}>{t('authMethods.unlink', { method: method.kind })}</Button>}
           </li>
         ))}</ul>}
+        {unlinkedProviders.length > 0 && <div>
+          <h3>{t('authMethods.linkTitle')}</h3>
+          {unlinkedProviders.map((provider) => <Button key={provider} onClick={() => void linkProvider(provider)}>{t('authMethods.link', { provider: provider === 'google' ? 'Google' : 'Steam' })}</Button>)}
+        </div>}
       </section>
       <section aria-labelledby="language-heading">
         <h2 id="language-heading">{t('language.title')}</h2>
@@ -147,14 +168,16 @@ export function AccountSettingsPage() {
           <Input id="account-time-zone" name="timeZone" defaultValue={session?.profile?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone} required />
           <Button type="submit">{t('actions.saveTimeZone', { ns: 'profile' })}</Button>
         </form>
-      </section>      <section aria-labelledby="delete-account-heading">
+      </section>
+      <section aria-labelledby="delete-account-heading">
         <h2 id="delete-account-heading">{t('delete.title')}</h2>
         <p>{t('delete.grace')}</p>
         <p>{t('delete.loginCancels')}</p>
-        <Button onClick={() => setAction('delete-account')}>{t('delete.start')}</Button>
+        <Button onClick={() => setAction({ kind: 'deleteAccount' })}>{t('delete.start')}</Button>
+        {graceEndsAt && <p role="status">{t('delete.scheduled', { graceEndsAt })}</p>}
       </section>
       {errorMessage && <p role="alert">{errorMessage}</p>}
-      <ReauthPrompt action={action} methods={methods} onOpenChange={(open) => { if (!open) setAction(null) }} onConfirmed={confirmAction} />
+      <ReauthPrompt action={action} methods={methods} onOpenChange={(open) => { if (!open) { clearPendingSettingsAction(); setAction(null) } }} onConfirmed={confirmAction} />
     </main>
   )
 }

@@ -6,9 +6,9 @@ import { Button } from '../../components/ui/button'
 import { Dialog } from '../../components/ui/dialog'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
-import { setPendingSettingsAction } from './reauthAction'
+import { setPendingSettingsAction, type ReauthAction } from './reauthAction'
 
-export type ReauthAction = 'delete-account' | `unlink:${string}`
+export type { ReauthAction } from './reauthAction'
 
 type ReauthProof = {
   currentPassword?: string
@@ -118,7 +118,7 @@ export function ReauthPrompt({ action, methods, onOpenChange, onConfirmed }: Rea
         <Dialog.Content aria-describedby="reauth-description">
           <Dialog.Title>{t('reauth.title')}</Dialog.Title>
           <Dialog.Description id="reauth-description">{t('reauth.description')}</Dialog.Description>
-          {action === 'delete-account' && <><p>{t('delete.grace')}</p><p>{t('delete.loginCancels')}</p></>}
+          {action?.kind === 'deleteAccount' && <><p>{t('delete.grace')}</p><p>{t('delete.loginCancels')}</p></>}
           {proof ? (
             <Button disabled={submitting} onClick={() => void continueWithProof()}>{t('reauth.confirmIdentity')}</Button>
           ) : (
