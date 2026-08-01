@@ -36,4 +36,25 @@ public sealed class ProductionUserGraphResolverTests : IAsyncLifetime
 
         Assert.Null(result);
     }
+
+    [Fact]
+    public async Task ResolveProfile_HidesTheSubjectWhoBlockedTheViewer_D065()
+    {
+        var clock = new MutableClock(Instant.FromUtc(2026, 8, 1, 18, 0));
+        User[] users = await _database.SeedUsersAsync(2, clock);
+        User viewer = users[0];
+        User subject = users[1];
+
+        await using AppDbContext context = _database.CreateContext();
+        context.Blocks.Add(Block.Create(subject.Id, viewer.Id, clock));
+        await context.SaveChangesAsync();
+        var resolver = new UserGraphResolver(context);
+
+        ResolvedUserGraph? result = await resolver.ResolveProfileByFriendCodeAsync(
+            viewer.Id,
+            subject.FriendCode!.Value.Value,
+            default);
+
+        Assert.Null(result);
+    }
 }
