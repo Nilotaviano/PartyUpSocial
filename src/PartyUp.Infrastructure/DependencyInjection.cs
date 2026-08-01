@@ -11,6 +11,7 @@ using PartyUp.Application.Text;
 using PartyUp.Infrastructure.Accounts;
 using PartyUp.Infrastructure.Auth;
 using PartyUp.Infrastructure.Email;
+using PartyUp.Infrastructure.Friends;
 using PartyUp.Infrastructure.Deletion;
 using PartyUp.Infrastructure.Identity;
 using PartyUp.Infrastructure.Persistence;
@@ -52,8 +53,15 @@ public static class DependencyInjection
         services.AddScoped<IAdminUserReader, AdminUserReader>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUsernameRegistryRepository, UsernameRegistryRepository>();
+        services.AddScoped<IFriendshipRepository, FriendshipRepository>();
+        services.AddScoped<IBlockRepository, BlockRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IFriendPairLocker, FriendPairLocker>();
+        services.AddScoped<IUserGraphResolver, UserGraphResolver>();
         services.AddScoped<IFriendCodeGenerator, FriendCodeGenerator>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddSingleton<IPublicLinkBuilder>(new PublicLinkBuilder(
+            configuration["PublicBaseUrl"] ?? "http://localhost:5173"));
         services.AddScoped<SecurityTokenService>();
         services.AddScoped<ISecurityTokenService>(provider =>
             provider.GetRequiredService<SecurityTokenService>());

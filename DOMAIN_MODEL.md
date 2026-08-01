@@ -55,6 +55,8 @@ Cross-aggregate references are by ID. The visibility engine, identity-masking se
 - **Unblock** deletes the Block row and restores nothing: no friendship, and no resurrection of `Removed` rows — those encode a removal that already happened. Unblock only re-enables discovery and future interaction (§12-24).
 - Mutual invisibility is enforced on **every** surface: the visibility engine (§7 rule 4), the user-lookup paths — profile link, friend code, QR resolution, username search — the friend-request command, **and Steam friend-list import matching** (a blocked counterpart or tombstoned user is never surfaced as a match, D-049/D-065). The only coexistence is an existing third-party session/poll, rendered through masking (D-076/D-086).
 
+**Phase 3 read-model closure:** profile and friend-code resolution apply D-068 only to profile pages: pre-acceptance identity is exactly username, while self and accepted friends receive the full profile and authorized rosters/voter lists continue through `IdentityMasking`. Username lookup trims and uses `UsernameRegistry.Canonicalize`; friend-code input trims, removes ASCII spaces and hyphens, uppercases invariantly, then validates exactly ten symbols from `FriendCodeFormat.Alphabet`. Share links use only the configured `PublicBaseUrl` without a trailing slash, `/u/{escaped current stored username}`, and `/add/{canonical friend code}`. Missing candidates, incomplete/tombstoned accounts, either block direction, and banned non-self/non-friends all collapse to the same hidden result without a reason or `DomainError.Blocked` escaping. The private block-management read is the sole disclosure exception: it returns only the current username for rows owned by the viewer as `BlockerId`; it exposes no inbound rows, full profile fields, friend code, or link. A related accepted/pending counterpart may still be selected for the safety action of blocking after a ban, but unrelated banned usernames remain hidden. Phase 3 adds no admin endpoint; D-179 friend counts are queryable schema only.
+
 ## 5. Session aggregate
 
 ### 5.1 Session
@@ -241,7 +243,7 @@ Execution (sweeper at grace expiry; idempotent; one transaction per user; delibe
 
 Steps 1–3 run before 4 so their notifications see the intact graph; notification rows are structured-only (§9), so nothing named survives the tombstone.
 
-## 12. Interpretation notes (spec-silent or spec-tension points this model resolves — ratify or veto)
+## 12. Ratified interpretation notes (spec-silent or spec-tension points this model resolves)
 
 Where a note overrides or arbitrates spec text, that text is quoted.
 
@@ -262,7 +264,7 @@ Where a note overrides or arbitrates spec text, that text is quoted.
 15. **Poll mutes carry onto the finalized session** — the user muted the plan, not the artifact. Accepted composed consequence of write-time mute (§9): unmuting never backfills, and a user who muted a poll can acquire a Going roster row on the finalized session with zero notification records — D-090/D-113's "suppresses every notification" is taken literally.
 16. **"Option selected" fires in every finalization branch, including Expired** — the spec §8.4 push list has no branch exception, and D-170 already establishes that a dead poll is notification-worthy.
 17. **A poll participant whose every current vote is Unavailable does not extend visibility** — D-051 maps Unavailable to Declined, and D-018 excludes Declined from extending; a participant with no votes yet extends (pending-invitee analogue).
-18. **Rosters and voter lists render display name + avatar to anyone with access; D-068's username-only rule governs profile pages.** The alternative reading (username-only rosters for non-friends) treats D-068 ("Before a friendship is accepted, only the unique username is visible", spec §8.3 — an *accounts* rule) as overriding D-030/D-114's roster scope, and turns the Discover flow into bare-username lists. Product-visible either way; confirm.
+18. **Rosters and voter lists render display name + avatar to anyone with access; D-068's username-only rule governs profile pages.** D-068 is an accounts/profile-page disclosure rule and does not override the authorized roster and voter-list identity required by D-030/D-114. This ruling is ratified.
 19. **DST arithmetic is wall-clock at both endpoints, on LocalDateTime** (midnight-crossing blocks never wrap); real duration varies on transition days; occurrences collapsed by a DST gap are dropped.
 20. **Series splits are day-granular at the selected occurrence's date** — the forward-only boundary D-143 demands; a weekday change replaces the selected occurrence with the new pattern from the first new-weekday date onward. Future-dated skip exceptions and materialized blocks are **dropped** at a split — the user is redefining the future.
 21. **Series deletion cascades** to skip exceptions and edit-one materialized blocks; an edit-one materialized block is an absolute instant, detached from D-061 zone migration (UI should disclose).

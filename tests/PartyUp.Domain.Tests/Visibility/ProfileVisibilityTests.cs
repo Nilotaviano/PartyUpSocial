@@ -9,6 +9,15 @@ namespace PartyUp.Domain.Tests.Visibility;
 public class ProfileVisibilityTests
 {
     [Fact]
+    public void For_AuthorizesUsernameOnlyOnProfileBeforeAcceptance_D068()
+    {
+        FakeClock clock = TestUsers.Clock();
+        User subject = TestUsers.Active(clock, "alex", "Alex");
+
+        Assert.Equal(ProfileDisclosure.UsernameOnly, ProfileVisibility.For(subject, TestViewers.Stranger()));
+    }
+
+    [Fact]
     public void For_ExposesOnlyTheUsernameBeforeAFriendshipIsAccepted_D068()
     {
         FakeClock clock = TestUsers.Clock();
