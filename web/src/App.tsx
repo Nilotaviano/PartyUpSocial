@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { RequireAuth } from './auth/RequireAuth'
 import { RequireOnboarded } from './auth/RequireOnboarded'
 import { useSession } from './auth/useSession'
+import { AgeGate, AuthCallback, ConfirmIdentity, EmailChange, Login, MagicLink, Register, ResetPassword, VerifyEmail, Welcome } from './features/auth/AuthScreens'
+import { OnboardingWizard } from './features/onboarding/OnboardingWizard'
 
 type PlaceholderProps = {
   testId: string
@@ -41,27 +43,27 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<LifecycleRedirect />} />
-      <Route path="/welcome" element={<Placeholder testId="screen-welcome" translationKey="pages.welcome" />} />
-      <Route path="/age-gate" element={<Placeholder testId="screen-age-gate" translationKey="pages.ageGate" />} />
-      <Route path="/login" element={<Placeholder testId="screen-login" translationKey="auth:pages.login" />} />
-      <Route path="/register" element={<Placeholder testId="screen-register" translationKey="auth:pages.register" />} />
-      <Route path="/auth/magic" element={<Placeholder testId="screen-auth-magic" translationKey="auth:pages.magic" />} />
-      <Route path="/auth/callback" element={<Placeholder testId="screen-auth-callback" translationKey="auth:pages.callback" />} />
-      <Route path="/auth/reset" element={<Placeholder testId="screen-auth-reset" translationKey="auth:pages.reset" />} />
-      <Route path="/auth/confirm-identity" element={<Placeholder testId="screen-auth-confirm-identity" translationKey="auth:pages.confirmIdentity" />} />
-      <Route path="/auth/verify-email" element={<Placeholder testId="screen-auth-verify-email" translationKey="auth:pages.verifyEmail" />} />
-      <Route path="/auth/email-change" element={<Placeholder testId="screen-auth-email-change" translationKey="auth:pages.emailChange" />} />
+      <Route path="/welcome" element={<Welcome />} />
+      <Route path="/age-gate" element={<AgeGate />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/auth/magic" element={<MagicLink />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/auth/reset" element={<ResetPassword />} />
+      <Route path="/auth/confirm-identity" element={<ConfirmIdentity />} />
+      <Route path="/auth/verify-email" element={<VerifyEmail />} />
+      <Route path="/auth/email-change" element={<EmailChange />} />
       <Route path="/account-deletion" element={<Placeholder testId="screen-account-deletion" translationKey="pages.accountDeletion" />} />
       <Route path="/account-deletion/confirm" element={<Placeholder testId="screen-account-deletion-confirm" translationKey="pages.accountDeletionConfirm" />} />
 
       <Route element={<RequireAuth />}>
-        <Route path="/onboarding" element={<Placeholder testId="screen-onboarding" translationKey="onboarding:pages.root" />} />
-        <Route path="/onboarding/username" element={<Placeholder testId="screen-onboarding-username" translationKey="onboarding:pages.username" />} />
-        <Route path="/onboarding/display-name" element={<Placeholder testId="screen-onboarding-display-name" translationKey="onboarding:pages.displayName" />} />
-        <Route path="/onboarding/avatar" element={<Placeholder testId="screen-onboarding-avatar" translationKey="onboarding:pages.avatar" />} />
-        <Route path="/onboarding/time-zone" element={<Placeholder testId="screen-onboarding-time-zone" translationKey="onboarding:pages.timeZone" />} />
-        <Route path="/onboarding/link-platforms" element={<Placeholder testId="screen-onboarding-link-platforms" translationKey="onboarding:pages.linkPlatforms" />} />
-        <Route path="/onboarding/friends" element={<Placeholder testId="screen-onboarding-friends" translationKey="onboarding:pages.friends" />} />
+        <Route path="/onboarding" element={<OnboardingWizard />} />
+        <Route path="/onboarding/username" element={<OnboardingWizard />} />
+        <Route path="/onboarding/display-name" element={<OnboardingWizard />} />
+        <Route path="/onboarding/avatar" element={<OnboardingWizard />} />
+        <Route path="/onboarding/time-zone" element={<OnboardingWizard />} />
+        <Route path="/onboarding/link-platforms" element={<OnboardingWizard />} />
+        <Route path="/onboarding/friends" element={<OnboardingWizard />} />
 
         <Route element={<RequireOnboarded />}>
           <Route path="/app" element={<Placeholder testId="screen-app" translationKey="pages.app" />} />

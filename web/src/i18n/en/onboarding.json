@@ -1,1 +1,7 @@
-{ "pages": { "root": "Set up your profile", "username": "Choose a username", "displayName": "Choose a display name", "avatar": "Choose an avatar", "timeZone": "Choose your time zone", "linkPlatforms": "Link platforms", "friends": "Find friends" } }
+{
+  "pages": { "root": "Set up your profile", "username": "Choose a username", "displayName": "Choose a display name", "avatar": "Choose an avatar", "timeZone": "Choose your time zone", "linkPlatforms": "Link platforms", "friends": "Find friends" },
+  "fields": { "username": "Username", "displayName": "Display name", "avatar": "Avatar", "timeZone": "Time zone" },
+  "actions": { "continue": "Continue", "finish": "Finish setup" },
+  "messages": { "platformLinksOptional": "Platform linking is optional.", "friendsPhaseThree": "Finding friends arrives in Phase 3. You can finish setup now." },
+  "progress": "Step {{current}} of {{total}}: {{step}}"
+}
