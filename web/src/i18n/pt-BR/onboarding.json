@@ -1,7 +1,7 @@
 {
-  "pages": { "root": "Set up your profile", "username": "Choose a username", "displayName": "Choose a display name", "avatar": "Choose an avatar", "timeZone": "Choose your time zone", "linkPlatforms": "Link platforms", "friends": "Find friends" },
-  "fields": { "username": "Username", "displayName": "Display name", "avatar": "Avatar", "timeZone": "Time zone" },
-  "actions": { "continue": "Continue", "finish": "Finish setup" },
-  "messages": { "platformLinksOptional": "Platform linking is optional.", "friendsPhaseThree": "Finding friends arrives in Phase 3. You can finish setup now." },
-  "progress": "Step {{current}} of {{total}}: {{step}}"
+  "pages": { "root": "Configure seu perfil", "username": "Escolha um nome de usuário", "displayName": "Escolha um nome de exibição", "avatar": "Escolha um avatar", "timeZone": "Escolha seu fuso horário", "linkPlatforms": "Vincule plataformas", "friends": "Encontre amigos" },
+  "fields": { "username": "Nome de usuário", "displayName": "Nome de exibição", "avatar": "Avatar", "timeZone": "Fuso horário" },
+  "actions": { "continue": "Continuar", "finish": "Concluir configuração" },
+  "messages": { "platformLinksOptional": "A vinculação de plataformas é opcional.", "friendsPhaseThree": "A busca de amigos chegará na Fase 3. Você já pode concluir a configuração." },
+  "progress": "Etapa {{current}} de {{total}}: {{step}}"
 }

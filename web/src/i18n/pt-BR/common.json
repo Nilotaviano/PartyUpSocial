@@ -1,5 +1,5 @@
 {
-  "app": { "name": "PartyUp", "tagline": "Find time to play with your friends." },
-  "common": { "loading": "Loading...", "continue": "Continue" },
-  "pages": { "welcome": "Welcome", "ageGate": "Age gate", "app": "Home", "accountDeletion": "Delete account", "accountDeletionConfirm": "Confirm account deletion" }
+  "app": { "name": "PartyUp", "tagline": "Encontre tempo para jogar com seus amigos." },
+  "common": { "loading": "Carregando...", "continue": "Continuar" },
+  "pages": { "welcome": "Boas-vindas", "ageGate": "Verificação de idade", "app": "Início", "accountDeletion": "Excluir conta", "accountDeletionConfirm": "Confirmar exclusão da conta" }
 }

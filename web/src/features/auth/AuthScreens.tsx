@@ -8,6 +8,7 @@ import { Checkbox } from '../../components/ui/checkbox'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { startExternalProviderWithRetry } from '../../auth/externalIntent'
+import { setReauthProof } from '../../auth/reauthProof'
 import { sessionQueryKey, useSession } from '../../auth/useSession'
 
 const ageGateStorageKey = 'partyup.age-gate-attested'
@@ -15,7 +16,7 @@ let pendingMagicToken: string | null = null
 function readHashToken() { const token = new URLSearchParams(window.location.hash.slice(1)).get('token'); window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search); return token }
 function attested() { return sessionStorage.getItem(ageGateStorageKey) === 'true' }
 function next(search: string) { return new URLSearchParams(search).get('next') ?? undefined }
-function destination(session: { state: string | null; onboarding: unknown } | undefined) { return session?.state === 'Onboarding' || session?.onboarding !== null ? '/onboarding' : '/app' }
+function destination(session: { state: string | null; onboarding: unknown } | undefined) { return session?.state === 'onboarding' || session?.onboarding !== null ? '/onboarding' : '/app' }
 function ErrorAlert({ error }: { error: unknown }) { const { t } = useTranslation('errors'); return error ? <p role="alert">{t(isApiError(error) ? error.code : 'generic', { defaultValue: t('generic') })}</p> : null }
 
 export function Welcome() { const { t } = useTranslation(['common', 'auth']); return <main data-testid="screen-welcome"><h1>{t('pages.welcome')}</h1><p>{t('app.tagline')}</p><Link to="/login">{t('pages.login', { ns: 'auth' })}</Link><Link to="/register">{t('pages.register', { ns: 'auth' })}</Link></main> }
@@ -48,7 +49,7 @@ export function MagicLink() {
 }
 
 export function AuthCallback() {
-  const { t } = useTranslation('auth'); const navigate = useNavigate(); const location = useLocation(); const queryClient = useQueryClient(); const [reauth] = useState(() => { const value = new URLSearchParams(window.location.hash.slice(1)).get('reauth'); window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search); return value }); const [error, setError] = useState<unknown>()
+  const { t } = useTranslation('auth'); const navigate = useNavigate(); const location = useLocation(); const queryClient = useQueryClient(); const [reauth] = useState(() => { const value = new URLSearchParams(window.location.hash.slice(1)).get('reauth'); window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search); if (value) setReauthProof(value); return value }); const [error, setError] = useState<unknown>()
   useEffect(() => { void (async () => { if (new URLSearchParams(location.search).get('status') === 'failed') { setError(new ApiError(400, 'callbackFailed')); return } try { await refreshAntiforgeryToken(); const result = await queryClient.fetchQuery({ queryKey: sessionQueryKey, queryFn: async () => { const { data } = await client.GET('/api/v1/auth/session'); if (!data) throw new ApiError(500, 'request_failed'); return data } }); navigate(next(location.search) ?? (reauth ? '/settings/account' : destination(result)), { replace: true }) } catch (caught) { setError(caught) } })() }, [location.search, navigate, queryClient, reauth])
   return <main data-testid="screen-auth-callback"><h1>{t('pages.callback')}</h1><ErrorAlert error={error} /></main>
 }
@@ -61,4 +62,4 @@ function TokenForm({ page, endpoint, password = false }: { page: 'reset' | 'veri
 export function ResetPassword() { return <TokenForm page="reset" endpoint="/api/v1/auth/password/reset" password /> }
 export function VerifyEmail() { return <TokenForm page="verifyEmail" endpoint="/api/v1/auth/email/verify" password /> }
 export function EmailChange() { return <TokenForm page="emailChange" endpoint="/api/v1/auth/email/change/verify" /> }
-export function ConfirmIdentity() { const { t } = useTranslation('auth'); const navigate = useNavigate(); const [token] = useState(readHashToken); return <main data-testid="screen-auth-confirm-identity"><h1>{t('pages.confirmIdentity')}</h1>{token ? <><p>{t('messages.pendingSettingsAction')}</p><Button onClick={() => navigate('/settings/account')}>{t('actions.continue')}</Button></> : <p role="alert">{t('messages.invalidLink')}</p>}</main> }
+export function ConfirmIdentity() { const { t } = useTranslation('auth'); const navigate = useNavigate(); const [token] = useState(() => { const value = readHashToken(); if (value) setReauthProof(value); return value }); return <main data-testid="screen-auth-confirm-identity"><h1>{t('pages.confirmIdentity')}</h1>{token ? <><p>{t('messages.pendingSettingsAction')}</p><Button onClick={() => navigate('/settings/account')}>{t('actions.continue')}</Button></> : <p role="alert">{t('messages.invalidLink')}</p>}</main> }

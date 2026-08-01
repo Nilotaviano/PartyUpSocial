@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router'
 import type { components } from '../../api/schema'
-import { client, isApiError, refreshAntiforgeryToken } from '../../api/client'
+import { ApiError, client, isApiError, refreshAntiforgeryToken } from '../../api/client'
 import { sessionQueryKey } from '../../auth/useSession'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -20,10 +20,20 @@ function reducer(state: ProfileDraft, update: Partial<ProfileDraft>) { return { 
 function fromPath(path: string): Step | undefined { return steps.find((step) => path.endsWith('/' + step)) }
 function nextStep(draft: ProfileDraft): Step { if (!draft.username) return 'username'; if (!draft.displayName) return 'display-name'; if (!draft.avatar) return 'avatar'; if (!draft.timeZone) return 'time-zone'; return 'link-platforms' }
 function errorText(error: unknown, t: (key: string, options?: object) => string) { return t(isApiError(error) ? error.code : 'generic', { defaultValue: t('generic') }) }
+function availabilityError(reason: string | null | undefined) {
+  switch (reason) {
+    case 'taken': return 'username.taken'
+    case 'reserved': return 'username.reserved'
+    case 'cooldown': return 'username.cooldown'
+    case 'profanity': return 'text.profanity'
+    case 'invalid': return 'text.invalid'
+    default: return 'generic'
+  }
+}
 
 export function UsernameStep({ value, onNext }: { value: string | null; onNext: (username: string) => void }) {
   const { t } = useTranslation(['onboarding', 'errors']); const [username, setUsername] = useState(value ?? ''); const [error, setError] = useState<unknown>()
-  async function submit(event: FormEvent) { event.preventDefault(); setError(undefined); try { await client.GET('/api/v1/onboarding/username/availability', { params: { query: { username } } }); onNext(username) } catch (caught) { setError(caught) } }
+  async function submit(event: FormEvent) { event.preventDefault(); setError(undefined); try { const { data } = await client.GET('/api/v1/onboarding/username/availability', { params: { query: { username } } }); const availability = data as unknown as { available: boolean; reason?: string | null }; if (!availability?.available) { setError(new ApiError(400, availabilityError(availability?.reason))); return }; onNext(username) } catch (caught) { setError(caught) } }
   const message = error ? errorText(error, (key, options) => t(key, { ns: 'errors', ...options })) : null
   return <form onSubmit={submit}><Label htmlFor="username">{t('fields.username')}</Label><Input id="username" value={username} onChange={(event) => setUsername(event.target.value)} aria-describedby={message ? 'username-error' : undefined} required />{message && <p id="username-error" role="alert">{message}</p>}<Button type="submit">{t('actions.continue')}</Button></form>
 }
