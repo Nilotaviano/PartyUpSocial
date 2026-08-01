@@ -13,6 +13,19 @@ namespace PartyUp.Domain.Tests.Visibility;
 public class IdentityMaskingTests
 {
     [Fact]
+    public void ForRoster_KeepsFullIdentityForAnAuthorizedNonFriend_D068()
+    {
+        FakeClock clock = TestUsers.Clock();
+        User subject = TestUsers.Active(clock, "alex", "Alex");
+
+        MaskedIdentity rendered = IdentityMasking.ForUser(subject, TestViewers.Stranger());
+
+        Assert.False(rendered.IsAnonymous);
+        Assert.Equal(DisplayName.Create("Alex"), rendered.DisplayName);
+        Assert.Equal(subject.Avatar, rendered.Avatar);
+    }
+
+    [Fact]
     public void ForUser_RendersDisplayNameAndAvatarToAnyViewerWithAccess_D030()
     {
         FakeClock clock = TestUsers.Clock();
