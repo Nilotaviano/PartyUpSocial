@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -13,7 +13,8 @@ import { AccountSettingsPage } from './AccountSettingsPage'
 import { getPendingSettingsAction, setPendingSettingsAction } from './reauthAction'
 
 function renderPage() {
-  return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter><AccountSettingsPage /></MemoryRouter></QueryClientProvider>)
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return { queryClient, ...render(<QueryClientProvider client={queryClient}><MemoryRouter><AccountSettingsPage /></MemoryRouter></QueryClientProvider>) }
 }
 
 afterEach(() => {
@@ -37,13 +38,16 @@ describe('DeleteAccount', () => {
     setPendingSettingsAction({ kind: 'deleteAccount' })
     setReauthProof('proof-from-callback')
 
-    renderPage()
+    const { queryClient } = renderPage()
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
 
+    expect(getPendingSettingsAction()).toBeNull()
     fireEvent.click(await screen.findByRole('button', { name: 'Continue with confirmed identity' }))
 
     expect(api.post).toHaveBeenCalledTimes(1)
     expect(api.post).toHaveBeenCalledWith('/api/v1/me/deletion', expect.objectContaining({ body: { currentPassword: null, reauthToken: 'proof-from-callback' } }))
     expect(await screen.findByRole('status')).toHaveTextContent('2026-08-08T00:00:00Z')
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['session'] }))
     expect(getPendingSettingsAction()).toBeNull()
   })
 })

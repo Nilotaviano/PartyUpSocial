@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { useLocation } from 'react-router'
 
 import { ApiError, client, isApiError } from '../../api/client'
 import { useSession, sessionQueryKey } from '../../auth/useSession'
@@ -32,6 +33,7 @@ function errorKey(error: unknown) {
 
 export function AccountSettingsPage() {
   const { t, i18n } = useTranslation(['settings', 'errors'])
+  const location = useLocation()
   const queryClient = useQueryClient()
   const { data: session } = useSession()
   const { data: methods = [], isPending } = useQuery({ queryKey: methodsQueryKey, queryFn: getAuthMethods })
@@ -127,6 +129,7 @@ export function AccountSettingsPage() {
   return (
     <main data-testid="screen-settings-account">
       <h1>{t('pages.account')}</h1>
+      {(location.state as { identityConfirmed?: boolean } | null)?.identityConfirmed && <p role="status">{t('reauth.confirmedIdentityChooseAction')}</p>}
       <section aria-labelledby="account-email-heading">
         <h2 id="account-email-heading">{t('email.title')}</h2>
         <p>{emailMethod?.detail ?? t('email.unavailable')}</p>

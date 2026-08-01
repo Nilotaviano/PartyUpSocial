@@ -19,6 +19,7 @@ export function setPendingSettingsAction(action: ReauthAction) {
 
 export function getPendingSettingsAction() {
   const value = sessionStorage.getItem(pendingActionStorageKey)
+  sessionStorage.removeItem(pendingActionStorageKey)
   if (!value) return null
 
   try {
@@ -28,8 +29,19 @@ export function getPendingSettingsAction() {
     // Malformed storage is never a valid action.
   }
 
-  sessionStorage.removeItem(pendingActionStorageKey)
   return null
+}
+
+export function peekPendingSettingsAction() {
+  const value = sessionStorage.getItem(pendingActionStorageKey)
+  if (!value) return null
+
+  try {
+    const action: unknown = JSON.parse(value)
+    return isReauthAction(action) ? action : null
+  } catch {
+    return null
+  }
 }
 
 export function clearPendingSettingsAction() {

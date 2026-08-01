@@ -26,13 +26,18 @@ vi.mock('../../api/client', () => ({
 }))
 
 import '../../i18n'
+import { setReauthProof } from '../../auth/reauthProof'
+import { getPendingSettingsAction, setPendingSettingsAction } from '../settings/reauthAction'
 import { ProfileSettingsPage } from './ProfileSettingsPage'
 
 function renderPage() {
   return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter><ProfileSettingsPage /></MemoryRouter></QueryClientProvider>)
 }
 
-afterEach(() => vi.clearAllMocks())
+afterEach(() => {
+  sessionStorage.clear()
+  vi.clearAllMocks()
+})
 
 describe('ProfileSettingsPage', () => {
   it('retries a Steam platform revoke with A-049 proof and renders the last-method API error_D137', async () => {
@@ -63,5 +68,35 @@ describe('ProfileSettingsPage', () => {
 
     await waitFor(() => expect(api.remove).toHaveBeenLastCalledWith('/api/v1/me/platform-links/{id}', expect.objectContaining({ body: { currentPassword: 'correct-password', reauthToken: null } })))
     expect(await screen.findByRole('alert')).toHaveTextContent('You need at least one sign-in method.')
+  })
+  it('resumes a persisted platform unlink with an arriving proof once', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') {
+        return Promise.resolve({ data: {
+          username: 'player',
+          displayName: 'Player',
+          avatar: { kind: 'emoji', emoji: 'game', platformLinkId: null },
+          timeZone: 'America/Fortaleza',
+          platformLinks: [{ id: 'steam-link', platform: 'Steam', handle: 'player' }],
+        } })
+      }
+      return Promise.resolve({ data: { methods: [{ kind: 'password', linked: true, removable: true, detail: 'Password' }] } })
+    })
+    api.remove.mockResolvedValue({ data: {} })
+    setPendingSettingsAction({ kind: 'unlinkPlatform', id: 'steam-link' })
+    setReauthProof('proof-from-callback')
+
+    renderPage()
+
+    await screen.findByRole('button', { name: 'Continue with confirmed identity' })
+    expect(getPendingSettingsAction()).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with confirmed identity' }))
+
+    await waitFor(() => expect(api.remove).toHaveBeenCalledWith('/api/v1/me/platform-links/{id}', expect.objectContaining({
+      params: expect.objectContaining({ path: { id: 'steam-link' } }),
+      body: { currentPassword: null, reauthToken: 'proof-from-callback' },
+    })))
+    expect(api.remove).toHaveBeenCalledTimes(1)
+    expect(getPendingSettingsAction()).toBeNull()
   })
 })

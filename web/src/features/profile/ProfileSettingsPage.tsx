@@ -1,10 +1,10 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { client, isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { ReauthPrompt, type ReauthAction } from '../settings/ReauthPrompt'
-import { clearPendingSettingsAction } from '../settings/reauthAction'
+import { clearPendingSettingsAction, getPendingSettingsAction } from '../settings/reauthAction'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 
@@ -40,6 +40,11 @@ export function ProfileSettingsPage() {
   const [formError, setFormError] = useState<unknown>()
   const [saving, setSaving] = useState(false)
   const [action, setAction] = useState<ReauthAction | null>(null)
+
+  useEffect(() => {
+    const pendingAction = getPendingSettingsAction()
+    if (pendingAction?.kind === 'unlinkPlatform') queueMicrotask(() => setAction(pendingAction))
+  }, [])
 
   async function save(event: FormEvent<HTMLFormElement>, endpoint: ProfileEndpoint) {
     event.preventDefault()
