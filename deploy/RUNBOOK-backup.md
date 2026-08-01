@@ -35,7 +35,7 @@ from a directory named `partyup`; confirm with `docker volume ls`.)
 
 Database dumps are only half of the compliance backup. The app's `Deletion:JournalPath` defaults to `/data/deletion-journal`, where `FileDeletionJournalShipper` appends monthly NDJSON files after the tombstone transaction commits. That directory must live on a durable Compose mount (expected volume name `partyup_deletion_journal`) and must be copied offsite with the dumps. Keep the files mode 600; the stable user ids are pseudonymous personal data, not anonymous telemetry.
 
-**Closing blocker:** the checked-in `deploy/compose.yaml` does not currently mount `/data/deletion-journal` into `app` or declare the expected volume. Do not report A-038 backup coverage as healthy until that Compose wiring is added and deployed. After it exists, locate it with:
+The checked-in `deploy/compose.yaml` declares the `deletion_journal` volume and mounts it at `/data/deletion-journal`. The Compose wiring only takes effect once the updated file is copied to `/opt/partyup` on the VM and `docker compose up -d` recreates `app` — do not report A-038 backup coverage as healthy before that. Locate the volume with:
 
 ```sh
 docker volume inspect partyup_deletion_journal

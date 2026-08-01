@@ -38,8 +38,19 @@ services:
       PublicBaseUrl: "https://partyup.social"
       Steam__ApiKey: "${STEAM_API_KEY:-}"
       Steam__Realm: "https://partyup.social"
+      Admin__SeedUserIds__0: "${ADMIN_SEED_USER_ID:-}"
+      Email__Provider: "${EMAIL_PROVIDER:-log}"
+      Email__Smtp__Host: "${SMTP_HOST:-}"
+      Email__Smtp__Port: "${SMTP_PORT:-587}"
+      Email__Smtp__User: "${SMTP_USER:-}"
+      Email__Smtp__Password: "${SMTP_PASSWORD:-}"
+      Google__ClientId: "${GOOGLE_CLIENT_ID:-}"
+      Google__ClientSecret: "${GOOGLE_CLIENT_SECRET:-}"
     volumes:
       - app_dataprotection:/data/dataprotection
+      # A-038: the deletion-journal NDJSON mirror must outlive the container — it is the
+      # restore-replay source RUNBOOK-restore.md depends on, and it joins the backup set.
+      - deletion_journal:/data/deletion-journal
     depends_on:
       postgres:
         condition: service_healthy
@@ -94,4 +105,5 @@ volumes:
   caddy_data:
   caddy_config:
   app_dataprotection:
+  deletion_journal:
   backups:
