@@ -32,7 +32,7 @@ function LifecycleRedirect() {
     return <Navigate replace to="/welcome" />
   }
 
-  if (session.state === 'Onboarding' || session.onboarding !== null) {
+  if (session.state === 'onboarding' || session.onboarding !== null) {
     return <Navigate replace to="/onboarding" />
   }
 
