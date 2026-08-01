@@ -884,6 +884,11 @@ export interface components {
             completedSteps: string[];
             nextStep: string;
         };
+        OnboardingState: {
+            completedSteps: string[];
+            nextStep: string;
+            isComplete: boolean;
+        };
         PendingDeletionResponse: {
             graceEndsAt: string;
         };
@@ -910,6 +915,12 @@ export interface components {
             avatar: null | components["schemas"]["AvatarDraft"];
             timeZone: null | string;
             locale: null | string;
+        };
+        ProfileDraftValidation: {
+            errors: {
+                [key: string]: string[];
+            };
+            isValid?: boolean;
         };
         ProfileResponse: {
             username: string;
@@ -958,6 +969,10 @@ export interface components {
         };
         TokenRequest: {
             token: string;
+        };
+        UsernameAvailability: {
+            available: boolean;
+            reason: null | string;
         };
         VerifyEmailRequest: {
             token: string;
@@ -2367,6 +2382,15 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "application/json": components["schemas"]["OnboardingState"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content?: never;
             };
         };
@@ -2387,7 +2411,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["UsernameAvailability"];
+                };
             };
         };
     };
@@ -2412,7 +2438,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ProfileDraftValidation"];
+                };
             };
         };
     };

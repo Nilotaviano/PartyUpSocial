@@ -21,20 +21,24 @@ public static class OnboardingEndpoints
         {
             OnboardingState? state = await useCase.ExecuteAsync(cancellationToken);
             return state is null ? Results.Unauthorized() : Results.Ok(state);
-        }).WithName("GetOnboardingState");
+        }).WithName("GetOnboardingState")
+            .Produces<OnboardingState>()
+            .Produces(StatusCodes.Status401Unauthorized);
 
         onboarding.MapGet("/username/availability", async (
             string username,
             CheckUsernameAvailabilityUseCase useCase,
             CancellationToken cancellationToken) =>
             Results.Ok(await useCase.ExecuteAsync(username, cancellationToken)))
-            .WithName(ApiOperationIds.CheckUsernameAvailability);
+            .WithName(ApiOperationIds.CheckUsernameAvailability)
+            .Produces<UsernameAvailability>();
 
         onboarding.MapPost("/validate", (
             ProfileDraft request,
             ValidateProfileDraftUseCase useCase) =>
             Results.Ok(useCase.Execute(request)))
-            .WithName("ValidateOnboardingProfile");
+            .WithName("ValidateOnboardingProfile")
+            .Produces<ProfileDraftValidation>();
 
         onboarding.MapPost("/complete", CompleteAsync)
             .WithName("CompleteOnboarding")

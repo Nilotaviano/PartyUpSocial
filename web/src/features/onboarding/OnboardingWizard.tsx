@@ -33,7 +33,7 @@ function availabilityError(reason: string | null | undefined) {
 
 export function UsernameStep({ value, onNext }: { value: string | null; onNext: (username: string) => void }) {
   const { t } = useTranslation(['onboarding', 'errors']); const [username, setUsername] = useState(value ?? ''); const [error, setError] = useState<unknown>()
-  async function submit(event: FormEvent) { event.preventDefault(); setError(undefined); try { const { data } = await client.GET('/api/v1/onboarding/username/availability', { params: { query: { username } } }); const availability = data as unknown as { available: boolean; reason?: string | null }; if (!availability?.available) { setError(new ApiError(400, availabilityError(availability?.reason))); return }; onNext(username) } catch (caught) { setError(caught) } }
+  async function submit(event: FormEvent) { event.preventDefault(); setError(undefined); try { const { data } = await client.GET('/api/v1/onboarding/username/availability', { params: { query: { username } } }); const availability = data; if (!availability?.available) { setError(new ApiError(400, availabilityError(availability?.reason))); return }; onNext(username) } catch (caught) { setError(caught) } }
   const message = error ? errorText(error, (key, options) => t(key, { ns: 'errors', ...options })) : null
   return <form onSubmit={submit}><Label htmlFor="username">{t('fields.username')}</Label><Input id="username" value={username} onChange={(event) => setUsername(event.target.value)} aria-describedby={message ? 'username-error' : undefined} required />{message && <p id="username-error" role="alert">{message}</p>}<Button type="submit">{t('actions.continue')}</Button></form>
 }
