@@ -63,7 +63,7 @@ describe('route guards', () => {
   })
 
   it('redirects an onboarding session away from onboarded routes', async () => {
-    setSession(session({ authenticated: true, state: 'Onboarding', onboarding: { completedSteps: [], nextStep: 'username' } }))
+    setSession(session({ authenticated: true, state: 'onboarding', onboarding: { completedSteps: [], nextStep: 'username' } }))
     renderRoute('/settings/profile')
 
     await waitFor(() => expect(screen.getByTestId('screen-onboarding')).toBeInTheDocument())
@@ -94,7 +94,7 @@ describe('route guards', () => {
 
   it.each([
     [session(), 'screen-welcome'],
-    [session({ authenticated: true, state: 'Onboarding', onboarding: { completedSteps: [], nextStep: 'username' } }), 'screen-onboarding'],
+    [session({ authenticated: true, state: 'onboarding', onboarding: { completedSteps: [], nextStep: 'username' } }), 'screen-onboarding'],
     [session({ authenticated: true, state: 'Active' }), 'screen-app'],
   ])('redirects the root lifecycle route to %s', async (value, expectedScreen) => {
     setSession(value)

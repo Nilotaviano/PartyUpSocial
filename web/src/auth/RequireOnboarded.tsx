@@ -7,7 +7,7 @@ type RequireOnboardedProps = {
 }
 
 function needsOnboarding(state: string | null, hasOnboarding: boolean) {
-  return state === 'Onboarding' || hasOnboarding
+  return state === 'onboarding' || hasOnboarding
 }
 
 export function RequireOnboarded({ children }: RequireOnboardedProps) {
