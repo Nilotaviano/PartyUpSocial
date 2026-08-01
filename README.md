@@ -97,6 +97,12 @@ dotnet run --project src/PartyUp.Api     # API on :5000 (OpenAPI at /openapi/v1.
 cd web && npm run dev                    # SPA on :5173, proxied to the API
 ```
 
+On Windows, development Postgres and the integration-test Docker daemon live inside WSL, not on the Windows host. The WSL VM idles out and stops Docker/Postgres when nothing keeps it active, so keep a WSL shell open while running the API from a Windows terminal.
+
+Development defaults `Email:Provider` to `log`. Rendered messages are logged and written as gitignored `.eml` files under `src/PartyUp.Api/mail-drop`; use those messages to follow local verification, recovery, magic-link and deletion flows.
+
+OpenAPI client generation is a live-server operation: start `src/PartyUp.Api` first, then run `cd web && npm run gen:api`. The command reads the running API's `/openapi/v1.json`; it does not generate from source files alone.
+
 Verify your setup:
 
 ```sh
@@ -122,6 +128,12 @@ git config core.hooksPath .githooks
   host — the hook routes the run through WSL:
   `wsl -d Ubuntu-24.04 -e bash -lc "cd /mnt/c/<repo> && dotnet test PartyUp.sln -p:ArtifactsPath=/tmp/partyup-artifacts"`
   (the `ArtifactsPath` redirect keeps build output off the slow `/mnt/c` mount).
+
+Run the same mandatory gate explicitly before a push when you want the result before the hook:
+
+```sh
+wsl -d Ubuntu-24.04 -e bash -lc 'cd /mnt/c/Users/nilot/source/repos/PartyUpSocial && dotnet test PartyUp.sln -p:ArtifactsPath=/tmp/partyup-artifacts'
+```
 - **Linux/macOS**: runs `dotnet test PartyUp.sln` directly and expects the
   .NET SDK plus a reachable Docker daemon (Testcontainers) on the host.
 
@@ -139,9 +151,8 @@ against real Postgres via Testcontainers).
 
 ### Bypassing
 
-`git push --no-verify` skips the hook. Emergencies only — CI runs the same
-suite and will fail the push anyway, so bypassing locally only defers the
-failure.
+Do not bypass the hook with `git push --no-verify`. The full WSL suite is a
+mandatory pre-push gate; fix the environment or the tests before pushing.
 
 ## 📚 Documentation
 
@@ -158,7 +169,7 @@ failure.
 |---|---|---|
 | 0 | Walking skeleton — CI/CD, deploy stack, health, migrations; spikes A/B/C decided (A-018..A-020) | ✅ |
 | 1 | Domain core — session/poll state machines, visibility & overlap engines, D-number test suite (DOMAIN_MODEL.md + TRACEABILITY.md, 1033 tests) | ✅ |
-| 2 | Accounts, auth (email, magic link, Google, Steam), onboarding, admin foundations ([PHASE2_DESIGN.md](PHASE2_DESIGN.md)) | 🚧 in progress — backend slices 1–5 of 9 shipped |
+| 2 | Accounts, auth (email, magic link, Google, Steam), onboarding, admin foundations, public deletion flow ([PHASE2_DESIGN.md](PHASE2_DESIGN.md)) | ✅ |
 | 3 | Friends, blocking, Steam import | ⬜ |
 | 4 | Fixed-time sessions end-to-end, guest links | ⬜ |
 | 5 | Availability, recommendations, calendar views | ⬜ |

@@ -31,6 +31,21 @@ docker run --rm -v partyup_backups:/backups -v "$PWD":/out alpine \
 (Volume name is prefixed with the compose project name — `partyup` if the stack was brought up
 from a directory named `partyup`; confirm with `docker volume ls`.)
 
+## Deletion-journal backup set (A-038)
+
+Database dumps are only half of the compliance backup. The app's `Deletion:JournalPath` defaults to `/data/deletion-journal`, where `FileDeletionJournalShipper` appends monthly NDJSON files after the tombstone transaction commits. That directory must live on a durable Compose mount (expected volume name `partyup_deletion_journal`) and must be copied offsite with the dumps. Keep the files mode 600; the stable user ids are pseudonymous personal data, not anonymous telemetry.
+
+**Closing blocker:** the checked-in `deploy/compose.yaml` does not currently mount `/data/deletion-journal` into `app` or declare the expected volume. Do not report A-038 backup coverage as healthy until that Compose wiring is added and deployed. After it exists, locate it with:
+
+```sh
+docker volume inspect partyup_deletion_journal
+```
+
+The offsite job must copy both:
+
+- `partyup_backups/_data/*.dump`, with the existing 30-day dump retention; and
+- the complete `partyup_deletion_journal/_data/*.ndjson` directory. Do not prune journal files merely because the matching dump aged out; retention follows the privacy/legal policy and must still cover every snapshot that could be restored.
+
 ## Why 30-day retention
 
 This isn't just disk hygiene. Per PRODUCT_SPEC.md §8.6, account deletion has a 7-day cancelable
@@ -66,6 +81,8 @@ remote target (object storage provider) is chosen:
    (preferred, e.g. an S3/B2 bucket lifecycle policy) or `rclone delete` with an age filter in the
    same cron job.
 5. Verify: after the first successful run, confirm a `.dump` file is visible via `rclone ls offsite:partyup-backups`.
+
+Add a second sync for the deletion-journal volume after its Compose blocker is closed, for example `rclone sync /var/lib/docker/volumes/partyup_deletion_journal/_data offsite:partyup-deletion-journal`, and verify at least the current `<yyyy-MM>.ndjson` object is visible. A dump-only offsite run is a failed backup for A-017/A-038 purposes.
 
 Until this is done, treat the VM's local disk as the only copy of the database and weigh that risk
 accordingly — this is the gap the Phase 9 restore drill (`RUNBOOK-restore.md`) does not cover.

@@ -63,23 +63,19 @@ row timestamps in a few key tables match what you'd expect from the dump's snaps
 
 ## 5. Required: re-apply account deletions requested after the snapshot
 
-A `pg_dump` only reflects data as of the moment it ran. Per ARCHITECTURE.md §8 and
-PRODUCT_SPEC.md §8.6, this step is not optional: if any account's 7-day deletion grace period
-expired — or a deletion was requested — between the snapshot timestamp and now, the restored
-database will show that account (and its friendships, sessions, polls, history) as if the
-deletion had never completed. Before reopening the app to users:
+Record the dump's snapshot instant before changing the old environment. If the source API is still reachable, export its authenticated restore-replay feed first:
 
-1. Identify accounts whose deletion grace period expired, or that requested deletion, in the
-   window between the dump's snapshot time and the incident. Cross-reference application logs,
-   notification records, or any audit trail available — there is no single query for this until
-   the deletion feature ships its own tracking (Phase 2+).
-2. For each one, re-run the deletion-completion effects (friendship removal, future-participation
-   removal, owned-session cancellation, owned-poll expiry, Completed-history anonymization to
-   **Anonymous User**) through the product's own deletion code path once it exists, not by hand
-   in SQL — that's the only way to guarantee every effect in D-092 is applied consistently.
-3. If the window can't be reliably reconstructed (no usable log), treat that as a compliance
-   incident to record and disclose, not a footnote — the deletion promise was violated for an
-   unknown set of accounts.
+```http
+GET /api/v1/admin/deletion-journal?since=<snapshot-instant>&limit=1000
+```
+
+This is A-017's product feed and returns `{ entries: [{ userId, executedAt }] }`. It reads the transactional `deletion_journal` table. Keep that response with the incident record, but do not depend on it being available during total VM loss.
+
+For disaster recovery, read the offsite monthly NDJSON files from the `/data/deletion-journal` backup set and select every unique entry whose `executedAt` is newer than the snapshot. The journal directory, not the restored database, is authoritative for the post-snapshot window: restoring the dump necessarily restores an older copy of `deletion_journal`. The endpoint on the restored instance is still useful to inspect what the snapshot already knew and to cross-check the NDJSON set.
+
+**Closing blocker:** Phase 2 exposes the read feed and `POST /api/v1/admin/maintenance/deletion-sweep`, but it does not expose a targeted journal-replay/import endpoint. The sweep only executes accounts already due in the restored database; it cannot reapply a post-snapshot tombstone represented only by `userId`. If the NDJSON/feed contains any newer entry, keep the app closed and escalate for a product-code replay path. Do not improvise direct SQL or hand-delete related rows.
+
+If the offsite journal is missing or the post-snapshot window cannot be reconstructed, treat that as a compliance incident to record and disclose. Do not reopen on the assumption that no entries means no deletions.
 
 ## 6. Bring the app back
 

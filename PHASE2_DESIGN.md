@@ -360,7 +360,11 @@ Test: `MigrationTests.Migrate_RoundTripsAnIdentityLockoutEnd` — write a lockou
 
 ### 5.3 New Phase-2 tables
 
+**`admin_seed_refusals`** (A-039 closing correction) — `user_id uuid PK FK→auth_users.id ON DELETE CASCADE`, `refused_at timestamptz NOT NULL`. A row durably records that the `Admin:SeedEmails` fallback once matched this account while its address was unconfirmed. The refusal binds **only** that email fallback; `Admin:SeedUserIds` deliberately bypasses it as the operator recovery path.
+
 **`auth_tokens`** — the A-015 security-token store (magic link, password reset, email verification, deletion-request confirmation, Steam/OAuth linking is *not* here).
+
+**Closing correction (slice 13):** `request_ip_hash` is schema-only in Phase 2 and remains `NULL`. The issue port preserves the nullable field for later abuse-forensics work, but no API endpoint currently computes or supplies the hash. §9.7's retention rationale therefore describes the preserved forensic column, not data Phase 2 emits.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -400,6 +404,7 @@ Indexes: `ux_auth_tokens_token_hash` UNIQUE; `ix_auth_tokens_expires_at` (consum
 | 3 | `AddAuthTokens` | `auth_tokens` (incl. `pending_locale`/`pending_age_gate`/`payload`; **no credential column** — A-046) |
 | 4 | `AddSteamIdentities` | `steam_identities` |
 | 5 | `AddDeletionJournal` | `deletion_journal` |
+| 6 | `AddAdminSeedRefusals` | `admin_seed_refusals` (A-039 durable email-fallback refusal) |
 
 **Round-1 correction — `banned_at` moves to migration 1.** It was scheduled last, but A-024's per-request projection includes `banned_at`, `CurrentUser` carries `IsBanned`, A-026's `RequireAuthenticated` rejects banned users, and §6.6 step 2 reads `user.IsBanned` — all of which land in slices 2 and 4. With the column arriving in slice 9, slices 2–8 could not compile or run the design as written, and would have had to ship a throwaway projection and be rewritten. The **column, the `User.BannedAt` property, `Ban`/`Unban`, and the A-043 visibility edits all land in slice 1**; only the *use cases and endpoints* that drive them (`BanUserUseCase`, `AdminEndpoints`, `AdminSeeder`) stay in slice 9. The D-180 domain tests land in slice 1 with the domain code, not in slice 9 (§15).
 
@@ -1042,12 +1047,14 @@ Platform linking during onboarding (D-127 step 7) uses the same `/me/platform-li
 | PUT | `/me/locale` | onboarded | D-146 account override |
 | PUT | `/me/reminder-default` | onboarded | D-082 |
 | GET | `/me/platform-links` | auth | |
-| POST | `/me/platform-links` | auth | `{platform,handle}`; **text policy on `handle` (A-036, `TextField.GamingHandle`, ≤64 — D-096/D-097), run before `User.LinkPlatform`**; 409 `platform_already_linked` |
+| POST | `/me/platform-links` | auth | `{platform,handle}`; **text policy on `handle` (A-036, `TextField.GamingHandle`, ≤64 — D-096/D-097), run before `User.LinkPlatform`**; 409 `platform_already_linked`; 409 `steam_external_flow_required` for Steam (use the external auth flow) |
 | PATCH | `/me/platform-links/{id}` | auth | `{handle}`; **same text policy, run before `User.ChangePlatformHandle`** |
 | DELETE | `/me/platform-links/{id}` | auth | body `{currentPassword?/reauthToken?}` — **required for a Steam link** (round-5); falls avatar back (D-050); for a **Steam** link this is the shared `UnlinkSteamUseCase` — removes the login row and `steam_identities` too, and can return 409 `last_auth_method` (A-030, D-137) or **409 `reauth_required` without proof (A-049)**. Non-Steam links are not auth methods: no proof is required and the body may be absent. RL `reauth` (Steam links) |
 | POST | `/me/deletion` | **auth** | `RequireAuthenticated`, *not* `RequireOnboarded` — an account abandoned mid-onboarding must be deletable (A-047). Body `{currentPassword?/reauthToken?}`: **re-authentication is required (A-049 item 1, round-3)**, 409 `reauth_required` without proof; RL `reauth`. → 202 `{graceEndsAt}`; rotates the stamp (D-165) so this response is the last thing the session does |
 
 There is **no** `DELETE /me/deletion`. §12-33: the account is signed out everywhere, so the only reachable cancel is a successful login (D-158). The 202 body and the confirmation email must state this (spec §8.6 requires the disclosure).
+
+**Closing correction (slice 13):** Steam links are created and removed through the external authentication flow so the login, platform-link and `steam_identities` facts stay atomic (A-030). `GET /auth/methods` is the client-facing inventory that reports whether the Steam authentication method is linked; the settings UI uses that row to offer the external link/unlink flow instead of treating Steam as an arbitrary handle.
 
 ### 7.4 Public deletion request (D-072)
 
@@ -1057,10 +1064,10 @@ The round-4 draft said "Phase 8 builds the page; Phase 2 ships the API" while §
 
 | Method | Route | Body → Response |
 |---|---|---|
-| POST | `/account-deletion-requests` | `{email}` → **202 always** (no enumeration). A known address gets a `DeletionRequestConfirmation` token, 60-minute TTL; an unknown one gets the `DeletionRequestNoAccount` template, so both branches do one render and one send and are indistinguishable in cost (§6.1 round-4). RL `deletion-request` |
+| POST | `/account-deletion-requests` | `{email}` → **202 always** (no enumeration). A known address gets a `DeletionRequestConfirmation` token, 60-minute TTL; an unknown one gets the `DeletionRequestNoAccount` template, so both branches do one render and one send and are indistinguishable in cost (§6.1 round-4). RL `deletion-request`. The known-account email uses template `DeletionRequestConfirmation`; `DeletionRequested` is reserved for the tokenless, localized grace notice sent only after confirmation starts the grace. |
 | POST | `/account-deletion-requests/confirm` | `{token}` → 202 `{graceEndsAt}`. Redeems the token, calls `RequestDeletion`, rotates the stamp |
 | GET | `/account-deletion-requests/steam/start` | → 302 to the Steam OP. Identity proof for **email-less accounts**; see below. **Non-destructive.** Mints state `{ flow = "deletion", nonce }` into cookie **`pu.extdel`**, `Path=/api/v1/account-deletion-requests/steam`, protector purpose `PartyUp.SteamState.Deletion` (A-051), and pins `openid.return_to` to **this** leg's absolute callback URL. It needs no A-050 intent: it is anonymous, its only durable output is a token delivered into the initiating browser's own fragment, which a cross-site initiator cannot read, and (round-5) minting that token no longer consumes any outstanding one — A-029's concurrent-token rule now files `DeletionRequestConfirmation` under *anonymously initiated*. RL `deletion-steam-ip` |
-| GET | `/account-deletion-requests/steam/callback` | `openid.*`,`n` → 302 to `/account-deletion/confirm#token=<raw>`. Verifies the assertion by §6.4 steps 1–5 **with this flow's cookie name, protector purpose, `flow` discriminator and `return_to`** (A-051 — §6.4's are scoped to the auth leg and are never valid here), resolves `auth_user_logins('Steam', steamid64)`, **mints a `DeletionRequestConfirmation` token bound to that `UserId` (10-minute TTL)** and redirects with it in the fragment (A-044). It performs **no** state change and **issues no cookie**. RL `deletion-steam-ip` |
+| GET | `/account-deletion-requests/steam/callback` | `openid.*`,`n` → 302 to `/account-deletion/confirm#token=<raw>`. Verifies the assertion by §6.4 steps 1–5 **with this flow's cookie name, protector purpose, `flow` discriminator and `return_to`** (A-051 — §6.4's are scoped to the auth leg and are never valid here), resolves `auth_user_logins('Steam', steamid64)`, **mints a `DeletionRequestConfirmation` token bound to that `UserId` (10-minute TTL)** and redirects with it in the fragment (A-044). It performs **no** state change and **issues no cookie**. RL `deletion-steam-ip` **Closing verification (slice 13):** this callback landed in slice 8 and completes A-051's pair; `ExternalStateTests.AuthStateCookie_IsRejectedByTheDeletionCallback` exercises this real route, the reverse-direction test rejects the deletion cookie at the auth callback, and `ExternalStateTests.AuthPurposeCookie_ForTheDeletionFlow_IsRejectedByTheAuthCallback` additionally pins the `flow` discriminator. |
 
 **Both public variants are two-step (round-2 correction).** The round-2 draft had the Steam callback call `RequestDeletion` + stamp rotation directly, while the email variant was deliberately request → emailed token → `/confirm`. Round-2 review showed the asymmetry is a live hazard: both Steam legs are GETs that A-031 exempts from antiforgery, so an unintended top-level navigation — an attacker page, a mistyped link, a link preview or prefetch of `/steam/start` — landing in a browser with a live `steamcommunity.com` session ended with the victim in `PendingDeletion`, signed out of every device (D-165), with only the `DeletionRequested` mail (which an email-less account never receives) as a signal. The `pu.ext` state cookie does not help: it is minted by the same attacker-initiated `/start`, so it authenticates the *flow*, not the user's intent. A Steam assertion proves "this browser controls this SteamID" — identity, never consent.
 
@@ -1072,7 +1079,7 @@ A banned user can use this route (spec §10 line 457: "A banned user can still r
 
 **Why two variants suffice, stated as a closed enumeration rather than as a claim about Google (round-6).** The round-5 text justified covering only the email and Steam variants with "Google-only accounts always carry a verified email and use the email route" — a sentence its own A-045 step 6 falsified, because two Google branches created accounts with `Email = NULL`. A-045 step 6 now carries the invariant that makes the enumeration true by construction: **no provider may create an address-less account unless it also has an assertion-based public deletion leg**, and in Phase 2 the only address-less-creating provider is Steam. So every account Phase 2 can produce holds either a confirmed address (password registration, magic link, verified-Google create, or a later `POST /auth/email/change`) or a Steam login row — and each of those is exactly one of the two public variants. A new provider is a design change that must ship one of the two, and `CompleteExternalSignInUseCaseTests.Execute_NeverCreatesAnAddresslessAccountForAProviderWithNoPublicDeletionLeg_D072` fails if it does not.
 
-Ops fallback, documented in `RUNBOOK-deletion.md`, is therefore a backstop for data that predates a rule change or arrives by import — **not** the route any Phase 2 account class depends on: the owner runs the admin deletion-sweep endpoint against a `userId` obtained from the admin user list. Tests: `PublicDeletionRouteTests.SteamAssertion_ForAnEmaillessBannedAccount_MintsAConfirmationTokenWithoutStartingTheGrace_D072`, `PublicDeletionRouteTests.SteamAssertion_ThenConfirm_StartsTheGrace_D072`, `PublicDeletionRouteTests.SteamAssertion_IssuesNoCookie_D180` (§14.3 names them in full — sweep), plus the A-045 step 6 invariant test above.
+**Closing correction (slice 13):** the ops fallback remains a backstop for legacy/imported data, never a route a Phase 2 account class depends on. The earlier sentence claimed the admin deletion-sweep endpoint accepted a `userId`; shipped code proves it does not. `RUNBOOK-deletion.md` records that the targeted fallback is not operational and forbids direct database improvisation. Tests: `PublicDeletionRouteTests.SteamAssertion_ForAnEmaillessBannedAccount_MintsAConfirmationTokenWithoutStartingTheGrace_D072`, `PublicDeletionRouteTests.SteamAssertion_ThenConfirm_StartsTheGrace_D072`, `PublicDeletionRouteTests.SteamAssertion_IssuesNoCookie_D180`, plus the A-045 step 6 invariant test above.
 
 ### 7.5 Admin (`/api/v1/admin`, `RequireAdmin`, 404 on failure)
 
@@ -1506,7 +1513,7 @@ The provider is the owner's later choice (Resend, Postmark, SES, Brevo — all s
 
 ### A-041 — Templates are embedded resources rendered by a placeholder substitutor; recipient locale is a required argument
 
-`Application/Email/Templates/{template}.{locale}.{part}` embedded as resources — e.g. `MagicLink.pt-BR.subject.txt`, `MagicLink.pt-BR.html`, `MagicLink.pt-BR.text`. `IEmailTemplateRenderer` substitutes `{{Key}}` tokens from `EmailMessage.Model` with HTML-encoding on the HTML part. Missing locale falls back to `en` (D-146). No Razor, no templating package: thirteen templates × three locales × three parts is data, not a rendering engine.
+`Application/Email/Templates/{template}.{locale}.{part}` embedded as resources — e.g. `MagicLink.pt-BR.subject.txt`, `MagicLink.pt-BR.html`, `MagicLink.pt-BR.text`. `IEmailTemplateRenderer` substitutes `{{Key}}` tokens from `EmailMessage.Model` with HTML-encoding on the HTML part. Missing locale falls back to `en` (D-146). No Razor, no templating package: fourteen templates × three locales × three parts is data, not a rendering engine.
 
 **The renderer lives in `PartyUp.Application`, not Infrastructure (round-2 correction).** `EmbeddedEmailTemplateRenderer` was filed under `Infrastructure/Email/` while its three D-numbered tests (`Render_UsesTheRecipientLocale_D060`, `Render_FallsBackToEnglish_D146`, `Render_PutsTheTokenInTheFragment_D067`) were filed under `tests/PartyUp.Application.Tests/`, which references only `src/PartyUp.Application` — so as designed they could not compile, and the repo has no `PartyUp.Infrastructure.Tests` project (ARCHITECTURE §2 defines exactly three test projects). The renderer is pure, I/O-free code reading embedded resources **from the Application assembly the templates already live in**, so Application is where it belongs; it is `Application/Email/EmbeddedEmailTemplateRenderer.cs`. Nothing else moves and no fourth test project is needed. The genuinely infrastructural half — `LoggingEmailSender`, `SmtpEmailSender` — stays in `Infrastructure/Email/` and is covered by the integration project's capturing sender. Every link a template emits carries the token in the **fragment** (A-044); `EmailTemplateRendererTests.Render_PutsTheTokenInTheFragment_D067` asserts no rendered output ever contains `?token=`.
 
@@ -1519,7 +1526,8 @@ Templates (D-060/D-146 — every one exists in en, pt-BR, es):
 | `EmailChangeRequested` | notice to the **previous** address when an email change is requested (A-048) |
 | `EmailChangeVerification` | verification link to the **new** address (A-048) |
 | `PasswordReset` | forgot password |
-| `DeletionRequested` | in-app or public deletion request — contains the D-148/D-158 disclosure and `graceEndsAt` in the recipient's zone/locale |
+| `DeletionRequested` | grace notice sent only after deletion actually enters `PendingDeletion` (in-app request or confirmed public request); tokenless; contains the D-148/D-158 disclosure and `GraceEndsAt` formatted in the recipient's time zone and locale |
+| `DeletionRequestConfirmation` | known-account leg of `POST /account-deletion-requests`; contains the public-request confirmation `Token` and starts no grace period by itself (§7.4) |
 | `DeletionCanceled` | login canceled a pending deletion |
 | `ExistingAccountNotice` | registration attempt against an existing address (anti-enumeration, §6.1) |
 | `AuthMethodAdded` | a sign-in method was linked, or a first password was set (A-049) |
@@ -1527,6 +1535,8 @@ Templates (D-060/D-146 — every one exists in en, pt-BR, es):
 | `PasswordResetNoAccount` | `POST /auth/password/forgot` for an address with no account — the anti-enumeration counterpart that equalizes the two branches (§6.1 round-4) |
 | `DeletionRequestNoAccount` | `POST /account-deletion-requests` for an address with no account — same reason (§7.4) |
 | `ReauthenticationRequested` | `POST /auth/reauth/email` — the emailed A-049 proof branch 3, for accounts with neither a password nor a provider login |
+
+**Closing correction (slice 13):** slice 8 split the former overloaded deletion mail into the two rows above. `DeletionRequestConfirmation` owns the public-request token; `DeletionRequested` is the tokenless grace notice and its `GraceEndsAt` model value is localized before rendering. The A-041 inventory is therefore fourteen templates, not thirteen.
 
 Locale resolution order: the account's `Locale` → the request's `locale` field → `Accept-Language` (matched against `en`, `pt-BR`, `es`) → `en`. Dates in email bodies are formatted with NodaTime patterns in the recipient's `TimeZone` and locale culture.
 
@@ -1674,16 +1684,18 @@ This is what makes the whole phase implementable and CI-testable before the owne
 
 | # | Action | What the code needs back | Blocking? |
 |---|---|---|---|
-| 1 | Choose a transactional email provider and create the account | SMTP host/port/user/password → `Email__Smtp__*`, and `Email__Provider=smtp` | Not for dev/CI (A-042). Blocks real magic-link login in prod. |
-| 2 | Create `mail.partyup.social` DNS: SPF (`v=spf1 include:<provider> -all`), DKIM (provider-issued CNAME/TXT), DMARC (`v=DMARC1; p=quarantine; rua=…`), then **inbox-test** to Gmail/Outlook | nothing (DNS only) | Blocks go-live, not development |
-| 3 | Create a Google Cloud OAuth 2.0 Web client; authorized redirect URI `https://partyup.social/api/v1/auth/external/google/callback` (+ `http://localhost:5000/...` for dev) | `Google__ClientId`, `Google__ClientSecret` | Blocks Google login only |
-| 4 | Obtain a Steam Web API key (needs a Steam account with ≥$5 spend) | `Steam__ApiKey` | Blocks Steam avatar/persona only — **not** Steam login |
-| 5 | Register the owner account, confirm its mailbox, read its `UserId` from the DB, and configure it | `Admin__SeedUserIds__0` (preferred; `Admin__SeedEmails__0` is the confirmed-only fallback, A-039) | Blocks admin endpoints only |
-| 6 | Complete the A-019 human pass: a real Steam login round trip, and confirm private-friends-list behavior | confirmation only | Recommended before slice 5 merges |
-| 7 | Add `/data/deletion-journal` to the compose volumes and to the offsite backup set; update `RUNBOOK-backup.md`/`RUNBOOK-restore.md` | nothing | Blocks A-017 compliance at go-live |
-| 8 | Confirm the privacy policy covers the deletion journal as pseudonymous personal data (A-017) and the analytics posture (D-161) | nothing | Blocks go-live |
-| 9 | Configure Caddy's access log to record the **path only**, not the raw URI with query string (A-044), and confirm no other proxy/CDN layer logs full URIs | nothing | Blocks go-live — it is half of the A-015 "never logged" guarantee |
-| 10 | Confirm Caddy sets `X-Forwarded-For`/`X-Forwarded-Proto` (its reverse-proxy default) and read back the compose network's subnet | `Network__TrustedProxies__0` (CIDR) for the VM `.env` — §7.6, round-4 | Blocks go-live: without it every IP-partitioned rate limit and every `auth_tokens.request_ip_hash` is the proxy's address, not the caller's |
+| 1 | **OPEN —** Choose a transactional email provider and create the account (owner evaluating Resend/Postmark/SES) | SMTP host/port/user/password → `Email__Smtp__*`, and `Email__Provider=smtp` | Not for dev/CI (A-042). `Email:Provider=log` in production sends no real mail, so this blocks real magic-link/recovery mail. |
+| 2 | **OPEN — follows #1:** Create `mail.partyup.social` DNS: SPF (`v=spf1 include:<provider> -all`), DKIM (provider-issued CNAME/TXT), DMARC (`v=DMARC1; p=quarantine; rua=…`), then **inbox-test** to Gmail/Outlook | nothing (DNS only) | Blocks go-live, not development |
+| 3 | **OPEN —** Create a Google Cloud OAuth 2.0 Web client; authorized redirect URI `https://partyup.social/api/v1/auth/external/google/callback` (+ `http://localhost:5000/...` for dev) | `Google__ClientId`, `Google__ClientSecret` | Blocks Google login only |
+| 4 | **DONE —** Obtain a Steam Web API key (needs a Steam account with ≥$5 spend) | `Steam__ApiKey` | Blocks Steam avatar/persona only — **not** Steam login |
+| 5 | **OPEN —** Register the owner account, confirm its mailbox, read its `UserId` through an operator-controlled path, and configure it | `Admin__SeedUserIds__0` (preferred; `Admin__SeedEmails__0` is the confirmed-only fallback, A-039) | Admin endpoints return 404 for everyone until the production app container receives this value. |
+| 6 | **DONE —** Complete the A-019 human pass: a real Steam login round trip, and confirm private-friends-list behavior | confirmation only | Recommended before slice 5 merges |
+| 7 | **BLOCKED IN REPO —** Add `/data/deletion-journal` to the compose volumes and to the offsite backup set; update `RUNBOOK-backup.md`/`RUNBOOK-restore.md` | a durable app mount plus offsite copy | Blocks A-017 compliance at go-live. The closing audit found `deploy/compose.yaml` still mounts only Data Protection into the app; docs cannot truthfully mark this done. |
+| 8 | **PHASE 8 —** Confirm the privacy policy covers the deletion journal as pseudonymous personal data (A-017) and the analytics posture (D-161) | nothing | Blocks go-live |
+| 9 | **DONE —** Configure Caddy's access log to record the **path only**, not the raw URI with query string (A-044), and confirm no other proxy/CDN layer logs full URIs | nothing | Deployed Caddyfile scrubs query strings; done 2026-07-31. |
+| 10 | **DONE —** Confirm Caddy sets `X-Forwarded-For`/`X-Forwarded-Proto` (its reverse-proxy default) and read back the compose network's subnet | `Network__TrustedProxies__0` (CIDR) for the VM `.env` — §7.6, round-4 | VM trusted-proxy configuration set; done 2026-07-31. |
+
+**Closing status (slice 13):** items 9 and 10 are done as of 2026-07-31: the deployed Caddyfile scrubs query strings and the VM trusted-proxy configuration is set. The active Phase 2 owner inputs are the SMTP provider/DNS (#1–2), Google OAuth credentials (#3), and `Admin__SeedUserIds__0` (#5). Item 7 is separately code-blocked by missing Compose volume wiring and is called out in the backup/restore runbooks rather than being falsely marked complete.
 
 ---
 

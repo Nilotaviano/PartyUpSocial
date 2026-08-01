@@ -71,8 +71,8 @@ Exit criteria: every **behavior-bearing** Confirmed decision (D-053..D-180) has 
 - Username rules: uniqueness, case-insensitivity, 30-day change cooldown + 30-day reservation (D-128, D-145); stable friend code generation.
 - Auth-method linking; last-method unlink error (D-137); email recovery (D-067, D-078).
 - Profile constraints + basic profanity filter: normalized multi-language wordlist (en/pt-BR/es), accepted as imperfect — it exists chiefly for store review (D-096/D-097); timebox it.
-- **Account deletion skeleton only:** request → 7-day cancelable grace, sign-out-everywhere, login-cancels (D-148, D-158, D-165). Per-entity deletion effects (friendships, sessions, polls, history anonymization — D-092) are added by the phase that owns each entity; Phase 8 verifies completeness.
-- **Admin foundations (D-177, D-180):** seeded admin role claim, `BannedAt` on User, ban/unban commands — ban reuses the D-165 security-stamp sign-out, gates login, and joins the tombstone/onboarding lookup-exclusion predicates; the optional content-removal path reuses the deletion executor's effect steps without the tombstone. Admin UI waits for Phase 8.
+- **Account deletion skeleton only:** in-app request plus the functional public request/confirmation pages → 7-day cancelable grace, sign-out-everywhere, login-cancels (D-072, D-148, D-158, D-165). Per-entity deletion effects (friendships, sessions, polls, history anonymization — D-092) are added by the phase that owns each entity; Phase 8 verifies completeness and surfaces the public route in the footer/store listing.
+- **Admin foundations (D-177, D-180):** seeded admin role membership, `BannedAt` on User, ban/unban commands — ban reuses the D-165 security-stamp sign-out, gates login, and joins the tombstone/onboarding lookup-exclusion predicates; the optional content-removal path reuses the deletion executor's effect steps without the tombstone. Admin UI waits for Phase 8.
 - First React slices: onboarding, profile, settings; API client generated from OpenAPI; i18n plumbing in from the start, including email templates (principle 6).
 
 ## Phase 3 — Friends and blocking
@@ -122,7 +122,7 @@ Emission already exists everywhere (principle 5). This phase is transport and pr
 - Translation pass: pt-BR + es for UI, **notifications, and emails**; locale formatting audit (D-060, D-146).
 - WCAG 2.2 AA audit across all screens; remediation (D-139). Calendar and poll grid get dedicated SR/keyboard sweeps.
 - **Cross-browser matrix pass:** current + previous Chrome, Edge, Firefox, Safari, incl. mobile variants (D-138).
-- Legal documents as a real work item, started during Phase 7: privacy policy, ToS, community standards — three locales, LGPD-aware (§8.6); public deletion-request route (D-072); platform unlink + data revocation.
+- Legal documents as a real work item, started during Phase 7: privacy policy, ToS, community standards — three locales, LGPD-aware (§8.6); footer/store-listing surfacing for Phase 2's functional public deletion-request route (D-072); compliance re-verification of the shipped platform unlink + data-revocation flow.
 - **Deletion completeness verification:** end-to-end test that grace expiry produces every D-092 effect and backups age out per retention policy.
 - Minimal first-party analytics events (D-151, D-161), and the **admin area** consuming them: usage dashboard (D-178), user list with stats + ban/unban UI incl. the optional content-removal action (D-179, D-180) — role-gated under `/api/v1/admin`.
 - Security pass: authz review of every endpoint against the visibility engine, guest-link handling re-check, OWASP basics, dependency audit.
