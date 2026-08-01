@@ -1,1 +1,17 @@
-{ "generic": "Algo salió mal.", "auth": { "lastMethod": "Necesitas al menos un método de inicio de sesión." }, "username": { "taken": "Ese nombre de usuario no está disponible.", "cooldown": "Ese nombre de usuario aún no se puede cambiar.", "reserved": "Ese nombre de usuario está reservado." }, "text": { "profanity": "Este texto no está permitido.", "invalid": "Este texto no es válido." } }
+{
+    "generic":  "Algo saliÃ³ mal.",
+    "auth":  {
+                 "lastMethod":  "Necesitas al menos un mÃ©todo de inicio de sesiÃ³n.",
+                 "methodNotRemovable":  "Este método de inicio de sesión no se puede eliminar.",
+                 "reauthRequired":  "Confirma que eres tú antes de continuar."
+             },
+    "username":  {
+                     "taken":  "Ese nombre de usuario no estÃ¡ disponible.",
+                     "cooldown":  "Ese nombre de usuario aÃºn no se puede cambiar.",
+                     "reserved":  "Ese nombre de usuario estÃ¡ reservado."
+                 },
+    "text":  {
+                 "profanity":  "Este texto no estÃ¡ permitido.",
+                 "invalid":  "Este texto no es vÃ¡lido."
+             }
+}

@@ -5,6 +5,10 @@ import { RequireOnboarded } from './auth/RequireOnboarded'
 import { useSession } from './auth/useSession'
 import { AgeGate, AuthCallback, ConfirmIdentity, EmailChange, Login, MagicLink, Register, ResetPassword, VerifyEmail, Welcome } from './features/auth/AuthScreens'
 import { OnboardingWizard } from './features/onboarding/OnboardingWizard'
+import { PublicDeletionConfirmPage } from './features/deletion/PublicDeletionConfirmPage'
+import { PublicDeletionRequestPage } from './features/deletion/PublicDeletionRequestPage'
+import { ProfileSettingsPage } from './features/profile/ProfileSettingsPage'
+import { AccountSettingsPage } from './features/settings/AccountSettingsPage'
 
 type PlaceholderProps = {
   testId: string
@@ -53,8 +57,8 @@ function App() {
       <Route path="/auth/confirm-identity" element={<ConfirmIdentity />} />
       <Route path="/auth/verify-email" element={<VerifyEmail />} />
       <Route path="/auth/email-change" element={<EmailChange />} />
-      <Route path="/account-deletion" element={<Placeholder testId="screen-account-deletion" translationKey="pages.accountDeletion" />} />
-      <Route path="/account-deletion/confirm" element={<Placeholder testId="screen-account-deletion-confirm" translationKey="pages.accountDeletionConfirm" />} />
+      <Route path="/account-deletion" element={<PublicDeletionRequestPage />} />
+      <Route path="/account-deletion/confirm" element={<PublicDeletionConfirmPage />} />
 
       <Route element={<RequireAuth />}>
         <Route path="/onboarding" element={<OnboardingWizard />} />
@@ -67,8 +71,8 @@ function App() {
 
         <Route element={<RequireOnboarded />}>
           <Route path="/app" element={<Placeholder testId="screen-app" translationKey="pages.app" />} />
-          <Route path="/settings/profile" element={<Placeholder testId="screen-settings-profile" translationKey="profile:pages.profile" />} />
-          <Route path="/settings/account" element={<Placeholder testId="screen-settings-account" translationKey="settings:pages.account" />} />
+          <Route path="/settings/profile" element={<ProfileSettingsPage />} />
+          <Route path="/settings/account" element={<AccountSettingsPage />} />
         </Route>
       </Route>
 

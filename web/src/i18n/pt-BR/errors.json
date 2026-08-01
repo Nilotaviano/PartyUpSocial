@@ -1,1 +1,17 @@
-{ "generic": "Algo deu errado.", "auth": { "lastMethod": "Você precisa de pelo menos uma forma de entrada." }, "username": { "taken": "Este nome de usuário não está disponível.", "cooldown": "Este nome de usuário ainda não pode ser alterado.", "reserved": "Este nome de usuário está reservado." }, "text": { "profanity": "Este texto não é permitido.", "invalid": "Este texto é inválido." } }
+{
+    "generic":  "Algo deu errado.",
+    "auth":  {
+                 "lastMethod":  "VocÃª precisa de pelo menos uma forma de entrada.",
+                 "methodNotRemovable":  "Este método de entrada não pode ser removido.",
+                 "reauthRequired":  "Confirme que é você antes de continuar."
+             },
+    "username":  {
+                     "taken":  "Este nome de usuÃ¡rio nÃ£o estÃ¡ disponÃ­vel.",
+                     "cooldown":  "Este nome de usuÃ¡rio ainda nÃ£o pode ser alterado.",
+                     "reserved":  "Este nome de usuÃ¡rio estÃ¡ reservado."
+                 },
+    "text":  {
+                 "profanity":  "Este texto nÃ£o Ã© permitido.",
+                 "invalid":  "Este texto Ã© invÃ¡lido."
+             }
+}
