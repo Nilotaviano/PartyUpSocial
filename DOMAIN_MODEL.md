@@ -202,6 +202,8 @@ Written in the same transaction as the causing state change (A-016). **Mute is a
 
 **Reminders** target Going/Maybe registered participants, waitlisted included — D-090's exception reads "Going or Maybe users" with no waitlist qualifier, and D-084 makes Going/Maybe the waitlisted user's real status (§12-30). Recompute/cancel triggers: RSVP change, waitlist flag change (promotion/reject), start-time or duration change, cancel, **block-driven and deletion-driven removal** — a `Removed` participant's pending reminder must die with their access. A reminder whose computed instant is already past is skipped, never fired late (D-153 finalization can create such cases).
 
+Steam-import match notifications are first-observation-only per `(recipient importer, matched actor)`. The database enforces that ruling with partial unique index `ux_notifications_steam_match_once` on `(recipient_user_id, actor_user_id) WHERE type = 24`, so repeated observations cannot create notification spam.
+
 ## 10. Event → recipient contracts (the spec §8.4 list, D-112)
 
 Recipients are defined per event — some legitimate recipients hold no Participation (a rejected requester) or just lost access through the very command being reported (a waitlist reject); those are explicit targets, not visibility-set members.
