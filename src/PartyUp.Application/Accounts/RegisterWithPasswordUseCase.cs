@@ -30,6 +30,7 @@ public sealed class RegisterWithPasswordUseCase(
 
         string normalizedEmail = AccountInput.NormalizeEmail(address);
         Locale locale = AccountInput.Locale(command.Locale);
+        string? continuation = FriendContinuation.Validate(command.Continuation);
         UserId? existingId = await accounts.FindUserIdByEmailAsync(address, cancellationToken);
 
         IssuedToken issued = await unitOfWork.ExecuteAsync(
@@ -42,7 +43,8 @@ public sealed class RegisterWithPasswordUseCase(
                     existingId is null
                         ? new PendingRegistration(locale.Value, true)
                         : null,
-                    Email: address),
+                    Email: address,
+                    Continuation: continuation),
                 ct),
             cancellationToken);
 
@@ -50,7 +52,7 @@ public sealed class RegisterWithPasswordUseCase(
             ? EmailTemplate.EmailVerification
             : EmailTemplate.ExistingAccountNotice;
         IReadOnlyDictionary<string, string> model = template == EmailTemplate.EmailVerification
-            ? AccountInput.LinkModel(emailOptions.PublicBaseUrl, issued.RawToken)
+            ? AccountInput.LinkModel(emailOptions.PublicBaseUrl, issued.RawToken, continuation)
             : AccountInput.EmptyModel;
         await emailDispatcher.DispatchAsync(
             new EmailMessage(address, locale, template, model),
@@ -63,7 +65,8 @@ public sealed class RegisterWithPasswordUseCase(
 public sealed record RegisterWithPasswordCommand(
     string Email,
     bool AgeGateAttested,
-    string? Locale);
+    string? Locale,
+    string? Continuation = null);
 
 public sealed record RegistrationResult(bool IsAccepted, string? Code)
 {
@@ -109,10 +112,14 @@ public static class AccountInput
 
     public static IReadOnlyDictionary<string, string> LinkModel(
         string publicBaseUrl,
-        string token) =>
+        string token,
+        string? continuation = null) =>
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["PublicBaseUrl"] = publicBaseUrl.TrimEnd('/'),
             ["Token"] = token,
+            ["Continuation"] = continuation is null
+                ? string.Empty
+                : $"&next={Uri.EscapeDataString(continuation)}",
         };
 }

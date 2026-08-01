@@ -1,3 +1,5 @@
+using PartyUp.Application.Auth;
+
 namespace PartyUp.Api.Auth;
 
 public static class ReturnToValidator
@@ -10,8 +12,13 @@ public static class ReturnToValidator
         "/settings/account",
     };
 
-    public static string Sanitize(string? returnTo, string defaultPath = "/app") =>
-        returnTo is not null && AllowedPaths.Contains(returnTo)
-            ? returnTo
-            : defaultPath;
+    public static string Sanitize(string? returnTo, string defaultPath = "/app")
+    {
+        if (returnTo is not null && AllowedPaths.Contains(returnTo))
+        {
+            return returnTo;
+        }
+
+        return FriendContinuation.Validate(returnTo) ?? defaultPath;
+    }
 }

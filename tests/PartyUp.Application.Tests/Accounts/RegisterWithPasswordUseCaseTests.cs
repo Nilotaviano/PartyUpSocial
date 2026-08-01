@@ -105,6 +105,45 @@ public sealed class RegisterWithPasswordUseCaseTests
         Assert.Equal(EmailTemplate.ExistingAccountNotice, known.Email.Messages[0].Template);
     }
 
+    [Theory]
+    [InlineData("/u/Player.One", "/u/player.one")]
+    [InlineData("/add/2345-6789-AB", "/add/23456789AB")]
+    public async Task Execute_IssuesAndEmailsOnlyServerCanonicalContinuation_D031(
+        string candidate,
+        string expected)
+    {
+        TestContext context = Create();
+
+        await context.UseCase.ExecuteAsync(
+            new RegisterWithPasswordCommand(
+                "new@example.test",
+                true,
+                "en",
+                candidate),
+            default);
+
+        Assert.Equal(expected, Assert.Single(context.Tokens.Issues).Continuation);
+        string fragment = Assert.Single(context.Email.Messages).Model["Continuation"];
+        Assert.Equal($"&next={Uri.EscapeDataString(expected)}", fragment);
+    }
+
+    [Fact]
+    public async Task Execute_DropsAnInvalidContinuationBeforeTokenOrEmail_D031()
+    {
+        TestContext context = Create();
+
+        await context.UseCase.ExecuteAsync(
+            new RegisterWithPasswordCommand(
+                "new@example.test",
+                true,
+                "en",
+                "https://attacker.example/u/player"),
+            default);
+
+        Assert.Null(Assert.Single(context.Tokens.Issues).Continuation);
+        Assert.Equal(string.Empty, Assert.Single(context.Email.Messages).Model["Continuation"]);
+    }
+
     private static TestContext Create()
     {
         var accounts = new FakeAccountGateway();

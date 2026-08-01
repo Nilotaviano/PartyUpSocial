@@ -19,11 +19,19 @@ public sealed class RequestMagicLinkUseCase(
     public async Task ExecuteAsync(
         string email,
         string? locale,
+        CancellationToken cancellationToken) =>
+        await ExecuteAsync(email, locale, continuation: null, cancellationToken);
+
+    public async Task ExecuteAsync(
+        string email,
+        string? locale,
+        string? continuation,
         CancellationToken cancellationToken)
     {
         string address = AccountInput.Email(email);
         string normalizedEmail = AccountInput.NormalizeEmail(address);
         Locale recipientLocale = AccountInput.Locale(locale);
+        string? canonicalContinuation = FriendContinuation.Validate(continuation);
         UserId? userId = await accounts.FindUserIdByEmailAsync(address, cancellationToken);
         IssuedToken issued = await unitOfWork.ExecuteAsync(
             ct => tokens.IssueAsync(
@@ -35,7 +43,8 @@ public sealed class RequestMagicLinkUseCase(
                     userId is null
                         ? new PendingRegistration(recipientLocale.Value, false)
                         : null,
-                    Email: address),
+                    Email: address,
+                    Continuation: canonicalContinuation),
                 ct),
             cancellationToken);
 
@@ -44,7 +53,10 @@ public sealed class RequestMagicLinkUseCase(
                 address,
                 recipientLocale,
                 EmailTemplate.MagicLink,
-                AccountInput.LinkModel(emailOptions.PublicBaseUrl, issued.RawToken)),
+                AccountInput.LinkModel(
+                    emailOptions.PublicBaseUrl,
+                    issued.RawToken,
+                    canonicalContinuation)),
             cancellationToken);
     }
 }

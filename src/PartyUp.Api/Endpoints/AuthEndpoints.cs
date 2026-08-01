@@ -151,7 +151,8 @@ public static class AuthEndpoints
             new RegisterWithPasswordCommand(
                 request.Email,
                 request.AgeGateAttested,
-                ResolveLocale(request.Locale, context)),
+                ResolveLocale(request.Locale, context),
+                request.Continuation),
             cancellationToken);
         return result.IsAccepted
             ? Results.Accepted(value: new StatusResponse("verification_sent"))
@@ -193,6 +194,7 @@ public static class AuthEndpoints
         await useCase.ExecuteAsync(
             request.Email,
             ResolveLocale(request.Locale, context),
+            request.Continuation,
             cancellationToken);
         return Results.Accepted(value: new StatusResponse("link_sent"));
     }
@@ -226,6 +228,7 @@ public static class AuthEndpoints
             projections,
             providers,
             context,
+            result.Continuation,
             cancellationToken);
     }
 
@@ -452,6 +455,7 @@ public static class AuthEndpoints
                 projections,
                 providers,
                 context,
+                result.Continuation,
                 cancellationToken);
         }
 
@@ -688,6 +692,25 @@ public static class AuthEndpoints
         ProviderCapabilities providers,
         HttpContext context,
         CancellationToken cancellationToken)
+        => await CreateSessionAsync(
+            userId,
+            signIn,
+            users,
+            projections,
+            providers,
+            context,
+            continuation: null,
+            cancellationToken);
+
+    private static async Task<IResult> CreateSessionAsync(
+        UserId userId,
+        AuthenticateAndSignIn signIn,
+        IUserRepository users,
+        ICurrentUserProjectionReader projections,
+        ProviderCapabilities providers,
+        HttpContext context,
+        string? continuation,
+        CancellationToken cancellationToken)
     {
         PostAuthenticationResult gate = await signIn.ExecuteAsync(userId, cancellationToken);
         if (gate is not PostAuthenticationResult.Admitted)
@@ -704,7 +727,8 @@ public static class AuthEndpoints
             : Results.Ok(SessionResponse.ForAuthenticatedUser(
                 user,
                 projection?.IsAdmin == true,
-                providers.Values));
+                providers.Values,
+                continuation));
     }
 
     private static IResult GateProblem(HttpContext context, PostAuthenticationResult result)
@@ -766,13 +790,18 @@ public sealed class RegisterRequest
 
     public string? Locale { get; init; }
 
+    public string? Continuation { get; init; }
+
     [System.Text.Json.Serialization.JsonExtensionData]
     public IDictionary<string, System.Text.Json.JsonElement>? AdditionalProperties { get; init; }
 }
 
 public sealed record LoginRequest(string Email, string Password);
 
-public sealed record MagicLinkRequest(string Email, string? Locale);
+public sealed record MagicLinkRequest(
+    string Email,
+    string? Locale,
+    string? Continuation = null);
 
 public sealed record ConsumeMagicLinkRequest(string Token, bool? AgeGateAttested);
 
@@ -851,15 +880,17 @@ public sealed record SessionResponse(
     bool IsAdmin,
     OnboardingResponse? Onboarding,
     PendingDeletionResponse? PendingDeletion,
-    ProfileResponse? Profile)
+    ProfileResponse? Profile,
+    string? Continuation)
 {
     public static SessionResponse Anonymous(IReadOnlyList<string> providers) =>
-        new(false, null, providers, null, false, null, null, null);
+        new(false, null, providers, null, false, null, null, null, null);
 
     public static SessionResponse ForAuthenticatedUser(
         User user,
         bool isAdmin,
-        IReadOnlyList<string> providers)
+        IReadOnlyList<string> providers,
+        string? continuation = null)
     {
         OnboardingResponse? onboarding = user.Lifecycle == UserLifecycle.Onboarding
             ? new OnboardingResponse(["ageGate", "auth"], "username")
@@ -880,7 +911,8 @@ public sealed record SessionResponse(
             isAdmin,
             onboarding,
             pendingDeletion,
-            profile);
+            profile,
+            continuation);
     }
 
     private static string StateName(UserLifecycle lifecycle) => lifecycle switch

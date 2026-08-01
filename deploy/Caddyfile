@@ -12,10 +12,20 @@ partyup.social {
 				# as a literal parameter name and scrubs nothing; this regexp
 				# is the form proven to strip the whole query string against
 				# the pinned caddy:2 image.
-				request>uri regexp "\?.*" ""
+				request>uri multi_regexp {
+					regexp "\?.*" ""
+					regexp "^(/(u|add|api/v1/(users/by-username|friend-codes))/).*" "${1}REDACTED"
+				}
+				resp_headers>Location multi_regexp {
+					regexp "\?.*" ""
+					regexp "^(https?://[^/]+)?(/(u|add|api/v1/(users/by-username|friend-codes))/).*" "${1}${2}REDACTED"
+				}
 			}
 		}
 	}
+
+	# OWNER-ACTION P3-DEPLOY-01: copy, validate, reload, and marker-test this
+	# bind-mounted file on the VM before exposing the identifier-bearing routes.
 
 	# Phase 4 adds guest links (bearer-token URLs, ARCHITECTURE.md §10). Once those
 	# routes exist, scrub the token from access logs with a uri regexp filter, e.g.:

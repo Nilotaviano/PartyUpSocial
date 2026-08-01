@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
+using PartyUp.Api.ErrorHandling;
 using PartyUp.Infrastructure.Identity;
 
 namespace PartyUp.Api.Auth;
@@ -36,9 +37,17 @@ public static class AuthCookieSetup
             options.LoginPath = PathString.Empty;
             options.AccessDeniedPath = PathString.Empty;
             options.Events.OnRedirectToLogin = context =>
-                WriteJsonFailureAsync(context.Response, StatusCodes.Status401Unauthorized, "unauthorized");
+                PartyUpProblemResults.WriteAsync(
+                    context.HttpContext,
+                    StatusCodes.Status401Unauthorized,
+                    "unauthorized",
+                    context.HttpContext.RequestAborted);
             options.Events.OnRedirectToAccessDenied = context =>
-                WriteJsonFailureAsync(context.Response, StatusCodes.Status403Forbidden, "forbidden");
+                PartyUpProblemResults.WriteAsync(
+                    context.HttpContext,
+                    StatusCodes.Status403Forbidden,
+                    "forbidden",
+                    context.HttpContext.RequestAborted);
             options.Events.OnValidatePrincipal = context =>
                 context.HttpContext.RequestServices
                     .GetRequiredService<ISecurityStampValidator>()
@@ -50,11 +59,5 @@ public static class AuthCookieSetup
         services.AddScoped<ISecurityStampValidator, PartyUpSecurityStampValidator>();
 
         return services;
-    }
-
-    private static Task WriteJsonFailureAsync(HttpResponse response, int statusCode, string code)
-    {
-        response.StatusCode = statusCode;
-        return response.WriteAsJsonAsync(new { code });
     }
 }

@@ -119,6 +119,20 @@ public sealed class VerifyEmailUseCaseTests
         Assert.True(context.Tokens.Redeems[1].AgeGateAttested);
     }
 
+    [Fact]
+    public async Task Execute_PropagatesOnlyTheRedeemedTokenContinuation_D031()
+    {
+        TestContext context = Create(Success("/add/23456789AB"));
+
+        EmailVerificationResult result = await context.UseCase.ExecuteAsync(
+            "token",
+            "mailbox-owner-password",
+            true,
+            default);
+
+        Assert.Equal("/add/23456789AB", result.Continuation);
+    }
+
     private static TestContext Create(params TokenRedemption[] redemptions)
     {
         var accounts = new FakeAccountGateway();
@@ -140,7 +154,7 @@ public sealed class VerifyEmailUseCaseTests
         return new TestContext(useCase, accounts, users, tokens);
     }
 
-    private static TokenRedemption Success() =>
+    private static TokenRedemption Success(string? continuation = null) =>
         new(
             true,
             null,
@@ -150,7 +164,8 @@ public sealed class VerifyEmailUseCaseTests
             new PendingRegistration("en", true),
             null,
             Now,
-            "Player@corp.example");
+            "Player@corp.example",
+            continuation);
 
     private static TokenRedemption Failed(TokenRedemptionFailure failure) =>
         new(

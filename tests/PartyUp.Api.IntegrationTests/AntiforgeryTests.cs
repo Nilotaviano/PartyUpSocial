@@ -121,6 +121,15 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 JsonContent.Create(new { email = "not-an-email" })),
             ["POST /api/v1/account-deletion-requests/confirm"] = Public(() =>
                 JsonContent.Create(new { token = "invalid" })),
+            ["POST /api/v1/friend-requests"] = Onboarded(() =>
+                JsonContent.Create(new { targetUsername = "MatrixPlayer" })),
+            ["POST /api/v1/friend-requests/{friendshipId}/accept"] = Onboarded(() => null),
+            ["POST /api/v1/friend-requests/{friendshipId}/reject"] = Onboarded(() => null),
+            ["DELETE /api/v1/friend-requests/{friendshipId}"] = Onboarded(() => null),
+            ["DELETE /api/v1/friends/{friendshipId}"] = Onboarded(() => null),
+            ["POST /api/v1/blocks"] = Onboarded(() =>
+                JsonContent.Create(new { targetUsername = "MatrixPlayer" })),
+            ["DELETE /api/v1/blocks/{blockId}"] = Onboarded(() => null),
             ["POST /api/v1/admin/users/{id:guid}/ban"] = Admin(() =>
                 JsonContent.Create(new { removeContent = false })),
             ["POST /api/v1/admin/users/{id:guid}/unban"] = Admin(() => null),
@@ -320,6 +329,8 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
     private static string RouteFromKey(string key) =>
         key[(key.IndexOf(' ') + 1)..]
             .Replace("{id:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
+            .Replace("{friendshipId}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
+            .Replace("{blockId}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
             .Replace("{kind}", "password", StringComparison.Ordinal);
 
     private static HttpMethod MethodFromKey(string key) =>

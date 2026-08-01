@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PartyUp.Api.ErrorHandling;
 using PartyUp.Api.Security;
 
 namespace PartyUp.Api.IntegrationTests;
@@ -45,6 +46,15 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
                 "DeleteMe",
             ],
             ["lookup"] = ["CheckUsernameAvailability"],
+            ["friend-lookup"] =
+            [
+                "GetUserProfile",
+                "ResolveFriendCode",
+                "BlockUser",
+                "ImportSteamFriends",
+            ],
+            ["friend-request-send"] = ["SendFriendRequest"],
+            ["steam-friend-import"] = ["ImportSteamFriends"],
             ["default"] = [],
         };
 
@@ -59,7 +69,7 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
     [Fact]
     public void EveryDimensionCoversItsDocumentedRoutes()
     {
-        Assert.Equal(14, RateLimitPolicies.Dimensions.Count);
+        Assert.Equal(17, RateLimitPolicies.Dimensions.Count);
         Assert.Equal(ExpectedRoutes.Keys, RateLimitPolicies.Dimensions.Select(value => value.Name));
         foreach (RateLimitDimension dimension in RateLimitPolicies.Dimensions)
         {
@@ -216,6 +226,9 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
             Case("email-send", ApiOperationIds.ReauthenticateByEmail),
             Case("reauth", ApiOperationIds.IssueExternalIntent),
             Case("lookup", ApiOperationIds.CheckUsernameAvailability),
+            Case("friend-lookup", ApiOperationIds.GetUserProfile),
+            Case("friend-request-send", ApiOperationIds.SendFriendRequest),
+            Case("steam-friend-import", ApiOperationIds.ImportSteamFriends),
             Case("default", ApiOperationIds.GetSession),
         ];
 
@@ -241,6 +254,15 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
                 otherKey: false);
             Assert.Equal(HttpStatusCode.TooManyRequests, rejected.StatusCode);
             Assert.True(rejected.Headers.RetryAfter?.Delta > TimeSpan.Zero);
+            Assert.Equal(
+                "application/problem+json",
+                rejected.Content.Headers.ContentType?.MediaType);
+            PartyUpProblem problem =
+                (await rejected.Content.ReadFromJsonAsync<PartyUpProblem>())!;
+            Assert.Equal("rate_limited", problem.Code);
+            Assert.Equal(
+                $"/probe/{testCase.OperationId}",
+                problem.Instance);
 
             using HttpResponseMessage otherKey = await SendProbeAsync(
                 client,

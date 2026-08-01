@@ -64,16 +64,24 @@ public sealed class ConsumeMagicLinkUseCase(
                 }
 
                 await accounts.ConfirmEmailAsync(userId.Value, ct);
-                return MagicLinkConsumptionResult.Success(userId.Value);
+                return MagicLinkConsumptionResult.Success(
+                    userId.Value,
+                    redemption.Continuation);
             },
             cancellationToken);
 }
 
-public sealed record MagicLinkConsumptionResult(bool Succeeded, UserId? UserId, string? Code)
+public sealed record MagicLinkConsumptionResult(
+    bool Succeeded,
+    UserId? UserId,
+    string? Code,
+    string? Continuation)
 {
-    public static MagicLinkConsumptionResult Success(UserId userId) =>
-        new(true, userId, null);
+    public static MagicLinkConsumptionResult Success(
+        UserId userId,
+        string? continuation = null) =>
+        new(true, userId, null, continuation);
 
     public static MagicLinkConsumptionResult Failed(string code) =>
-        new(false, null, code);
+        new(false, null, code, null);
 }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using PartyUp.Api.Endpoints;
 using PartyUp.Application.Email;
 using PartyUp.Infrastructure.Persistence;
 
@@ -33,6 +34,46 @@ public sealed class MagicLinkFlowTests : IAsyncLifetime, IDisposable
         Assert.Contains(
             response.Headers.GetValues("Set-Cookie"),
             value => value.StartsWith("pu.auth=", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("/u/Player.Name", "/u/player.name")]
+    [InlineData("/add/2345-6789-AB", "/add/23456789AB")]
+    public async Task RequestThenConsume_RoundTripsOnlyCanonicalFriendContinuation(
+        string requested,
+        string expected)
+    {
+        using HttpClient client = Slice5HttpTest.CreateClient(_factory);
+        string email = $"magic-continuation-{Guid.NewGuid():N}@example.test";
+        HttpResponseMessage request = await AntiforgeryTestClient.PostAsync(
+            client,
+            "/api/v1/auth/magic-link",
+            JsonContent.Create(new
+            {
+                email,
+                locale = "es",
+                continuation = requested,
+            }));
+        Assert.Equal(HttpStatusCode.Accepted, request.StatusCode);
+        EmailMessage message = await _factory.EmailSender.WaitForAsync(
+            candidate => candidate.ToAddress == email &&
+                candidate.Template == EmailTemplate.MagicLink);
+        Assert.Equal(
+            $"&next={Uri.EscapeDataString(expected)}",
+            message.Model["Continuation"]);
+
+        HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
+            client,
+            "/api/v1/auth/magic-link/consume",
+            JsonContent.Create(new
+            {
+                token = message.Model["Token"],
+                ageGateAttested = true,
+            }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        SessionResponse session = (await response.Content.ReadFromJsonAsync<SessionResponse>())!;
+        Assert.Equal(expected, session.Continuation);
     }
 
     [Fact]
