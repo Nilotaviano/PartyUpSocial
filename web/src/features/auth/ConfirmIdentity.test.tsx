@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -12,7 +12,9 @@ vi.mock('../../api/client', () => ({
 }))
 
 import '../../i18n'
+import { resources } from '../../i18n'
 import { consumeReauthProof } from '../../auth/reauthProof'
+import { setPendingSettingsAction } from '../settings/reauthAction'
 import { ConfirmIdentity } from './AuthScreens'
 
 function Location() {
@@ -21,6 +23,7 @@ function Location() {
 }
 
 afterEach(() => {
+  cleanup()
   consumeReauthProof()
   sessionStorage.clear()
   window.history.replaceState({}, '', '/')
@@ -37,5 +40,29 @@ describe('ConfirmIdentity', () => {
     expect(consumeReauthProof()).toBe('fresh-proof')
     expect(api.get).not.toHaveBeenCalled()
     expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('shows the confirmed-identity status line, translated in every locale', () => {
+    window.history.replaceState({}, '', '/auth/confirm-identity#token=fresh-proof')
+
+    render(<MemoryRouter initialEntries={['/auth/confirm-identity']}><ConfirmIdentity /></MemoryRouter>)
+
+    expect(screen.getByText((resources.en.auth as { messages: { confirmedIdentity: string } }).messages.confirmedIdentity)).toBeInTheDocument()
+    for (const locale of ['en', 'pt-BR', 'es'] as const) {
+      const auth = resources[locale].auth as { messages: Record<string, string> }
+      expect(auth.messages.confirmedIdentity).toBeTruthy()
+    }
+    const english = (resources.en.auth as { messages: Record<string, string> }).messages.confirmedIdentity
+    expect((resources['pt-BR'].auth as { messages: Record<string, string> }).messages.confirmedIdentity).not.toBe(english)
+    expect((resources.es.auth as { messages: Record<string, string> }).messages.confirmedIdentity).not.toBe(english)
+  })
+
+  it('routes a pending platform unlink to profile settings instead of account', async () => {
+    setPendingSettingsAction({ kind: 'unlinkPlatform', id: 'link-1' })
+    window.history.replaceState({}, '', '/auth/confirm-identity#token=fresh-proof')
+
+    render(<MemoryRouter initialEntries={['/auth/confirm-identity']}><ConfirmIdentity /><Location /></MemoryRouter>)
+
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/settings/profile:{"identityConfirmed":true}'))
   })
 })
