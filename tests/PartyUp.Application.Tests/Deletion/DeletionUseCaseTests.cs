@@ -233,11 +233,13 @@ public sealed class ExecuteDeletionForUserUseCaseTests
 
         Assert.False(await context.UseCase.ExecuteAsync(context.User.Id, default));
         Assert.True(context.User.IsPendingDeletion);
+        Assert.Empty(context.ResultApplier.Applications);
 
         context.Clock.Advance(User.DeletionGracePeriod);
         Assert.True(await context.UseCase.ExecuteAsync(context.User.Id, default));
         Assert.True(context.User.IsTombstoned);
         Assert.Contains(context.User.Id, context.Accounts.PurgedCredentials);
+        Assert.Single(context.ResultApplier.Applications);
     }
 
     [Fact]
@@ -265,6 +267,23 @@ public sealed class ExecuteDeletionForUserUseCaseTests
 
         Assert.Single(context.Journal.Entries);
         Assert.Single(context.Accounts.PurgedCredentials);
+        Assert.Single(context.ResultApplier.Applications);
+    }
+
+    [Fact]
+    public async Task Execute_AppliesTheDeletionResultBeforeCredentialPurge_D092()
+    {
+        ExecutionContext context = Create();
+        context.Clock.Advance(User.DeletionGracePeriod);
+
+        await context.UseCase.ExecuteAsync(context.User.Id, default);
+
+        CapturedDeletionApplication application = Assert.Single(
+            context.ResultApplier.Applications);
+        Assert.Equal(context.User.Id, application.Subject);
+        Assert.Equal(context.User.Id, application.Result.Journal.UserId);
+        Assert.Same(context.Username, application.Result.ReservedUsername);
+        Assert.True(application.BeforeCredentialPurge);
     }
 
     private static ExecutionContext Create()
@@ -285,9 +304,11 @@ public sealed class ExecuteDeletionForUserUseCaseTests
         var accounts = new FakeAccountGateway();
         var journal = new FakeDeletionJournal();
         var shipper = new FakeDeletionJournalShipper();
+        var resultApplier = new FakeDeletionResultApplier(accounts);
         var useCase = new ExecuteDeletionForUserUseCase(
             users,
             new FakeDeletionScopeProvider(username),
+            resultApplier,
             accounts,
             journal,
             shipper,
@@ -298,6 +319,7 @@ public sealed class ExecuteDeletionForUserUseCaseTests
             user,
             username,
             accounts,
+            resultApplier,
             journal,
             shipper,
             clock);
@@ -308,9 +330,33 @@ public sealed class ExecuteDeletionForUserUseCaseTests
         User User,
         UsernameRegistryEntry Username,
         FakeAccountGateway Accounts,
+        FakeDeletionResultApplier ResultApplier,
         FakeDeletionJournal Journal,
         FakeDeletionJournalShipper Shipper,
         MutableClock Clock);
+}
+
+internal sealed record CapturedDeletionApplication(
+    DeletionExecutionResult Result,
+    UserId Subject,
+    bool BeforeCredentialPurge);
+
+internal sealed class FakeDeletionResultApplier(FakeAccountGateway accounts)
+    : IDeletionResultApplier
+{
+    internal List<CapturedDeletionApplication> Applications { get; } = [];
+
+    public Task ApplyAsync(
+        DeletionExecutionResult result,
+        UserId subject,
+        CancellationToken cancellationToken)
+    {
+        Applications.Add(new CapturedDeletionApplication(
+            result,
+            subject,
+            accounts.PurgedCredentials.Count == 0));
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class MutableClock(Instant current) : IClock
