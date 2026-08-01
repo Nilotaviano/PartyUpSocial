@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using PartyUp.Domain.Friendships;
+using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Users;
+using PartyUp.Infrastructure.Auth;
 using PartyUp.Infrastructure.Identity;
 using PartyUp.Infrastructure.Deletion;
 using PartyUp.Infrastructure.Persistence.Configurations;
@@ -26,6 +29,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<DeletionJournalRecord> DeletionJournal => Set<DeletionJournalRecord>();
 
+    public DbSet<Friendship> Friendships => Set<Friendship>();
+
+    public DbSet<Block> Blocks => Set<Block>();
+
+    public DbSet<Notification> Notifications => Set<Notification>();
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+        // The schema has an exact index contract, so every required FK index is declared explicitly.
+        configurationBuilder.Conventions.Remove<
+            Microsoft.EntityFrameworkCore.Metadata.Conventions.ForeignKeyIndexConvention>();
+    }
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -46,6 +63,24 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.Entity<IdentityUserClaim<Guid>>().ToTable("auth_user_claims");
         builder.Entity<IdentityRoleClaim<Guid>>().ToTable("auth_role_claims");
         builder.Entity<IdentityUserToken<Guid>>().ToTable("auth_user_tokens");
+        builder.Entity<IdentityUserRole<Guid>>()
+            .HasIndex(userRole => userRole.RoleId)
+            .HasDatabaseName("ix_auth_user_roles_role_id");
+        builder.Entity<IdentityUserLogin<Guid>>()
+            .HasIndex(login => login.UserId)
+            .HasDatabaseName("ix_auth_user_logins_user_id");
+        builder.Entity<IdentityUserClaim<Guid>>()
+            .HasIndex(claim => claim.UserId)
+            .HasDatabaseName("ix_auth_user_claims_user_id");
+        builder.Entity<IdentityRoleClaim<Guid>>()
+            .HasIndex(claim => claim.RoleId)
+            .HasDatabaseName("ix_auth_role_claims_role_id");
+        builder.Entity<AuthToken>()
+            .HasIndex(token => token.UserId)
+            .HasDatabaseName("ix_auth_tokens_user_id");
         builder.Ignore<IdentityUserPasskey<Guid>>();
+        builder.ApplyConfiguration(new FriendshipConfiguration());
+        builder.ApplyConfiguration(new BlockConfiguration());
+        builder.ApplyConfiguration(new NotificationConfiguration());
     }
 }

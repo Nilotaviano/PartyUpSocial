@@ -154,6 +154,166 @@ namespace PartyUp.Infrastructure.Migrations
                     b.ToTable("auth_user_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("PartyUp.Domain.Friendships.Block", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BlockedId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("blocked_id");
+
+                    b.Property<Guid>("BlockerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("blocker_id");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_blocks");
+
+                    b.HasAlternateKey("BlockerId", "BlockedId")
+                        .HasName("ux_blocks_ordered_pair");
+
+                    b.HasIndex("BlockedId")
+                        .HasDatabaseName("ix_blocks_blocked");
+
+                    b.HasIndex("BlockerId", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_blocks_blocker_created");
+
+                    b.ToTable("blocks", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_blocks_not_self", "blocker_id <> blocked_id");
+                        });
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Friendships.Friendship", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant?>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<Instant>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<Guid>("RequestedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by");
+
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("UserHiId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_hi_id");
+
+                    b.Property<Guid>("UserLoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_lo_id");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_friendships");
+
+                    b.HasAlternateKey("UserLoId", "UserHiId")
+                        .HasName("ux_friendships_pair");
+
+                    b.HasIndex("RequestedBy", "RequestedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_friendships_pending_requested_by")
+                        .HasFilter("status = 0");
+
+                    b.HasIndex("UserHiId", "Status")
+                        .HasDatabaseName("ix_friendships_hi_status");
+
+                    b.HasIndex("UserLoId", "Status")
+                        .HasDatabaseName("ix_friendships_lo_status");
+
+                    b.ToTable("friendships", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_friendships_accept_time", "(status = 0 AND accepted_at IS NULL) OR (status = 1 AND accepted_at IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_friendships_canonical", "user_lo_id < user_hi_id");
+
+                            t.HasCheckConstraint("ck_friendships_requester", "requested_by IN (user_lo_id, user_hi_id)");
+
+                            t.HasCheckConstraint("ck_friendships_status", "status IN (0, 1)");
+                        });
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Notifications.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Instant?>("OptionStartTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("option_start_time");
+
+                    b.Property<Guid?>("PollId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("poll_id");
+
+                    b.Property<Instant?>("ReadAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at");
+
+                    b.Property<Guid>("RecipientUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recipient_user_id");
+
+                    b.Property<Guid?>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<short>("Type")
+                        .HasColumnType("smallint")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notifications");
+
+                    b.HasIndex("RecipientUserId", "ActorUserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_notifications_steam_match_once")
+                        .HasFilter("type = 24");
+
+                    b.HasIndex("RecipientUserId", "CreatedAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_notifications_recipient_created");
+
+                    b.ToTable("notifications", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_notifications_friend_shape", "type NOT IN (23, 24) OR (actor_user_id IS NOT NULL AND session_id IS NULL AND poll_id IS NULL AND option_start_time IS NULL)");
+
+                            t.HasCheckConstraint("ck_notifications_type", "type BETWEEN 0 AND 24");
+                        });
+                });
+
             modelBuilder.Entity("PartyUp.Domain.Users.PlatformLink", b =>
                 {
                     b.Property<Guid>("Id")
@@ -632,6 +792,63 @@ namespace PartyUp.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_auth_user_tokens_auth_users_user_id");
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Friendships.Block", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("BlockedId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_blocks_users_blocked_id");
+
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("BlockerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_blocks_users_blocker_id");
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Friendships.Friendship", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_friendships_users_requested_by");
+
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserHiId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_friendships_users_user_hi_id");
+
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserLoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_friendships_users_user_lo_id");
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Notifications.Notification", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_notifications_users_actor_user_id");
+
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecipientUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_notifications_users_recipient_user_id");
                 });
 
             modelBuilder.Entity("PartyUp.Domain.Users.PlatformLink", b =>
