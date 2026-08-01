@@ -15,12 +15,18 @@ public sealed class FriendshipRepository(AppDbContext context) : IFriendshipRepo
             cancellationToken);
     }
 
-    public Task<Friendship?> FindPairForUpdateAsync(UserId first, UserId second, CancellationToken cancellationToken)
+    public async Task<Friendship?> FindPairForUpdateAsync(
+        UserId first,
+        UserId second,
+        CancellationToken cancellationToken)
     {
         (UserId lo, UserId hi) = Friendship.CanonicalPair(first, second);
-        return context.Friendships
-            .FromSqlInterpolated($"SELECT * FROM friendships WHERE user_lo_id = {lo.Value} AND user_hi_id = {hi.Value} FOR UPDATE")
-            .SingleOrDefaultAsync(cancellationToken);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM friendships WHERE user_lo_id = {lo.Value} AND user_hi_id = {hi.Value} FOR UPDATE",
+            cancellationToken);
+        return await context.Friendships.SingleOrDefaultAsync(
+            friendship => friendship.UserLoId == lo && friendship.UserHiId == hi,
+            cancellationToken);
     }
 
     public Task<FriendshipPair?> FindOwnedPairAsync(
@@ -33,12 +39,17 @@ public sealed class FriendshipRepository(AppDbContext context) : IFriendshipRepo
             .Select(friendship => new FriendshipPair(friendship.UserLoId, friendship.UserHiId))
             .SingleOrDefaultAsync(cancellationToken);
 
-    public Task<Friendship?> FindByIdForUpdateAsync(
+    public async Task<Friendship?> FindByIdForUpdateAsync(
         FriendshipId friendshipId,
-        CancellationToken cancellationToken) =>
-        context.Friendships
-            .FromSqlInterpolated($"SELECT * FROM friendships WHERE id = {friendshipId.Value} FOR UPDATE")
-            .SingleOrDefaultAsync(cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM friendships WHERE id = {friendshipId.Value} FOR UPDATE",
+            cancellationToken);
+        return await context.Friendships.SingleOrDefaultAsync(
+            friendship => friendship.Id == friendshipId,
+            cancellationToken);
+    }
 
     public async Task<IReadOnlyList<AcceptedFriendProjection>> ListAcceptedAsync(
         UserId userId,
