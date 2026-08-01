@@ -231,3 +231,9 @@ IMPLEMENTATION_PLAN Phase 5 surfaces — are pure functions in
 up to `now + 15 min` so the prefilled session start or poll option satisfies the D-130 window, and a
 chosen duration longer than the recommended window is accepted with an over-duration warning
 measured from the clamped start, never an error; `UserBanTests.Ban_MarksTheUserBannedWithoutChangingTheLifecycle_D180`; `UserBanTests.Ban_IsIdempotent_D180`; `UserBanTests.Unban_RestoresLookupListing_D180`; `UserBanTests.MarkDeleted_KeepsTheBanOnTheTombstone_D180`; `UserBanTests.Ban_RejectsATombstone_D180`; `UserBanTests.Unban_RejectsATombstone_D180`; `UserTests.CanBeFriended_IsFalseForABannedUser_D180`; `LookupVisibilityTests.IsListed_ExcludesABannedUser_D180`; `ProfileVisibilityTests.For_KeepsABannedUsersProfileVisibleToAnExistingFriend_D180`; `ProfileVisibilityTests.For_HidesABannedUserFromANonFriend_D180`; `ProfileVisibilityTests.For_KeepsABannedUsersOwnProfileVisibleToThemselves_D180`; `IdentityMaskingTests.ForUser_DoesNotMaskABannedUser_D180`. Phase 2 ships ban/unban, sign-out, login block and lookup exclusion; optional content-removal returns 501 `not_implemented_in_phase` until Phase 8 (§10.2)..
+
+## Slice 10 additions
+
+| Decision | Added verification |
+|---|---|
+| D-060 | `web/src/i18n/i18n.keys.test.ts` — `i18n locale keys D-060` asserts the complete English key set for `pt-BR` and `es` in every web namespace. |

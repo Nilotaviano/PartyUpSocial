@@ -1,9 +1,11 @@
 {
-  "app": {
-    "name": "PartyUp",
-    "tagline": "Find time to play with your friends."
-  },
-  "common": {
-    "loading": "Loading…"
+  "app": { "name": "PartyUp", "tagline": "Find time to play with your friends." },
+  "common": { "loading": "Loading…" },
+  "pages": {
+    "welcome": "Welcome",
+    "ageGate": "Age gate",
+    "app": "Home",
+    "accountDeletion": "Delete account",
+    "accountDeletionConfirm": "Confirm account deletion"
   }
 }

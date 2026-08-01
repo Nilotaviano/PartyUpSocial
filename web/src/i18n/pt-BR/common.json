@@ -1,9 +1,11 @@
 {
-  "app": {
-    "name": "PartyUp",
-    "tagline": "Encontre um horário para jogar com seus amigos."
-  },
-  "common": {
-    "loading": "Carregando…"
+  "app": { "name": "PartyUp", "tagline": "Encontre um horário para jogar com seus amigos." },
+  "common": { "loading": "Carregando…" },
+  "pages": {
+    "welcome": "Boas-vindas",
+    "ageGate": "Verificação de idade",
+    "app": "Início",
+    "accountDeletion": "Excluir conta",
+    "accountDeletionConfirm": "Confirmar exclusão da conta"
   }
 }
