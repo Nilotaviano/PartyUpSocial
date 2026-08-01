@@ -168,7 +168,7 @@ Secrets at this scale are the VM's `.env` (mode 600, never committed — `.gitig
 | A-036 | Profanity/shape policy is an Application service running before any domain call or registry claim | Keeps wordlists out of Domain; rejected text never consumes a reservation. |
 | A-037 | Grace expiry uses a `PeriodicTimer` hosted service plus admin trigger; batch reads ids only, then each user executes in its own scope/transaction under a per-user lock | A-013 defers Hangfire, not scheduled deletion; the use case survives the Phase 4 scheduler swap. |
 | A-038 | Deletion journal is a transactional Postgres table mirrored post-commit to append-only NDJSON shipped with backups | A-017 restore replay needs entries outside the restored database snapshot. |
-| A-039 | Seed `admin` idempotently from `Admin:SeedUserIds` (preferred) or a confirmed-only `Admin:SeedEmails` fallback; `admin_seed_refusals` durably refuses an unconfirmed fallback match, while `SeedUserIds` remains the recovery path; never auto-revoke | D-177 is operational assignment. Durable refusal closes restart-based privilege escalation without locking out an operator who has the stable user id. |
+| A-039 | Seed `admin` idempotently from `Admin:SeedUserIds` (preferred) and the confirmed-only `Admin:SeedEmails` fallback — both lists applied every startup; `admin_seed_refusals` durably refuses an unconfirmed fallback match, while `SeedUserIds` remains the recovery path; never auto-revoke | D-177 is operational assignment. Durable refusal closes restart-based privilege escalation without locking out an operator who has the stable user id. |
 | A-040 | `IEmailSender` has a development log/file sender and one SMTP adapter; no vendor SDK | The provider is an owner choice and every candidate speaks SMTP. |
 | A-041 | Fourteen email templates are embedded per locale with placeholder substitution; recipient locale is required | D-060/D-146 apply to mail from the first slice; the template split keeps public confirmation tokens out of the tokenless deletion-grace notice. |
 | A-042 | Every external dependency is optional at startup; the app runs and is testable with none configured | Development and CI cannot block on owner actions. |
@@ -195,14 +195,14 @@ Secrets at this scale are the VM's `.env` (mode 600, never committed — `.gitig
 
 ### Done
 
-- **Phase 2:** ASP.NET Identity + cookie BFF auth — with antiforgery, `HttpOnly`/`Secure`/`SameSite=Lax` cookies, and security-stamp-based sign-out-everywhere (deletion start invalidates all sessions, successful login cancels deletion — D-158/D-165); transactional email + mail.partyup.social DNS/SPF/DKIM/DMARC; deletion skeleton incl. deletion journal (A-017); admin foundations (D-177/D-180: seeded role, `BannedAt`, ban/unban on the same security-stamp machinery).
+- **Phase 2:** ASP.NET Identity + cookie BFF auth — with antiforgery, `HttpOnly`/`Secure`/`SameSite=Lax` cookies, and security-stamp-based sign-out-everywhere (deletion start invalidates all sessions, successful login cancels deletion — D-158/D-165); transactional email pipeline (the mail.partyup.social DNS/SPF/DKIM/DMARC records and the SMTP provider remain open owner actions — production still runs `Email:Provider=log`); deletion skeleton incl. deletion journal (A-017); admin foundations (D-177/D-180: seeded role, `BannedAt`, ban/unban on the same security-stamp machinery).
 
 ### Still deferred
 
-- **Phase 0 remainder:** spikes A/B/C are built and decided (A-018..A-020, code under `spikes/`); human confirmation passes remain: NVDA + real-device touch on the custom grid, real Steam login + API key outcomes, Firefox/Android Chrome push delivery.
+- **Phase 0 remainder:** spikes A/B/C are built and decided (A-018..A-020, code under `spikes/`); human confirmation passes remain: NVDA + real-device touch on the custom grid, Firefox/Android Chrome push delivery. (Real Steam login and the API-key outcomes were confirmed in production during Phase 2 — Spike B closed.)
 - **Phase 9 (go-live, before the first beta invite):** VM + DNS + secrets + `DEPLOY_ENABLED=true` and the first TLS auto-deploy done 2026-07-30 (CI+CD green, `https://partyup.social/health` → 200; provisioned early, during Phase 1). Still open: offsite backup target (rclone, RUNBOOK-backup.md), **restore drill against a real dump**.
 - **Phase 1 opener:** aggregate/tombstone data-model design doc (A-014) — done: DOMAIN_MODEL.md; its §12 interpretation notes await ratification.
 - **Phase 4/6:** Hangfire wiring + sweeper jobs; guest-link security package (A-015 + plan Phase 4).
 - **Phase 5:** Playwright E2E + axe lane (§4).
 - **Phase 7:** Web Push/VAPID transport + send-log.
-- **Later:** Steam OpenID + Web API (Phase 2/3, Spike B), OpenAPI client staleness check in CI once real endpoints exist (A-011), uptime monitor + Hangfire dashboard auth-gated (Phase 9), Apple Developer account + Sign in with Apple (mobile phase per D-067 — account opened only at iOS publish).
+- **Later:** Steam Web API friend import (Phase 3 — the OpenID sign-in half shipped in Phase 2), OpenAPI client staleness check in CI once real endpoints exist (A-011), uptime monitor + Hangfire dashboard auth-gated (Phase 9), Apple Developer account + Sign in with Apple (mobile phase per D-067 — account opened only at iOS publish).
