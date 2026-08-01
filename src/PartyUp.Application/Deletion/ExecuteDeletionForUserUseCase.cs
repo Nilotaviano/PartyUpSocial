@@ -9,6 +9,7 @@ namespace PartyUp.Application.Deletion;
 public sealed class ExecuteDeletionForUserUseCase(
     IUserRepository users,
     IDeletionScopeProvider scopeProvider,
+    IDeletionResultApplier resultApplier,
     IUserAccountGateway accounts,
     IDeletionJournal journal,
     IDeletionJournalShipper shipper,
@@ -28,6 +29,7 @@ public sealed class ExecuteDeletionForUserUseCase(
 
                 DeletionScope scope = await scopeProvider.LoadAsync(userId, ct);
                 DeletionExecutionResult result = DeletionExecutor.Execute(user, scope, clock);
+                await resultApplier.ApplyAsync(result, userId, ct);
                 await accounts.PurgeCredentialsAsync(userId, ct);
                 journal.Append(result.Journal);
                 return true;

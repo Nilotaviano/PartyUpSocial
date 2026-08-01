@@ -61,11 +61,17 @@ public static class DependencyInjection
         services.AddScoped<IUserGraphResolver, UserGraphResolver>();
         services.AddScoped<IFriendCodeGenerator, FriendCodeGenerator>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IBlockEffectsExecutor, BlockEffectsExecutor>();
+        services.AddScoped<IBlockEffectScopeProvider, EmptyBlockEffectScopeProvider>();
+        services.AddScoped<IReminderScheduleWriter, NoSessionReminderScheduleWriter>();
+        services.AddScoped<IDeletionResultApplier, DeletionResultApplier>();
         services.AddScoped<SendFriendRequestUseCase>();
         services.AddScoped<AcceptFriendRequestUseCase>();
         services.AddScoped<RejectFriendRequestUseCase>();
         services.AddScoped<CancelFriendRequestUseCase>();
         services.AddScoped<UnfriendUseCase>();
+        services.AddScoped<BlockUserUseCase>();
+        services.AddScoped<UnblockUserUseCase>();
         services.AddSingleton<IPublicLinkBuilder>(new PublicLinkBuilder(
             configuration["PublicBaseUrl"] ?? "http://localhost:5173"));
         services.AddScoped<SecurityTokenService>();
