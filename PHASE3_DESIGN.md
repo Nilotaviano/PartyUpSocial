@@ -1146,3 +1146,21 @@ Each slice appends the §14.5 citations for the tests it adds in that same commi
 ## 18. Review checklist
 
 An adversarial review should fail this design if any answer is implicit: exact route/status/code including malformed-body 400 and unsupported-media-type 415; hidden-versus-missing behavior; actor-filtered id probes; `P3-LK-01` pair/content/attachment lock order; same-direction block exact effects; crossed notification behavior; D-105 suppression of block-derived events and `P4-NOTIFY-01` ownership; block deletion/removal transaction and full post-applier rollback; Phase 4/6 seam contract and deferred race ownership; deletion of every Phase 3 row class; Steam private-list/key disambiguation, stable importer/candidate ownership under locks, unlink/relink retry orderings, linearization, and all states; persistent localized Friends/settings navigation and route reachability; QR payload/origin; D-068 profile and pending-list response fields; server-validated `/u` and `/add` continuation through email links, cross-tab authentication, and onboarding; two-layer identifier-path log redaction plus deployment owner action; D-180 banned profile behavior; localized Resolve action and i18n key parity; D-numbered tests; or slice ownership/gates. P3-01 and P3-02 are decided rulings in §17, with no implementation branch or open ratification item.
+
+---
+
+## 19. Visual direction (owner-ratified references; full design pass is its own future phase)
+
+**Status.** Owner directive 2026-08-01: reference set = **Rallly** (rallly.co), **Luma** (lu.ma), **Sleeper**. A proper design pass — new tokens applied across the whole app — is **its own phase** (see §16 IMPLEMENTATION_PLAN delta). Phase 3 screens ship visually consistent with the existing Phase 2 styling; this section constrains *new* Phase 3 surfaces so they do not drift toward generic defaults, and records the north star the design-pass phase will execute.
+
+**Thesis.** PartyUp is the calm space where a friend group decides when to play. The product's job is coordination clarity with game-night warmth — not a Discord-adjacent dark gamer shell, not a corporate calendar. From the references: Rallly's scheduling legibility (the grid is the hero; states are obvious at a glance), Luma's quiet event-page hierarchy (one subject per screen, generous whitespace, restrained accent), Sleeper's social warmth (friends feel like people, not rows — avatar-forward, personality in empty states, never sterile).
+
+**Phase 3 binding constraints (new screens only, current token set):**
+- Friends list and request cards are **avatar-forward**: identity block (avatar, display name, @username) is the primary visual unit, actions are secondary. No dense tables for people.
+- Every empty state directs the next action in product voice (e.g. Friends empty state leads with the friend-code share block, not an illustration of absence). No apologetic or filler copy; sentence case; verbs name outcomes ("Send request", toast "Request sent").
+- One accent does the work per screen; destructive/block actions use the existing danger treatment and plain words ("Block @name" — never euphemisms), with the consequence sentence in body type, not fine print.
+- The QR/share surface is composed like a Luma event card: code, QR, share link as one calm object — this is Phase 3's single signature moment; everything around it stays quiet.
+- Masked identities ("Anonymous User") render with a neutral placeholder avatar and regular type — masking must look ordinary, never highlighted.
+- Quality floor unchanged: WCAG 2.2 AA, visible focus, keyboard paths, reduced-motion respected, i18n key parity.
+
+**Design-pass phase (deferred, needs its own brief):** full token system (palette/type/spacing/motion) derived from this thesis; candidate directions to explore — display face with warmth (not the default grotesque), light-first palette with a game-night accent range, Sleeper-grade personality in moments (onboarding finish, session confirmed) while Rallly-grade neutrality in planning grids. Explicitly out of scope for Phase 3 slices.
