@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Kernel;
 
@@ -8,11 +9,10 @@ namespace PartyUp.Api.Hosting;
 public sealed partial class AdminSeeder(
     IServiceScopeFactory scopeFactory,
     IConfiguration configuration,
+    IClock clock,
     ILogger<AdminSeeder> logger) : IHostedService
 {
     private const string AdminRole = "admin";
-    private readonly HashSet<UserId> _permanentlyRefusedUsers = [];
-    private readonly object _refusalGate = new();
 
     public Task StartAsync(CancellationToken cancellationToken) =>
         SeedAsync(cancellationToken);
@@ -24,6 +24,7 @@ public sealed partial class AdminSeeder(
         await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
         IServiceProvider services = scope.ServiceProvider;
         var accounts = services.GetRequiredService<IUserAccountGateway>();
+        var refusals = services.GetRequiredService<IAdminSeedRefusalStore>();
         var sessions = services.GetRequiredService<IAccountSessionService>();
         var users = services.GetRequiredService<IUserRepository>();
         var unitOfWork = services.GetRequiredService<IUnitOfWork>();
@@ -37,71 +38,96 @@ public sealed partial class AdminSeeder(
             cancellationToken);
 
         string[] seedUserIds = ReadSeedValues("Admin:SeedUserIds");
-        if (seedUserIds.Length > 0)
+        foreach (string configuredId in seedUserIds.Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            foreach (string configuredId in seedUserIds.Distinct(StringComparer.OrdinalIgnoreCase))
+            if (!Guid.TryParse(configuredId, out Guid value))
             {
-                if (!Guid.TryParse(configuredId, out Guid value))
-                {
-                    LogInvalidSeedUserId(logger, configuredId);
-                    continue;
-                }
-
-                await GrantAsync(
-                    UserId.From(value),
-                    accounts,
-                    sessions,
-                    users,
-                    unitOfWork,
-                    cancellationToken);
-            }
-
-            return;
-        }
-
-        foreach (string email in ReadSeedValues("Admin:SeedEmails")
-                     .Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            string emailHash = HashEmail(email);
-            UserId? userId = await accounts.FindUserIdByEmailAsync(email, cancellationToken);
-            if (userId is null)
-            {
-                LogSeedEmailWithoutAccount(logger, emailHash);
+                LogInvalidSeedUserId(logger, configuredId);
                 continue;
-            }
-
-            AccountEmailInfo? emailInfo = await accounts.GetEmailAsync(
-                userId.Value,
-                cancellationToken);
-            if (emailInfo is not { IsConfirmed: true })
-            {
-                lock (_refusalGate)
-                {
-                    _permanentlyRefusedUsers.Add(userId.Value);
-                }
-
-                LogUnconfirmedSeedEmail(logger, emailHash);
-                continue;
-            }
-
-            lock (_refusalGate)
-            {
-                if (_permanentlyRefusedUsers.Contains(userId.Value))
-                {
-                    LogPreviouslyRefusedSeedEmail(logger, emailHash);
-                    continue;
-                }
             }
 
             await GrantAsync(
-                userId.Value,
+                UserId.From(value),
                 accounts,
                 sessions,
                 users,
                 unitOfWork,
                 cancellationToken);
         }
+
+        foreach (string email in ReadSeedValues("Admin:SeedEmails")
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            string emailHash = HashEmail(email);
+            SeedEmailOutcome outcome = await ProcessSeedEmailAsync(
+                email,
+                accounts,
+                refusals,
+                sessions,
+                users,
+                unitOfWork,
+                cancellationToken);
+            switch (outcome)
+            {
+                case SeedEmailOutcome.NoAccount:
+                    LogSeedEmailWithoutAccount(logger, emailHash);
+                    break;
+                case SeedEmailOutcome.Unconfirmed:
+                    LogUnconfirmedSeedEmail(logger, emailHash);
+                    break;
+                case SeedEmailOutcome.PreviouslyRefused:
+                    LogPreviouslyRefusedSeedEmail(logger, emailHash);
+                    break;
+                case SeedEmailOutcome.Granted:
+                    break;
+            }
+        }
     }
+
+    private async Task<SeedEmailOutcome> ProcessSeedEmailAsync(
+        string email,
+        IUserAccountGateway accounts,
+        IAdminSeedRefusalStore refusals,
+        IAccountSessionService sessions,
+        IUserRepository users,
+        IUnitOfWork unitOfWork,
+        CancellationToken cancellationToken) =>
+        await unitOfWork.ExecuteAsync(
+            async ct =>
+            {
+                UserId? userId = await accounts.FindUserIdByEmailAsync(email, ct);
+                if (userId is null)
+                {
+                    return SeedEmailOutcome.NoAccount;
+                }
+
+                // Refusals bind only SeedEmails; SeedUserIds deliberately remains the recovery path.
+                if (await refusals.ExistsAsync(userId.Value, ct))
+                {
+                    return SeedEmailOutcome.PreviouslyRefused;
+                }
+
+                AccountEmailInfo? emailInfo = await accounts.GetEmailAsync(userId.Value, ct);
+                if (emailInfo is not { IsConfirmed: true })
+                {
+                    await refusals.RecordAsync(userId.Value, clock.GetCurrentInstant(), ct);
+                    return SeedEmailOutcome.Unconfirmed;
+                }
+
+                if (await users.FindAsync(userId.Value, ct) is null)
+                {
+                    return SeedEmailOutcome.NoAccount;
+                }
+
+                bool changed = await accounts.AddToRoleAsync(userId.Value, AdminRole, ct);
+                if (changed)
+                {
+                    await sessions.SignOutEverywhereAsync(userId.Value, ct);
+                }
+
+                return SeedEmailOutcome.Granted;
+            },
+            cancellationToken);
 
     private async Task GrantAsync(
         UserId userId,
@@ -144,6 +170,14 @@ public sealed partial class AdminSeeder(
     {
         byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(email.Trim().ToUpperInvariant()));
         return Convert.ToHexString(bytes);
+    }
+
+    private enum SeedEmailOutcome
+    {
+        NoAccount,
+        Unconfirmed,
+        PreviouslyRefused,
+        Granted,
     }
 
     [LoggerMessage(

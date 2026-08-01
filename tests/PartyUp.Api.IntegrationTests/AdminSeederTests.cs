@@ -56,6 +56,7 @@ public sealed class AdminSeederTests : IAsyncLifetime, IDisposable
         AdminSeeder seeder = await RunSeederAsync(configured);
 
         Assert.False(await HasAdminRoleAsync(userId));
+        Assert.True(await HasRefusalAsync(userId));
         Assert.Contains(sink.Events, logEvent =>
             logEvent.Level == LogEventLevel.Error &&
             logEvent.RenderMessage(CultureInfo.InvariantCulture).Contains(
@@ -91,7 +92,58 @@ public sealed class AdminSeederTests : IAsyncLifetime, IDisposable
         await RunSeederAsync(configured);
 
         Assert.True(await HasAdminRoleAsync(idSeeded));
-        Assert.False(await HasAdminRoleAsync(emailSeeded));
+        Assert.True(await HasAdminRoleAsync(emailSeeded));
+    }
+
+    [Fact]
+    public async Task Seed_RefusalSurvivesARestart_D177()
+    {
+        const string email = "restart-refusal@example.test";
+        UserId userId = await _factory.SeedUserAsync(
+            email: email,
+            emailConfirmed: false);
+        AdminSeeder firstSeeder;
+        await using (WebApplicationFactory<Program> firstPass = ConfigureSeeds(
+                         seedEmails: [email]))
+        {
+            firstSeeder = await RunSeederAsync(firstPass);
+        }
+
+        Assert.True(await HasRefusalAsync(userId));
+        Assert.False(await HasAdminRoleAsync(userId));
+
+        await SetEmailConfirmedAsync(userId);
+
+        await using WebApplicationFactory<Program> restarted = ConfigureSeeds(
+            seedEmails: [email]);
+        AdminSeeder restartedSeeder = await RunSeederAsync(restarted);
+
+        Assert.NotSame(firstSeeder, restartedSeeder);
+        Assert.True(await HasRefusalAsync(userId));
+        Assert.False(await HasAdminRoleAsync(userId));
+    }
+
+    [Fact]
+    public async Task Seed_SeedUserIdsOverridesAnEarlierRefusal_D177()
+    {
+        const string email = "refusal-recovery@example.test";
+        UserId userId = await _factory.SeedUserAsync(
+            email: email,
+            emailConfirmed: false);
+        await using (WebApplicationFactory<Program> emailPass = ConfigureSeeds(
+                         seedEmails: [email]))
+        {
+            await RunSeederAsync(emailPass);
+        }
+
+        Assert.True(await HasRefusalAsync(userId));
+        Assert.False(await HasAdminRoleAsync(userId));
+
+        await using WebApplicationFactory<Program> idPass = ConfigureSeeds(
+            seedUserIds: [userId.Value.ToString("D")]);
+        await RunSeederAsync(idPass);
+
+        Assert.True(await HasAdminRoleAsync(userId));
     }
 
     [Fact]
@@ -197,6 +249,24 @@ public sealed class AdminSeederTests : IAsyncLifetime, IDisposable
         return adminRoleId is { } roleId && await context.Set<IdentityUserRole<Guid>>()
             .AnyAsync(userRole =>
                 userRole.UserId == userId.Value && userRole.RoleId == roleId);
+    }
+
+    private async Task<bool> HasRefusalAsync(UserId userId)
+    {
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await context.AdminSeedRefusals
+            .AsNoTracking()
+            .AnyAsync(refusal => refusal.UserId == userId.Value);
+    }
+
+    private async Task SetEmailConfirmedAsync(UserId userId)
+    {
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        AuthUser account = await context.AuthUsers.SingleAsync(user => user.Id == userId.Value);
+        account.EmailConfirmed = true;
+        await context.SaveChangesAsync();
     }
 
     private async Task<string> SecurityStampAsync(UserId userId)

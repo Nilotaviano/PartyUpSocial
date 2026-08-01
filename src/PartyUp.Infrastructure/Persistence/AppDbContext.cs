@@ -16,6 +16,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<AuthUser> AuthUsers => Set<AuthUser>();
 
+    public DbSet<AdminSeedRefusal> AdminSeedRefusals => Set<AdminSeedRefusal>();
+
     public DbSet<PlatformLink> PlatformLinks => Set<PlatformLink>();
 
     public DbSet<SteamIdentity> SteamIdentities => Set<SteamIdentity>();
@@ -29,6 +31,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         base.OnModelCreating(builder);
 
         builder.ApplyConfiguration(new AuthUserConfiguration());
+        builder.ApplyConfiguration(new AdminSeedRefusalConfiguration());
         builder.ApplyConfiguration(new AuthTokenConfiguration());
         builder.ApplyConfiguration(new DeletionJournalConfiguration());
         builder.ApplyConfiguration(new UserConfiguration());

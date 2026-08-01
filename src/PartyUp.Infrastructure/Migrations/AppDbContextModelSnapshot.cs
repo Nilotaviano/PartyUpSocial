@@ -524,6 +524,22 @@ namespace PartyUp.Infrastructure.Migrations
                     b.ToTable("auth_users", (string)null);
                 });
 
+            modelBuilder.Entity("PartyUp.Infrastructure.Persistence.AdminSeedRefusal", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Instant>("RefusedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("refused_at");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_admin_seed_refusals");
+
+                    b.ToTable("admin_seed_refusals", (string)null);
+                });
+
             modelBuilder.Entity("PartyUp.Infrastructure.Steam.SteamIdentity", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -644,6 +660,16 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("fk_auth_tokens_users_user_id");
+                });
+
+            modelBuilder.Entity("PartyUp.Infrastructure.Persistence.AdminSeedRefusal", b =>
+                {
+                    b.HasOne("PartyUp.Infrastructure.Identity.AuthUser", null)
+                        .WithOne()
+                        .HasForeignKey("PartyUp.Infrastructure.Persistence.AdminSeedRefusal", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_admin_seed_refusals_auth_users_user_id");
                 });
 
             modelBuilder.Entity("PartyUp.Infrastructure.Steam.SteamIdentity", b =>

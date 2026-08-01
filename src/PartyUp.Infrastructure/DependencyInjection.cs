@@ -46,6 +46,7 @@ public static class DependencyInjection
             PartyUpUserClaimsPrincipalFactory>());
 
         services.AddScoped<IUserAccountGateway, UserAccountGateway>();
+        services.AddScoped<IAdminSeedRefusalStore, AdminSeedRefusalStore>();
         services.AddScoped<IAccountSessionService, AccountSessionService>();
         services.AddScoped<ICurrentUserProjectionReader, CurrentUserProjectionReader>();
         services.AddScoped<IAdminUserReader, AdminUserReader>();
