@@ -13,11 +13,13 @@ using PartyUp.Api.Auth;
 using PartyUp.Api.Endpoints;
 using PartyUp.Api.ErrorHandling;
 using PartyUp.Api.Hosting;
+using PartyUp.Api.Logging;
 using PartyUp.Api.Security;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Accounts;
 using PartyUp.Application.Admin;
 using PartyUp.Application.Deletion;
+using PartyUp.Application.Friends;
 using PartyUp.Application.Onboarding;
 using PartyUp.Application.Profile;
 using PartyUp.Infrastructure;
@@ -103,6 +105,12 @@ builder.Services.AddScoped<GetOnboardingStateUseCase>();
 builder.Services.AddScoped<CheckUsernameAvailabilityUseCase>();
 builder.Services.AddScoped<ValidateProfileDraftUseCase>();
 builder.Services.AddScoped<CompleteOnboardingUseCase>();
+builder.Services.AddScoped<GetFriendShareUseCase>();
+builder.Services.AddScoped<GetProfileUseCase>();
+builder.Services.AddScoped<ResolveFriendCodeUseCase>();
+builder.Services.AddScoped<ListFriendsUseCase>();
+builder.Services.AddScoped<ListFriendRequestsUseCase>();
+builder.Services.AddScoped<ListBlockedUsersUseCase>();
 builder.Services.AddSingleton<ExternalAuthOriginOptions>();
 builder.Services.AddSingleton(new AccountEmailOptions(
     builder.Configuration["PublicBaseUrl"] ?? "http://localhost:5173"));
@@ -136,6 +144,7 @@ builder.Services.AddPartyUpAuthorization();
 builder.Services.AddSingleton<ProviderCapabilities>();
 builder.Services.AddExceptionHandler<RequestBindingExceptionMapper>();
 builder.Services.AddExceptionHandler<DomainExceptionMapper>();
+builder.Services.AddExceptionHandler<InternalExceptionMapper>();
 builder.Services.AddProblemDetails();
 // Outside Development, binding failures short-circuit an empty 400 that never
 // reaches the exception handlers; throwing keeps the JSON problem shape uniform.
@@ -220,7 +229,15 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseSerilogRequestLogging(options =>
-    options.IncludeQueryInRequestPath = false);
+{
+    options.IncludeQueryInRequestPath = false;
+    options.GetMessageTemplateProperties =
+        FriendPathLogSanitizer.MessageTemplateProperties;
+    options.EnrichDiagnosticContext = (diagnosticContext, context) =>
+        diagnosticContext.Set(
+            "RequestPath",
+            FriendPathLogSanitizer.Sanitize(context.Request.Path));
+});
 
 app.UseRouting();
 app.UseAuthentication();
@@ -229,6 +246,7 @@ app.UseWhen(
     context => context.Request.Path.StartsWithSegments(ApiRoutes.V1),
     branch => branch.UseRateLimiter());
 app.UseAuthorization();
+app.UseMiddleware<RequestContentTypeMiddleware>();
 
 // /health/live is process-only (no registered checks run) so the proxy/container layer can tell
 // a dead app from a reachable app with an unhealthy dependency; /health includes Postgres.
@@ -237,7 +255,7 @@ app.MapHealthChecks("/health");
 app.MapOpenApi();
 
 var api = app.MapGroup(ApiRoutes.V1);
-api.AddEndpointFilter<AntiforgeryFilter>();
+api.AddEndpointFilter<ProblemAntiforgeryFilter>();
 api.MapAuthEndpoints();
 api.MapExternalAuthEndpoints(
     !string.IsNullOrWhiteSpace(app.Configuration["Google:ClientId"]),
@@ -248,6 +266,7 @@ api.MapAccountDeletionEndpoints(
     app.Environment);
 api.MapOnboardingEndpoints();
 api.MapMeEndpoints();
+api.MapFriendEndpoints();
 api.MapAdminMaintenanceEndpoints();
 
 if (app.Environment.IsEnvironment("Testing"))

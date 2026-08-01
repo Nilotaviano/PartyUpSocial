@@ -8,6 +8,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Net.Http.Headers;
 using PartyUp.Api.Endpoints;
+using PartyUp.Application.Abstractions;
+using PartyUp.Application.Accounts;
+using PartyUp.Domain.Kernel;
 using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Steam;
 
@@ -192,6 +195,51 @@ public sealed class SteamCallbackRouteTests : IAsyncLifetime, IDisposable
         await AssertNoAccountAsync();
     }
 
+    [Theory]
+    [InlineData("/u/Player.Name", "/u/player.name", true)]
+    [InlineData("/add/2345-6789-AB", "/add/23456789AB", true)]
+    [InlineData("/u/Player.Name", "/u/player.name", false)]
+    [InlineData("/add/2345-6789-AB", "/add/23456789AB", false)]
+    public async Task Callback_PreservesCanonicalFriendContinuationForEveryAccountState(
+        string requested,
+        string expected,
+        bool completeProfile)
+    {
+        string steamId = $"7656119{Random.Shared.Next(100000000, 999999999)}";
+        UserId userId = await _factory.SeedUserAsync(
+            completeProfile: completeProfile,
+            email: null);
+        await using (AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IUserAccountGateway>()
+                .AddLoginAsync(
+                    userId,
+                    ExternalProviderPolicy.Steam,
+                    steamId,
+                    default);
+        }
+
+        var verifier = new AcceptingVerifier(steamId);
+        await using var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<ISteamOpenIdVerifier>();
+                services.AddSingleton<ISteamOpenIdVerifier>(verifier);
+                services.RemoveAll<ISteamProfileClient>();
+                services.AddSingleton<ISteamProfileClient>(new StaticSteamProfileClient());
+            }));
+        using HttpClient client = Slice5HttpTest.CreateClient(factory);
+        StartedSteamFlow flow = await StartSteamAsync(client, requested);
+
+        HttpResponseMessage response = await SendCallbackAsync(client, flow);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        string next = QueryHelpers.ParseQuery(
+            new Uri(new Uri("https://localhost"), response.Headers.Location!).Query)["next"]!;
+        Assert.Equal(expected, next);
+        Assert.Equal(1, verifier.Calls);
+    }
+
     private async Task AssertNoAccountAsync()
     {
         await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
@@ -200,7 +248,9 @@ public sealed class SteamCallbackRouteTests : IAsyncLifetime, IDisposable
         Assert.Empty(await context.DomainUsers.ToListAsync());
     }
 
-    private static async Task<StartedSteamFlow> StartSteamAsync(HttpClient client)
+    private static async Task<StartedSteamFlow> StartSteamAsync(
+        HttpClient client,
+        string returnTo = "/app")
     {
         HttpResponseMessage mint = await AntiforgeryTestClient.PostAsync(
             client,
@@ -209,7 +259,7 @@ public sealed class SteamCallbackRouteTests : IAsyncLifetime, IDisposable
             {
                 provider = "steam",
                 mode = "login",
-                returnTo = "/app",
+                returnTo,
                 ageGateAttested = true,
             }));
         mint.EnsureSuccessStatusCode();
@@ -226,8 +276,8 @@ public sealed class SteamCallbackRouteTests : IAsyncLifetime, IDisposable
         Assert.Equal(HttpStatusCode.Redirect, start.StatusCode);
         Uri providerRedirect = start.Headers.Location!;
         SetCookieHeaderValue stateSetCookie = ReadSetCookie(start, "pu.ext");
-        string returnTo = QueryHelpers.ParseQuery(providerRedirect.Query)["openid.return_to"].ToString();
-        string nonce = QueryHelpers.ParseQuery(new Uri(returnTo).Query)["n"].ToString();
+        string callbackReturnTo = QueryHelpers.ParseQuery(providerRedirect.Query)["openid.return_to"].ToString();
+        string nonce = QueryHelpers.ParseQuery(new Uri(callbackReturnTo).Query)["n"].ToString();
         return new StartedSteamFlow(
             $"{stateSetCookie.Name.Value}={stateSetCookie.Value.Value}",
             nonce,
@@ -288,6 +338,30 @@ public sealed class SteamCallbackRouteTests : IAsyncLifetime, IDisposable
             Interlocked.Increment(ref _calls);
             return Task.FromResult(SteamOpenIdVerification.Invalid);
         }
+    }
+
+    private sealed class AcceptingVerifier(string steamId) : ISteamOpenIdVerifier
+    {
+        private int _calls;
+
+        internal int Calls => Volatile.Read(ref _calls);
+
+        public Task<SteamOpenIdVerification> VerifyAsync(
+            IReadOnlyDictionary<string, string> assertion,
+            string expectedReturnTo,
+            CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _calls);
+            return Task.FromResult(new SteamOpenIdVerification(true, steamId));
+        }
+    }
+
+    private sealed class StaticSteamProfileClient : ISteamProfileClient
+    {
+        public Task<SteamProfile?> GetProfileAsync(
+            string steamId64,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<SteamProfile?>(new SteamProfile("Steam Player", null));
     }
 
     private sealed record StartedSteamFlow(

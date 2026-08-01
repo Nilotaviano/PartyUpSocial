@@ -40,8 +40,10 @@ public sealed class SecurityTokenService(AppDbContext context, IClock clock)
             AuthTokenPurpose.EmailChange or AuthTokenPurpose.Reauthentication;
         string? payload = request.Intent is not null
             ? JsonSerializer.Serialize(request.Intent, PayloadJsonOptions)
-            : request.Email is not null
-                ? JsonSerializer.Serialize(new EmailTokenPayload(request.Email), PayloadJsonOptions)
+            : request.Email is not null || request.Continuation is not null
+                ? JsonSerializer.Serialize(
+                    new EmailTokenPayload(request.Email, request.Continuation),
+                    PayloadJsonOptions)
                 : null;
 
         const string sql = """
@@ -176,10 +178,10 @@ public sealed class SecurityTokenService(AppDbContext context, IClock clock)
                 payload is null || purpose != AuthTokenPurpose.ExternalStartIntent
                 ? null
                 : JsonSerializer.Deserialize<ExternalIntentPayload>(payload, PayloadJsonOptions);
-            string? emailAddress =
+            EmailTokenPayload? emailPayload =
                 payload is null || purpose == AuthTokenPurpose.ExternalStartIntent
                 ? null
-                : JsonSerializer.Deserialize<EmailTokenPayload>(payload, PayloadJsonOptions)?.Email;
+                : JsonSerializer.Deserialize<EmailTokenPayload>(payload, PayloadJsonOptions);
 
             if (!redeemed)
             {
@@ -194,7 +196,8 @@ public sealed class SecurityTokenService(AppDbContext context, IClock clock)
                         pending,
                         intent,
                         default,
-                        emailAddress);
+                        emailPayload?.Email,
+                        emailPayload?.Continuation);
             }
 
             return new TokenRedemption(
@@ -206,7 +209,8 @@ public sealed class SecurityTokenService(AppDbContext context, IClock clock)
                 pending,
                 intent,
                 now,
-                emailAddress);
+                emailPayload?.Email,
+                emailPayload?.Continuation);
         }
         finally
         {
@@ -319,7 +323,7 @@ public sealed class SecurityTokenService(AppDbContext context, IClock clock)
         return options;
     }
 
-    private sealed record EmailTokenPayload(string Email);
+    private sealed record EmailTokenPayload(string? Email, string? Continuation = null);
 }
 
 internal sealed class AuthToken

@@ -8,6 +8,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Primitives;
 using Microsoft.Net.Http.Headers;
+using PartyUp.Api.ErrorHandling;
 
 namespace PartyUp.Api.Security;
 
@@ -150,6 +151,28 @@ public static class RateLimitPolicies
             RateLimitPartitionKind.User,
             Operations(ApiOperationIds.CheckUsernameAvailability)),
         new(
+            "friend-lookup",
+            20,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.User,
+            Operations(
+                ApiOperationIds.GetUserProfile,
+                ApiOperationIds.ResolveFriendCode,
+                ApiOperationIds.BlockUser,
+                ApiOperationIds.ImportSteamFriends)),
+        new(
+            "friend-request-send",
+            10,
+            TimeSpan.FromHours(1),
+            RateLimitPartitionKind.User,
+            Operations(ApiOperationIds.SendFriendRequest)),
+        new(
+            "steam-friend-import",
+            5,
+            TimeSpan.FromMinutes(15),
+            RateLimitPartitionKind.User,
+            Operations(ApiOperationIds.ImportSteamFriends)),
+        new(
             "default",
             300,
             TimeSpan.FromMinutes(1),
@@ -176,7 +199,6 @@ public static class RateLimitPolicies
     {
         HttpResponse response = context.HttpContext.Response;
         response.StatusCode = StatusCodes.Status429TooManyRequests;
-        response.ContentType = "application/problem+json";
 
         if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out TimeSpan retryAfter))
         {
@@ -186,14 +208,13 @@ public static class RateLimitPolicies
         }
 
         await response.WriteAsJsonAsync(
-            new
-            {
-                type = "about:blank",
-                title = "Too Many Requests",
-                status = StatusCodes.Status429TooManyRequests,
-                code = "rate_limited",
-                traceId = context.HttpContext.TraceIdentifier,
-            },
+            PartyUpProblemResults.Body(
+                context.HttpContext.Request.Path,
+                context.HttpContext.TraceIdentifier,
+                StatusCodes.Status429TooManyRequests,
+                "rate_limited"),
+            options: null,
+            contentType: "application/problem+json",
             cancellationToken);
     }
 

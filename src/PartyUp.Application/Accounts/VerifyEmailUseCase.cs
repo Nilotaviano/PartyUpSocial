@@ -45,7 +45,9 @@ public sealed class VerifyEmailUseCase(
                     if (redemption.UserId is { } existingSubject)
                     {
                         await accounts.ConfirmEmailAsync(existingSubject, ct);
-                        return EmailVerificationResult.Confirmed(existingSubject);
+                        return EmailVerificationResult.Confirmed(
+                            existingSubject,
+                            redemption.Continuation);
                     }
 
                     if (redemption.EmailNormalized is not { } normalizedAddress)
@@ -78,7 +80,9 @@ public sealed class VerifyEmailUseCase(
                         emailConfirmed: true,
                         password,
                         ct);
-                    return EmailVerificationResult.Created(createdId);
+                    return EmailVerificationResult.Created(
+                        createdId,
+                        redemption.Continuation);
                 },
                 cancellationToken);
         }
@@ -94,17 +98,22 @@ public sealed record EmailVerificationResult(
     UserId? UserId,
     bool ShouldSignIn,
     bool AccountAlreadyExisted,
-    string? Code)
+    string? Code,
+    string? Continuation)
 {
-    public static EmailVerificationResult Created(UserId userId) =>
-        new(true, userId, true, false, null);
+    public static EmailVerificationResult Created(
+        UserId userId,
+        string? continuation = null) =>
+        new(true, userId, true, false, null, continuation);
 
-    public static EmailVerificationResult Confirmed(UserId userId) =>
-        new(true, userId, false, false, null);
+    public static EmailVerificationResult Confirmed(
+        UserId userId,
+        string? continuation = null) =>
+        new(true, userId, false, false, null, continuation);
 
     public static EmailVerificationResult Existing { get; } =
-        new(true, null, false, true, null);
+        new(true, null, false, true, null, null);
 
     public static EmailVerificationResult Failed(string code) =>
-        new(false, null, false, false, code);
+        new(false, null, false, false, code, null);
 }

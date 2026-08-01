@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
 
 namespace PartyUp.Api.ErrorHandling;
 
@@ -15,23 +14,43 @@ public sealed class RequestBindingExceptionMapper : IExceptionHandler
             return false;
         }
 
-        var problem = new ProblemDetails
-        {
-            Type = "about:blank",
-            Title = "Bad Request",
-            Status = badRequest.StatusCode,
-            Detail = "The request body could not be read.",
-            Instance = httpContext.Request.Path,
-        };
-        problem.Extensions["code"] = "invalid_request";
-        problem.Extensions["traceId"] = httpContext.TraceIdentifier;
+        int status = badRequest.StatusCode == StatusCodes.Status415UnsupportedMediaType
+            ? StatusCodes.Status415UnsupportedMediaType
+            : StatusCodes.Status400BadRequest;
+        string code = status == StatusCodes.Status415UnsupportedMediaType
+            ? "unsupported_media_type"
+            : "validation_failed";
 
-        httpContext.Response.StatusCode = badRequest.StatusCode;
-        await httpContext.Response.WriteAsJsonAsync(
-            problem,
-            options: null,
-            contentType: "application/problem+json",
+        await PartyUpProblemResults.WriteAsync(
+            httpContext,
+            status,
+            code,
             cancellationToken);
         return true;
+    }
+}
+
+public sealed class RequestContentTypeMiddleware(RequestDelegate next)
+{
+    public async Task InvokeAsync(HttpContext context)
+    {
+        bool requestHasBody =
+            context.Request.ContentLength is > 0 ||
+            context.Request.Headers.ContainsKey("Transfer-Encoding");
+
+        if (context.GetEndpoint() is not null &&
+            context.Request.Path.StartsWithSegments(ApiRoutes.V1) &&
+            requestHasBody &&
+            !context.Request.HasJsonContentType())
+        {
+            await PartyUpProblemResults.WriteAsync(
+                context,
+                StatusCodes.Status415UnsupportedMediaType,
+                "unsupported_media_type",
+                context.RequestAborted);
+            return;
+        }
+
+        await next(context);
     }
 }

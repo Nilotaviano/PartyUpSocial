@@ -39,6 +39,29 @@ public sealed class SecurityTokenServiceTests : IAsyncLifetime, IDisposable
         Assert.Equal(TokenRedemptionFailure.NotFound, second.Failure);
     }
 
+    [Theory]
+    [InlineData("/u/player.name")]
+    [InlineData("/add/23456789AB")]
+    public async Task EmailTokenPayload_RoundTripsCanonicalFriendContinuation(
+        string continuation)
+    {
+        IssuedToken issued = await IssueAsync(new IssueTokenRequest(
+            AuthTokenPurpose.MagicLink,
+            null,
+            "CONTINUATION@EXAMPLE.TEST",
+            Duration.FromMinutes(15),
+            Email: "Continuation@Example.Test",
+            Continuation: continuation));
+
+        TokenRedemption redemption = await RedeemAsync(new RedeemTokenRequest(
+            AuthTokenPurpose.MagicLink,
+            issued.RawToken));
+
+        Assert.True(redemption.Succeeded);
+        Assert.Equal("Continuation@Example.Test", redemption.Email);
+        Assert.Equal(continuation, redemption.Continuation);
+    }
+
     [Fact]
     public async Task Redeem_RefusesAnExpiredToken_D067()
     {

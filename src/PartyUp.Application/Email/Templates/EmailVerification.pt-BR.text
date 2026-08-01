@@ -1,3 +1,3 @@
 Verifique seu e-mail para continuar:
 
-{{PublicBaseUrl}}/auth/verify-email#token={{Token}}
+{{PublicBaseUrl}}/auth/verify-email#token={{Token}}{{Continuation}}

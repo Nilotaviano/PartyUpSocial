@@ -144,6 +144,21 @@ public sealed class ConsumeMagicLinkUseCaseTests
         Assert.Equal(id, result.UserId);
     }
 
+    [Fact]
+    public async Task Execute_PropagatesOnlyTheRedeemedTokenContinuation_D031()
+    {
+        UserId id = UserId.New();
+        TestContext context = Create(
+            Success(id, "PLAYER@EXAMPLE.TEST", continuation: "/u/player"));
+
+        MagicLinkConsumptionResult result = await context.UseCase.ExecuteAsync(
+            "token",
+            false,
+            default);
+
+        Assert.Equal("/u/player", result.Continuation);
+    }
+
     private static TestContext Create(params TokenRedemption[] redemptions)
     {
         var accounts = new FakeAccountGateway();
@@ -167,7 +182,8 @@ public sealed class ConsumeMagicLinkUseCaseTests
     private static TokenRedemption Success(
         UserId? id,
         string emailNormalized,
-        string? email = null) =>
+        string? email = null,
+        string? continuation = null) =>
         new(
             true,
             null,
@@ -177,7 +193,8 @@ public sealed class ConsumeMagicLinkUseCaseTests
             new PendingRegistration("en", false),
             null,
             Now,
-            email);
+            email,
+            continuation);
 
     private static TokenRedemption Failed(TokenRedemptionFailure failure) =>
         new(
@@ -218,5 +235,34 @@ public sealed class RequestMagicLinkUseCaseTests
         Assert.Equal("PLAYER@CORP.EXAMPLE", issue.EmailNormalized);
         Assert.Equal("Player@corp.example", issue.Email);
         Assert.Equal("Player@corp.example", Assert.Single(email.Messages).ToAddress);
+    }
+
+    [Theory]
+    [InlineData("/u/Player.One", "/u/player.one")]
+    [InlineData("/add/2345-6789-AB", "/add/23456789AB")]
+    public async Task Execute_IssuesAndEmailsOnlyCanonicalContinuation_D031(
+        string candidate,
+        string expected)
+    {
+        var accounts = new FakeAccountGateway();
+        var tokens = new FakeTokenService();
+        var email = new FakeEmailDispatcher();
+        var useCase = new RequestMagicLinkUseCase(
+            accounts,
+            tokens,
+            new FakeUnitOfWork(),
+            email,
+            new AccountEmailOptions("https://partyup.social"));
+
+        await useCase.ExecuteAsync(
+            "Player@corp.example",
+            "en",
+            candidate,
+            default);
+
+        Assert.Equal(expected, Assert.Single(tokens.Issues).Continuation);
+        Assert.Equal(
+            $"&next={Uri.EscapeDataString(expected)}",
+            Assert.Single(email.Messages).Model["Continuation"]);
     }
 }

@@ -7,6 +7,24 @@ public sealed class PartyUpOpenApiTransformer :
     IOpenApiDocumentTransformer,
     IOpenApiOperationTransformer
 {
+    private static readonly HashSet<string> FriendOperationIds =
+        new HashSet<string>(StringComparer.Ordinal)
+        {
+            ApiOperationIds.GetFriendShare,
+            ApiOperationIds.GetUserProfile,
+            ApiOperationIds.ResolveFriendCode,
+            ApiOperationIds.ListFriends,
+            ApiOperationIds.ListFriendRequests,
+            ApiOperationIds.SendFriendRequest,
+            ApiOperationIds.AcceptFriendRequest,
+            ApiOperationIds.RejectFriendRequest,
+            ApiOperationIds.CancelFriendRequest,
+            ApiOperationIds.Unfriend,
+            ApiOperationIds.ListBlocks,
+            ApiOperationIds.BlockUser,
+            ApiOperationIds.UnblockUser,
+        };
+
     public Task TransformAsync(
         OpenApiDocument document,
         OpenApiDocumentTransformerContext context,
@@ -22,7 +40,72 @@ public sealed class PartyUpOpenApiTransformer :
             Name = "pu.auth",
             Description = "PartyUp browser session cookie.",
         };
+
+        if (document.Components.Schemas is { } schemas)
+        {
+            if (schemas.TryGetValue("ProfileViewResponse", out IOpenApiSchema? profileSchema) &&
+                profileSchema is OpenApiSchema profile)
+            {
+                profile.OneOf = profile.AnyOf;
+                profile.AnyOf = null;
+            }
+
+            if (schemas.TryGetValue(
+                    "FriendRelationshipResponse",
+                    out IOpenApiSchema? relationshipSchema) &&
+                relationshipSchema is OpenApiSchema relationship)
+            {
+                relationship.Required?.Remove("friendshipId");
+            }
+
+            if (schemas.TryGetValue("SessionResponse", out IOpenApiSchema? sessionSchema) &&
+                sessionSchema is OpenApiSchema session)
+            {
+                session.Required?.Remove("continuation");
+            }
+
+            SetObjectType(schemas, "ProfileViewResponseUsernameOnlyProfileResponse");
+            SetObjectType(schemas, "ProfileViewResponseFullProfileResponse");
+        }
+
+        var cookieReference = new OpenApiSecuritySchemeReference(
+            "cookieAuth",
+            document,
+            externalResource: null);
+        foreach (IOpenApiPathItem path in document.Paths.Values)
+        {
+            if (path.Operations is not { } operations)
+            {
+                continue;
+            }
+
+            foreach (OpenApiOperation operation in operations.Values)
+            {
+                if (operation.OperationId is null ||
+                    !FriendOperationIds.Contains(operation.OperationId))
+                {
+                    continue;
+                }
+
+                operation.Security ??= [];
+                operation.Security.Add(new OpenApiSecurityRequirement
+                {
+                    [cookieReference] = [],
+                });
+            }
+        }
         return Task.CompletedTask;
+    }
+
+    private static void SetObjectType(
+        IDictionary<string, IOpenApiSchema> schemas,
+        string schemaName)
+    {
+        if (schemas.TryGetValue(schemaName, out IOpenApiSchema? schema) &&
+            schema is OpenApiSchema objectSchema)
+        {
+            objectSchema.Type = JsonSchemaType.Object;
+        }
     }
 
     public Task TransformAsync(

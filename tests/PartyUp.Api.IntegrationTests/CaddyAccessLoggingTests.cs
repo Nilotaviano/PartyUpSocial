@@ -1,0 +1,127 @@
+using System.Net;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Configurations;
+using DotNet.Testcontainers.Containers;
+
+namespace PartyUp.Api.IntegrationTests;
+
+[Trait("Category", "Integration")]
+public sealed class CaddyAccessLoggingTests
+{
+    [Fact]
+    public async Task IdentifierRoutes_AreRedactedInCapturedAccessEvents_D031()
+    {
+        string caddyfile = Path.Combine(FindRepositoryRoot(), "deploy", "Caddyfile");
+        await using IContainer caddy = new ContainerBuilder("caddy:2")
+            .WithPortBinding(80, assignRandomHostPort: true)
+            .WithBindMount(caddyfile, "/etc/caddy/Caddyfile", AccessMode.ReadOnly)
+            .WithWaitStrategy(
+                Wait.ForUnixContainer().UntilMessageIsLogged("serving initial configuration"))
+            .Build();
+        await caddy.StartAsync();
+
+        string[] markers =
+        [
+            "proxy-spa-user-marker",
+            "proxy-spa-code-marker",
+            "proxy-api-user-marker",
+            "proxy-api-code-marker",
+        ];
+        string[] routes =
+        [
+            $"/u/{markers[0]}/malformed-extra?secret={markers[0]}",
+            $"/add/{markers[1]}%2Fencoded?secret={markers[1]}",
+            $"/api/v1/users/by-username/{markers[2]}/malformed-extra?secret={markers[2]}",
+            $"/api/v1/friend-codes/{markers[3]}%252Fencoded?secret={markers[3]}",
+        ];
+        string[] expectedUris =
+        [
+            "/u/REDACTED",
+            "/add/REDACTED",
+            "/api/v1/users/by-username/REDACTED",
+            "/api/v1/friend-codes/REDACTED",
+        ];
+        using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+        using var client = new HttpClient(handler)
+        {
+            BaseAddress = new Uri(
+                $"http://{caddy.Hostname}:{caddy.GetMappedPublicPort(80)}"),
+        };
+
+        foreach (string route in routes)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, route);
+            request.Headers.Host = "partyup.social";
+            using HttpResponseMessage response = await client.SendAsync(request);
+            Assert.Equal(HttpStatusCode.PermanentRedirect, response.StatusCode);
+        }
+
+        await Task.Delay(250);
+        (string stdout, string stderr) = await caddy.GetLogsAsync(
+            DateTime.UtcNow.AddMinutes(-2),
+            DateTime.UtcNow.AddMinutes(1),
+            timestampsEnabled: false);
+        string combined = stdout + Environment.NewLine + stderr;
+        JsonElement[] accessEvents = combined
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(TryParse)
+            .Where(element => element is { } &&
+                element.Value.TryGetProperty("request", out _))
+            .Select(element => element!.Value)
+            .ToArray();
+
+        Assert.Equal(expectedUris, accessEvents.Select(AccessUri));
+        foreach (string marker in markers)
+        {
+            Assert.DoesNotContain(marker, combined, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(
+                Uri.EscapeDataString(marker),
+                combined,
+                StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private static JsonElement? TryParse(string line)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(line);
+            return document.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string AccessUri(JsonElement accessEvent) =>
+        accessEvent.GetProperty("request").GetProperty("uri").GetString()!;
+
+    private static string FindRepositoryRoot(
+        [CallerFilePath] string sourceFile = "")
+    {
+        foreach (string candidate in new[]
+                 {
+                     Path.GetDirectoryName(sourceFile) ?? string.Empty,
+                     Directory.GetCurrentDirectory(),
+                     AppContext.BaseDirectory,
+                 })
+        {
+            DirectoryInfo? directory = new(candidate);
+            while (directory is not null &&
+                   !File.Exists(Path.Combine(directory.FullName, "PartyUp.sln")))
+            {
+                directory = directory.Parent;
+            }
+
+            if (directory is not null)
+            {
+                return directory.FullName;
+            }
+        }
+
+        throw new InvalidOperationException("Repository root was not found.");
+    }
+}

@@ -85,6 +85,36 @@ public sealed class EmailTemplateRendererTests
         }
     }
 
+    [Theory]
+    [InlineData(EmailTemplate.EmailVerification)]
+    [InlineData(EmailTemplate.MagicLink)]
+    public void Render_PutsCanonicalContinuationInTheFragmentForEveryLocale_D031(
+        EmailTemplate template)
+    {
+        foreach (string locale in new[] { "en", "pt-BR", "es" })
+        {
+            var message = new EmailMessage(
+                "recipient@example.test",
+                Locale.Create(locale),
+                template,
+                PartyUp.Application.Accounts.AccountInput.LinkModel(
+                    "https://partyup.social",
+                    "raw-token",
+                    "/add/23456789AB"));
+
+            RenderedEmail rendered = _renderer.Render(message);
+            Assert.Contains(
+                "#token=raw-token&next=%2Fadd%2F23456789AB",
+                rendered.TextBody,
+                StringComparison.Ordinal);
+            Assert.Contains(
+                "#token=raw-token&amp;next=%2Fadd%2F23456789AB",
+                rendered.HtmlBody,
+                StringComparison.Ordinal);
+            Assert.DoesNotContain("?next=", rendered.TextBody, StringComparison.Ordinal);
+        }
+    }
+
     private static EmailMessage CreateMessage(EmailTemplate template, string locale) =>
         new(
             "recipient@example.test",
@@ -94,6 +124,7 @@ public sealed class EmailTemplateRendererTests
             {
                 ["PublicBaseUrl"] = "https://partyup.social",
                 ["Token"] = "raw-token",
+                ["Continuation"] = string.Empty,
                 ["GraceEndsAt"] = "localized-grace-end",
                 ["NewEmail"] = "new@example.test",
                 ["Method"] = "<Steam>",

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
+using PartyUp.Api.ErrorHandling;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Kernel;
 
@@ -99,8 +100,11 @@ public sealed class PartyUpAuthorizationResultHandler : IAuthorizationMiddleware
 
         if (authorizeResult.Forbidden && partyUpRequirement?.Access == CurrentUserAccess.Onboarded)
         {
-            context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            await context.Response.WriteAsJsonAsync(new { code = "onboarding_required" });
+            await PartyUpProblemResults.WriteAsync(
+                context,
+                StatusCodes.Status403Forbidden,
+                "onboarding_required",
+                context.RequestAborted);
             return;
         }
 
@@ -111,8 +115,11 @@ public sealed class PartyUpAuthorizationResultHandler : IAuthorizationMiddleware
                 .GetProjectionAsync(context.RequestAborted);
             if (projection?.IsBanned == true)
             {
-                context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await context.Response.WriteAsJsonAsync(new { code = "account_banned" });
+                await PartyUpProblemResults.WriteAsync(
+                    context,
+                    StatusCodes.Status403Forbidden,
+                    "account_banned",
+                    context.RequestAborted);
                 return;
             }
         }

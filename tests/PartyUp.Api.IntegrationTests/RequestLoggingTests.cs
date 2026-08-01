@@ -122,9 +122,69 @@ public sealed class RequestLoggingTests : IAsyncLifetime, IDisposable
         // proven to scrub against the pinned caddy:2 image, and reject any
         // reappearance of the no-op form.
         string caddyfile = File.ReadAllText(FindRepositoryFile(["deploy", "Caddyfile"]));
-        Assert.Contains("request>uri regexp", caddyfile, StringComparison.Ordinal);
+        Assert.Contains("request>uri multi_regexp", caddyfile, StringComparison.Ordinal);
         Assert.Contains(@"""\?.*""", caddyfile, StringComparison.Ordinal);
         Assert.DoesNotContain("delete *", caddyfile, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FriendIdentifierRoutes_EmitOnlyRedactedRequestPath_D031()
+    {
+        string[] markers =
+        [
+            "spa-username-marker",
+            "spa-code-marker",
+            "api-username-marker",
+            "api-code-marker",
+        ];
+        string[] routes =
+        [
+            $"/u/{markers[0]}/malformed-extra",
+            $"/add/{markers[1]}%2Fencoded",
+            $"/api/v1/users/by-username/{markers[2]}/malformed-extra",
+            $"/api/v1/friend-codes/{markers[3]}%252Fencoded",
+        ];
+        string[] expectedPaths =
+        [
+            "/u/REDACTED",
+            "/add/REDACTED",
+            "/api/v1/users/by-username/REDACTED",
+            "/api/v1/friend-codes/REDACTED",
+        ];
+        var sink = new CapturingSink();
+        await using var factory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services => services.AddSerilog((provider, logger) => logger
+                .ReadFrom.Configuration(provider.GetRequiredService<IConfiguration>())
+                .WriteTo.Sink(sink))));
+        using HttpClient client = factory.CreateClient();
+
+        foreach (string route in routes)
+        {
+            _ = await client.GetAsync(route);
+        }
+
+        LogEvent[] requestLogs = sink.Events.Where(logEvent =>
+            logEvent.Properties.TryGetValue("SourceContext", out LogEventPropertyValue? source) &&
+            source is ScalarValue { Value: "Serilog.AspNetCore.RequestLoggingMiddleware" }).ToArray();
+        Assert.Equal(4, requestLogs.Length);
+        Assert.Equal(
+            expectedPaths,
+            requestLogs.Select(logEvent =>
+                Assert.IsType<ScalarValue>(logEvent.Properties["RequestPath"]).Value));
+
+        foreach (LogEvent logEvent in sink.Events)
+        {
+            AssertContainsNoSecret(
+                logEvent.RenderMessage(CultureInfo.InvariantCulture),
+                markers);
+            foreach (LogEventPropertyValue value in logEvent.Properties.Values)
+            {
+                foreach (string propertyValue in Flatten(value))
+                {
+                    AssertContainsNoSecret(propertyValue, markers);
+                }
+            }
+        }
     }
 
     private static IEnumerable<string> Flatten(LogEventPropertyValue value)

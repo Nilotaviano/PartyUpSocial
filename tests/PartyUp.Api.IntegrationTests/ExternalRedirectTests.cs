@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Net.Http.Headers;
+using PartyUp.Api.Auth;
 using PartyUp.Api.Endpoints;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Accounts;
@@ -31,6 +32,36 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
 
     public void Dispose() => _factory.Dispose();
 
+    [Theory]
+    [InlineData("/app")]
+    [InlineData("/onboarding")]
+    [InlineData("/settings/profile")]
+    [InlineData("/settings/account")]
+    public void ReturnToValidator_RetainsEveryFixedPath(string path)
+    {
+        Assert.Equal(path, ReturnToValidator.Sanitize(path));
+    }
+
+    [Theory]
+    [InlineData("/u/Player.Name", "/u/player.name")]
+    [InlineData("/add/2345-6789-AB", "/add/23456789AB")]
+    public void ReturnToValidator_CanonicalizesStrictFriendRoutes(
+        string requested,
+        string expected)
+    {
+        Assert.Equal(expected, ReturnToValidator.Sanitize(requested));
+    }
+
+    [Theory]
+    [InlineData("//evil.test/u/player")]
+    [InlineData("/u/player/extra")]
+    [InlineData("/u/player%2Fextra")]
+    [InlineData("/add/23456789AB?next=/app")]
+    public void ReturnToValidator_DropsHostileFriendRoutes(string requested)
+    {
+        Assert.Equal("/app", ReturnToValidator.Sanitize(requested));
+    }
+
     [Fact]
     public async Task GoogleChallenge_SetsTheCorrelationCookieSameSiteLax()
     {
@@ -50,6 +81,36 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
         Assert.DoesNotContain(
             challenge.Headers.GetValues(HeaderNames.SetCookie),
             value => value.Contains("SameSite=None", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
+    [InlineData("/u/Player.Name", "/u/player.name", true)]
+    [InlineData("/add/2345-6789-AB", "/add/23456789AB", true)]
+    [InlineData("/u/Player.Name", "/u/player.name", false)]
+    [InlineData("/add/2345-6789-AB", "/add/23456789AB", false)]
+    public async Task GoogleCallback_PreservesCanonicalFriendContinuationForEveryAccountState(
+        string requested,
+        string expected,
+        bool completeProfile)
+    {
+        string suffix = Guid.NewGuid().ToString("N");
+        string providerKey = $"continuation-{suffix}";
+        string email = $"continuation-{suffix}@example.test";
+        UserId userId = await _factory.SeedUserAsync(
+            completeProfile: completeProfile,
+            email: email);
+        await AddGoogleLoginAsync(userId, providerKey);
+
+        ExternalCompletion completion = await CompleteGoogleAsync(
+            providerKey,
+            "login",
+            email,
+            returnTo: requested);
+
+        string next = QueryHelpers.ParseQuery(
+            new Uri(new Uri("https://localhost"), completion.Response.Headers.Location!).Query)
+            ["next"]!;
+        Assert.Equal(expected, next);
     }
 
     [Theory]
@@ -257,7 +318,8 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
         UserId? authenticatedUserId = null,
         string? currentPassword = null,
         bool includeEmailVerifiedClaim = true,
-        Action<AuthenticationProperties>? mutateFlow = null)
+        Action<AuthenticationProperties>? mutateFlow = null,
+        string returnTo = "/settings/account")
     {
         await using WebApplicationFactory<Program> googleFactory =
             CreateGoogleFactory(
@@ -273,7 +335,8 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
             client,
             mode,
             authCookie,
-            currentPassword);
+            currentPassword,
+            returnTo);
         HttpResponseMessage challenge = await StartAsync(client, minted, authCookie);
         string externalCookie = Cookie(
             challenge,
@@ -359,7 +422,8 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
         HttpClient client,
         string mode,
         string? authCookie = null,
-        string? currentPassword = null)
+        string? currentPassword = null,
+        string returnTo = "/settings/account")
     {
         HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
             client,
@@ -368,7 +432,7 @@ public sealed class ExternalRedirectTests : IAsyncLifetime, IDisposable
             {
                 provider = "google",
                 mode,
-                returnTo = "/settings/account",
+                returnTo,
                 ageGateAttested = true,
                 currentPassword,
             }),

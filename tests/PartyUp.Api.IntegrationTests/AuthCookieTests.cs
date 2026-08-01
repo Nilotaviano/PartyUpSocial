@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
@@ -213,9 +214,16 @@ public sealed class AuthCookieTests : IAsyncLifetime, IDisposable
             "text/html",
             response.Content.Headers.ContentType?.MediaType ?? string.Empty,
             StringComparison.OrdinalIgnoreCase);
-        Dictionary<string, string> body =
-            (await response.Content.ReadFromJsonAsync<Dictionary<string, string>>())!;
-        Assert.Equal(expectedCode, body["code"]);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        using JsonDocument body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        JsonElement root = body.RootElement;
+        Assert.Equal(6, root.EnumerateObject().Count());
+        Assert.Equal("about:blank", root.GetProperty("type").GetString());
+        Assert.Equal((int)expectedStatus, root.GetProperty("status").GetInt32());
+        Assert.Equal(expectedCode, root.GetProperty("code").GetString());
+        Assert.StartsWith("/api/v1/", root.GetProperty("instance").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("traceId").GetString()));
+        Assert.False(root.TryGetProperty("detail", out _));
     }
 
     private static string CookiePair(SetCookieHeaderValue cookie) =>

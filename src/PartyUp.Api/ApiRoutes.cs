@@ -31,4 +31,18 @@ public static class ApiOperationIds
     public const string CompleteSteamDeletion = "CompleteSteamDeletion";
     public const string DeleteMe = "DeleteMe";
     public const string CheckUsernameAvailability = "CheckUsernameAvailability";
+    public const string GetFriendShare = "GetFriendShare";
+    public const string GetUserProfile = "GetUserProfile";
+    public const string ResolveFriendCode = "ResolveFriendCode";
+    public const string ListFriends = "ListFriends";
+    public const string ListFriendRequests = "ListFriendRequests";
+    public const string SendFriendRequest = "SendFriendRequest";
+    public const string AcceptFriendRequest = "AcceptFriendRequest";
+    public const string RejectFriendRequest = "RejectFriendRequest";
+    public const string CancelFriendRequest = "CancelFriendRequest";
+    public const string Unfriend = "Unfriend";
+    public const string ListBlocks = "ListBlocks";
+    public const string BlockUser = "BlockUser";
+    public const string UnblockUser = "UnblockUser";
+    public const string ImportSteamFriends = "ImportSteamFriends";
 }

@@ -76,6 +76,47 @@ public sealed class RegistrationFlowTests : IAsyncLifetime, IDisposable
             .ToListAsync());
     }
 
+    [Theory]
+    [InlineData("/u/Player.Name", "/u/player.name")]
+    [InlineData("/add/2345-6789-AB", "/add/23456789AB")]
+    public async Task RegisterVerification_RoundTripsOnlyCanonicalFriendContinuation(
+        string requested,
+        string expected)
+    {
+        string email = $"registration-continuation-{Guid.NewGuid():N}@example.test";
+        using HttpClient client = Slice5HttpTest.CreateClient(_factory);
+        HttpResponseMessage registration = await AntiforgeryTestClient.PostAsync(
+            client,
+            "/api/v1/auth/register",
+            JsonContent.Create(new
+            {
+                email,
+                ageGateAttested = true,
+                locale = "en",
+                continuation = requested,
+            }));
+        Assert.Equal(HttpStatusCode.Accepted, registration.StatusCode);
+        EmailMessage verification = await _factory.EmailSender.WaitForAsync(
+            message => message.ToAddress == email &&
+                message.Template == EmailTemplate.EmailVerification);
+        Assert.Equal(
+            $"&next={Uri.EscapeDataString(expected)}",
+            verification.Model["Continuation"]);
+
+        HttpResponseMessage verified = await AntiforgeryTestClient.PostAsync(
+            client,
+            "/api/v1/auth/email/verify",
+            JsonContent.Create(new
+            {
+                token = verification.Model["Token"],
+                password = "mailbox-owner-password",
+            }));
+
+        Assert.Equal(HttpStatusCode.OK, verified.StatusCode);
+        SessionResponse session = (await verified.Content.ReadFromJsonAsync<SessionResponse>())!;
+        Assert.Equal(expected, session.Continuation);
+    }
+
     [Fact]
     public async Task RegisterThenVerify_PreservesTheMailboxAddressCase_D016()
     {
