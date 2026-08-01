@@ -294,12 +294,26 @@ public sealed class FriendRequestConcurrencyTests : IAsyncLifetime
         var holdingLocker = new HoldingFriendPairLocker(
             new FriendPairLocker(firstContext),
             gate);
+        var secondLockGate = new PairLockAttemptGate();
 
         Task<FriendGraphCommandResult> first = firstAction(firstContext, holdingLocker);
         await gate.Held.Task.WaitAsync(TimeSpan.FromSeconds(10));
         Task<FriendGraphCommandResult> second =
-            secondAction(secondContext, new FriendPairLocker(secondContext));
-        gate.Release.TrySetResult();
+            secondAction(
+                secondContext,
+                new AttemptingFriendPairLocker(
+                    new FriendPairLocker(secondContext),
+                    secondLockGate));
+        try
+        {
+            await secondLockGate.Attempted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.False(second.IsCompleted);
+        }
+        finally
+        {
+            gate.Release.TrySetResult();
+        }
+
         return (await first, await second);
     }
 
@@ -327,6 +341,27 @@ internal sealed class PairLockGate
 
     internal TaskCompletionSource Release { get; } =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
+}
+
+internal sealed class PairLockAttemptGate
+{
+    internal TaskCompletionSource Attempted { get; } =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+}
+
+internal sealed class AttemptingFriendPairLocker(
+    IFriendPairLocker inner,
+    PairLockAttemptGate gate) : IFriendPairLocker
+{
+    public async Task<LockedFriendPair?> LockAsync(
+        UserId first,
+        UserId second,
+        CancellationToken cancellationToken)
+    {
+        Task<LockedFriendPair?> attempt = inner.LockAsync(first, second, cancellationToken);
+        gate.Attempted.TrySetResult();
+        return await attempt;
+    }
 }
 
 internal sealed class HoldingFriendPairLocker(

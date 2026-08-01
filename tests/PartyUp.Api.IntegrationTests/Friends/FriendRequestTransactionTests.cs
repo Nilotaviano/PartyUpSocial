@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
+using Npgsql;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Friends;
 using PartyUp.Domain.Kernel;
@@ -61,7 +62,7 @@ public sealed class FriendRequestTransactionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task NotificationInsertFailure_RollsBackTheRequest_D105()
+    public async Task NotificationInsertConstraintFailure_RollsBackTheRequest_D105()
     {
         await using (AppDbContext context = _database.CreateContext())
         {
@@ -70,15 +71,19 @@ public sealed class FriendRequestTransactionTests : IAsyncLifetime
                 new FriendPairLocker(context),
                 new FriendshipRepository(context),
                 new BlockRepository(context),
-                new ThrowingNotificationRepository(),
+                new ConstraintViolatingNotificationRepository(context),
                 new UnitOfWork(context),
                 _clock);
 
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            DbUpdateException exception = await Assert.ThrowsAsync<DbUpdateException>(() =>
                 useCase.ExecuteAsync(
                     _users[0].Id,
                     _users[1].Username!.Value.Value,
                     default));
+            PostgresException postgresException =
+                Assert.IsType<PostgresException>(exception.InnerException);
+            Assert.Equal(PostgresErrorCodes.CheckViolation, postgresException.SqlState);
+            Assert.Equal("ck_notifications_type", postgresException.ConstraintName);
         }
 
         await using AppDbContext verification = _database.CreateContext();
@@ -87,17 +92,25 @@ public sealed class FriendRequestTransactionTests : IAsyncLifetime
     }
 }
 
-internal sealed class ThrowingNotificationRepository : INotificationRepository
+internal sealed class ConstraintViolatingNotificationRepository(
+    AppDbContext context) : INotificationRepository
 {
-    public void Add(Notification notification) =>
-        throw new InvalidOperationException("forced notification failure");
+    private readonly NotificationRepository _inner = new(context);
+
+    public void Add(Notification notification)
+    {
+        _inner.Add(notification);
+        context.Entry(notification).Property(candidate => candidate.Type).CurrentValue =
+            (NotificationType)25;
+    }
 
     public Task AddSteamMatchIfAbsentAsync(
         Notification notification,
         CancellationToken cancellationToken) =>
-        throw new InvalidOperationException("forced notification failure");
+        _inner.AddSteamMatchIfAbsentAsync(notification, cancellationToken);
 
     public Task DeleteForRecipientAsync(
         UserId recipientUserId,
-        CancellationToken cancellationToken) => Task.CompletedTask;
+        CancellationToken cancellationToken) =>
+        _inner.DeleteForRecipientAsync(recipientUserId, cancellationToken);
 }
