@@ -24,10 +24,13 @@ public sealed class ProfileUseCaseTests
             UserId.New(), "  ALEX  ", default);
 
         UsernameOnlyProfile profile = Assert.IsType<UsernameOnlyProfile>(result!.Profile);
+        Assert.Equal("username_only", profile.Disclosure);
         Assert.Equal("alex", profile.Username);
         Assert.Equal("alex", resolver.LastUsername);
-        Assert.DoesNotContain("DisplayName", profile.GetType().GetProperties().Select(property => property.Name));
-        Assert.DoesNotContain("Avatar", profile.GetType().GetProperties().Select(property => property.Name));
+        Assert.Equal(
+            ["Disclosure", "Relationship", "Username"],
+            profile.GetType().GetProperties().Select(property => property.Name).Order().ToArray());
+        Assert.Equal(["Profile"], result.GetType().GetProperties().Select(property => property.Name));
     }
 
     [Fact]
@@ -47,6 +50,7 @@ public sealed class ProfileUseCaseTests
             .ExecuteAsync(UserId.New(), "alex", default);
 
         FullProfile profile = Assert.IsType<FullProfile>(result!.Profile);
+        Assert.Equal("full", profile.Disclosure);
         Assert.Equal("Alex", profile.DisplayName);
         Assert.Equal(subject.Avatar, profile.Avatar);
         Assert.Equal("alex-steam", Assert.Single(profile.Platforms).Handle);
@@ -72,15 +76,28 @@ public sealed class ProfileUseCaseTests
     }
 
     [Fact]
-    public async Task Execute_HidesEitherDirectionOfBlockAsMissing_D065()
+    public async Task Execute_VisibilityBackedResolverHidesEitherDirectionOfBlockAsMissing_D065()
     {
-        var resolver = new FriendTestResolver();
-        var useCase = new GetProfileUseCase(resolver);
+        User viewer = FriendTestData.Active("viewer", "Viewer");
+        User subject = FriendTestData.Active("alex", "Alex");
+        var useCase = new GetProfileUseCase(
+            new FriendTestResolver
+            {
+                Candidate = subject,
+                Blocks = [(viewer.Id, subject.Id)],
+            });
 
         UsernameProfileResolution? blockedByViewer = await useCase.ExecuteAsync(
-            UserId.New(), "alex", default);
+            viewer.Id, "alex", default);
+
+        useCase = new GetProfileUseCase(
+            new FriendTestResolver
+            {
+                Candidate = subject,
+                Blocks = [(subject.Id, viewer.Id)],
+            });
         UsernameProfileResolution? viewerBlocked = await useCase.ExecuteAsync(
-            UserId.New(), "alex", default);
+            viewer.Id, "alex", default);
 
         Assert.Null(blockedByViewer);
         Assert.Null(viewerBlocked);
@@ -125,6 +142,10 @@ internal sealed class FriendTestResolver : IUserGraphResolver
 {
     public ResolvedUserGraph? Result { get; init; }
 
+    public User? Candidate { get; init; }
+
+    public IReadOnlyCollection<(UserId BlockerId, UserId BlockedId)> Blocks { get; init; } = [];
+
     public string? LastUsername { get; private set; }
 
     public string? LastFriendCode { get; private set; }
@@ -139,7 +160,7 @@ internal sealed class FriendTestResolver : IUserGraphResolver
         CancellationToken cancellationToken)
     {
         LastUsername = canonicalUsername;
-        return Task.FromResult(Result);
+        return Task.FromResult(ResolveProfile(viewerId));
     }
 
     public Task<ResolvedUserGraph?> ResolveProfileByFriendCodeAsync(
@@ -167,8 +188,25 @@ internal sealed class FriendTestResolver : IUserGraphResolver
         CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyDictionary<string, ResolvedUserGraph>>(
             new Dictionary<string, ResolvedUserGraph>());
-}
 
+    private ResolvedUserGraph? ResolveProfile(UserId viewerId)
+    {
+        if (Candidate is null)
+        {
+            return Result;
+        }
+
+        bool isBlocked = Blocks.Any(block =>
+            (block.BlockerId == viewerId && block.BlockedId == Candidate.Id) ||
+            (block.BlockerId == Candidate.Id && block.BlockedId == viewerId));
+        Viewer viewer = Viewer.Create(
+            viewerId,
+            blockedCounterpartIds: isBlocked ? [Candidate.Id] : null);
+        ProfileDisclosure disclosure = ProfileVisibility.For(Candidate, viewer);
+        return disclosure == ProfileDisclosure.Hidden ? null : FriendTestData.Resolved(Candidate, disclosure);
+    }
+
+}
 internal sealed class FriendTestFriendshipRepository : IFriendshipRepository
 {
     public IReadOnlyList<AcceptedFriendProjection> Accepted { get; init; } = [];

@@ -32,10 +32,6 @@ public sealed class FriendPairLocker(AppDbContext context) : IFriendPairLocker
             return null;
         }
 
-        User? firstUser = users.Find(user => user.Id == first);
-        User? secondUser = users.Find(user => user.Id == second);
-        return firstUser is null || secondUser is null
-            ? null
-            : new LockedFriendPair(firstUser, secondUser);
+        return new LockedFriendPair(users[0], users[1]);
     }
 }
