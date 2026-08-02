@@ -185,13 +185,6 @@ internal sealed class BlockTestResolver(User self, User target) : IUserGraphReso
         UserId viewerId,
         string canonicalUsername,
         CancellationToken cancellationToken) => Task.FromResult<ResolvedUserGraph?>(null);
-
-    public Task<IReadOnlyDictionary<string, ResolvedUserGraph>> ResolveSteamCandidatesAsync(
-        UserId viewerId,
-        IReadOnlyCollection<string> steamIds,
-        CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyDictionary<string, ResolvedUserGraph>>(
-            new Dictionary<string, ResolvedUserGraph>());
 }
 
 internal sealed class BlockTestPairLocker(

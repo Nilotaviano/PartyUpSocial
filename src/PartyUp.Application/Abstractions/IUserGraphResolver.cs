@@ -29,11 +29,6 @@ public interface IUserGraphResolver
         UserId viewerId,
         string canonicalUsername,
         CancellationToken cancellationToken);
-
-    Task<IReadOnlyDictionary<string, ResolvedUserGraph>> ResolveSteamCandidatesAsync(
-        UserId viewerId,
-        IReadOnlyCollection<string> steamIds,
-        CancellationToken cancellationToken);
 }
 
 public enum FriendRelationshipKind

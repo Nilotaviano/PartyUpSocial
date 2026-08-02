@@ -182,13 +182,6 @@ internal sealed class FriendTestResolver : IUserGraphResolver
         string canonicalUsername,
         CancellationToken cancellationToken) => Task.FromResult(Result);
 
-    public Task<IReadOnlyDictionary<string, ResolvedUserGraph>> ResolveSteamCandidatesAsync(
-        UserId viewerId,
-        IReadOnlyCollection<string> steamIds,
-        CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyDictionary<string, ResolvedUserGraph>>(
-            new Dictionary<string, ResolvedUserGraph>());
-
     private ResolvedUserGraph? ResolveProfile(UserId viewerId)
     {
         if (Candidate is null)

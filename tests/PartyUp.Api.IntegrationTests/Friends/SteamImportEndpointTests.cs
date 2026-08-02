@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Accounts;
+using PartyUp.Application.Auth;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Notifications;
 using PartyUp.Infrastructure.Persistence;
@@ -28,6 +30,8 @@ public sealed class SteamImportEndpointTests : IAsyncLifetime, IDisposable
             {
                 services.RemoveAll<ISteamFriendListClient>();
                 services.AddSingleton<ISteamFriendListClient>(_steam);
+                services.RemoveAll<ISteamProfileClient>();
+                services.AddSingleton<ISteamProfileClient>(new StaticSteamProfileClient());
             }));
     }
 
@@ -90,7 +94,7 @@ public sealed class SteamImportEndpointTests : IAsyncLifetime, IDisposable
     {
         const string importedSteamId = "same-steam-id";
         FriendEndpointUser actor = await SeedLinkedAsync("blocked-importer");
-        FriendEndpointUser candidate = await SeedLinkedAsync(importedSteamId);
+        FriendEndpointUser candidate = await SeedA030LinkedAsync(importedSteamId);
         await using (AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
         {
             AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -101,19 +105,43 @@ public sealed class SteamImportEndpointTests : IAsyncLifetime, IDisposable
         _steam.Result = new SteamFriendListSuccess(
             [new SteamFriend(importedSteamId, "Same Persona", "https://cdn.test/same.png")]);
         using FriendEndpointSession session = await SignInAsync(actor.Id);
-        JsonElement blocked = await ImportJsonAsync(session);
+        GraphSnapshot blockedBaseline = await SnapshotAsync();
+        using HttpResponseMessage blockedResponse = await ImportAsync(session);
+        byte[] blockedBytes = await blockedResponse.Content.ReadAsByteArrayAsync();
+        Assert.Equal(blockedBaseline, await SnapshotAsync());
 
-        await using (AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
+        await using (AsyncServiceScope scope = _configured!.Services.CreateAsyncScope())
         {
-            AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            SteamIdentity identity = await context.SteamIdentities.SingleAsync(value =>
-                value.SteamId64 == importedSteamId);
-            context.SteamIdentities.Remove(identity);
-            await context.SaveChangesAsync();
+            UnlinkSteamResult unlinked = await scope.ServiceProvider
+                .GetRequiredService<UnlinkSteamUseCase>()
+                .ExecuteAsync(
+                    new UnlinkSteamCommand(candidate.Id, UnlinkOrigin.AuthMethod, true),
+                    default);
+            Assert.True(unlinked.Succeeded);
         }
 
-        JsonElement absent = await ImportJsonAsync(session);
-        Assert.Equal(Normalize(blocked), Normalize(absent));
+        GraphSnapshot absentBaseline = await SnapshotAsync();
+        using HttpResponseMessage absentResponse = await ImportAsync(session);
+        byte[] absentBytes = await absentResponse.Content.ReadAsByteArrayAsync();
+        Assert.Equal(absentBaseline, await SnapshotAsync());
+
+        Assert.Equal(HttpStatusCode.OK, blockedResponse.StatusCode);
+        Assert.Equal(blockedResponse.StatusCode, absentResponse.StatusCode);
+        Assert.Equal("application/json", blockedResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(
+            blockedResponse.Content.Headers.ContentType,
+            absentResponse.Content.Headers.ContentType);
+        Assert.Equal(HeaderSnapshot(blockedResponse), HeaderSnapshot(absentResponse));
+        Assert.Equal(blockedBytes, absentBytes);
+
+        using JsonDocument body = JsonDocument.Parse(blockedBytes);
+        JsonElement root = body.RootElement;
+        string invitationUrl = $"http://localhost:5173/add/{actor.FriendCode}";
+        Assert.Equal("zero_matches", root.GetProperty("state").GetString());
+        Assert.Equal(invitationUrl, root.GetProperty("invitationUrl").GetString());
+        JsonElement unmatched = Assert.Single(root.GetProperty("unmatched").EnumerateArray());
+        Assert.Equal(invitationUrl, unmatched.GetProperty("invitationUrl").GetString());
+        Assert.Equal(importedSteamId, unmatched.GetProperty("steamId64").GetString());
 
         await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
         AppDbContext verificationContext =
@@ -151,26 +179,40 @@ public sealed class SteamImportEndpointTests : IAsyncLifetime, IDisposable
         Assert.False(union.TryGetProperty("anyOf", out _));
     }
 
-    private static async Task<JsonElement> ImportJsonAsync(FriendEndpointSession session)
-    {
-        HttpResponseMessage response = await session.SendUnsafeAsync(
-            HttpMethod.Post,
-            "/api/v1/friends/imports/steam");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        using JsonDocument document = await FriendEndpointTest.SuccessJsonAsync(response);
-        return document.RootElement.Clone();
-    }
+    private static Task<HttpResponseMessage> ImportAsync(FriendEndpointSession session) =>
+        session.SendUnsafeAsync(HttpMethod.Post, "/api/v1/friends/imports/steam");
 
-    private static string Normalize(JsonElement root)
+    private static Dictionary<string, string> HeaderSnapshot(
+        HttpResponseMessage response) =>
+        response.Headers
+            .Concat(response.Content.Headers)
+            .Where(header => !header.Key.Equals("Date", StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(
+                header => header.Key,
+                header => string.Join(',', header.Value),
+                StringComparer.OrdinalIgnoreCase);
+
+    private async Task<GraphSnapshot> SnapshotAsync()
     {
-        JsonElement unmatched = Assert.Single(root.GetProperty("unmatched").EnumerateArray());
-        return JsonSerializer.Serialize(new
-        {
-            State = root.GetProperty("state").GetString(),
-            SteamId = unmatched.GetProperty("steamId64").GetString(),
-            Persona = unmatched.GetProperty("personaName").GetString(),
-            Avatar = unmatched.GetProperty("avatarUrl").GetString(),
-        });
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var friendships = await context.Friendships.AsNoTracking().ToArrayAsync();
+        var blocks = await context.Blocks.AsNoTracking().ToArrayAsync();
+        var notifications = await context.Notifications.AsNoTracking().ToArrayAsync();
+        return new GraphSnapshot(
+            string.Join('|', friendships
+                .OrderBy(friendship => friendship.Id.Value)
+                .Select(friendship =>
+                    $"{friendship.Id.Value:D}:{friendship.Status}:{friendship.AcceptedAt}")),
+            string.Join('|', blocks
+                .OrderBy(block => block.Id.Value)
+                .Select(block =>
+                    $"{block.Id.Value:D}:{block.BlockerId.Value:D}:{block.BlockedId.Value:D}")),
+            string.Join('|', notifications
+                .OrderBy(notification => notification.Id.Value)
+                .Select(notification =>
+                    $"{notification.Id.Value:D}:{notification.RecipientUserId.Value:D}:" +
+                    $"{notification.ActorUserId?.Value:D}:{notification.Type}")));
     }
 
     private async Task<FriendEndpointUser> SeedLinkedAsync(string? steamId64 = null)
@@ -188,6 +230,27 @@ public sealed class SteamImportEndpointTests : IAsyncLifetime, IDisposable
         return user;
     }
 
+    private async Task<FriendEndpointUser> SeedA030LinkedAsync(string steamId64)
+    {
+        FriendEndpointUser user = await FriendEndpointTest.SeedAsync(_factory);
+        await using AsyncServiceScope scope = _configured!.Services.CreateAsyncScope();
+        ExternalSignInResult linked = await scope.ServiceProvider
+            .GetRequiredService<CompleteExternalSignInUseCase>()
+            .ExecuteAsync(
+                new CompleteExternalSignInCommand(
+                    "steam",
+                    steamId64,
+                    null,
+                    false,
+                    ExternalStartMode.Link,
+                    false,
+                    user.Id,
+                    user.Id),
+                default);
+        Assert.True(linked.MethodLinked);
+        return user;
+    }
+
     private async Task<FriendEndpointSession> SignInAsync(PartyUp.Domain.Kernel.UserId userId)
     {
         HttpClient client = Slice5HttpTest.CreateClient(_configured!);
@@ -198,6 +261,11 @@ public sealed class SteamImportEndpointTests : IAsyncLifetime, IDisposable
         Assert.Equal(HttpStatusCode.NoContent, signIn.StatusCode);
         return new FriendEndpointSession(client, Slice5HttpTest.AuthCookie(signIn));
     }
+
+    private sealed record GraphSnapshot(
+        string Friendships,
+        string Blocks,
+        string Notifications);
 }
 
 internal sealed class MutableSteamFriendListClient : ISteamFriendListClient

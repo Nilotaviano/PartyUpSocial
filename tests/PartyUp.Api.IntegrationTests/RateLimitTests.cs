@@ -7,16 +7,21 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Net.Http.Headers;
+using PartyUp.Application.Abstractions;
+using PartyUp.Application.Friends;
 using PartyUp.Api.ErrorHandling;
 using PartyUp.Api.Security;
 using PartyUp.Api.IntegrationTests.Friends;
 using PartyUp.Domain.Kernel;
+using PartyUp.Infrastructure.Steam;
 
 namespace PartyUp.Api.IntegrationTests;
 
@@ -504,6 +509,119 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
             "rate_limited");
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task BlockedAndAbsentSteamImports_ConsumeEveryRealRouteLease_D065(
+        bool blocked)
+    {
+        var steam = new RoutingSteamFriendListClient();
+        await using WebApplicationFactory<Program> factory = SteamRateLimitFactory(steam);
+        using HttpClient client = CreateClient(factory);
+        RateLimitDimension importDimension = Assert.Single(
+            RateLimitPolicies.Dimensions,
+            dimension => dimension.Name == "steam-friend-import");
+        RateLimitDimension lookupDimension = Assert.Single(
+            RateLimitPolicies.Dimensions,
+            dimension => dimension.Name == "friend-lookup");
+        RateLimitDimension defaultDimension = Assert.Single(
+            RateLimitPolicies.Dimensions,
+            dimension => dimension.Name == "default");
+        Assert.True(importDimension.PermitLimit < lookupDimension.PermitLimit);
+        Assert.True(importDimension.PermitLimit < defaultDimension.PermitLimit);
+
+        FriendEndpointUser importActor = await SeedSteamLimiterActorAsync(
+            factory,
+            steam,
+            blocked,
+            "import");
+        string importCookie = await SignInAsync(client, importActor.Id);
+        AntiforgeryPair importPair = await AntiforgeryTestClient.GetAsync(client, importCookie);
+        for (int attempt = 0; attempt < importDimension.PermitLimit; attempt++)
+        {
+            using HttpResponseMessage allowed = await SendSteamImportAsync(
+                client,
+                importCookie,
+                importPair,
+                "192.0.2.61");
+            Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+        }
+        using (HttpResponseMessage rejected = await SendSteamImportAsync(
+            client,
+            importCookie,
+            importPair,
+            "192.0.2.61"))
+        {
+            Assert.Equal(HttpStatusCode.TooManyRequests, rejected.StatusCode);
+        }
+
+        FriendEndpointUser lookupActor = await SeedSteamLimiterActorAsync(
+            factory,
+            steam,
+            blocked,
+            "lookup");
+        string lookupCookie = await SignInAsync(client, lookupActor.Id);
+        AntiforgeryPair lookupPair = await AntiforgeryTestClient.GetAsync(client, lookupCookie);
+        for (int attempt = 0;
+             attempt < lookupDimension.PermitLimit - importDimension.PermitLimit;
+             attempt++)
+        {
+            using HttpResponseMessage allowed = await SendGetAsync(
+                client,
+                $"/api/v1/users/by-username/{lookupActor.Username}",
+                lookupCookie,
+                "192.0.2.62");
+            Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+        }
+        for (int attempt = 0; attempt < importDimension.PermitLimit; attempt++)
+        {
+            using HttpResponseMessage allowed = await SendSteamImportAsync(
+                client,
+                lookupCookie,
+                lookupPair,
+                "192.0.2.62");
+            Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+        }
+        using (HttpResponseMessage rejected = await SendGetAsync(
+            client,
+            $"/api/v1/users/by-username/{lookupActor.Username}",
+            lookupCookie,
+            "192.0.2.62"))
+        {
+            Assert.Equal(HttpStatusCode.TooManyRequests, rejected.StatusCode);
+        }
+
+        FriendEndpointUser defaultActor = await SeedSteamLimiterActorAsync(
+            factory,
+            steam,
+            blocked,
+            "default");
+        string defaultCookie = await SignInAsync(client, defaultActor.Id);
+        AntiforgeryPair defaultPair = await AntiforgeryTestClient.GetAsync(client, defaultCookie);
+        for (int attempt = 0;
+             attempt < defaultDimension.PermitLimit - importDimension.PermitLimit;
+             attempt++)
+        {
+            using HttpResponseMessage allowed = await SendForwardedSessionAsync(
+                client,
+                "192.0.2.63");
+            Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+        }
+        for (int attempt = 0; attempt < importDimension.PermitLimit; attempt++)
+        {
+            using HttpResponseMessage allowed = await SendSteamImportAsync(
+                client,
+                defaultCookie,
+                defaultPair,
+                "192.0.2.63");
+            Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+        }
+        using HttpResponseMessage defaultRejected = await SendForwardedSessionAsync(
+            client,
+            "192.0.2.63");
+        Assert.Equal(HttpStatusCode.TooManyRequests, defaultRejected.StatusCode);
+    }
+
     private Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program>
         ForwardedHeadersFactory() =>
         _factory.WithWebHostBuilder(builder =>
@@ -517,6 +635,81 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
                 services.AddSingleton<IStartupFilter>(new RemoteIpStartupFilter(
                     IPAddress.Parse("10.0.0.2"))));
         });
+
+    private WebApplicationFactory<Program> SteamRateLimitFactory(
+        RoutingSteamFriendListClient steam) =>
+        _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureAppConfiguration((_, configuration) =>
+                configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Network:TrustedProxies:0"] = "10.0.0.2",
+                }));
+            builder.ConfigureServices(services =>
+                services.AddSingleton<IStartupFilter>(new RemoteIpStartupFilter(
+                    IPAddress.Parse("10.0.0.2"))));
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<ISteamFriendListClient>();
+                services.AddSingleton<ISteamFriendListClient>(steam);
+            });
+        });
+
+    private async Task<FriendEndpointUser> SeedSteamLimiterActorAsync(
+        WebApplicationFactory<Program> factory,
+        RoutingSteamFriendListClient steam,
+        bool blocked,
+        string discriminator)
+    {
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string importerSteamId = $"i{discriminator[0]}{suffix}";
+        string candidateSteamId = $"c{discriminator[0]}{suffix}";
+        FriendEndpointUser actor = await SteamImportIntegrationData.SeedLinkedAsync(
+            _factory,
+            importerSteamId);
+        steam.Results[importerSteamId] = new SteamFriendListSuccess(
+            [new SteamFriend(candidateSteamId, "Equivalent candidate", null)]);
+        if (!blocked)
+        {
+            return actor;
+        }
+
+        FriendEndpointUser candidate = await SteamImportIntegrationData.SeedLinkedAsync(
+            _factory,
+            candidateSteamId);
+        await using AsyncServiceScope scope = factory.Services.CreateAsyncScope();
+        BlockGraphCommandResult result = await scope.ServiceProvider
+            .GetRequiredService<BlockUserUseCase>()
+            .ExecuteAsync(actor.Id, candidate.Username, default);
+        Assert.True(result.Succeeded);
+        return actor;
+    }
+
+    private static Task<HttpResponseMessage> SendSteamImportAsync(
+        HttpClient client,
+        string authCookie,
+        AntiforgeryPair antiforgery,
+        string forwardedFor)
+    {
+        var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            "/api/v1/friends/imports/steam");
+        request.Headers.Add("X-CSRF-TOKEN", antiforgery.Token);
+        request.Headers.Add(
+            HeaderNames.Cookie,
+            $"{authCookie}; {antiforgery.Cookie}");
+        request.Headers.Add("X-Forwarded-For", forwardedFor);
+        return client.SendAsync(request);
+    }
+
+    private static Task<HttpResponseMessage> SendForwardedSessionAsync(
+        HttpClient client,
+        string forwardedFor)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/session");
+        request.Headers.Add("X-Forwarded-For", forwardedFor);
+        return client.SendAsync(request);
+    }
 
     private async Task<RouteRequest[]> CreateStaleActionRoutesAsync(
         HttpClient client,
