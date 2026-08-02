@@ -61,6 +61,19 @@ public sealed class BlockUserUseCaseTests
     }
 
     [Fact]
+    public async Task Execute_CapturesTheAtBlockUsernameSnapshot_D065()
+    {
+        var fixture = new BlockUserFixture();
+
+        BlockGraphCommandResult result = await fixture.ExecuteAsync();
+
+        Block block = Assert.Single(fixture.Blocks.Rows);
+        Assert.True(result.Succeeded);
+        Assert.Single(fixture.Blocks.UsernameSnapshots);
+        Assert.Equal("block-target", fixture.Blocks.UsernameSnapshots[block.Id]);
+    }
+
+    [Fact]
     public async Task Execute_WithThePhase3EmptyScope_ChangesNoSessionOrPoll_D077()
     {
         var fixture = new BlockUserFixture();
@@ -260,6 +273,8 @@ internal sealed class BlockTestBlockRepository(List<string> calls) : IBlockRepos
 {
     internal List<Block> Rows { get; } = [];
 
+    internal Dictionary<BlockId, string> UsernameSnapshots { get; } = [];
+
     public Task<IReadOnlyList<Block>> FindPairForUpdateAsync(
         UserId first,
         UserId second,
@@ -297,6 +312,12 @@ internal sealed class BlockTestBlockRepository(List<string> calls) : IBlockRepos
     {
         calls.Add("block-add");
         Rows.Add(block);
+    }
+
+    public void Add(Block block, Username blockedUsernameSnapshot)
+    {
+        Add(block);
+        UsernameSnapshots.Add(block.Id, blockedUsernameSnapshot.Value);
     }
 
     public void Remove(Block block)

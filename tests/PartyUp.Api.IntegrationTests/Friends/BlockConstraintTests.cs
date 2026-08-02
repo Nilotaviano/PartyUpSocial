@@ -4,6 +4,7 @@ using NodaTime;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Persistence;
+using PartyUp.Infrastructure.Persistence.Repositories;
 
 namespace PartyUp.Api.IntegrationTests.Friends;
 
@@ -25,7 +26,7 @@ public sealed class BlockConstraintTests : IAsyncLifetime
 
         await using (AppDbContext context = _database.CreateContext())
         {
-            context.Blocks.Add(forward);
+            new BlockRepository(context).Add(forward, users[1].Username!.Value);
             await context.SaveChangesAsync();
         }
 
@@ -40,22 +41,28 @@ public sealed class BlockConstraintTests : IAsyncLifetime
 
         await using (AppDbContext duplicateContext = _database.CreateContext())
         {
-            duplicateContext.Blocks.Add(Block.Create(users[0].Id, users[1].Id, clock));
+            new BlockRepository(duplicateContext).Add(
+                Block.Create(users[0].Id, users[1].Id, clock),
+                users[1].Username!.Value);
             await Assert.ThrowsAsync<DbUpdateException>(() => duplicateContext.SaveChangesAsync());
         }
 
         await using (AppDbContext reverseContext = _database.CreateContext())
         {
-            reverseContext.Blocks.Add(Block.Create(users[1].Id, users[0].Id, clock));
+            new BlockRepository(reverseContext).Add(
+                Block.Create(users[1].Id, users[0].Id, clock),
+                users[0].Username!.Value);
             await reverseContext.SaveChangesAsync();
         }
 
         await using AppDbContext selfContext = _database.CreateContext();
         await Assert.ThrowsAnyAsync<DbException>(() =>
             selfContext.Database.ExecuteSqlInterpolatedAsync($"""
-                INSERT INTO blocks (id, blocker_id, blocked_id, created_at)
+                INSERT INTO blocks (
+                    id, blocker_id, blocked_id, blocked_username_snapshot, created_at)
                 VALUES ({Guid.CreateVersion7()}, {users[0].Id.Value},
-                        {users[0].Id.Value}, {clock.GetCurrentInstant()})
+                        {users[0].Id.Value}, {users[0].Username!.Value.Value},
+                        {clock.GetCurrentInstant()})
                 """));
     }
 }

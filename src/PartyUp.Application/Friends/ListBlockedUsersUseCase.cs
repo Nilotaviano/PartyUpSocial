@@ -13,7 +13,10 @@ public sealed class ListBlockedUsersUseCase(IBlockRepository blocks)
         IReadOnlyList<BlockedUserProjection> rows =
             await blocks.ListOutboundAsync(userId, cancellationToken);
         return new BlockedUserList(rows
-            .Select(row => new BlockedUserItem(row.BlockId, row.Username, row.CreatedAt))
+            .Select(row => new BlockedUserItem(
+                row.BlockId,
+                row.BlockedUsernameSnapshot,
+                row.CreatedAt))
             .ToArray());
     }
 }

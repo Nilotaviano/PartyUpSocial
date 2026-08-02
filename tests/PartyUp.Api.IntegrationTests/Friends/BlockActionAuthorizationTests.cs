@@ -24,7 +24,7 @@ public sealed class BlockActionAuthorizationTests : IAsyncLifetime
         Block block = Block.Create(_users[0].Id, _users[1].Id, _clock);
         _blockId = block.Id;
         await using AppDbContext context = _database.CreateContext();
-        context.Blocks.Add(block);
+        new BlockRepository(context).Add(block, _users[1].Username!.Value);
         await context.SaveChangesAsync();
     }
 

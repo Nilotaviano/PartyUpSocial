@@ -24,6 +24,10 @@ public sealed class BlockConfiguration : IEntityTypeConfiguration<Block>
             .HasConversion(new TypedIdConverter<UserId>());
         builder.Property(block => block.CreatedAt)
             .HasColumnType("timestamp with time zone");
+        builder.Property<string>("BlockedUsernameSnapshot")
+            .HasColumnName("blocked_username_snapshot")
+            .HasMaxLength(Username.MaxLength)
+            .IsRequired();
 
         builder.HasAlternateKey(block => new { block.BlockerId, block.BlockedId })
             .HasName("ux_blocks_ordered_pair");

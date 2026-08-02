@@ -26,6 +26,9 @@ public interface IBlockRepository
 
     void Add(Block block);
 
+    void Add(Block block, Username blockedUsernameSnapshot) =>
+        throw new NotSupportedException("Block persistence must store the at-block username snapshot.");
+
     void Remove(Block block);
 }
 
@@ -33,5 +36,5 @@ public sealed record BlockPair(UserId BlockerId, UserId BlockedId);
 
 public sealed record BlockedUserProjection(
     BlockId BlockId,
-    string Username,
+    string BlockedUsernameSnapshot,
     Instant CreatedAt);
