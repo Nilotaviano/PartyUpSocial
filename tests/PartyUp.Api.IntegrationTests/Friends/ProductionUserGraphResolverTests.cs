@@ -25,7 +25,8 @@ public sealed class ProductionUserGraphResolverTests : IAsyncLifetime
         User subject = users[1];
 
         await using AppDbContext context = _database.CreateContext();
-        context.Blocks.Add(Block.Create(viewer.Id, subject.Id, clock));
+        context.Blocks.Add(
+            Block.Create(viewer.Id, subject.Id, subject.Username!.Value, clock));
         await context.SaveChangesAsync();
         var resolver = new UserGraphResolver(context);
 
@@ -46,7 +47,8 @@ public sealed class ProductionUserGraphResolverTests : IAsyncLifetime
         User subject = users[1];
 
         await using AppDbContext context = _database.CreateContext();
-        context.Blocks.Add(Block.Create(subject.Id, viewer.Id, clock));
+        context.Blocks.Add(
+            Block.Create(subject.Id, viewer.Id, viewer.Username!.Value, clock));
         await context.SaveChangesAsync();
         var resolver = new UserGraphResolver(context);
 

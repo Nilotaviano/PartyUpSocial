@@ -108,7 +108,11 @@ public sealed class FriendGraphMigrationTests : IAsyncLifetime
         User blocked = FriendGraphDatabase.CreateActiveUser(clock);
         context.DomainUsers.AddRange(blocker, blocked);
         await context.SaveChangesAsync();
-        Block block = Block.Create(blocker.Id, blocked.Id, clock);
+        Block block = Block.Create(
+            blocker.Id,
+            blocked.Id,
+            blocked.Username!.Value,
+            clock);
         await context.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO blocks (id, blocker_id, blocked_id, created_at)
             VALUES ({block.Id.Value}, {block.BlockerId.Value}, {block.BlockedId.Value},

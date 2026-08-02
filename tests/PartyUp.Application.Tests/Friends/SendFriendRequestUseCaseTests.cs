@@ -114,7 +114,14 @@ public sealed class SendFriendRequestUseCaseTests
         Assert.Equal("user_not_found", hiddenResult.Code);
 
         var blocked = new FriendCommandFixture();
-        blocked.Blocks.Rows = [Block.Create(blocked.Actor.Id, blocked.Target.Id, blocked.Clock)];
+        blocked.Blocks.Rows =
+        [
+            Block.Create(
+                blocked.Actor.Id,
+                blocked.Target.Id,
+                blocked.Target.Username!.Value,
+                blocked.Clock),
+        ];
         FriendGraphCommandResult blockedResult = await blocked.SendAsync();
         Assert.Equal("user_not_found", blockedResult.Code);
         Assert.Null(blocked.Friendships.Existing);

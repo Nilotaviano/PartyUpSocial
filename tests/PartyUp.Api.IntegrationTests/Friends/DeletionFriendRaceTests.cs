@@ -202,8 +202,8 @@ public sealed class DeletionFriendRaceTests : IAsyncLifetime, IDisposable
         _ = friendship.DequeueEvents();
         context.Friendships.Add(friendship);
         context.Blocks.AddRange(
-            Block.Create(first.Id, second.Id, _factory.Clock),
-            Block.Create(second.Id, first.Id, _factory.Clock));
+            Block.Create(first.Id, second.Id, second.Username!.Value, _factory.Clock),
+            Block.Create(second.Id, first.Id, first.Username!.Value, _factory.Clock));
         first.RequestDeletion(_factory.Clock);
         second.RequestDeletion(_factory.Clock);
         await context.SaveChangesAsync();

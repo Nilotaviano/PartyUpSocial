@@ -26,9 +26,6 @@ public interface IBlockRepository
 
     void Add(Block block);
 
-    void Add(Block block, Username blockedUsernameSnapshot) =>
-        throw new NotSupportedException("Block persistence must store the at-block username snapshot.");
-
     void Remove(Block block);
 }
 

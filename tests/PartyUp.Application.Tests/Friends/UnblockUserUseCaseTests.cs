@@ -16,7 +16,7 @@ public sealed class UnblockUserUseCaseTests
         IClock clock = FriendTestData.Clock();
         User blocker = FriendTestData.Active("unblock-actor", "Unblock Actor");
         User blocked = FriendTestData.Active("unblock-target", "Unblock Target");
-        Block block = Block.Create(blocker.Id, blocked.Id, clock);
+        Block block = Block.Create(blocker.Id, blocked.Id, blocked.Username!.Value, clock);
         Session session = BlockExecutorTestData.Session(blocker.Id, blocked.Id, clock, makeGoing: true);
         _ = BlockEffects.Apply(block, [], [session], [], clock);
         _ = session.DequeueEvents();
@@ -48,7 +48,7 @@ public sealed class UnblockUserUseCaseTests
         IClock clock = FriendTestData.Clock();
         User blocker = FriendTestData.Active("no-scope-actor", "No Scope Actor");
         User blocked = FriendTestData.Active("no-scope-target", "No Scope Target");
-        Block block = Block.Create(blocker.Id, blocked.Id, clock);
+        Block block = Block.Create(blocker.Id, blocked.Id, blocked.Username!.Value, clock);
         var calls = new List<string>();
         var blocks = new BlockTestBlockRepository(calls);
         blocks.Rows.Add(block);

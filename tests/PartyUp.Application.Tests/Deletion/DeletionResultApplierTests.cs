@@ -18,7 +18,11 @@ public sealed class DeletionResultApplierTests
         User counterpart = CreateUser(clock, "KLMNPQRSTU");
         User control = CreateUser(clock, "UVWXYZ2345");
         Friendship friendship = Friendship.Request(subject, counterpart, clock);
-        Block block = Block.Create(counterpart.Id, subject.Id, clock);
+        Block block = Block.Create(
+            counterpart.Id,
+            subject.Id,
+            subject.Username!.Value,
+            clock);
         Notification recipient = Notification.Create(
             subject.Id,
             NotificationType.FriendRequestReceived,

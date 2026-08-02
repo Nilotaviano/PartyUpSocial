@@ -24,7 +24,7 @@ public class BlockEffectsTests
         FakeClock clock = LifecycleFixtures.Clock();
         Friendship pending = FriendshipBetween(Blocker, Blocked, clock, accept: false);
         Friendship accepted = FriendshipBetween(Blocked, Third, clock, accept: true);
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
 
         BlockEffectResult result = BlockEffects.Apply(block, [pending, accepted], [], [], clock);
 
@@ -36,7 +36,7 @@ public class BlockEffectsTests
     {
         FakeClock clock = LifecycleFixtures.Clock();
         Friendship accepted = FriendshipBetween(Blocker, Blocked, clock, accept: true);
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
 
         BlockEffectResult result = BlockEffects.Apply(block, [accepted], [], [], clock);
 
@@ -50,7 +50,7 @@ public class BlockEffectsTests
         Session session = LifecycleFixtures.NewSession(Blocker, [Blocked], LifecycleFixtures.Hours(24), clock, minAttendance: 1);
         session.Rsvp(BlockedRef, ParticipationStatus.Going, clock);
         session.DequeueEvents();
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
 
         BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], clock);
 
@@ -66,7 +66,7 @@ public class BlockEffectsTests
         Session session = LifecycleFixtures.NewSession(Blocked, [Blocker], LifecycleFixtures.Hours(24), clock, minAttendance: 1);
         session.Rsvp(BlockerRef, ParticipationStatus.Going, clock);
         session.DequeueEvents();
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
 
         BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], clock);
 
@@ -81,7 +81,7 @@ public class BlockEffectsTests
         Session session = LifecycleFixtures.NewSession(Blocker, [Blocked], LifecycleFixtures.Hours(24), clock, minAttendance: 1);
         session.DeclineInvitation(BlockedRef, clock);
         session.DequeueEvents();
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
 
         BlockEffects.Apply(block, [], [session], [], clock);
 
@@ -94,7 +94,7 @@ public class BlockEffectsTests
         FakeClock clock = LifecycleFixtures.Clock();
         Session session = LifecycleFixtures.NewSession(Blocker, [Blocked], LifecycleFixtures.Hours(24), clock, minAttendance: 1);
         session.DequeueEvents();
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
 
         BlockEffects.Apply(block, [], [session], [], clock);
 
@@ -110,7 +110,7 @@ public class BlockEffectsTests
         session.Rsvp(BlockedRef, ParticipationStatus.Going, clock);
         Assert.Equal(SessionStatus.Confirmed, session.Status);
         session.DequeueEvents();
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
 
         BlockEffects.Apply(block, [], [session], [], clock);
 
@@ -134,7 +134,7 @@ public class BlockEffectsTests
         Assert.True(LifecycleFixtures.RowOf(session, Third).IsWaitlisted);
         Assert.Equal(SessionStatus.Confirmed, session.Status);
         session.DequeueEvents();
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
 
         BlockEffects.Apply(block, [], [session], [], clock);
 
@@ -148,7 +148,7 @@ public class BlockEffectsTests
         FakeClock clock = LifecycleFixtures.Clock();
         Session session = LifecycleFixtures.NewSession(Blocker, [Blocked], LifecycleFixtures.Hours(24), clock, minAttendance: 1);
         session.Rsvp(BlockedRef, ParticipationStatus.Going, clock);
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
 
         BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], clock);
 
@@ -164,7 +164,7 @@ public class BlockEffectsTests
         Session session = LifecycleFixtures.NewSession(Blocker, [Blocked], LifecycleFixtures.Hours(24), clock, minAttendance: 1);
         session.Rsvp(BlockedRef, ParticipationStatus.Going, clock);
         FakeClock inProgress = LifecycleFixtures.At(LifecycleFixtures.Hours(25));
-        Block block = Block.Create(Blocker, Blocked, inProgress);
+        Block block = CreateBlock(inProgress);
 
         BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], inProgress);
 
@@ -181,7 +181,7 @@ public class BlockEffectsTests
         FakeClock after = LifecycleFixtures.At(LifecycleFixtures.Hours(30));
         session.ApplyDueTransitions(after);
         Assert.Equal(SessionStatus.Completed, session.Status);
-        Block block = Block.Create(Blocker, Blocked, after);
+        Block block = CreateBlock(after);
 
         BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], after);
 
@@ -196,7 +196,7 @@ public class BlockEffectsTests
         Session session = LifecycleFixtures.NewSession(Blocker, [Blocked], LifecycleFixtures.Hours(24), clock, minAttendance: 1);
         session.Rsvp(BlockedRef, ParticipationStatus.Going, clock);
         FakeClock after = LifecycleFixtures.At(LifecycleFixtures.Hours(30));
-        Block block = Block.Create(Blocker, Blocked, after);
+        Block block = CreateBlock(after);
 
         BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], after);
 
@@ -211,7 +211,7 @@ public class BlockEffectsTests
         Session session = LifecycleFixtures.NewSession(Third, [Blocker, Blocked], LifecycleFixtures.Hours(24), clock, minAttendance: 1);
         session.Rsvp(BlockerRef, ParticipationStatus.Going, clock);
         session.Rsvp(BlockedRef, ParticipationStatus.Going, clock);
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
 
         BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], clock);
 
@@ -226,7 +226,7 @@ public class BlockEffectsTests
         FakeClock clock = LifecycleFixtures.Clock();
         Session session = LifecycleFixtures.NewSession(Blocker, [Third], LifecycleFixtures.Hours(24), clock, minAttendance: 1);
         JoinRequest request = session.OpenJoinRequest(Blocked, clock);
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
 
         BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], clock);
 
@@ -240,7 +240,7 @@ public class BlockEffectsTests
         FakeClock clock = LifecycleFixtures.Clock();
         Session session = LifecycleFixtures.NewSession(Blocker, [Blocked], LifecycleFixtures.Hours(24), clock, minAttendance: 1);
         JoinRequest request = session.OpenJoinRequest(Third, clock);
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
 
         BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], clock);
 
@@ -254,7 +254,7 @@ public class BlockEffectsTests
         FakeClock clock = LifecycleFixtures.Clock();
         Poll poll = LifecycleFixtures.NewPoll(Blocker, [Third], [LifecycleFixtures.Hours(72), LifecycleFixtures.Hours(96)], clock);
         JoinRequest request = poll.OpenJoinRequest(Blocked, clock);
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
 
         BlockEffectResult result = BlockEffects.Apply(block, [], [], [poll], clock);
 
@@ -268,7 +268,7 @@ public class BlockEffectsTests
         FakeClock clock = LifecycleFixtures.Clock();
         Poll poll = LifecycleFixtures.NewPoll(Blocker, [Blocked], [LifecycleFixtures.Hours(72), LifecycleFixtures.Hours(96)], clock);
         poll.Vote(BlockedRef, poll.Options[0].Id, VoteChoice.Available, clock);
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
 
         BlockEffectResult result = BlockEffects.Apply(block, [], [], [poll], clock);
 
@@ -287,7 +287,7 @@ public class BlockEffectsTests
             clock,
             minAttendance: 1);
         poll.Vote(BlockedRef, poll.Options[0].Id, VoteChoice.Available, clock);
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
         BlockEffects.Apply(block, [], [], [poll], clock);
 
         PollFinalizationResult finalized = poll.Finalize(poll.Options[0].Id, LifecycleFixtures.At(LifecycleFixtures.Hours(25)));
@@ -309,7 +309,7 @@ public class BlockEffectsTests
         poll.Vote(BlockedRef, poll.Options[0].Id, VoteChoice.Available, clock);
         FakeClock atSelection = LifecycleFixtures.At(LifecycleFixtures.Hours(25));
         poll.Finalize(poll.Options[0].Id, atSelection);
-        Block block = Block.Create(Blocker, Blocked, atSelection);
+        Block block = CreateBlock(atSelection);
 
         BlockEffectResult result = BlockEffects.Apply(block, [], [], [poll], atSelection);
 
@@ -325,7 +325,7 @@ public class BlockEffectsTests
         session.Rsvp(BlockedRef, ParticipationStatus.Going, clock);
         Poll poll = LifecycleFixtures.NewPoll(Blocker, [Blocked], [LifecycleFixtures.Hours(72), LifecycleFixtures.Hours(96)], clock);
         JoinRequest request = poll.OpenJoinRequest(Third, clock);
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
 
         BlockEffects.Apply(block, [], [session], [poll], clock);
         session.DequeueEvents();
@@ -349,7 +349,7 @@ public class BlockEffectsTests
         Session session = LifecycleFixtures.NewSession(Blocker, [Blocked], LifecycleFixtures.Hours(24), clock, minAttendance: 1);
         session.Rsvp(BlockedRef, ParticipationStatus.Going, clock);
         Friendship friendship = FriendshipBetween(Blocker, Blocked, clock, accept: true);
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
         BlockEffects.Apply(block, [friendship], [session], [], clock);
         session.DequeueEvents();
 
@@ -366,7 +366,7 @@ public class BlockEffectsTests
     {
         FakeClock clock = LifecycleFixtures.Clock();
         Session session = LifecycleFixtures.NewSession(Blocker, [Blocked], LifecycleFixtures.Hours(24), clock, minAttendance: 1);
-        Block block = Block.Create(Blocker, Blocked, clock);
+        Block block = CreateBlock(clock);
         BlockEffects.Apply(block, [], [session], [], clock);
         BlockEffects.Unblock(block);
 
@@ -386,6 +386,9 @@ public class BlockEffectsTests
 
         return friendship;
     }
+
+    private static Block CreateBlock(IClock clock) =>
+        Block.Create(Blocker, Blocked, Username.Create("blocked-user"), clock);
 
     private static User TestUser(UserId id, IClock clock)
     {

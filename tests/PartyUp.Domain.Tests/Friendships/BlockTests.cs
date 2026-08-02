@@ -8,16 +8,18 @@ namespace PartyUp.Domain.Tests.Friendships;
 public class BlockTests
 {
     [Fact]
-    public void Create_StoresTheOrderedPairWithItsInstant_D065()
+    public void Create_StoresTheOrderedPairSnapshotAndInstant_D065()
     {
         FakeClock clock = TestUsers.Clock();
         UserId blocker = UserId.New();
         UserId blocked = UserId.New();
 
-        Block block = Block.Create(blocker, blocked, clock);
+        Username blockedUsername = Username.Create("blocked-user");
+        Block block = Block.Create(blocker, blocked, blockedUsername, clock);
 
         Assert.Equal(blocker, block.BlockerId);
         Assert.Equal(blocked, block.BlockedId);
+        Assert.Equal(blockedUsername, block.BlockedUsernameSnapshot);
         Assert.Equal(TestUsers.Origin, block.CreatedAt);
         Assert.NotEqual(default, block.Id.Value);
     }
@@ -29,8 +31,8 @@ public class BlockTests
         UserId one = UserId.New();
         UserId two = UserId.New();
 
-        Block forwards = Block.Create(one, two, clock);
-        Block backwards = Block.Create(two, one, clock);
+        Block forwards = Block.Create(one, two, Username.Create("user-two"), clock);
+        Block backwards = Block.Create(two, one, Username.Create("user-one"), clock);
 
         Assert.NotEqual(forwards.Id, backwards.Id);
         Assert.Equal(forwards.BlockerId, backwards.BlockedId);
@@ -43,7 +45,8 @@ public class BlockTests
         FakeClock clock = TestUsers.Clock();
         UserId user = UserId.New();
 
-        DomainException error = Assert.Throws<DomainException>(() => Block.Create(user, user, clock));
+        DomainException error = Assert.Throws<DomainException>(
+            () => Block.Create(user, user, Username.Create("blocked-user"), clock));
 
         Assert.Equal(DomainError.ValidationFailed, error.Error);
     }
@@ -51,7 +54,19 @@ public class BlockTests
     [Fact]
     public void Create_RejectsANullClock_D065()
     {
-        Assert.Throws<ArgumentNullException>(() => Block.Create(UserId.New(), UserId.New(), null!));
+        Assert.Throws<ArgumentNullException>(
+            () => Block.Create(
+                UserId.New(),
+                UserId.New(),
+                Username.Create("blocked-user"),
+                null!));
+    }
+
+    [Fact]
+    public void Create_RejectsAMissingUsernameSnapshot_D065()
+    {
+        Assert.Throws<ArgumentException>(
+            () => Block.Create(UserId.New(), UserId.New(), default, TestUsers.Clock()));
     }
 
     [Fact]
@@ -61,7 +76,7 @@ public class BlockTests
         UserId blocker = UserId.New();
         UserId blocked = UserId.New();
 
-        Block block = Block.Create(blocker, blocked, clock);
+        Block block = Block.Create(blocker, blocked, Username.Create("blocked-user"), clock);
 
         UserBlocked raised = Assert.Single(block.DequeueEvents().OfType<UserBlocked>());
         Assert.Equal(block.Id, raised.BlockId);
@@ -75,7 +90,7 @@ public class BlockTests
         FakeClock clock = TestUsers.Clock();
         UserId blocker = UserId.New();
         UserId blocked = UserId.New();
-        Block block = Block.Create(blocker, blocked, clock);
+        Block block = Block.Create(blocker, blocked, Username.Create("blocked-user"), clock);
 
         Assert.True(block.Hides(blocker, blocked));
         Assert.True(block.Hides(blocked, blocker));
@@ -88,7 +103,7 @@ public class BlockTests
         UserId blocker = UserId.New();
         UserId blocked = UserId.New();
         UserId stranger = UserId.New();
-        Block block = Block.Create(blocker, blocked, clock);
+        Block block = Block.Create(blocker, blocked, Username.Create("blocked-user"), clock);
 
         Assert.False(block.Hides(blocker, stranger));
         Assert.False(block.Hides(stranger, blocked));

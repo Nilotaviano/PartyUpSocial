@@ -38,7 +38,7 @@ public class ViewerTests
 
         Friendship others = Friendship.Request(first, second, clock);
         others.Accept(second.Id, clock);
-        Block othersBlock = Block.Create(first.Id, second.Id, clock);
+        Block othersBlock = Block.Create(first.Id, second.Id, second.Username!.Value, clock);
 
         Viewer built = Viewer.From(viewer.Id, [others], [othersBlock]);
 
@@ -53,8 +53,15 @@ public class ViewerTests
         UserId viewerId = UserId.New();
         UserId counterpart = UserId.New();
 
-        Viewer asBlocker = Viewer.From(viewerId, [], [Block.Create(viewerId, counterpart, clock)]);
-        Viewer asBlocked = Viewer.From(viewerId, [], [Block.Create(counterpart, viewerId, clock)]);
+        Username counterpartUsername = Username.Create("counterpart");
+        Viewer asBlocker = Viewer.From(
+            viewerId,
+            [],
+            [Block.Create(viewerId, counterpart, counterpartUsername, clock)]);
+        Viewer asBlocked = Viewer.From(
+            viewerId,
+            [],
+            [Block.Create(counterpart, viewerId, Username.Create("viewer"), clock)]);
 
         Assert.True(asBlocker.IsBlockedWith(counterpart));
         Assert.True(asBlocked.IsBlockedWith(counterpart));
