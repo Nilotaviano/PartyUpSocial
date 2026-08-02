@@ -4,7 +4,9 @@ using Microsoft.Extensions.Logging;
 using NodaTime;
 using Npgsql;
 using PartyUp.Application.Abstractions;
+using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Auth;
 using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Steam;
@@ -16,7 +18,7 @@ public sealed partial class UserAccountGateway(
     RoleManager<AuthRole> roleManager,
     IPasswordHasher<AuthUser> passwordHasher,
     AppDbContext context,
-    ILogger<UserAccountGateway> logger) : IUserAccountGateway
+    ILogger<UserAccountGateway> logger) : IUserAccountGateway, ISteamImportAccountGateway
 {
     private const int AccessFailureRetryLimit = 5;
 
@@ -259,6 +261,103 @@ public sealed partial class UserAccountGateway(
         }
     }
 
+    public Task<string?> FindSteamIdAsync(
+        UserId id,
+        CancellationToken cancellationToken) =>
+        context.SteamIdentities.AsNoTracking()
+            .Where(identity => identity.UserId == id)
+            .Select(identity => identity.SteamId64)
+            .SingleOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyDictionary<string, UserId>> FindSteamIdentityOwnersAsync(
+        IReadOnlyCollection<string> steamIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(steamIds);
+        return await context.SteamIdentities.AsNoTracking()
+            .Where(identity => steamIds.Contains(identity.SteamId64))
+            .ToDictionaryAsync(
+                identity => identity.SteamId64,
+                identity => identity.UserId,
+                StringComparer.Ordinal,
+                cancellationToken);
+    }
+
+    public async Task LockUsersAsync(
+        IReadOnlyCollection<UserId> userIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(userIds);
+        Guid[] orderedIds = userIds
+            .Select(id => id.Value)
+            .Distinct()
+            .Order()
+            .ToArray();
+        if (orderedIds.Length == 0)
+        {
+            return;
+        }
+
+        var parameter = new NpgsqlParameter<Guid[]>("user_ids", orderedIds);
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            SELECT 1
+            FROM users
+            WHERE id = ANY (@user_ids)
+            ORDER BY id
+            FOR UPDATE
+            """,
+            [parameter],
+            cancellationToken);
+    }
+
+    public async Task<SteamImportOwnershipSnapshot> ReadSteamImportOwnershipSnapshotAsync(
+        UserId importerId,
+        IReadOnlyCollection<string> steamIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(steamIds);
+        string? importerSteamId = await context.SteamIdentities.AsNoTracking()
+            .Where(identity => identity.UserId == importerId)
+            .Select(identity => identity.SteamId64)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        List<SteamImportCandidateRow> rows = await (
+            from identity in context.SteamIdentities.AsNoTracking()
+            where steamIds.Contains(identity.SteamId64)
+            join candidate in context.DomainUsers.AsNoTracking()
+                on identity.UserId equals candidate.Id
+            select new SteamImportCandidateRow(
+                identity.SteamId64,
+                candidate,
+                context.Friendships.Where(friendship =>
+                        (friendship.UserLoId == importerId &&
+                         friendship.UserHiId == candidate.Id) ||
+                        (friendship.UserLoId == candidate.Id &&
+                         friendship.UserHiId == importerId))
+                    .Select(friendship => (FriendshipStatus?)friendship.Status)
+                    .SingleOrDefault(),
+                context.Blocks.Any(block =>
+                    (block.BlockerId == importerId && block.BlockedId == candidate.Id) ||
+                    (block.BlockerId == candidate.Id && block.BlockedId == importerId))))
+            .ToListAsync(cancellationToken);
+
+        Dictionary<string, SteamImportCandidate> candidates = rows.ToDictionary(
+            row => row.SteamId64,
+            row => new SteamImportCandidate(
+                row.SteamId64,
+                row.User,
+                row.FriendshipStatus switch
+                {
+                    FriendshipStatus.Accepted => FriendRelationshipKind.Accepted,
+                    FriendshipStatus.Pending => FriendRelationshipKind.OutgoingPending,
+                    _ => FriendRelationshipKind.None,
+                },
+                row.IsBlocked),
+            StringComparer.Ordinal);
+        return new SteamImportOwnershipSnapshot(importerSteamId, candidates);
+    }
+
     public async Task PurgeCredentialsAsync(UserId id, CancellationToken cancellationToken)
     {
         AuthUser user = await RequireUserAsync(id, cancellationToken);
@@ -442,4 +541,10 @@ public sealed partial class UserAccountGateway(
             DomainError.Conflict,
             FormattableString.Invariant($"Identity could not {operation}: {details}"));
     }
+
+    private sealed record SteamImportCandidateRow(
+        string SteamId64,
+        User User,
+        FriendshipStatus? FriendshipStatus,
+        bool IsBlocked);
 }

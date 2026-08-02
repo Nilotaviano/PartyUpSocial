@@ -46,6 +46,7 @@ public sealed class PartyUpOpenApiTransformer :
             ApiOperationIds.ListBlocks,
             ApiOperationIds.BlockUser,
             ApiOperationIds.UnblockUser,
+            ApiOperationIds.ImportSteamFriends,
         };
 
     public Task TransformAsync(
@@ -71,6 +72,15 @@ public sealed class PartyUpOpenApiTransformer :
             {
                 profile.OneOf = profile.AnyOf;
                 profile.AnyOf = null;
+            }
+
+            if (schemas.TryGetValue(
+                    "SteamFriendImportResponse",
+                    out IOpenApiSchema? steamImportSchema) &&
+                steamImportSchema is OpenApiSchema steamImport)
+            {
+                steamImport.OneOf = steamImport.AnyOf;
+                steamImport.AnyOf = null;
             }
 
             if (schemas.TryGetValue(
@@ -102,6 +112,15 @@ public sealed class PartyUpOpenApiTransformer :
             }
 
             if (schemas.TryGetValue(
+                    "SteamUnmatchedFriendResponse",
+                    out IOpenApiSchema? unmatchedFriendSchema) &&
+                unmatchedFriendSchema is OpenApiSchema unmatchedFriend)
+            {
+                unmatchedFriend.Required?.Remove("personaName");
+                unmatchedFriend.Required?.Remove("avatarUrl");
+            }
+
+            if (schemas.TryGetValue(
                     "PartyUpProblem",
                     out IOpenApiSchema? problemSchema) &&
                 problemSchema is OpenApiSchema problem)
@@ -123,6 +142,22 @@ public sealed class PartyUpOpenApiTransformer :
 
             SetObjectType(schemas, "ProfileViewResponseUsernameOnlyProfileResponse");
             SetObjectType(schemas, "ProfileViewResponseFullProfileResponse");
+            SetObjectType(schemas, "SteamFriendImportResponseReadySteamFriendImportResponse");
+            SetObjectType(
+                schemas,
+                "SteamFriendImportResponsePrivateProfileSteamFriendImportResponse");
+            SetObjectType(
+                schemas,
+                "SteamFriendImportResponseZeroFriendsSteamFriendImportResponse");
+            SetObjectType(
+                schemas,
+                "SteamFriendImportResponseZeroMatchesSteamFriendImportResponse");
+            SetObjectType(
+                schemas,
+                "SteamFriendImportResponseNotConfiguredSteamFriendImportResponse");
+            SetObjectType(
+                schemas,
+                "SteamFriendImportResponseUpstreamFailureSteamFriendImportResponse");
         }
 
         var cookieReference = new OpenApiSecuritySchemeReference(

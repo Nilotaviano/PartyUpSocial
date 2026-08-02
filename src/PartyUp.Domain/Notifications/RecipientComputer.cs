@@ -496,11 +496,11 @@ public static class RecipientComputer
     }
 
     /// <summary>
-    /// D-105/§12-32: the <em>importer</em> — at import time and again when an imported Steam friend
-    /// registers or links later. The matched user learns nothing until an actual friend request
-    /// arrives, because telling them would disclose the importer's Steam friend list.
+    /// D-049/D-105/§12-32: the <em>importer</em>, at explicit import time only. The matched user learns
+    /// nothing until an actual friend request arrives, because telling them would disclose the
+    /// importer's Steam friend list.
     /// </summary>
-    public static IReadOnlyList<NotificationRequest> SteamImportMatch(
+    public static IReadOnlyList<NotificationRequest> SteamImportMatchAtImport(
         UserId importerId,
         UserId matchedUserId,
         RecipientFilter filter) =>

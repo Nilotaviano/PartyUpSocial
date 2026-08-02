@@ -1,4 +1,5 @@
 using NodaTime;
+using PartyUp.Domain.Users;
 using PartyUp.Domain.Kernel;
 
 namespace PartyUp.Application.Abstractions;
@@ -77,3 +78,33 @@ public interface IUserAccountGateway
 public sealed record PasswordCheckResult(bool Succeeded, bool IsLockedOut, bool HashVerified);
 
 public sealed record AccountEmailInfo(string Email, bool IsConfirmed);
+
+public interface ISteamImportAccountGateway
+{
+    Task<string?> FindSteamIdAsync(
+        UserId id,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyDictionary<string, UserId>> FindSteamIdentityOwnersAsync(
+        IReadOnlyCollection<string> steamIds,
+        CancellationToken cancellationToken);
+
+    Task LockUsersAsync(
+        IReadOnlyCollection<UserId> userIds,
+        CancellationToken cancellationToken);
+
+    Task<SteamImportOwnershipSnapshot> ReadSteamImportOwnershipSnapshotAsync(
+        UserId importerId,
+        IReadOnlyCollection<string> steamIds,
+        CancellationToken cancellationToken);
+}
+
+public sealed record SteamImportOwnershipSnapshot(
+    string? ImporterSteamId64,
+    IReadOnlyDictionary<string, SteamImportCandidate> Candidates);
+
+public sealed record SteamImportCandidate(
+    string SteamId64,
+    User User,
+    FriendRelationshipKind Relationship,
+    bool IsBlocked);

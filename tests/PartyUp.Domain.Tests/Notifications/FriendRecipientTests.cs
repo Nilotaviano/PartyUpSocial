@@ -51,16 +51,14 @@ public class FriendRecipientTests
     }
 
     [Fact]
-    public void SteamImportMatch_ReachesTheImporterAndNeverTheMatchedUser_D105()
+    public void SteamImportMatch_TargetsOnlyTheImporterAtImportTime_D049()
     {
         UserId importer = UserId.New();
         UserId matched = UserId.New();
 
         IReadOnlyList<NotificationRequest> requests =
-            RecipientComputer.SteamImportMatch(importer, matched, RecipientFilter.None);
+            RecipientComputer.SteamImportMatchAtImport(importer, matched, RecipientFilter.None);
 
-        // §12-32: notifying the matched side would disclose the importer's Steam friend list before
-        // any friend request exists.
         Assert.Equal([importer], TestNotifications.Recipients(requests));
         Assert.Equal(NotificationType.SteamImportMatch, requests[0].Type);
         Assert.Equal(matched, requests[0].Subject.ActorUserId);
@@ -72,7 +70,10 @@ public class FriendRecipientTests
         UserId importer = UserId.New();
         RecipientFilter filter = RecipientFilter.None.Excluding(importer);
 
-        Assert.Empty(RecipientComputer.SteamImportMatch(importer, UserId.New(), filter));
+        Assert.Empty(RecipientComputer.SteamImportMatchAtImport(
+            importer,
+            UserId.New(),
+            filter));
     }
 
     [Fact]
@@ -83,7 +84,10 @@ public class FriendRecipientTests
         UserId matched = UserId.New();
 
         Notification notification = Notification.From(
-            RecipientComputer.SteamImportMatch(importer, matched, RecipientFilter.None)[0],
+            RecipientComputer.SteamImportMatchAtImport(
+                importer,
+                matched,
+                RecipientFilter.None)[0],
             clock);
 
         Assert.Equal(importer, notification.RecipientUserId);

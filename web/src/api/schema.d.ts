@@ -916,6 +916,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/friends/imports/steam": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ImportSteamFriends"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1243,6 +1259,73 @@ export interface components {
             newPassword: string;
             currentPassword: null | string;
             reauthToken: null | string;
+        };
+        SteamFriendImportResponse: components["schemas"]["SteamFriendImportResponseReadySteamFriendImportResponse"] | components["schemas"]["SteamFriendImportResponsePrivateProfileSteamFriendImportResponse"] | components["schemas"]["SteamFriendImportResponseZeroFriendsSteamFriendImportResponse"] | components["schemas"]["SteamFriendImportResponseZeroMatchesSteamFriendImportResponse"] | components["schemas"]["SteamFriendImportResponseNotConfiguredSteamFriendImportResponse"] | components["schemas"]["SteamFriendImportResponseUpstreamFailureSteamFriendImportResponse"];
+        SteamFriendImportResponseNotConfiguredSteamFriendImportResponse: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "not_configured";
+            invitationUrl: string;
+        };
+        SteamFriendImportResponsePrivateProfileSteamFriendImportResponse: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "private_profile";
+            matches: components["schemas"]["SteamMatchedUserResponse"][];
+            unmatched: components["schemas"]["SteamUnmatchedFriendResponse"][];
+            invitationUrl: string;
+        };
+        SteamFriendImportResponseReadySteamFriendImportResponse: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "ready";
+            matches: components["schemas"]["SteamMatchedUserResponse"][];
+            unmatched: components["schemas"]["SteamUnmatchedFriendResponse"][];
+            invitationUrl: string;
+        };
+        SteamFriendImportResponseUpstreamFailureSteamFriendImportResponse: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "upstream_failure";
+            retryable: boolean;
+            invitationUrl: string;
+        };
+        SteamFriendImportResponseZeroFriendsSteamFriendImportResponse: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "zero_friends";
+            matches: components["schemas"]["SteamMatchedUserResponse"][];
+            unmatched: components["schemas"]["SteamUnmatchedFriendResponse"][];
+            invitationUrl: string;
+        };
+        SteamFriendImportResponseZeroMatchesSteamFriendImportResponse: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "zero_matches";
+            matches: components["schemas"]["SteamMatchedUserResponse"][];
+            unmatched: components["schemas"]["SteamUnmatchedFriendResponse"][];
+            invitationUrl: string;
+        };
+        SteamMatchedUserResponse: {
+            username: string;
+        };
+        SteamUnmatchedFriendResponse: {
+            steamId64: string;
+            personaName?: null | string;
+            avatarUrl?: null | string;
+            invitationUrl: string;
         };
         TargetUsernameRequest: {
             targetUsername: null | string;
@@ -3825,6 +3908,83 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    ImportSteamFriends: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SteamFriendImportResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["UnauthorizedPartyUpProblem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OnboardingRequiredPartyUpProblem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

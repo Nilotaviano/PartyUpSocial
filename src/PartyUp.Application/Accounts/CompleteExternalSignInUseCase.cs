@@ -145,6 +145,11 @@ public sealed class CompleteExternalSignInUseCase(
             (bool Allowed, bool Added) mutation = await unitOfWork.ExecuteAsync(
                 async ct =>
                 {
+                    if (await users.FindForUpdateAsync(boundUserId, ct) is null)
+                    {
+                        return (false, false);
+                    }
+
                     UserId? appeared = await accounts.FindUserIdByLoginAsync(
                         command.Provider,
                         command.ProviderKey,
