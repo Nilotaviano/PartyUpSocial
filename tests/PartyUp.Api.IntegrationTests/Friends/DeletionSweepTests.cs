@@ -209,9 +209,21 @@ internal static class Phase3DeletionTestSupport
         Friendship controlFriendship = Friendship.Request(first, control, factory.Clock);
         controlFriendship.Accept(control.Id, factory.Clock);
         _ = controlFriendship.DequeueEvents();
-        Block outbound = Block.Create(subject.Id, first.Id, factory.Clock);
-        Block inbound = Block.Create(second.Id, subject.Id, factory.Clock);
-        Block controlBlock = Block.Create(first.Id, control.Id, factory.Clock);
+        Block outbound = Block.Create(
+            subject.Id,
+            first.Id,
+            first.Username!.Value,
+            factory.Clock);
+        Block inbound = Block.Create(
+            second.Id,
+            subject.Id,
+            subject.Username!.Value,
+            factory.Clock);
+        Block controlBlock = Block.Create(
+            first.Id,
+            control.Id,
+            control.Username!.Value,
+            factory.Clock);
         Notification recipient = Notification.Create(
             subject.Id,
             NotificationType.FriendRequestReceived,

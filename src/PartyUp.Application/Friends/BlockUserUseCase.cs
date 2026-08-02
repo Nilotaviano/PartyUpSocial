@@ -74,11 +74,11 @@ public sealed class BlockUserUseCase(
                     return BlockGraphCommandResult.Failed("user_not_found");
                 }
 
-                Block block = Block.Create(actorId, targetId, clock);
                 Username blockedUsernameSnapshot = target.Username.Value;
+                Block block = Block.Create(actorId, targetId, blockedUsernameSnapshot, clock);
                 IReadOnlyList<Friendship> pairFriendships = friendship is null ? [] : [friendship];
                 await effectsExecutor.ExecuteAsync(block, pairFriendships, ct);
-                blocks.Add(block, blockedUsernameSnapshot);
+                blocks.Add(block);
 
                 return BlockGraphCommandResult.CreatedBlock(
                     new BlockedUserItem(

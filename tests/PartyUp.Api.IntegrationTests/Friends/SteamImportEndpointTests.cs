@@ -9,6 +9,7 @@ using PartyUp.Application.Abstractions;
 using PartyUp.Application.Accounts;
 using PartyUp.Application.Auth;
 using PartyUp.Domain.Friendships;
+using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Notifications;
 using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Steam;
@@ -98,7 +99,12 @@ public sealed class SteamImportEndpointTests : IAsyncLifetime, IDisposable
         await using (AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
         {
             AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            context.Blocks.Add(Block.Create(actor.Id, candidate.Id, _factory.Clock));
+            context.Blocks.Add(
+                Block.Create(
+                    actor.Id,
+                    candidate.Id,
+                    Username.Create(candidate.Username),
+                    _factory.Clock));
             await context.SaveChangesAsync();
         }
 

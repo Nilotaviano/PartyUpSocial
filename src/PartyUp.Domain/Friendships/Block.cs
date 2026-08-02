@@ -16,11 +16,17 @@ public sealed class Block : AggregateRoot
     {
     }
 
-    private Block(BlockId id, UserId blockerId, UserId blockedId, Instant createdAt)
+    private Block(
+        BlockId id,
+        UserId blockerId,
+        UserId blockedId,
+        Username blockedUsernameSnapshot,
+        Instant createdAt)
     {
         Id = id;
         BlockerId = blockerId;
         BlockedId = blockedId;
+        BlockedUsernameSnapshot = blockedUsernameSnapshot;
         CreatedAt = createdAt;
     }
 
@@ -30,18 +36,32 @@ public sealed class Block : AggregateRoot
 
     public UserId BlockedId { get; private set; }
 
+    public Username BlockedUsernameSnapshot { get; private set; }
+
     public Instant CreatedAt { get; private set; }
 
-    public static Block Create(UserId blockerId, UserId blockedId, IClock clock)
+    public static Block Create(
+        UserId blockerId,
+        UserId blockedId,
+        Username blockedUsernameSnapshot,
+        IClock clock)
     {
         ArgumentNullException.ThrowIfNull(clock);
+        ArgumentException.ThrowIfNullOrEmpty(
+            blockedUsernameSnapshot.Value,
+            nameof(blockedUsernameSnapshot));
 
         if (blockerId == blockedId)
         {
             throw new DomainException(DomainError.ValidationFailed, "A user cannot block themselves.");
         }
 
-        Block block = new(BlockId.New(), blockerId, blockedId, clock.GetCurrentInstant());
+        Block block = new(
+            BlockId.New(),
+            blockerId,
+            blockedId,
+            blockedUsernameSnapshot,
+            clock.GetCurrentInstant());
         block.Raise(new UserBlocked(block.Id, blockerId, blockedId));
 
         return block;

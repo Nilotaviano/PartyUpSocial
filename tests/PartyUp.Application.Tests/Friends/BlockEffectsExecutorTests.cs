@@ -20,7 +20,7 @@ public sealed class BlockEffectsExecutorTests
         User blocked = FriendTestData.Active("effect-blocked", "Effect Blocked");
         Friendship friendship = BlockExecutorTestData.Friendship(blocker, blocked, clock);
         Session session = BlockExecutorTestData.Session(blocker.Id, blocked.Id, clock, makeGoing: true);
-        Block block = Block.Create(blocker.Id, blocked.Id, clock);
+        Block block = Block.Create(blocker.Id, blocked.Id, blocked.Username!.Value, clock);
         var calls = new List<string>();
         var repository = new BlockTestFriendshipRepository(calls) { Existing = friendship };
         var scope = new RecordingBlockEffectScopeProvider(
@@ -48,7 +48,11 @@ public sealed class BlockEffectsExecutorTests
         User blocker = FriendTestData.Active("drain-blocker", "Drain Blocker");
         User blocked = FriendTestData.Active("drain-blocked", "Drain Blocked");
         Session control = BlockExecutorTestData.Session(blocker.Id, blocked.Id, clock, makeGoing: true);
-        Block controlBlock = Block.Create(blocker.Id, blocked.Id, clock);
+        Block controlBlock = Block.Create(
+            blocker.Id,
+            blocked.Id,
+            blocked.Username!.Value,
+            clock);
         _ = BlockEffects.Apply(controlBlock, [], [control], [], clock);
         SessionUnconfirmed derived = Assert.Single(
             control.DequeueEvents().OfType<SessionUnconfirmed>());
@@ -56,7 +60,7 @@ public sealed class BlockEffectsExecutorTests
             RecipientComputer.ForSessionEvent(control, derived, RecipientFilter.None));
 
         Session actual = BlockExecutorTestData.Session(blocker.Id, blocked.Id, clock, makeGoing: true);
-        Block block = Block.Create(blocker.Id, blocked.Id, clock);
+        Block block = Block.Create(blocker.Id, blocked.Id, blocked.Username!.Value, clock);
         var executor = new BlockEffectsExecutor(
             new RecordingBlockEffectScopeProvider(new BlockEffectScope([actual], [])),
             new BlockTestFriendshipRepository([]),

@@ -22,11 +22,15 @@ public sealed class BlockConstraintTests : IAsyncLifetime
     {
         var clock = new MutableClock(Instant.FromUtc(2026, 8, 1, 15, 0));
         User[] users = await _database.SeedUsersAsync(2, clock);
-        Block forward = Block.Create(users[0].Id, users[1].Id, clock);
+        Block forward = Block.Create(
+            users[0].Id,
+            users[1].Id,
+            users[1].Username!.Value,
+            clock);
 
         await using (AppDbContext context = _database.CreateContext())
         {
-            new BlockRepository(context).Add(forward, users[1].Username!.Value);
+            new BlockRepository(context).Add(forward);
             await context.SaveChangesAsync();
         }
 
@@ -42,16 +46,22 @@ public sealed class BlockConstraintTests : IAsyncLifetime
         await using (AppDbContext duplicateContext = _database.CreateContext())
         {
             new BlockRepository(duplicateContext).Add(
-                Block.Create(users[0].Id, users[1].Id, clock),
-                users[1].Username!.Value);
+                Block.Create(
+                    users[0].Id,
+                    users[1].Id,
+                    users[1].Username!.Value,
+                    clock));
             await Assert.ThrowsAsync<DbUpdateException>(() => duplicateContext.SaveChangesAsync());
         }
 
         await using (AppDbContext reverseContext = _database.CreateContext())
         {
             new BlockRepository(reverseContext).Add(
-                Block.Create(users[1].Id, users[0].Id, clock),
-                users[0].Username!.Value);
+                Block.Create(
+                    users[1].Id,
+                    users[0].Id,
+                    users[0].Username!.Value,
+                    clock));
             await reverseContext.SaveChangesAsync();
         }
 

@@ -452,8 +452,16 @@ public class DeletionExecutorTests
             User second = TestUsers.Active(clock, "secondie", "Second", "PU-SECND1");
             Friendship unrelated = Friendship.Request(first, second, clock);
 
-            Block blockAgainstSubject = Block.Create(stranger, me, clock);
-            Block unrelatedBlock = Block.Create(first.Id, second.Id, clock);
+            Block blockAgainstSubject = Block.Create(
+                stranger,
+                me,
+                subject.Username!.Value,
+                clock);
+            Block unrelatedBlock = Block.Create(
+                first.Id,
+                second.Id,
+                second.Username!.Value,
+                clock);
 
             UsernameRegistryEntry usernameEntry = UsernameRegistry.Claim(
                 null, subject.Username!.Value, me, clock);
