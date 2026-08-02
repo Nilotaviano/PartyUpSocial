@@ -206,13 +206,6 @@ internal sealed class CommandResolver(User actor, User initialTarget) : IUserGra
         UserId viewerId,
         string canonicalUsername,
         CancellationToken cancellationToken) => Task.FromResult<ResolvedUserGraph?>(null);
-
-    public Task<IReadOnlyDictionary<string, ResolvedUserGraph>> ResolveSteamCandidatesAsync(
-        UserId viewerId,
-        IReadOnlyCollection<string> steamIds,
-        CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyDictionary<string, ResolvedUserGraph>>(
-            new Dictionary<string, ResolvedUserGraph>());
 }
 
 internal sealed class CommandPairLocker(

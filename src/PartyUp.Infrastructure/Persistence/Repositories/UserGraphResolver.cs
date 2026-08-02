@@ -76,55 +76,6 @@ public sealed class UserGraphResolver(AppDbContext context) : IUserGraphResolver
         return Materialize(row, disclosure);
     }
 
-    public async Task<IReadOnlyDictionary<string, ResolvedUserGraph>> ResolveSteamCandidatesAsync(
-        UserId viewerId,
-        IReadOnlyCollection<string> steamIds,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(steamIds);
-        if (steamIds.Count == 0)
-        {
-            return new Dictionary<string, ResolvedUserGraph>(StringComparer.Ordinal);
-        }
-
-        List<SteamCandidateGraphRow> rows = await (
-            from identity in context.SteamIdentities.AsNoTracking()
-            where steamIds.Contains(identity.SteamId64)
-            join candidate in context.DomainUsers.AsNoTracking() on identity.UserId equals candidate.Id
-            select new SteamCandidateGraphRow(identity.SteamId64, new CandidateGraphRow(
-                candidate,
-                context.Friendships.Where(friendship =>
-                        (friendship.UserLoId == viewerId && friendship.UserHiId == candidate.Id) ||
-                        (friendship.UserLoId == candidate.Id && friendship.UserHiId == viewerId))
-                    .Select(friendship => (FriendshipId?)friendship.Id).SingleOrDefault(),
-                context.Friendships.Where(friendship =>
-                        (friendship.UserLoId == viewerId && friendship.UserHiId == candidate.Id) ||
-                        (friendship.UserLoId == candidate.Id && friendship.UserHiId == viewerId))
-                    .Select(friendship => (FriendshipStatus?)friendship.Status).SingleOrDefault(),
-                context.Friendships.Where(friendship =>
-                        (friendship.UserLoId == viewerId && friendship.UserHiId == candidate.Id) ||
-                        (friendship.UserLoId == candidate.Id && friendship.UserHiId == viewerId))
-                    .Select(friendship => (UserId?)friendship.RequestedBy).SingleOrDefault(),
-                context.Blocks.Any(block =>
-                    (block.BlockerId == viewerId && block.BlockedId == candidate.Id) ||
-                    (block.BlockerId == candidate.Id && block.BlockedId == viewerId)))))
-            .ToListAsync(cancellationToken);
-
-        Dictionary<string, ResolvedUserGraph> visible = new(StringComparer.Ordinal);
-        foreach (SteamCandidateGraphRow steamRow in rows)
-        {
-            CandidateGraphRow row = steamRow.Graph;
-            Viewer viewer = ViewerFor(row, viewerId);
-            if (LookupVisibility.CanMatchSteamImport(row.Candidate, viewer))
-            {
-                visible[steamRow.SteamId] = Materialize(
-                    row, ProfileVisibility.For(row.Candidate, viewer));
-            }
-        }
-
-        return visible;
-    }
-
     private async Task<CandidateGraphRow?> FindByUsernameAsync(
         string canonicalUsername, UserId viewerId, CancellationToken cancellationToken)
     {
@@ -201,6 +152,4 @@ public sealed class UserGraphResolver(AppDbContext context) : IUserGraphResolver
         FriendshipStatus? RelationshipStatus,
         UserId? RequestedBy,
         bool IsBlocked);
-
-    private sealed record SteamCandidateGraphRow(string SteamId, CandidateGraphRow Graph);
 }
