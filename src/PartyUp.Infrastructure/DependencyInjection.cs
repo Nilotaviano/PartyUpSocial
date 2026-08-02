@@ -48,6 +48,7 @@ public static class DependencyInjection
             PartyUpUserClaimsPrincipalFactory>());
 
         services.AddScoped<IUserAccountGateway, UserAccountGateway>();
+        services.AddScoped<ISteamImportAccountGateway, UserAccountGateway>();
         services.AddScoped<IAdminSeedRefusalStore, AdminSeedRefusalStore>();
         services.AddScoped<IAccountSessionService, AccountSessionService>();
         services.AddScoped<ICurrentUserProjectionReader, CurrentUserProjectionReader>();
@@ -72,6 +73,7 @@ public static class DependencyInjection
         services.AddScoped<UnfriendUseCase>();
         services.AddScoped<BlockUserUseCase>();
         services.AddScoped<UnblockUserUseCase>();
+        services.AddScoped<ImportSteamFriendsUseCase>();
         services.AddSingleton<IPublicLinkBuilder>(new PublicLinkBuilder(
             configuration["PublicBaseUrl"] ?? "http://localhost:5173"));
         services.AddScoped<SecurityTokenService>();
@@ -89,6 +91,10 @@ public static class DependencyInjection
         services.AddSingleton<SteamApiClient>();
         services.AddSingleton<ISteamProfileClient>(provider =>
             new SteamProfileClient(
+                provider.GetRequiredService<SteamApiClient>(),
+                configuration["Steam:ApiKey"]));
+        services.AddSingleton<ISteamFriendListClient>(provider =>
+            new SteamFriendListClient(
                 provider.GetRequiredService<SteamApiClient>(),
                 configuration["Steam:ApiKey"]));
         services.AddSingleton<IDateTimeZoneProvider>(DateTimeZoneProviders.Tzdb);

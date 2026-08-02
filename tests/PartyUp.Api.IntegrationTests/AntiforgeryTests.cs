@@ -128,6 +128,7 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             ["POST /api/v1/friend-requests/{friendshipId}/reject"] = Onboarded(() => null),
             ["DELETE /api/v1/friend-requests/{friendshipId}"] = Onboarded(() => null),
             ["DELETE /api/v1/friends/{friendshipId}"] = Onboarded(() => null),
+            ["POST /api/v1/friends/imports/steam"] = Onboarded(() => null),
             ["POST /api/v1/blocks"] = Onboarded(() =>
                 JsonContent.Create(new { targetUsername = "MatrixPlayer" })),
             ["DELETE /api/v1/blocks/{blockId}"] = Onboarded(() => null),

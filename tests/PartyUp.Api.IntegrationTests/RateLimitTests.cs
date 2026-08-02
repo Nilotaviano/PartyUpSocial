@@ -286,6 +286,67 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
         }
     }
 
+    [Fact]
+    public async Task SteamImportMustSatisfyLookupImportAndDefaultDimensions_D049()
+    {
+        await using WebApplication application = await CreateLimiterProbeAsync();
+        using HttpClient client = application.GetTestClient();
+
+        for (int attempt = 0; attempt < 5; attempt++)
+        {
+            Assert.Equal(
+                HttpStatusCode.NoContent,
+                (await SendOperationProbeAsync(
+                    client,
+                    ApiOperationIds.ImportSteamFriends,
+                    "steam-user",
+                    $"192.0.2.{attempt + 1}")).StatusCode);
+        }
+        Assert.Equal(
+            HttpStatusCode.TooManyRequests,
+            (await SendOperationProbeAsync(
+                client,
+                ApiOperationIds.ImportSteamFriends,
+                "steam-user",
+                "192.0.2.10")).StatusCode);
+
+        for (int attempt = 0; attempt < 20; attempt++)
+        {
+            Assert.Equal(
+                HttpStatusCode.NoContent,
+                (await SendOperationProbeAsync(
+                    client,
+                    ApiOperationIds.GetUserProfile,
+                    "lookup-user",
+                    $"198.51.100.{attempt + 1}")).StatusCode);
+        }
+        Assert.Equal(
+            HttpStatusCode.TooManyRequests,
+            (await SendOperationProbeAsync(
+                client,
+                ApiOperationIds.ImportSteamFriends,
+                "lookup-user",
+                "198.51.100.50")).StatusCode);
+
+        for (int attempt = 0; attempt < 300; attempt++)
+        {
+            Assert.Equal(
+                HttpStatusCode.NoContent,
+                (await SendOperationProbeAsync(
+                    client,
+                    ApiOperationIds.GetSession,
+                    $"default-user-{attempt}",
+                    "203.0.113.10")).StatusCode);
+        }
+        Assert.Equal(
+            HttpStatusCode.TooManyRequests,
+            (await SendOperationProbeAsync(
+                client,
+                ApiOperationIds.ImportSteamFriends,
+                "default-import-user",
+                "203.0.113.10")).StatusCode);
+    }
+
     [Theory]
     [InlineData("profile", 20)]
     [InlineData("friend-code", 20)]
@@ -747,6 +808,18 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
             request.Headers.Add("X-Probe-User", user);
         }
 
+        return client.SendAsync(request);
+    }
+
+    private static Task<HttpResponseMessage> SendOperationProbeAsync(
+        HttpClient client,
+        string operationId,
+        string user,
+        string ip)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/probe/{operationId}");
+        request.Headers.Add("X-Probe-IP", ip);
+        request.Headers.Add("X-Probe-User", user);
         return client.SendAsync(request);
     }
 

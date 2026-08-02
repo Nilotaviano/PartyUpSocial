@@ -90,6 +90,11 @@ public static class FriendEndpoints
                 .Produces(StatusCodes.Status204NoContent))
             .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
 
+        Unsafe(friends.MapPost("/friends/imports/steam", ImportSteamFriendsAsync)
+                .WithName(ApiOperationIds.ImportSteamFriends)
+                .Produces<SteamFriendImportResponse>())
+            .ProducesPartyUpProblem(StatusCodes.Status409Conflict);
+
         return api;
     }
 
@@ -398,6 +403,26 @@ public static class FriendEndpoints
             : CommandProblem(context, result.Code!);
     }
 
+    private static async Task<IResult> ImportSteamFriendsAsync(
+        ICurrentUserAccessor currentUser,
+        ImportSteamFriendsUseCase useCase,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Problem(context, StatusCodes.Status401Unauthorized, "unauthorized");
+        }
+
+        ImportSteamFriendsResult result = await useCase.ExecuteAsync(
+            actorId.Value,
+            cancellationToken);
+        return result is SteamImportNotLinked
+            ? Problem(context, StatusCodes.Status409Conflict, "steam_not_linked")
+            : Results.Ok(SteamFriendImportResponse.From(result));
+    }
+
     private static async Task<UserId?> ActorIdAsync(
         ICurrentUserAccessor currentUser,
         CancellationToken cancellationToken) =>
@@ -600,4 +625,95 @@ public sealed record BlockedUserResponse(Guid BlockId, string Username, string C
             item.BlockId.Value,
             item.Username,
             InstantPattern.ExtendedIso.Format(item.CreatedAt));
+}
+
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "state")]
+[JsonDerivedType(typeof(ReadySteamFriendImportResponse), "ready")]
+[JsonDerivedType(typeof(PrivateProfileSteamFriendImportResponse), "private_profile")]
+[JsonDerivedType(typeof(ZeroFriendsSteamFriendImportResponse), "zero_friends")]
+[JsonDerivedType(typeof(ZeroMatchesSteamFriendImportResponse), "zero_matches")]
+[JsonDerivedType(typeof(NotConfiguredSteamFriendImportResponse), "not_configured")]
+[JsonDerivedType(typeof(UpstreamFailureSteamFriendImportResponse), "upstream_failure")]
+public abstract record SteamFriendImportResponse
+{
+    public static SteamFriendImportResponse From(ImportSteamFriendsResult result) => result switch
+    {
+        SteamImportReady ready => new ReadySteamFriendImportResponse(
+            ready.Matches.Select(SteamMatchedUserResponse.From).ToArray(),
+            ready.Unmatched.Select(SteamUnmatchedFriendResponse.From).ToArray(),
+            ready.InvitationUrl),
+        SteamImportPrivateProfile profile => new PrivateProfileSteamFriendImportResponse(
+            profile.Matches.Select(SteamMatchedUserResponse.From).ToArray(),
+            profile.Unmatched.Select(SteamUnmatchedFriendResponse.From).ToArray(),
+            profile.InvitationUrl),
+        SteamImportZeroFriends zeroFriends => new ZeroFriendsSteamFriendImportResponse(
+            zeroFriends.Matches.Select(SteamMatchedUserResponse.From).ToArray(),
+            zeroFriends.Unmatched.Select(SteamUnmatchedFriendResponse.From).ToArray(),
+            zeroFriends.InvitationUrl),
+        SteamImportZeroMatches zeroMatches => new ZeroMatchesSteamFriendImportResponse(
+            zeroMatches.Matches.Select(SteamMatchedUserResponse.From).ToArray(),
+            zeroMatches.Unmatched.Select(SteamUnmatchedFriendResponse.From).ToArray(),
+            zeroMatches.InvitationUrl),
+        SteamImportNotConfigured notConfigured =>
+            new NotConfiguredSteamFriendImportResponse(notConfigured.InvitationUrl),
+        SteamImportUpstreamFailure failure =>
+            new UpstreamFailureSteamFriendImportResponse(
+                failure.Retryable,
+                failure.InvitationUrl),
+        _ => throw new ArgumentOutOfRangeException(nameof(result)),
+    };
+}
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record ReadySteamFriendImportResponse(
+    IReadOnlyList<SteamMatchedUserResponse> Matches,
+    IReadOnlyList<SteamUnmatchedFriendResponse> Unmatched,
+    string InvitationUrl) : SteamFriendImportResponse;
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record PrivateProfileSteamFriendImportResponse(
+    IReadOnlyList<SteamMatchedUserResponse> Matches,
+    IReadOnlyList<SteamUnmatchedFriendResponse> Unmatched,
+    string InvitationUrl) : SteamFriendImportResponse;
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record ZeroFriendsSteamFriendImportResponse(
+    IReadOnlyList<SteamMatchedUserResponse> Matches,
+    IReadOnlyList<SteamUnmatchedFriendResponse> Unmatched,
+    string InvitationUrl) : SteamFriendImportResponse;
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record ZeroMatchesSteamFriendImportResponse(
+    IReadOnlyList<SteamMatchedUserResponse> Matches,
+    IReadOnlyList<SteamUnmatchedFriendResponse> Unmatched,
+    string InvitationUrl) : SteamFriendImportResponse;
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record NotConfiguredSteamFriendImportResponse(
+    string InvitationUrl) : SteamFriendImportResponse;
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record UpstreamFailureSteamFriendImportResponse(
+    bool Retryable,
+    string InvitationUrl) : SteamFriendImportResponse;
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record SteamMatchedUserResponse(string Username)
+{
+    public static SteamMatchedUserResponse From(SteamMatchedUser user) => new(user.Username);
+}
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record SteamUnmatchedFriendResponse(
+    string SteamId64,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? PersonaName,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? AvatarUrl,
+    string InvitationUrl)
+{
+    public static SteamUnmatchedFriendResponse From(SteamUnmatchedFriend friend) =>
+        new(
+            friend.SteamId64,
+            friend.PersonaName,
+            friend.AvatarUrl,
+            friend.InvitationUrl);
 }
