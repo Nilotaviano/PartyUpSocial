@@ -1,9 +1,16 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 
 namespace PartyUp.Api.IntegrationTests.Friends;
 
 [Trait("Category", "Integration")]
-public sealed class FriendEndpointOpenApiTests : IAsyncLifetime, IDisposable
+public sealed class FriendEndpointOpenApiTests : IDisposable
 {
     private static readonly IReadOnlyDictionary<string, string[]> Operations =
         new Dictionary<string, string[]>(StringComparer.Ordinal)
@@ -22,10 +29,8 @@ public sealed class FriendEndpointOpenApiTests : IAsyncLifetime, IDisposable
             ["BlockUser"] = ["201", "400", "401", "403", "404", "415", "429", "500"],
             ["UnblockUser"] = ["204", "400", "401", "403", "404", "429", "500"],
         };
-    private readonly PartyUpApiFactory _factory = new();
+    private readonly WebApplicationFactory<Program> _factory = new OpenApiOnlyFactory();
 
-    public Task InitializeAsync() => _factory.StartAsync();
-    public Task DisposeAsync() => _factory.StopAsync();
     public void Dispose() => _factory.Dispose();
 
     [Fact]
@@ -86,5 +91,83 @@ public sealed class FriendEndpointOpenApiTests : IAsyncLifetime, IDisposable
             schemas.GetProperty("PartyUpProblem").GetProperty("required")
                 .EnumerateArray()
                 .Select(value => value.GetString()));
+        Assert.Equal(
+            [
+                "none",
+                "incoming_pending",
+                "outgoing_pending",
+                "accepted",
+            ],
+            EnumValues(schemas.GetProperty("FriendRelationshipResponse"), "kind"));
+        Assert.Equal(
+            ["pending", "accepted"],
+            EnumValues(schemas.GetProperty("FriendshipResourceResponse"), "status"));
+        Assert.Equal(
+            ["outgoing", "incoming", "accepted"],
+            EnumValues(schemas.GetProperty("FriendshipResourceResponse"), "direction"));
+        Assert.DoesNotContain(
+            "acceptedAt",
+            schemas.GetProperty("FriendshipResourceResponse")
+                .GetProperty("required")
+                .EnumerateArray()
+                .Select(value => value.GetString()));
+
+        foreach (string operationId in Operations.Keys)
+        {
+            AssertExactProblemCode(
+                operations[operationId],
+                "401",
+                schemas,
+                "UnauthorizedPartyUpProblem",
+                "unauthorized");
+            AssertExactProblemCode(
+                operations[operationId],
+                "403",
+                schemas,
+                "OnboardingRequiredPartyUpProblem",
+                "onboarding_required");
+        }
+    }
+
+    private static string[] EnumValues(JsonElement schema, string propertyName) =>
+        schema.GetProperty("properties")
+            .GetProperty(propertyName)
+            .GetProperty("enum")
+            .EnumerateArray()
+            .Select(value => value.GetString()!)
+            .ToArray();
+
+    private static void AssertExactProblemCode(
+        JsonElement operation,
+        string status,
+        JsonElement schemas,
+        string schemaName,
+        string code)
+    {
+        string reference = operation.GetProperty("responses")
+            .GetProperty(status)
+            .GetProperty("content")
+            .GetProperty("application/problem+json")
+            .GetProperty("schema")
+            .GetProperty("$ref")
+            .GetString()!;
+        Assert.Equal($"#/components/schemas/{schemaName}", reference);
+        Assert.Equal([code], EnumValues(schemas.GetProperty(schemaName), "code"));
+    }
+
+    private sealed class OpenApiOnlyFactory : WebApplicationFactory<Program>
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.UseEnvironment("Development");
+            builder.ConfigureAppConfiguration((_, configuration) =>
+                configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:MigrateOnStartup"] = "false",
+                    ["Deletion:SweepEnabled"] = "false",
+                }));
+            builder.ConfigureTestServices(services =>
+                services.RemoveAll<IHostedService>());
+        }
     }
 }

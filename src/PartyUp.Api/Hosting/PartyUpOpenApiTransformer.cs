@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 
@@ -7,6 +8,28 @@ public sealed class PartyUpOpenApiTransformer :
     IOpenApiDocumentTransformer,
     IOpenApiOperationTransformer
 {
+    private static readonly string[] ProblemCodes =
+    [
+        "validation_failed",
+        "friend_code_invalid",
+        "friend_request_self",
+        "block_self",
+        "antiforgery_failed",
+        "unauthorized",
+        "onboarding_required",
+        "user_not_found",
+        "friend_request_not_found",
+        "friendship_not_found",
+        "block_not_found",
+        "friend_request_already_exists",
+        "friendship_already_exists",
+        "friend_request_not_pending",
+        "steam_not_linked",
+        "unsupported_media_type",
+        "rate_limited",
+        "internal_error",
+    ];
+
     private static readonly HashSet<string> FriendOperationIds =
         new HashSet<string>(StringComparer.Ordinal)
         {
@@ -56,6 +79,40 @@ public sealed class PartyUpOpenApiTransformer :
                 relationshipSchema is OpenApiSchema relationship)
             {
                 relationship.Required?.Remove("friendshipId");
+                SetStringEnum(relationship, "kind",
+                    "none",
+                    "incoming_pending",
+                    "outgoing_pending",
+                    "accepted");
+            }
+
+            if (schemas.TryGetValue(
+                    "FriendshipResourceResponse",
+                    out IOpenApiSchema? friendshipResourceSchema) &&
+                friendshipResourceSchema is OpenApiSchema friendshipResource)
+            {
+                friendshipResource.Required?.Remove("acceptedAt");
+                SetStringEnum(friendshipResource, "status", "pending", "accepted");
+                SetStringEnum(
+                    friendshipResource,
+                    "direction",
+                    "outgoing",
+                    "incoming",
+                    "accepted");
+            }
+
+            if (schemas.TryGetValue(
+                    "PartyUpProblem",
+                    out IOpenApiSchema? problemSchema) &&
+                problemSchema is OpenApiSchema problem)
+            {
+                SetStringEnum(problem, "code", ProblemCodes);
+                schemas["UnauthorizedPartyUpProblem"] = ExactProblemSchema(
+                    document,
+                    "unauthorized");
+                schemas["OnboardingRequiredPartyUpProblem"] = ExactProblemSchema(
+                    document,
+                    "onboarding_required");
             }
 
             if (schemas.TryGetValue("SessionResponse", out IOpenApiSchema? sessionSchema) &&
@@ -92,10 +149,88 @@ public sealed class PartyUpOpenApiTransformer :
                 {
                     [cookieReference] = [],
                 });
+                SetProblemResponseSchema(
+                    operation,
+                    document,
+                    "401",
+                    "UnauthorizedPartyUpProblem");
+                SetProblemResponseSchema(
+                    operation,
+                    document,
+                    "403",
+                    "OnboardingRequiredPartyUpProblem");
             }
         }
         return Task.CompletedTask;
     }
+
+    private static OpenApiSchema ExactProblemSchema(
+        OpenApiDocument document,
+        string code) =>
+        new()
+        {
+            AllOf =
+            [
+                new OpenApiSchemaReference(
+                    "PartyUpProblem",
+                    document,
+                    externalResource: null),
+            ],
+            Properties = new Dictionary<string, IOpenApiSchema>(StringComparer.Ordinal)
+            {
+                ["code"] = StringEnum(code),
+            },
+            Required = new HashSet<string>(StringComparer.Ordinal) { "code" },
+        };
+
+    private static void SetProblemResponseSchema(
+        OpenApiOperation operation,
+        OpenApiDocument document,
+        string status,
+        string schemaName)
+    {
+        if (operation.Responses is null ||
+            !operation.Responses.TryGetValue(status, out IOpenApiResponse? response) ||
+            response is not OpenApiResponse concreteResponse ||
+            concreteResponse.Content is null ||
+            !concreteResponse.Content.TryGetValue(
+                "application/problem+json",
+                out OpenApiMediaType? mediaType))
+        {
+            return;
+        }
+
+        mediaType.Schema = new OpenApiSchemaReference(
+            schemaName,
+            document,
+            externalResource: null);
+    }
+
+    private static void SetStringEnum(
+        OpenApiSchema objectSchema,
+        string propertyName,
+        params string[] values)
+    {
+        if (objectSchema.Properties is not null &&
+            objectSchema.Properties.TryGetValue(
+                propertyName,
+                out IOpenApiSchema? property) &&
+            property is OpenApiSchema concreteProperty)
+        {
+            concreteProperty.Enum = values
+                .Select(value => (JsonNode)JsonValue.Create(value)!)
+                .ToList();
+        }
+    }
+
+    private static OpenApiSchema StringEnum(params string[] values) =>
+        new()
+        {
+            Type = JsonSchemaType.String,
+            Enum = values
+                .Select(value => (JsonNode)JsonValue.Create(value)!)
+                .ToList(),
+        };
 
     private static void SetObjectType(
         IDictionary<string, IOpenApiSchema> schemas,

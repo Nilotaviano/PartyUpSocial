@@ -31,17 +31,17 @@ public sealed class CaddyAccessLoggingTests
         ];
         string[] routes =
         [
-            $"/u/{markers[0]}/malformed-extra?secret={markers[0]}",
-            $"/add/{markers[1]}%2Fencoded?secret={markers[1]}",
-            $"/api/v1/users/by-username/{markers[2]}/malformed-extra?secret={markers[2]}",
-            $"/api/v1/friend-codes/{markers[3]}%252Fencoded?secret={markers[3]}",
+            $"/U/{markers[0]}/malformed-extra?secret={markers[0]}",
+            $"/AdD/{markers[1]}%2Fencoded?secret={markers[1]}",
+            $"/API/V1/Users/By-Username/{markers[2]}/malformed-extra?secret={markers[2]}",
+            $"/Api/v1/Friend-Codes/{markers[3]}%252Fencoded?secret={markers[3]}",
         ];
         string[] expectedUris =
         [
-            "/u/REDACTED",
-            "/add/REDACTED",
-            "/api/v1/users/by-username/REDACTED",
-            "/api/v1/friend-codes/REDACTED",
+            "/U/REDACTED",
+            "/AdD/REDACTED",
+            "/API/V1/Users/By-Username/REDACTED",
+            "/Api/v1/Friend-Codes/REDACTED",
         ];
         using var handler = new HttpClientHandler { AllowAutoRedirect = false };
         using var client = new HttpClient(handler)

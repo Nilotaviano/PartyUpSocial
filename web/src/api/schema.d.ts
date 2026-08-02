@@ -1057,7 +1057,8 @@ export interface components {
             items: components["schemas"]["FriendItemResponse"][];
         };
         FriendRelationshipResponse: {
-            kind: string;
+            /** @enum {string} */
+            kind: "none" | "incoming_pending" | "outgoing_pending" | "accepted";
             /** Format: uuid */
             friendshipId?: null | string;
         };
@@ -1079,11 +1080,13 @@ export interface components {
         FriendshipResourceResponse: {
             /** Format: uuid */
             friendshipId: string;
-            status: string;
-            direction: string;
+            /** @enum {string} */
+            status: "pending" | "accepted";
+            /** @enum {string} */
+            direction: "outgoing" | "incoming" | "accepted";
             counterpartUsername: string;
             requestedAt: string;
-            acceptedAt: null | string;
+            acceptedAt?: null | string;
         };
         LinkPlatformRequest: {
             platform: string;
@@ -1109,6 +1112,10 @@ export interface components {
             platformLinks: components["schemas"]["PlatformLinkResponse"][];
             authMethods: components["schemas"]["AuthMethodResponse"][];
         };
+        OnboardingRequiredPartyUpProblem: {
+            /** @enum {string} */
+            code: "onboarding_required";
+        } & WithRequired<components["schemas"]["PartyUpProblem"], "code">;
         OnboardingResponse: {
             completedSteps: string[];
             nextStep: string;
@@ -1124,7 +1131,8 @@ export interface components {
             /** Format: int32 */
             status: number | string;
             instance: string;
-            code: string;
+            /** @enum {string} */
+            code: "validation_failed" | "friend_code_invalid" | "friend_request_self" | "block_self" | "antiforgery_failed" | "unauthorized" | "onboarding_required" | "user_not_found" | "friend_request_not_found" | "friendship_not_found" | "block_not_found" | "friend_request_already_exists" | "friendship_already_exists" | "friend_request_not_pending" | "steam_not_linked" | "unsupported_media_type" | "rate_limited" | "internal_error";
             traceId: string;
             errors?: null | {
                 [key: string]: string[];
@@ -1242,6 +1250,10 @@ export interface components {
         TokenRequest: {
             token: string;
         };
+        UnauthorizedPartyUpProblem: {
+            /** @enum {string} */
+            code: "unauthorized";
+        } & WithRequired<components["schemas"]["PartyUpProblem"], "code">;
         UsernameAvailability: {
             available: boolean;
             reason: null | string;
@@ -2885,7 +2897,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["UnauthorizedPartyUpProblem"];
                 };
             };
             /** @description Forbidden */
@@ -2894,7 +2906,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["OnboardingRequiredPartyUpProblem"];
                 };
             };
             /** @description Too Many Requests */
@@ -2943,7 +2955,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["UnauthorizedPartyUpProblem"];
                 };
             };
             /** @description Forbidden */
@@ -2952,7 +2964,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["OnboardingRequiredPartyUpProblem"];
                 };
             };
             /** @description Not Found */
@@ -3019,7 +3031,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["UnauthorizedPartyUpProblem"];
                 };
             };
             /** @description Forbidden */
@@ -3028,7 +3040,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["OnboardingRequiredPartyUpProblem"];
                 };
             };
             /** @description Not Found */
@@ -3084,7 +3096,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["UnauthorizedPartyUpProblem"];
                 };
             };
             /** @description Forbidden */
@@ -3093,7 +3105,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["OnboardingRequiredPartyUpProblem"];
                 };
             };
             /** @description Too Many Requests */
@@ -3140,7 +3152,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["UnauthorizedPartyUpProblem"];
                 };
             };
             /** @description Forbidden */
@@ -3149,7 +3161,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["OnboardingRequiredPartyUpProblem"];
                 };
             };
             /** @description Too Many Requests */
@@ -3221,7 +3233,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["UnauthorizedPartyUpProblem"];
                 };
             };
             /** @description Forbidden */
@@ -3230,7 +3242,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["OnboardingRequiredPartyUpProblem"];
                 };
             };
             /** @description Not Found */
@@ -3318,7 +3330,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["UnauthorizedPartyUpProblem"];
                 };
             };
             /** @description Forbidden */
@@ -3327,7 +3339,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["OnboardingRequiredPartyUpProblem"];
                 };
             };
             /** @description Not Found */
@@ -3404,7 +3416,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["UnauthorizedPartyUpProblem"];
                 };
             };
             /** @description Forbidden */
@@ -3413,7 +3425,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["OnboardingRequiredPartyUpProblem"];
                 };
             };
             /** @description Not Found */
@@ -3490,7 +3502,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["UnauthorizedPartyUpProblem"];
                 };
             };
             /** @description Forbidden */
@@ -3499,7 +3511,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["OnboardingRequiredPartyUpProblem"];
                 };
             };
             /** @description Not Found */
@@ -3576,7 +3588,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["UnauthorizedPartyUpProblem"];
                 };
             };
             /** @description Forbidden */
@@ -3585,7 +3597,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["OnboardingRequiredPartyUpProblem"];
                 };
             };
             /** @description Not Found */
@@ -3641,7 +3653,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["UnauthorizedPartyUpProblem"];
                 };
             };
             /** @description Forbidden */
@@ -3650,7 +3662,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["OnboardingRequiredPartyUpProblem"];
                 };
             };
             /** @description Too Many Requests */
@@ -3713,7 +3725,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["UnauthorizedPartyUpProblem"];
                 };
             };
             /** @description Forbidden */
@@ -3722,7 +3734,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["OnboardingRequiredPartyUpProblem"];
                 };
             };
             /** @description Not Found */
@@ -3799,7 +3811,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["UnauthorizedPartyUpProblem"];
                 };
             };
             /** @description Forbidden */
@@ -3808,7 +3820,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                    "application/problem+json": components["schemas"]["OnboardingRequiredPartyUpProblem"];
                 };
             };
             /** @description Not Found */
@@ -3841,3 +3853,6 @@ export interface operations {
         };
     };
 }
+type WithRequired<T, K extends keyof T> = T & {
+    [P in K]-?: T[P];
+};

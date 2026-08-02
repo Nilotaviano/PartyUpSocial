@@ -14,11 +14,11 @@ partyup.social {
 				# the pinned caddy:2 image.
 				request>uri multi_regexp {
 					regexp "\?.*" ""
-					regexp "^(/(u|add|api/v1/(users/by-username|friend-codes))/).*" "${1}REDACTED"
+					regexp "(?i)^(/(u|add|api/v1/(users/by-username|friend-codes))/).*" "${1}REDACTED"
 				}
 				resp_headers>Location multi_regexp {
 					regexp "\?.*" ""
-					regexp "^(https?://[^/]+)?(/(u|add|api/v1/(users/by-username|friend-codes))/).*" "${1}${2}REDACTED"
+					regexp "(?i)^(https?://[^/]+)?(/(u|add|api/v1/(users/by-username|friend-codes))/).*" "${1}${2}REDACTED"
 				}
 			}
 		}
