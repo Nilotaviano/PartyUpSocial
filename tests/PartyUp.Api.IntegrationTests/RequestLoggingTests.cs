@@ -1,11 +1,17 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using PartyUp.Application.Auth;
 using Serilog;
 using Serilog.Core;
@@ -289,6 +295,101 @@ public sealed class RequestLoggingTests : IAsyncLifetime, IDisposable
         public IReadOnlyCollection<LogEvent> Events => _events;
 
         public void Emit(LogEvent logEvent) => _events.Enqueue(logEvent);
+    }
+
+    private sealed class ThrowingTokenService : ISecurityTokenService
+    {
+        public Task<IssuedToken> IssueAsync(
+            IssueTokenRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromException<IssuedToken>(
+                new InvalidOperationException("Synthetic token-service failure."));
+
+        public Task<TokenRedemption> RedeemAsync(
+            RedeemTokenRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromException<TokenRedemption>(
+                new InvalidOperationException("Synthetic token-service failure."));
+    }
+}
+
+[Trait("Category", "Integration")]
+public sealed class Phase2ResponseParityTests : IDisposable
+{
+    private readonly WebApplicationFactory<Program> _factory = new ResponseOnlyFactory();
+
+    [Fact]
+    public async Task ExistingPhase2Failure_RetainsExact500Problem()
+    {
+        using HttpClient client = Slice5HttpTest.CreateClient(_factory);
+
+        HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
+            client,
+            "/api/v1/auth/magic-link/consume",
+            JsonContent.Create(new { token = "phase2-500", ageGateAttested = true }));
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.Equal(
+            "application/problem+json",
+            response.Content.Headers.ContentType?.MediaType);
+        string body = await response.Content.ReadAsStringAsync();
+        using JsonDocument problem = JsonDocument.Parse(body);
+        string traceId = problem.RootElement.GetProperty("traceId").GetString()!;
+        Assert.False(string.IsNullOrWhiteSpace(traceId));
+        Assert.Equal(
+            $$"""{"type":"https://tools.ietf.org/html/rfc9110#section-15.6.1","title":"An error occurred while processing your request.","status":500,"traceId":"{{traceId}}"}""",
+            body);
+    }
+
+    [Fact]
+    public async Task ExistingPhase2Antiforgery_RetainsExactProblemBody()
+    {
+        using HttpClient client = Slice5HttpTest.CreateClient(_factory);
+
+        HttpResponseMessage response = await client.PostAsJsonAsync(
+            "/api/v1/auth/login",
+            new { email = "player@example.test", password = "wrong-password" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(
+            "application/problem+json",
+            response.Content.Headers.ContentType?.MediaType);
+        string body = await response.Content.ReadAsStringAsync();
+        using JsonDocument problem = JsonDocument.Parse(body);
+        Assert.Equal(
+            ["type", "title", "status", "detail", "instance", "code", "traceId"],
+            problem.RootElement.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("about:blank", problem.RootElement.GetProperty("type").GetString());
+        Assert.Equal("Bad Request", problem.RootElement.GetProperty("title").GetString());
+        Assert.Equal(400, problem.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal(
+            "The antiforgery token is invalid.",
+            problem.RootElement.GetProperty("detail").GetString());
+        Assert.Equal(
+            "/api/v1/auth/login",
+            problem.RootElement.GetProperty("instance").GetString());
+        Assert.Equal("antiforgery_failed", problem.RootElement.GetProperty("code").GetString());
+        string traceId = problem.RootElement.GetProperty("traceId").GetString()!;
+        Assert.False(string.IsNullOrWhiteSpace(traceId));
+        Assert.Equal(
+            $$"""{"type":"about:blank","title":"Bad Request","status":400,"detail":"The antiforgery token is invalid.","instance":"/api/v1/auth/login","code":"antiforgery_failed","traceId":"{{traceId}}"}""",
+            body);
+    }
+
+    public void Dispose() => _factory.Dispose();
+
+    private sealed class ResponseOnlyFactory : WebApplicationFactory<Program>
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.UseEnvironment("Development");
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IHostedService>();
+                services.RemoveAll<ISecurityTokenService>();
+                services.AddScoped<ISecurityTokenService, ThrowingTokenService>();
+            });
+        }
     }
 
     private sealed class ThrowingTokenService : ISecurityTokenService

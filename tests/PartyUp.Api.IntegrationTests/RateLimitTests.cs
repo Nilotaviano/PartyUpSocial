@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -11,8 +12,11 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Net.Http.Headers;
 using PartyUp.Api.ErrorHandling;
 using PartyUp.Api.Security;
+using PartyUp.Api.IntegrationTests.Friends;
+using PartyUp.Domain.Kernel;
 
 namespace PartyUp.Api.IntegrationTests;
 
@@ -226,9 +230,6 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
             Case("email-send", ApiOperationIds.ReauthenticateByEmail),
             Case("reauth", ApiOperationIds.IssueExternalIntent),
             Case("lookup", ApiOperationIds.CheckUsernameAvailability),
-            Case("friend-lookup", ApiOperationIds.GetUserProfile),
-            Case("friend-request-send", ApiOperationIds.SendFriendRequest),
-            Case("steam-friend-import", ApiOperationIds.ImportSteamFriends),
             Case("default", ApiOperationIds.GetSession),
         ];
 
@@ -285,6 +286,163 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
         }
     }
 
+    [Theory]
+    [InlineData("profile", 20)]
+    [InlineData("friend-code", 20)]
+    [InlineData("block", 20)]
+    [InlineData("send", 10)]
+    public async Task TargetStateCannotChangeRealRouteLeaseConsumption_D065(
+        string routeKind,
+        int permitLimit)
+    {
+        await using var factory = ForwardedHeadersFactory();
+        using HttpClient client = CreateClient(factory);
+        FriendEndpointUser target = await FriendEndpointTest.SeedAsync(_factory);
+        FriendEndpointUser hiddenActor = await FriendEndpointTest.SeedAsync(_factory);
+        FriendEndpointUser missingActor = await FriendEndpointTest.SeedAsync(_factory);
+        string targetCookie = await SignInAsync(client, target.Id);
+        string hiddenCookie = await SignInAsync(client, hiddenActor.Id);
+        string missingCookie = await SignInAsync(client, missingActor.Id);
+
+        HttpResponseMessage block = await AntiforgeryTestClient.PostAsync(
+            client,
+            "/api/v1/blocks",
+            JsonContent.Create(new { targetUsername = hiddenActor.Username }),
+            targetCookie,
+            forwardedFor: "192.0.2.30");
+        Assert.Equal(HttpStatusCode.Created, block.StatusCode);
+
+        string missingUsername = "miss" + target.Username[4..];
+        string missingCode = target.FriendCode == "2222222222"
+            ? "3333333333"
+            : "2222222222";
+        AntiforgeryPair? hiddenPair = routeKind is "block" or "send"
+            ? await AntiforgeryTestClient.GetAsync(client, hiddenCookie)
+            : null;
+        AntiforgeryPair? missingPair = routeKind is "block" or "send"
+            ? await AntiforgeryTestClient.GetAsync(client, missingCookie)
+            : null;
+
+        for (int attempt = 0; attempt < permitLimit; attempt++)
+        {
+            using HttpResponseMessage hidden = await SendTargetRouteAsync(
+                client,
+                routeKind,
+                target.Username,
+                target.FriendCode,
+                hiddenCookie,
+                hiddenPair,
+                "192.0.2.31");
+            using HttpResponseMessage missing = await SendTargetRouteAsync(
+                client,
+                routeKind,
+                missingUsername,
+                missingCode,
+                missingCookie,
+                missingPair,
+                "192.0.2.32");
+            await AssertTargetStateResponseEquivalentAsync(
+                hidden,
+                missing,
+                HttpStatusCode.NotFound,
+                "user_not_found");
+        }
+
+        using HttpResponseMessage hiddenRejected = await SendTargetRouteAsync(
+            client,
+            routeKind,
+            target.Username,
+            target.FriendCode,
+            hiddenCookie,
+            hiddenPair,
+            "192.0.2.31");
+        using HttpResponseMessage missingRejected = await SendTargetRouteAsync(
+            client,
+            routeKind,
+            missingUsername,
+            missingCode,
+            missingCookie,
+            missingPair,
+            "192.0.2.32");
+        await AssertTargetStateResponseEquivalentAsync(
+            hiddenRejected,
+            missingRejected,
+            HttpStatusCode.TooManyRequests,
+            "rate_limited");
+        Assert.NotNull(hiddenRejected.Headers.RetryAfter?.Delta);
+        Assert.Equal(
+            hiddenRejected.Headers.RetryAfter?.Delta,
+            missingRejected.Headers.RetryAfter?.Delta);
+    }
+
+    [Fact]
+    public async Task StaleAndMissingIdRoutes_ConsumeSameRealDefaultLeases_D065()
+    {
+        await using var factory = ForwardedHeadersFactory();
+        using HttpClient client = CreateClient(factory);
+        FriendEndpointUser hiddenActor = await FriendEndpointTest.SeedAsync(_factory);
+        FriendEndpointUser missingActor = await FriendEndpointTest.SeedAsync(_factory);
+        string hiddenCookie = await SignInAsync(client, hiddenActor.Id);
+        string missingCookie = await SignInAsync(client, missingActor.Id);
+        RouteRequest[] hiddenRoutes = await CreateStaleActionRoutesAsync(
+            client,
+            hiddenActor,
+            hiddenCookie);
+        RouteRequest[] missingRoutes =
+        [
+            new(HttpMethod.Post, $"/api/v1/friend-requests/{Guid.NewGuid():D}/accept"),
+            new(HttpMethod.Post, $"/api/v1/friend-requests/{Guid.NewGuid():D}/reject"),
+            new(HttpMethod.Delete, $"/api/v1/friend-requests/{Guid.NewGuid():D}"),
+            new(HttpMethod.Delete, $"/api/v1/friends/{Guid.NewGuid():D}"),
+        ];
+        AntiforgeryPair hiddenPair = await AntiforgeryTestClient.GetAsync(client, hiddenCookie);
+        AntiforgeryPair missingPair = await AntiforgeryTestClient.GetAsync(client, missingCookie);
+
+        for (int attempt = 0; attempt < 300; attempt++)
+        {
+            RouteRequest hiddenRoute = hiddenRoutes[attempt % hiddenRoutes.Length];
+            RouteRequest missingRoute = missingRoutes[attempt % missingRoutes.Length];
+            using HttpResponseMessage hidden = await SendUnsafeWithPairAsync(
+                client,
+                hiddenRoute,
+                hiddenCookie,
+                hiddenPair,
+                "192.0.2.41");
+            using HttpResponseMessage missing = await SendUnsafeWithPairAsync(
+                client,
+                missingRoute,
+                missingCookie,
+                missingPair,
+                "192.0.2.42");
+            string code = attempt % hiddenRoutes.Length == 3
+                ? "friendship_not_found"
+                : "friend_request_not_found";
+            await AssertTargetStateResponseEquivalentAsync(
+                hidden,
+                missing,
+                HttpStatusCode.NotFound,
+                code);
+        }
+
+        using HttpResponseMessage hiddenRejected = await SendUnsafeWithPairAsync(
+            client,
+            hiddenRoutes[0],
+            hiddenCookie,
+            hiddenPair,
+            "192.0.2.41");
+        using HttpResponseMessage missingRejected = await SendUnsafeWithPairAsync(
+            client,
+            missingRoutes[0],
+            missingCookie,
+            missingPair,
+            "192.0.2.42");
+        await AssertTargetStateResponseEquivalentAsync(
+            hiddenRejected,
+            missingRejected,
+            HttpStatusCode.TooManyRequests,
+            "rate_limited");
+    }
+
     private Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program>
         ForwardedHeadersFactory() =>
         _factory.WithWebHostBuilder(builder =>
@@ -298,6 +456,190 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
                 services.AddSingleton<IStartupFilter>(new RemoteIpStartupFilter(
                     IPAddress.Parse("10.0.0.2"))));
         });
+
+    private async Task<RouteRequest[]> CreateStaleActionRoutesAsync(
+        HttpClient client,
+        FriendEndpointUser actor,
+        string actorCookie)
+    {
+        var routes = new List<RouteRequest>();
+        foreach (string action in new[] { "accept", "reject", "cancel", "unfriend" })
+        {
+            FriendEndpointUser counterpart = await FriendEndpointTest.SeedAsync(_factory);
+            string counterpartCookie = await SignInAsync(client, counterpart.Id);
+            bool incoming = action is "accept" or "reject";
+            string requesterCookie = incoming ? counterpartCookie : actorCookie;
+            string targetUsername = incoming ? actor.Username : counterpart.Username;
+            HttpResponseMessage pending = await AntiforgeryTestClient.PostAsync(
+                client,
+                "/api/v1/friend-requests",
+                JsonContent.Create(new { targetUsername }),
+                requesterCookie,
+                forwardedFor: "192.0.2.40");
+            pending.EnsureSuccessStatusCode();
+            Guid friendshipId = (await pending.Content.ReadFromJsonAsync<JsonElement>())
+                .GetProperty("friendshipId")
+                .GetGuid();
+
+            if (action == "unfriend")
+            {
+                HttpResponseMessage accepted = await AntiforgeryTestClient.PostAsync(
+                    client,
+                    $"/api/v1/friend-requests/{friendshipId:D}/accept",
+                    content: null,
+                    counterpartCookie,
+                    forwardedFor: "192.0.2.40");
+                Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+            }
+
+            HttpResponseMessage blocked = await AntiforgeryTestClient.PostAsync(
+                client,
+                "/api/v1/blocks",
+                JsonContent.Create(new { targetUsername = counterpart.Username }),
+                actorCookie,
+                forwardedFor: "192.0.2.40");
+            Assert.Equal(HttpStatusCode.Created, blocked.StatusCode);
+            routes.Add(action switch
+            {
+                "accept" => new(
+                    HttpMethod.Post,
+                    $"/api/v1/friend-requests/{friendshipId:D}/accept"),
+                "reject" => new(
+                    HttpMethod.Post,
+                    $"/api/v1/friend-requests/{friendshipId:D}/reject"),
+                "cancel" => new(
+                    HttpMethod.Delete,
+                    $"/api/v1/friend-requests/{friendshipId:D}"),
+                "unfriend" => new(
+                    HttpMethod.Delete,
+                    $"/api/v1/friends/{friendshipId:D}"),
+                _ => throw new InvalidOperationException($"Unknown action '{action}'."),
+            });
+        }
+
+        return routes.ToArray();
+    }
+
+    private static async Task<string> SignInAsync(HttpClient client, UserId userId)
+    {
+        HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
+            client,
+            $"/api/v1/_slice2/sign-in/{userId.Value:D}",
+            content: null);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        return Slice5HttpTest.AuthCookie(response);
+    }
+
+    private static Task<HttpResponseMessage> SendTargetRouteAsync(
+        HttpClient client,
+        string routeKind,
+        string username,
+        string friendCode,
+        string authCookie,
+        AntiforgeryPair? antiforgery,
+        string forwardedFor) =>
+        routeKind switch
+        {
+            "profile" => SendGetAsync(
+                client,
+                $"/api/v1/users/by-username/{username}",
+                authCookie,
+                forwardedFor),
+            "friend-code" => SendGetAsync(
+                client,
+                $"/api/v1/friend-codes/{friendCode}",
+                authCookie,
+                forwardedFor),
+            "block" => SendUnsafeWithPairAsync(
+                client,
+                new RouteRequest(HttpMethod.Post, "/api/v1/blocks", username),
+                authCookie,
+                antiforgery!,
+                forwardedFor),
+            "send" => SendUnsafeWithPairAsync(
+                client,
+                new RouteRequest(HttpMethod.Post, "/api/v1/friend-requests", username),
+                authCookie,
+                antiforgery!,
+                forwardedFor),
+            _ => throw new ArgumentOutOfRangeException(nameof(routeKind)),
+        };
+
+    private static Task<HttpResponseMessage> SendGetAsync(
+        HttpClient client,
+        string path,
+        string authCookie,
+        string forwardedFor)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Add(HeaderNames.Cookie, authCookie);
+        request.Headers.Add("X-Forwarded-For", forwardedFor);
+        return client.SendAsync(request);
+    }
+
+    private static Task<HttpResponseMessage> SendUnsafeWithPairAsync(
+        HttpClient client,
+        RouteRequest route,
+        string authCookie,
+        AntiforgeryPair antiforgery,
+        string forwardedFor)
+    {
+        var request = new HttpRequestMessage(route.Method, route.Path)
+        {
+            Content = route.TargetUsername is null
+                ? null
+                : JsonContent.Create(new { targetUsername = route.TargetUsername }),
+        };
+        request.Headers.Add("X-CSRF-TOKEN", antiforgery.Token);
+        request.Headers.Add(
+            HeaderNames.Cookie,
+            $"{authCookie}; {antiforgery.Cookie}");
+        request.Headers.Add("X-Forwarded-For", forwardedFor);
+        return client.SendAsync(request);
+    }
+
+    private static async Task AssertTargetStateResponseEquivalentAsync(
+        HttpResponseMessage hidden,
+        HttpResponseMessage missing,
+        HttpStatusCode status,
+        string code)
+    {
+        Assert.Equal(status, hidden.StatusCode);
+        Assert.Equal(hidden.StatusCode, missing.StatusCode);
+        Assert.Equal(
+            HeaderSnapshot(hidden),
+            HeaderSnapshot(missing));
+        Assert.Equal(
+            await NormalizedProblemAsync(hidden, code),
+            await NormalizedProblemAsync(missing, code));
+    }
+
+    private static async Task<string> NormalizedProblemAsync(
+        HttpResponseMessage response,
+        string code)
+    {
+        using JsonDocument document = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync());
+        JsonElement root = document.RootElement;
+        Assert.Equal(code, root.GetProperty("code").GetString());
+        return JsonSerializer.Serialize(new
+        {
+            type = root.GetProperty("type").GetString(),
+            title = root.GetProperty("title").GetString(),
+            status = root.GetProperty("status").GetInt32(),
+            code = root.GetProperty("code").GetString(),
+        });
+    }
+
+    private static Dictionary<string, string> HeaderSnapshot(
+        HttpResponseMessage response) =>
+        response.Headers
+            .Concat(response.Content.Headers)
+            .Where(header => !header.Key.Equals("Date", StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(
+                header => header.Key,
+                header => string.Join(",", header.Value),
+                StringComparer.OrdinalIgnoreCase);
 
     private static HttpClient CreateClient(
         Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory) =>
@@ -411,6 +753,11 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
     private sealed record LimiterCase(
         RateLimitDimension Dimension,
         string OperationId);
+
+    private sealed record RouteRequest(
+        HttpMethod Method,
+        string Path,
+        string? TargetUsername = null);
 
     private sealed class RemoteIpStartupFilter(IPAddress proxyAddress) : IStartupFilter
     {

@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
 
 namespace PartyUp.Api.ErrorHandling;
 
@@ -94,6 +95,11 @@ public sealed class InternalExceptionMapper : IExceptionHandler
             return false;
         }
 
+        if (!FriendProblemScope.Contains(httpContext))
+        {
+            return false;
+        }
+
         await PartyUpProblemResults.WriteAsync(
             httpContext,
             StatusCodes.Status500InternalServerError,
@@ -126,12 +132,53 @@ public sealed class ProblemAntiforgeryFilter(IAntiforgery antiforgery) : IEndpoi
         }
         catch (AntiforgeryValidationException)
         {
-            return PartyUpProblemResults.Create(
-                httpContext,
-                StatusCodes.Status400BadRequest,
-                "antiforgery_failed");
+            if (FriendProblemScope.Contains(httpContext))
+            {
+                return PartyUpProblemResults.Create(
+                    httpContext,
+                    StatusCodes.Status400BadRequest,
+                    "antiforgery_failed");
+            }
+
+            var problem = new ProblemDetails
+            {
+                Type = "about:blank",
+                Title = "Bad Request",
+                Status = StatusCodes.Status400BadRequest,
+                Detail = "The antiforgery token is invalid.",
+                Instance = httpContext.Request.Path,
+            };
+            problem.Extensions["code"] = "antiforgery_failed";
+            problem.Extensions["traceId"] = httpContext.TraceIdentifier;
+            return Results.Problem(problem);
         }
 
         return await next(context);
     }
+}
+
+internal static class FriendProblemScope
+{
+    private static readonly HashSet<string> OperationIds =
+        new HashSet<string>(StringComparer.Ordinal)
+        {
+            ApiOperationIds.GetFriendShare,
+            ApiOperationIds.GetUserProfile,
+            ApiOperationIds.ResolveFriendCode,
+            ApiOperationIds.ListFriends,
+            ApiOperationIds.ListFriendRequests,
+            ApiOperationIds.SendFriendRequest,
+            ApiOperationIds.AcceptFriendRequest,
+            ApiOperationIds.RejectFriendRequest,
+            ApiOperationIds.CancelFriendRequest,
+            ApiOperationIds.Unfriend,
+            ApiOperationIds.ListBlocks,
+            ApiOperationIds.BlockUser,
+            ApiOperationIds.UnblockUser,
+        };
+
+    internal static bool Contains(HttpContext context) =>
+        context.GetEndpoint()?.Metadata.GetMetadata<IEndpointNameMetadata>()?.EndpointName
+            is { } operationId &&
+        OperationIds.Contains(operationId);
 }

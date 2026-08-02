@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Routing;
@@ -155,7 +156,14 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         string body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("antiforgery_failed", body, StringComparison.Ordinal);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        Assert.Equal(
+            ["type", "title", "status", "detail", "instance", "code", "traceId"],
+            problem.RootElement.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(
+            "The antiforgery token is invalid.",
+            problem.RootElement.GetProperty("detail").GetString());
+        Assert.Equal("antiforgery_failed", problem.RootElement.GetProperty("code").GetString());
     }
 
     [Fact]
