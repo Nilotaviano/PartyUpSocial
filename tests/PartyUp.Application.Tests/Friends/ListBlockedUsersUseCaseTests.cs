@@ -7,7 +7,7 @@ namespace PartyUp.Application.Tests.Friends;
 public sealed class ListBlockedUsersUseCaseTests
 {
     [Fact]
-    public async Task Execute_ReturnsOnlyRowsTheViewerCreated_D065()
+    public async Task Execute_ReturnsStoredUsernameSnapshotsForViewerOwnedRows_D065()
     {
         UserId viewer = UserId.New();
         var repository = new FriendTestBlockRepository

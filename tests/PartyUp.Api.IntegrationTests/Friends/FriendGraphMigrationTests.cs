@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using NodaTime;
+using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Persistence;
@@ -94,6 +95,33 @@ public sealed class FriendGraphMigrationTests : IAsyncLifetime
             await FriendGraphDatabase.ReadScalarAsync(
                 context,
                 "SELECT to_regclass('public.friendships')::text"));
+    }
+
+    [Fact]
+    public async Task Migrate_BackfillsBlockUsernameSnapshotFromCurrentUsername_D065()
+    {
+        await using AppDbContext context = _database.CreateContext();
+        IMigrator migrator = context.GetService<IMigrator>();
+        await migrator.MigrateAsync("20260801172308_AddFriendGraph");
+        var clock = new MutableClock(Instant.FromUtc(2026, 8, 2, 12, 0));
+        User blocker = FriendGraphDatabase.CreateActiveUser(clock);
+        User blocked = FriendGraphDatabase.CreateActiveUser(clock);
+        context.DomainUsers.AddRange(blocker, blocked);
+        await context.SaveChangesAsync();
+        Block block = Block.Create(blocker.Id, blocked.Id, clock);
+        await context.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO blocks (id, blocker_id, blocked_id, created_at)
+            VALUES ({block.Id.Value}, {block.BlockerId.Value}, {block.BlockedId.Value},
+                    {block.CreatedAt})
+            """);
+
+        await migrator.MigrateAsync();
+
+        Assert.Equal(
+            blocked.Username!.Value.Value,
+            await FriendGraphDatabase.ReadScalarAsync(
+                context,
+                "SELECT blocked_username_snapshot FROM blocks"));
     }
 }
 

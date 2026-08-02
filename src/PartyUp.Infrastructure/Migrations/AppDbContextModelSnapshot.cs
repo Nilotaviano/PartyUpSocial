@@ -164,6 +164,12 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("blocked_id");
 
+                    b.Property<string>("BlockedUsernameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("blocked_username_snapshot");
+
                     b.Property<Guid>("BlockerId")
                         .HasColumnType("uuid")
                         .HasColumnName("blocker_id");

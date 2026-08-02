@@ -75,14 +75,15 @@ public sealed class BlockUserUseCase(
                 }
 
                 Block block = Block.Create(actorId, targetId, clock);
+                Username blockedUsernameSnapshot = target.Username.Value;
                 IReadOnlyList<Friendship> pairFriendships = friendship is null ? [] : [friendship];
                 await effectsExecutor.ExecuteAsync(block, pairFriendships, ct);
-                blocks.Add(block);
+                blocks.Add(block, blockedUsernameSnapshot);
 
                 return BlockGraphCommandResult.CreatedBlock(
                     new BlockedUserItem(
                         block.Id,
-                        target.Username.Value.Value,
+                        blockedUsernameSnapshot.Value,
                         block.CreatedAt));
             },
             cancellationToken);
