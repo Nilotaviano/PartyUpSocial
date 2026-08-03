@@ -64,12 +64,14 @@
     "friends": "No friends yet.",
     "incoming": "No incoming requests.",
     "outgoing": "No sent requests.",
-    "blocked": "No blocked users."
+    "blocked": "No blocked users.",
+    "blockedHelp": "Block people from a profile or friend card. They cannot find or contact you while blocked."
   },
   "profile": {
     "usernameOnly": "Only this username is shared until you become friends.",
     "notFound": "This profile could not be found.",
-    "platforms": "Linked game platforms"
+    "platforms": "Linked game platforms",
+    "blockConsequence": "Blocking removes your connection and shared participation. It does not notify the other person."
   },
   "share": {
     "addLinkDescription": "Share this link so a friend can find you by code.",
@@ -81,7 +83,7 @@
   },
   "dialogs": {
     "unfriendTitle": "Remove {{username}}?",
-    "unfriendBody": "You will no longer appear in each other's friends list."
+    "unfriendBody": "You will no longer appear in each other's friends list. Shared sessions stay unchanged."
   },
   "steam": {
     "readyTitle": "Steam friends found",

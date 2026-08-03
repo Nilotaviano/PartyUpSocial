@@ -5,6 +5,7 @@ import { client, isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { ReauthPrompt, type ReauthAction } from '../settings/ReauthPrompt'
 import { clearPendingSettingsAction, getPendingSettingsAction } from '../settings/reauthAction'
+import { SettingsNavigation } from '../settings/BlockedUsersPage'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 
@@ -91,10 +92,11 @@ export function ProfileSettingsPage() {
   async function confirmAction(proof: { currentPassword?: string; reauthToken?: string }) {
     if (action?.kind === 'unlinkPlatform') await unlinkPlatform(action.id, proof)
   }
-  if (isPending) return <main data-testid="screen-settings-profile">{t('loading')}</main>
+  if (isPending) return <main data-testid="screen-settings-profile"><SettingsNavigation /><p>{t('loading')}</p></main>
 
   return (
     <main data-testid="screen-settings-profile">
+      <SettingsNavigation />
       <h1>{t('pages.profile')}</h1>
       <ProfileError error={error} />
       <form onSubmit={(event) => void save(event, '/api/v1/me/username')}>

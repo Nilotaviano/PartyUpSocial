@@ -1,9 +1,4 @@
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type QueryClient,
-} from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router'
@@ -11,25 +6,15 @@ import type { components } from '../../api/schema'
 import { client, isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { validateFriendContinuation } from '../../auth/friendContinuation'
+import { UnfriendDialog } from './FriendList'
+import {
+  friendKeys,
+  invalidateFriendGraph,
+  runFriendGraphAction,
+  type FriendGraphAction,
+} from './friendGraph'
 
 type ProfileView = components['schemas']['ProfileViewResponse']
-
-const profileQueryKey = (username: string) => ['profile', username] as const
-
-async function invalidateFriendGraph(
-  queryClient: QueryClient,
-  username?: string,
-) {
-  await Promise.all([
-    username
-      ? queryClient.invalidateQueries({ queryKey: profileQueryKey(username) })
-      : Promise.resolve(),
-    queryClient.invalidateQueries({ queryKey: ['friendCode'] }),
-    queryClient.invalidateQueries({ queryKey: ['friends'] }),
-    queryClient.invalidateQueries({ queryKey: ['friendRequests'] }),
-    queryClient.invalidateQueries({ queryKey: ['blocks'] }),
-  ])
-}
 
 async function getProfile(username: string) {
   const { data } = await client.GET('/api/v1/users/by-username/{username}', {
@@ -43,7 +28,7 @@ function FriendError({ error }: { error: unknown }) {
   const { t } = useTranslation('errors')
   if (!error) return null
   return (
-    <p role="alert">
+    <p ref={(node) => node?.focus()} role="alert" tabIndex={-1}>
       {t(isApiError(error) ? error.code : 'generic', {
         defaultValue: t('generic'),
       })}
@@ -53,54 +38,38 @@ function FriendError({ error }: { error: unknown }) {
 
 type ProfileActionCardProps = {
   profile: ProfileView
-  onChanged?: () => void
+  friendCode?: string
+  onChanged?: (kind: FriendGraphAction['kind']) => void
 }
 
 export function ProfileActionCard({
   profile,
+  friendCode,
   onChanged,
 }: ProfileActionCardProps) {
   const { t } = useTranslation('friends')
   const queryClient = useQueryClient()
   const [status, setStatus] = useState('')
 
+  function input(kind: FriendGraphAction['kind']): FriendGraphAction {
+    const base = { username: profile.username, friendCode }
+    if (kind === 'send') return { kind, ...base }
+    if (kind === 'block') return { kind, ...base }
+    if (kind === 'unblock') {
+      throw new Error('Unblock is not a profile action.')
+    }
+    const friendshipId = profile.relationship.friendshipId
+    if (!friendshipId) throw new Error('Friendship identifier was missing.')
+    return { kind, friendshipId, ...base }
+  }
+
   const action = useMutation({
-    mutationFn: async (
-      kind: 'send' | 'accept' | 'reject' | 'cancel' | 'unfriend' | 'block',
-    ) => {
-      const friendshipId = profile.relationship.friendshipId
-      if (kind === 'send') {
-        await client.POST('/api/v1/friend-requests', {
-          params: { header: { 'X-CSRF-TOKEN': '' } },
-          body: { targetUsername: profile.username },
-        })
-      } else if (kind === 'block') {
-        await client.POST('/api/v1/blocks', {
-          params: { header: { 'X-CSRF-TOKEN': '' } },
-          body: { targetUsername: profile.username },
-        })
-      } else if (!friendshipId) {
-        throw new Error('Friendship identifier was missing.')
-      } else if (kind === 'accept') {
-        await client.POST('/api/v1/friend-requests/{friendshipId}/accept', {
-          params: { header: { 'X-CSRF-TOKEN': '' }, path: { friendshipId } },
-        })
-      } else if (kind === 'reject') {
-        await client.POST('/api/v1/friend-requests/{friendshipId}/reject', {
-          params: { header: { 'X-CSRF-TOKEN': '' }, path: { friendshipId } },
-        })
-      } else if (kind === 'cancel') {
-        await client.DELETE('/api/v1/friend-requests/{friendshipId}', {
-          params: { header: { 'X-CSRF-TOKEN': '' }, path: { friendshipId } },
-        })
-      } else {
-        await client.DELETE('/api/v1/friends/{friendshipId}', {
-          params: { header: { 'X-CSRF-TOKEN': '' }, path: { friendshipId } },
-        })
-      }
-      return kind
+    mutationFn: async (kind: FriendGraphAction['kind']) => {
+      const graphAction = input(kind)
+      const result = await runFriendGraphAction(graphAction)
+      return { graphAction, result }
     },
-    onSuccess: async (kind) => {
+    onSuccess: async ({ graphAction }) => {
       const statusKeys = {
         send: 'status.requestSent',
         accept: 'status.requestAccepted',
@@ -108,10 +77,11 @@ export function ProfileActionCard({
         cancel: 'status.requestCanceled',
         unfriend: 'status.unfriended',
         block: 'status.blocked',
+        unblock: 'status.unblocked',
       } as const
-      setStatus(t(statusKeys[kind]))
-      await invalidateFriendGraph(queryClient, profile.username)
-      onChanged?.()
+      setStatus(t(statusKeys[graphAction.kind]))
+      await invalidateFriendGraph(queryClient, graphAction)
+      onChanged?.(graphAction.kind)
     },
   })
 
@@ -150,7 +120,7 @@ export function ProfileActionCard({
               {profile.platforms.map((platform) => (
                 <li
                   key={`${platform.platform}:${platform.handle}`}
-                  className="text-sm text-slate-700"
+                  className="break-all text-sm text-slate-700"
                 >
                   {platform.platform}: {platform.handle}
                 </li>
@@ -173,6 +143,8 @@ export function ProfileActionCard({
       <div className="mt-4 flex flex-wrap gap-2">
         {relationship === 'none' && (
           <Button
+            aria-busy={action.isPending}
+            className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
             disabled={action.isPending}
             onClick={() => action.mutate('send')}
           >
@@ -182,12 +154,16 @@ export function ProfileActionCard({
         {relationship === 'incoming_pending' && (
           <>
             <Button
+              aria-busy={action.isPending}
+              className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
               disabled={action.isPending}
               onClick={() => action.mutate('accept')}
             >
               {t('actions.accept')}
             </Button>
             <Button
+              aria-busy={action.isPending}
+              className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
               disabled={action.isPending}
               onClick={() => action.mutate('reject')}
             >
@@ -197,19 +173,35 @@ export function ProfileActionCard({
         )}
         {relationship === 'outgoing_pending' && (
           <Button
+            aria-busy={action.isPending}
+            className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
             disabled={action.isPending}
             onClick={() => action.mutate('cancel')}
           >
             {t('actions.cancelRequest')}
           </Button>
         )}
+        {relationship === 'accepted' && profile.relationship.friendshipId && (
+          <UnfriendDialog
+            pending={action.isPending}
+            username={profile.username}
+            onConfirm={async () => {
+              await action.mutateAsync('unfriend')
+            }}
+          />
+        )}
         <Button
+          aria-busy={action.isPending}
+          className="min-h-11 rounded-md border border-red-300 px-4 py-2 text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-60"
           disabled={action.isPending}
           onClick={() => action.mutate('block')}
         >
           {t('actions.block')}
         </Button>
       </div>
+      <p className="mt-3 text-sm text-slate-600">
+        {t('profile.blockConsequence')}
+      </p>
       <p aria-live="polite" className="mt-3 text-sm text-emerald-700">
         {status}
       </p>
@@ -220,10 +212,12 @@ export function ProfileActionCard({
 
 export function ProfileResolution({ username }: { username: string }) {
   const { t } = useTranslation('friends')
+  const [hiddenUsername, setHiddenUsername] = useState<string>()
   const continuation = validateFriendContinuation('/u/' + username)
   const canonical = continuation?.slice(3)
+  const hidden = canonical !== undefined && hiddenUsername === canonical
   const profile = useQuery({
-    queryKey: profileQueryKey(canonical ?? username),
+    queryKey: friendKeys.profile(canonical ?? username),
     queryFn: () => getProfile(canonical!),
     enabled: canonical !== undefined,
   })
@@ -233,7 +227,16 @@ export function ProfileResolution({ username }: { username: string }) {
       {!canonical && <p role="alert">{t('profile.notFound')}</p>}
       {profile.isPending && canonical && <p>{t('status.loading')}</p>}
       <FriendError error={profile.error} />
-      {profile.data && <ProfileActionCard profile={profile.data} />}
+      <p aria-live="polite">{hidden ? t('status.blocked') : ''}</p>
+      {hidden && <p>{t('profile.notFound')}</p>}
+      {profile.data && !hidden && (
+        <ProfileActionCard
+          profile={profile.data}
+          onChanged={(kind) => {
+            if (kind === 'block') setHiddenUsername(canonical)
+          }}
+        />
+      )}
     </>
   )
 }

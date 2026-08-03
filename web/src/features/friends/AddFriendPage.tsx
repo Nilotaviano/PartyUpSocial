@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router'
 import { client, isApiError } from '../../api/client'
@@ -9,6 +9,7 @@ import {
 } from '../../auth/friendContinuation'
 import { FriendCodeInput } from './FriendCodeInput'
 import { ProfileActionCard } from './ProfilePage'
+import { friendKeys } from './friendGraph'
 
 async function resolveFriendCode(friendCode: string) {
   const { data } = await client.GET('/api/v1/friend-codes/{friendCode}', {
@@ -20,10 +21,12 @@ async function resolveFriendCode(friendCode: string) {
 
 export function FriendCodeResolution({ friendCode }: { friendCode: string }) {
   const { t } = useTranslation(['friends', 'errors'])
+  const [hiddenCode, setHiddenCode] = useState<string>()
   const normalized = normalizeFriendCode(friendCode)
+  const hidden = hiddenCode === normalized
   const valid = isWellFormedFriendCode(normalized)
   const resolution = useQuery({
-    queryKey: ['friendCode', normalized],
+    queryKey: friendKeys.friendCode(normalized),
     queryFn: () => resolveFriendCode(normalized),
     enabled: valid,
   })
@@ -42,7 +45,17 @@ export function FriendCodeResolution({ friendCode }: { friendCode: string }) {
           })}
         </p>
       )}
-      {resolution.data && <ProfileActionCard profile={resolution.data} />}
+      <p aria-live="polite">{hidden ? t('status.blocked') : ''}</p>
+      {hidden && <p>{t('profile.notFound')}</p>}
+      {resolution.data && !hidden && (
+        <ProfileActionCard
+          friendCode={normalized}
+          profile={resolution.data}
+          onChanged={(kind) => {
+            if (kind === 'block') setHiddenCode(normalized)
+          }}
+        />
+      )}
     </>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -20,12 +20,14 @@ export function FriendCodeInput({
   const { t } = useTranslation(['friends', 'errors'])
   const [value, setValue] = useState(initialValue)
   const [invalid, setInvalid] = useState(false)
+  const error = useRef<HTMLParagraphElement>(null)
 
   function submit(event: FormEvent) {
     event.preventDefault()
     const normalized = normalizeFriendCode(value)
     if (!isWellFormedFriendCode(normalized)) {
       setInvalid(true)
+      queueMicrotask(() => error.current?.focus())
       return
     }
 
@@ -44,7 +46,7 @@ export function FriendCodeInput({
           }
           autoCapitalize="characters"
           autoComplete="off"
-          className="min-w-56 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono tracking-wider"
+          className="min-h-11 min-w-56 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono tracking-wider"
           id="friend-code"
           inputMode="text"
           maxLength={14}
@@ -53,7 +55,7 @@ export function FriendCodeInput({
           value={value}
         />
         <Button
-          className="rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          className="min-h-11 rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
           type="submit"
         >
           {t('actions.resolve')}
@@ -63,7 +65,7 @@ export function FriendCodeInput({
         {t('labels.friendCodeHelp')}
       </p>
       {invalid && (
-        <p id="friend-code-error" role="alert">
+        <p id="friend-code-error" ref={error} role="alert" tabIndex={-1}>
           {t('friend_code_invalid', { ns: 'errors' })}
         </p>
       )}

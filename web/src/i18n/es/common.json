@@ -1,5 +1,22 @@
 {
-  "app": { "name": "PartyUp", "tagline": "Encuentra tiempo para jugar con tus amistades." },
-  "common": { "loading": "Cargando...", "continue": "Continuar" },
-  "pages": { "welcome": "Bienvenida", "ageGate": "Verificación de edad", "app": "Inicio", "accountDeletion": "Eliminar cuenta", "accountDeletionConfirm": "Confirmar eliminación de la cuenta" }
+  "app": {
+    "name": "PartyUp",
+    "tagline": "Encuentra tiempo para jugar con tus amistades."
+  },
+  "common": {
+    "loading": "Cargando...",
+    "continue": "Continuar"
+  },
+  "navigation": {
+    "label": "Navegación principal",
+    "home": "Inicio",
+    "friends": "Amistades"
+  },
+  "pages": {
+    "welcome": "Bienvenida",
+    "ageGate": "Verificación de edad",
+    "app": "Inicio",
+    "accountDeletion": "Eliminar cuenta",
+    "accountDeletionConfirm": "Confirmar eliminación de la cuenta"
+  }
 }

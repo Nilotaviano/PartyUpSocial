@@ -64,12 +64,14 @@
     "friends": "Aún no tienes amistades.",
     "incoming": "No hay solicitudes recibidas.",
     "outgoing": "No hay solicitudes enviadas.",
-    "blocked": "No hay usuarios bloqueados."
+    "blocked": "No hay usuarios bloqueados.",
+    "blockedHelp": "Bloquea personas desde un perfil o una tarjeta de amistad. No podrán encontrarte ni contactarte mientras estén bloqueadas."
   },
   "profile": {
     "usernameOnly": "Solo se muestra este nombre de usuario hasta que sean amistades.",
     "notFound": "No se encontró este perfil.",
-    "platforms": "Plataformas de juego vinculadas"
+    "platforms": "Plataformas de juego vinculadas",
+    "blockConsequence": "Bloquear elimina la conexión y la participación compartida. La otra persona no recibe una notificación."
   },
   "share": {
     "addLinkDescription": "Comparte este enlace para que una amistad te encuentre por código.",
@@ -81,7 +83,7 @@
   },
   "dialogs": {
     "unfriendTitle": "¿Eliminar a {{username}}?",
-    "unfriendBody": "Ya no aparecerán en sus respectivas listas de amistades."
+    "unfriendBody": "Ya no aparecerán en sus respectivas listas de amistades. Las sesiones compartidas no cambian."
   },
   "steam": {
     "readyTitle": "Amistades de Steam encontradas",

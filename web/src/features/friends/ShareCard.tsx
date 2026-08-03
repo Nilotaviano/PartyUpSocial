@@ -61,6 +61,7 @@ export function ShareCard() {
                 {share.data.friendCode}
               </p>
               <Button
+                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                 onClick={() =>
                   void copy(share.data.friendCode, t('labels.friendCode'))
                 }
@@ -73,12 +74,13 @@ export function ShareCard() {
                 {t('share.addLinkDescription')}
               </p>
               <a
-                className="block break-all text-indigo-700 underline"
+                className="inline-flex min-h-11 items-center break-all text-indigo-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                 href={share.data.addUrl}
               >
                 {share.data.addUrl}
               </a>
               <Button
+                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                 onClick={() =>
                   void copy(share.data.addUrl, t('actions.copyAddLink'))
                 }
@@ -91,12 +93,13 @@ export function ShareCard() {
                 {t('share.profileLinkDescription')}
               </p>
               <a
-                className="block break-all text-indigo-700 underline"
+                className="inline-flex min-h-11 items-center break-all text-indigo-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                 href={share.data.profileUrl}
               >
                 {share.data.profileUrl}
               </a>
               <Button
+                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                 onClick={() =>
                   void copy(share.data.profileUrl, t('actions.copyProfileLink'))
                 }
