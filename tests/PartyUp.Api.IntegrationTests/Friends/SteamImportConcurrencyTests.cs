@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Identity;
+using System.Data.Common;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -136,27 +136,38 @@ public sealed class SteamImportConcurrencyTests : IAsyncLifetime, IDisposable
         if (mutationLinearizesFirst)
         {
             var projectionGate = new OwnershipProjectionGate();
+            var mutationHold = new UserLockHoldState(mutation == "unlink" ? 1 : 2);
+            var importAttempt = new PairLockAttemptGate();
             await using WebApplicationFactory<Program> raceFactory =
-                ProjectionRaceFactory(projectionGate);
+                MutationFirstA030RaceFactory(projectionGate, mutationHold, importAttempt);
             Task<ImportSteamFriendsResult> import = ImportAsync(importer.Id, raceFactory);
             IReadOnlyDictionary<string, UserId> projected =
                 await projectionGate.FirstProjection.Task.WaitAsync(RaceTimeout);
             Assert.Equal(oldCandidate.Id, projected["cand-old"]);
 
-            if (mutation == "unlink")
+            Task mutationTask = mutation == "unlink"
+                ? UnlinkSteamSuccessfullyAsync(importer.Id, raceFactory)
+                : RelinkSteamAsync(importer.Id, "imp-new", raceFactory);
+            try
             {
-                Assert.True((await UnlinkSteamAsync(importer.Id, raceFactory)).Succeeded);
+                await mutationHold.Gate.Held.Task.WaitAsync(RaceTimeout);
                 projectionGate.ReleaseFirst.TrySetResult();
-                result = await import;
+                await importAttempt.Attempted.Task.WaitAsync(RaceTimeout);
+                Assert.False(import.IsCompleted);
             }
-            else
+            finally
             {
-                await RelinkSteamAsync(importer.Id, "imp-new", raceFactory);
+                projectionGate.ReleaseFirst.TrySetResult();
+                mutationHold.Gate.Release.TrySetResult();
+            }
+
+            await mutationTask;
+            if (mutation == "relink")
+            {
                 RetryWriteSnapshot beforeRetry = await RetrySnapshotAsync(
                     importer.Id,
                     oldCandidate.Id,
                     newCandidate.Id);
-                projectionGate.ReleaseFirst.TrySetResult();
                 try
                 {
                     await projectionGate.RetryProjection.Task.WaitAsync(RaceTimeout);
@@ -170,9 +181,10 @@ public sealed class SteamImportConcurrencyTests : IAsyncLifetime, IDisposable
                     projectionGate.ReleaseRetry.TrySetResult();
                 }
 
-                result = await import;
                 Assert.Equal(2, projectionGate.ProjectionCalls);
             }
+
+            result = await import;
         }
         else
         {
@@ -399,6 +411,30 @@ public sealed class SteamImportConcurrencyTests : IAsyncLifetime, IDisposable
                         gate));
             }));
 
+    private WebApplicationFactory<Program> MutationFirstA030RaceFactory(
+        OwnershipProjectionGate projectionGate,
+        UserLockHoldState mutationHold,
+        PairLockAttemptGate importAttempt) =>
+        _configured!.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<ISteamImportAccountGateway>();
+                services.AddScoped<UserAccountGateway>();
+                services.AddScoped<ISteamImportAccountGateway>(provider =>
+                    new AttemptingSteamImportAccountGateway(
+                        new ProjectingSteamImportAccountGateway(
+                            provider.GetRequiredService<UserAccountGateway>(),
+                            projectionGate),
+                        importAttempt));
+                services.RemoveAll<IUserRepository>();
+                services.AddSingleton(mutationHold);
+                services.AddScoped<UserRepository>();
+                services.AddScoped<IUserRepository>(provider =>
+                    new HoldingUserRepository(
+                        provider.GetRequiredService<UserRepository>(),
+                        provider.GetRequiredService<UserLockHoldState>()));
+            }));
+
     private WebApplicationFactory<Program> ImportFirstA030RaceFactory(
         PairLockGate holdingGate,
         UserLockAttemptState attempt) =>
@@ -538,21 +574,51 @@ public sealed class SteamImportConcurrencyTests : IAsyncLifetime, IDisposable
                 .SingleAsync();
             versions.Add((row.Id, row.Xmin));
         }
-        var identities = await context.SteamIdentities.AsNoTracking().ToArrayAsync();
         return new RetryWriteSnapshot(
             string.Join('|', versions
                 .OrderBy(value => value.Id.Value)
                 .Select(value => $"{value.Id.Value:D}:{value.Xmin}")),
             await context.DomainUsers.CountAsync(),
-            await context.PlatformLinks.CountAsync(),
-            identities.Length,
-            string.Join('|', identities
-                .OrderBy(value => value.UserId.Value)
-                .Select(value => $"{value.UserId.Value:D}:{value.SteamId64}")),
-            await context.Set<IdentityUserLogin<Guid>>().CountAsync(),
-            await context.Friendships.CountAsync(),
-            await context.Blocks.CountAsync(),
-            await context.Notifications.CountAsync());
+            await MutableRowsSnapshotAsync(context));
+    }
+
+    private static async Task<string> MutableRowsSnapshotAsync(AppDbContext context)
+    {
+        DbConnection connection = context.Database.GetDbConnection();
+        await connection.OpenAsync();
+        await using DbCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT table_name || ':' || row_version || ':' || row_data
+            FROM (
+                SELECT 'platform_links' AS table_name, xmin::text AS row_version,
+                       to_jsonb(platform_link)::text AS row_data
+                FROM platform_links AS platform_link
+                UNION ALL
+                SELECT 'steam_identities', xmin::text, to_jsonb(steam_identity)::text
+                FROM steam_identities AS steam_identity
+                UNION ALL
+                SELECT 'auth_user_logins', xmin::text, to_jsonb(auth_login)::text
+                FROM auth_user_logins AS auth_login
+                UNION ALL
+                SELECT 'friendships', xmin::text, to_jsonb(friendship)::text
+                FROM friendships AS friendship
+                UNION ALL
+                SELECT 'blocks', xmin::text, to_jsonb(block)::text
+                FROM blocks AS block
+                UNION ALL
+                SELECT 'notifications', xmin::text, to_jsonb(notification)::text
+                FROM notifications AS notification
+            ) AS mutable_rows
+            ORDER BY table_name, row_data, row_version
+            """;
+        await using DbDataReader reader = await command.ExecuteReaderAsync();
+        var rows = new List<string>();
+        while (await reader.ReadAsync())
+        {
+            rows.Add(reader.GetString(0));
+        }
+
+        return string.Join('|', rows);
     }
 
     private static Task<int> SteamMatchCountAsync(
@@ -581,13 +647,7 @@ public sealed class SteamImportConcurrencyTests : IAsyncLifetime, IDisposable
     private sealed record RetryWriteSnapshot(
         string UserXmins,
         int Users,
-        int PlatformLinks,
-        int SteamIdentities,
-        string SteamOwners,
-        int AuthLogins,
-        int Friendships,
-        int Blocks,
-        int Notifications);
+        string MutableRows);
 }
 
 internal sealed class RoutingSteamFriendListClient : ISteamFriendListClient
@@ -735,6 +795,48 @@ internal sealed class UserLockAttemptState
 {
     internal TaskCompletionSource Attempted { get; } =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
+}
+
+internal sealed class UserLockHoldState(int holdOnAttempt)
+{
+    private int _attempts;
+
+    internal PairLockGate Gate { get; } = new();
+
+    internal bool ShouldHold() => Interlocked.Increment(ref _attempts) == holdOnAttempt;
+}
+
+internal sealed class HoldingUserRepository(
+    IUserRepository inner,
+    UserLockHoldState state) : IUserRepository
+{
+    public Task<PartyUp.Domain.Users.User?> FindAsync(
+        UserId id,
+        CancellationToken cancellationToken) =>
+        inner.FindAsync(id, cancellationToken);
+
+    public async Task<PartyUp.Domain.Users.User?> FindForUpdateAsync(
+        UserId id,
+        CancellationToken cancellationToken)
+    {
+        PartyUp.Domain.Users.User? user =
+            await inner.FindForUpdateAsync(id, cancellationToken);
+        if (state.ShouldHold())
+        {
+            state.Gate.Held.TrySetResult();
+            await state.Gate.Release.Task.WaitAsync(cancellationToken);
+        }
+
+        return user;
+    }
+
+    public Task<IReadOnlyList<UserId>> FindDueForDeletionAsync(
+        NodaTime.Instant now,
+        int max,
+        CancellationToken cancellationToken) =>
+        inner.FindDueForDeletionAsync(now, max, cancellationToken);
+
+    public void Add(PartyUp.Domain.Users.User user) => inner.Add(user);
 }
 
 internal sealed class AttemptingUserRepository(
