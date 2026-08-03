@@ -1,5 +1,22 @@
 {
-  "app": { "name": "PartyUp", "tagline": "Find time to play with your friends." },
-  "common": { "loading": "Loading...", "continue": "Continue" },
-  "pages": { "welcome": "Welcome", "ageGate": "Age gate", "app": "Home", "accountDeletion": "Delete account", "accountDeletionConfirm": "Confirm account deletion" }
+  "app": {
+    "name": "PartyUp",
+    "tagline": "Find time to play with your friends."
+  },
+  "common": {
+    "loading": "Loading...",
+    "continue": "Continue"
+  },
+  "navigation": {
+    "label": "Primary navigation",
+    "home": "Home",
+    "friends": "Friends"
+  },
+  "pages": {
+    "welcome": "Welcome",
+    "ageGate": "Age gate",
+    "app": "Home",
+    "accountDeletion": "Delete account",
+    "accountDeletionConfirm": "Confirm account deletion"
+  }
 }

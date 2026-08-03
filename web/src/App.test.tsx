@@ -1,9 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import './i18n'
+import i18n from './i18n'
 import type { Session } from './api/client'
 import { RequireAuth } from './auth/RequireAuth'
 import { RequireOnboarded } from './auth/RequireOnboarded'
@@ -55,9 +61,10 @@ function setSession(value: Session) {
   } as ReturnType<typeof useSession>)
 }
 
-afterEach(() => {
+afterEach(async () => {
   cleanup()
   mockedUseSession.mockReset()
+  await i18n.changeLanguage('en')
 })
 
 describe('route guards', () => {
@@ -172,4 +179,63 @@ describe('Slice 7 friend route reachability', () => {
       '/onboarding/username?next=%2Fu%2Ffriend.one',
     )
   })
+})
+describe('AppNavigationTests', () => {
+  it.each([
+    ['/app', 'screen-app'],
+    ['/friends', 'screen-friends'],
+    ['/friends/import/steam', 'screen-steam-import'],
+    ['/u/friend.one', 'screen-friend-profile'],
+    ['/add/23456789AB', 'screen-add-friend'],
+    ['/settings/profile', 'screen-settings-profile'],
+    ['/settings/account', 'screen-settings-account'],
+    ['/settings/blocked', 'screen-settings-blocked'],
+  ])(
+    'AuthenticatedEntries_ReachFriendsAndBlockedRoutes_D127: %s',
+    async (path, testId) => {
+      setSession(session({ authenticated: true, state: 'active' }))
+      renderRoute(path)
+
+      expect(await screen.findByTestId(testId)).toBeInTheDocument()
+      const friends = screen.getByRole('link', { name: 'Friends' })
+      friends.focus()
+      expect(friends).toHaveFocus()
+      if (path.startsWith('/settings/')) {
+        expect(screen.getByRole('link', { name: 'Blocked users' })).toBeInTheDocument()
+      }
+    },
+  )
+
+  it('clicked entries render the guarded Friends and Blocked pages', async () => {
+    setSession(session({ authenticated: true, state: 'active' }))
+    const first = renderRoute('/app')
+
+    fireEvent.click(screen.getByRole('link', { name: 'Friends' }))
+    expect(await screen.findByTestId('screen-friends')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Find Steam friends' }))
+    expect(await screen.findByTestId('screen-steam-import')).toBeInTheDocument()
+
+    first.unmount()
+    renderRoute('/settings/account')
+    fireEvent.click(await screen.findByRole('link', { name: 'Blocked users' }))
+    expect(
+      await screen.findByTestId('screen-settings-blocked'),
+    ).toBeInTheDocument()
+  })
+
+  it.each([
+    ['en', 'Friends'],
+    ['pt-BR', 'Amigos'],
+    ['es', 'Amistades'],
+  ])(
+    'PersistentEntries_HaveLocalizedAccessibleLabelsAndCurrentState_D139: %s',
+    async (locale, label) => {
+      await i18n.changeLanguage(locale)
+      setSession(session({ authenticated: true, state: 'active' }))
+      renderRoute('/friends')
+
+      const link = await screen.findByRole('link', { name: label })
+      expect(link).toHaveAttribute('aria-current', 'page')
+    },
+  )
 })

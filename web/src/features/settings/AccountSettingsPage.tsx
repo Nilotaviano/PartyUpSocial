@@ -12,6 +12,7 @@ import { Input } from '../../components/ui/input'
 import { Select } from '../../components/ui/select'
 import { ReauthPrompt, type ReauthAction } from './ReauthPrompt'
 import { clearPendingSettingsAction, getPendingSettingsAction } from './reauthAction'
+import { SettingsNavigation } from './BlockedUsersPage'
 
 const methodsQueryKey = ['auth-methods'] as const
 
@@ -128,6 +129,7 @@ export function AccountSettingsPage() {
 
   return (
     <main data-testid="screen-settings-account">
+      <SettingsNavigation />
       <h1>{t('pages.account')}</h1>
       {(location.state as { identityConfirmed?: boolean } | null)?.identityConfirmed && <p role="status">{t('reauth.confirmedIdentityChooseAction')}</p>}
       <section aria-labelledby="account-email-heading">

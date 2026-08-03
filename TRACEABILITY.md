@@ -267,6 +267,22 @@ Slice 6 performs only live explicit imports. It persists no import/correlation s
 | D-144 | `AddFriendPage.test.tsx` — local normalization, invalid-input rejection, and failure preservation; `ShareCard.test.tsx` — QR payload is the caller-owned API absolute add URL |
 
 Slice 7 consumes only server-validated friend continuations. Profile activation precedes all optional friends education and API calls; Active reload is deterministic, and the optional step persists no completion flag.
+## Phase 3 slice 8 test citations
+
+| Decision | Slice 8 citations |
+|---|---|
+| D-015 | `FriendsPageTests.RequestActions_RenderAndMutateEveryLifecycleAction_D015`; `AddFriendPageTests.ResolvedProfile_AllowsAnExplicitFriendRequest_D031` |
+| D-049 | `SteamImportPageTests.Render_DistinguishesEveryProviderAndEmptyState_D049` |
+| D-059 | `BlockedUsersPageTests.BlockAndUnblock_AreAvailableInTheWebMvp_D059` |
+| D-060/D-146 | `SettingsNavigationTests` localized en/pt-BR/es accessible-label cases; `AppNavigationTests.PersistentEntries_HaveLocalizedAccessibleLabelsAndCurrentState_D139`; the existing `I18nKeyTests` full-tree parity oracle includes the added common/friends/settings keys. |
+| D-065 | `BlockedUsersPageTests.Render_ManagesOutboundRowsWithoutProfileLinks_D065`; `SteamImportPageTests.HiddenLocalCandidate_IsNeverLabeledAsRegistered_D065`; `SteamImportPageTests.SendAndBlock_ReconcileOrRemoveMatchingActionCards_D065`; `AddFriendPageTests.SendAndBlock_InvalidateCanonicalCodeAndReconcileActionCard_D031`; `FriendsPageTests.RequestActions_RenderAndMutateEveryLifecycleAction_D015` |
+| D-068 | `FriendRequestsTests.PendingCards_ExposeOnlyUsername_D068` injects forbidden display-name/avatar/platform fields and proves none enter the rendered or accessibility tree. |
+| D-105 | `FriendsPageTests.Unfriend_RequiresConfirmationAndShowsNoNotificationCopy_D105` |
+| D-127 | `AppNavigationTests.AuthenticatedEntries_ReachFriendsAndBlockedRoutes_D127`; clicked-route reachability renders guarded Friends, Steam import, and Blocked users pages. |
+| D-139 | `FriendsAccessibilityTests.KeyboardAndScreenReaderPaths_MeetComponentDuties_D139`; `FriendsPage.test.tsx` — `moves focus to the first mutation error summary_D139`; `SettingsNavigationTests`; `AppNavigationTests.PersistentEntries_HaveLocalizedAccessibleLabelsAndCurrentState_D139` |
+| D-144 | `AddFriendPageTests.SendAndBlock_InvalidateCanonicalCodeAndReconcileActionCard_D031` retains the canonical friend-code query key through graph mutations. |
+
+Slice 8 ships the actionable Friends surface, outbound block management, explicit Steam-import UI, and persistent authenticated/settings navigation. Request cards remain username-only; accepted friend cards are avatar-forward; block success removes now-hidden cards immediately. Notification-center, unread-state, and transport UI remain Phase 7-owned.
 ## Shipped-name mappings and test-plan gaps
 
 - PHASE2_DESIGN §6.5/§14 names `UnlinkAuthMethodUseCaseTests.Execute_SerializesConcurrentUnlinks_D137`; the stronger shipped integration test is `UnlinkAuthMethodConcurrencyTests.Unlink_TwoOverlappingTransactions_LeaveOneMethod_D137`. It forces two overlapping transactions and proves exactly one method remains.
