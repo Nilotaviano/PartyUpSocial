@@ -252,6 +252,21 @@ Slice 4 persists the friend/block/notification deletion effects and the vacuous 
 
 Slice 6 performs only live explicit imports. It persists no import/correlation state and installs no registration or platform-link matcher; notification center, unread state, and transports remain Phase 7-owned.
 
+## Phase 3 slice 7 test citations
+
+| Decision | Slice 7 citations |
+|---|---|
+| D-015 | `ProfilePage.test.tsx` — `sends a request only after the explicit action and refetches the canonical profile_D015` |
+| D-031 | `friend continuation D-031` (`web/src/auth/friendContinuation.test.ts`); `Register.test.tsx` — canonical `/u` and `/add` registration continuations plus hostile-drop and age-gate retention; `AuthEmailLink.test.tsx` — redeemed response authority for magic and verification links; `AuthCallback.test.tsx` — Active/incomplete callback continuations and hostile-drop; `FriendRouteGuard.test.tsx` — anonymous and onboarding route retention; `App.test.tsx` — protected route reachability |
+| D-032 | `ProfilePage.test.tsx` — `renders full identity only for a full disclosure_D032` |
+| D-060/D-146 | `i18n locale keys D-060`; `friends namespace rendering D-060` (`web/src/i18n/i18n.keys.test.ts`, en/pt-BR/es runtime rendering and full key parity) |
+| D-065 | `ProfilePage.test.tsx` — `reconciles a block across profile and list query families_D065` |
+| D-068 | `ProfilePage.test.tsx` — `renders only username and relationship controls before acceptance_D068` |
+| D-127 | `OnboardingWizard.test.tsx` — activation-before-friend-call ordering, continuation retention across incomplete steps, refresh-only retry with no early friend call, completion exactly once, and Active direct reload |
+| D-139 | `ShareCard.test.tsx` — hidden QR SVG, visible equivalent URLs, copy live announcement; `OnboardingWizard.test.tsx` — focused page heading and retry alert/status duties |
+| D-144 | `AddFriendPage.test.tsx` — local normalization, invalid-input rejection, and failure preservation; `ShareCard.test.tsx` — QR payload is the caller-owned API absolute add URL |
+
+Slice 7 consumes only server-validated friend continuations. Profile activation precedes all optional friends education and API calls; Active reload is deterministic, and the optional step persists no completion flag.
 ## Shipped-name mappings and test-plan gaps
 
 - PHASE2_DESIGN §6.5/§14 names `UnlinkAuthMethodUseCaseTests.Execute_SerializesConcurrentUnlinks_D137`; the stronger shipped integration test is `UnlinkAuthMethodConcurrencyTests.Unlink_TwoOverlappingTransactions_LeaveOneMethod_D137`. It forces two overlapping transactions and proves exactly one method remains.

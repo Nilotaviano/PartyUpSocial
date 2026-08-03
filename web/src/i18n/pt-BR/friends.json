@@ -1,0 +1,114 @@
+{
+  "pages": {
+    "list": "Amigos",
+    "profile": "Perfil",
+    "add": "Adicionar amigo",
+    "share": "Compartilhe seu perfil do PartyUp",
+    "importSteam": "Encontrar amigos da Steam",
+    "blocked": "Usuários bloqueados"
+  },
+  "sections": {
+    "friends": "Amigos",
+    "incoming": "Solicitações recebidas",
+    "outgoing": "Solicitações enviadas",
+    "share": "Compartilhe com amigos",
+    "findByCode": "Buscar por código de amigo"
+  },
+  "actions": {
+    "sendRequest": "Enviar solicitação de amizade",
+    "resolve": "Buscar amigo",
+    "accept": "Aceitar solicitação",
+    "reject": "Recusar solicitação",
+    "cancelRequest": "Cancelar solicitação",
+    "unfriend": "Remover amigo",
+    "confirmUnfriend": "Remover amigo",
+    "block": "Bloquear",
+    "unblock": "Desbloquear",
+    "importSteam": "Encontrar amigos da Steam",
+    "retry": "Tentar novamente",
+    "copyCode": "Copiar código de amigo",
+    "copyAddLink": "Copiar link para adicionar",
+    "copyProfileLink": "Copiar link do perfil",
+    "copyInvitationLink": "Copiar link de convite",
+    "finishSetup": "Concluir configuração",
+    "skipForNow": "Pular por enquanto"
+  },
+  "fields": {
+    "friendCode": "Código de amigo",
+    "username": "Nome de usuário"
+  },
+  "labels": {
+    "friendCode": "Seu código de amigo",
+    "friendCodeHelp": "Espaços e hífens são removidos; as letras viram maiúsculas.",
+    "qrCode": "QR code para adicionar amigo",
+    "blockedOn": "Bloqueado em {{date}}"
+  },
+  "status": {
+    "loading": "Carregando…",
+    "none": "Sem conexão",
+    "incoming_pending": "Solicitação recebida",
+    "outgoing_pending": "Solicitação enviada",
+    "accepted": "Amigos",
+    "pendingIncoming": "Solicitação recebida",
+    "pendingOutgoing": "Solicitação enviada",
+    "friends": "Amigos",
+    "requestSent": "Solicitação de amizade enviada.",
+    "requestAccepted": "Solicitação de amizade aceita.",
+    "requestRejected": "Solicitação de amizade recusada.",
+    "requestCanceled": "Solicitação de amizade cancelada.",
+    "unfriended": "Amigo removido.",
+    "blocked": "Usuário bloqueado.",
+    "unblocked": "Usuário desbloqueado."
+  },
+  "empty": {
+    "friends": "Nenhum amigo ainda.",
+    "incoming": "Nenhuma solicitação recebida.",
+    "outgoing": "Nenhuma solicitação enviada.",
+    "blocked": "Nenhum usuário bloqueado."
+  },
+  "profile": {
+    "usernameOnly": "Somente este nome de usuário é exibido até vocês se tornarem amigos.",
+    "notFound": "Este perfil não foi encontrado.",
+    "platforms": "Plataformas de jogos vinculadas"
+  },
+  "share": {
+    "addLinkDescription": "Compartilhe este link para que um amigo encontre você pelo código.",
+    "profileLinkDescription": "Compartilhe este link para o seu perfil do PartyUp."
+  },
+  "qr": {
+    "description": "Escaneie o QR code ou use o link visível abaixo.",
+    "fallback": "Use o link para adicionar se não puder escanear o QR code."
+  },
+  "dialogs": {
+    "unfriendTitle": "Remover {{username}}?",
+    "unfriendBody": "Vocês não aparecerão mais nas listas de amigos um do outro."
+  },
+  "steam": {
+    "readyTitle": "Amigos da Steam encontrados",
+    "privateTitle": "Sua lista de amigos da Steam é privada",
+    "privateHelp": "Abrir as configurações de privacidade da Steam em uma nova aba",
+    "zeroFriendsTitle": "Nenhum amigo da Steam encontrado",
+    "zeroFriendsBody": "A Steam retornou uma lista de amigos vazia.",
+    "zeroMatchesTitle": "Nenhuma correspondência no PartyUp ainda",
+    "zeroMatchesBody": "Compartilhe seu link de convite com seus amigos da Steam.",
+    "notConfiguredTitle": "A importação da Steam está indisponível",
+    "notConfiguredBody": "Tente novamente mais tarde ou compartilhe seu link de convite.",
+    "upstreamFailureTitle": "Não foi possível acessar a Steam",
+    "upstreamFailureBody": "Tente importar novamente em instantes.",
+    "matchDescription": "Conta do PartyUp: @{{username}}",
+    "unmatchedDescription": "Amigo da Steam ainda não encontrado no PartyUp"
+  },
+  "onboarding": {
+    "title": "Comece com amigos",
+    "body": "Encontrar amigos é opcional. Compartilhe seu código, procure alguém ou continue para o PartyUp.",
+    "continuation": "O amigo que você abriu",
+    "steamOptional": "A importação da Steam é opcional e sempre exige uma ação explícita.",
+    "refreshFailed": "Seu perfil está ativo, mas o PartyUp não conseguiu atualizar sua sessão segura."
+  },
+  "live": {
+    "copied": "{{label}} copiado.",
+    "listUpdated": "Lista de amigos atualizada.",
+    "requestUpdated": "Solicitação de amizade atualizada.",
+    "blockUpdated": "Usuários bloqueados atualizados."
+  }
+}

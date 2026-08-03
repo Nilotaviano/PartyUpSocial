@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
+import { validateAuthNext } from './friendContinuation'
 import { useSession } from './useSession'
 
 type RequireAuthProps = {
@@ -15,7 +16,7 @@ export function RequireAuth({ children }: RequireAuthProps) {
   }
 
   if (!session?.authenticated) {
-    const next = `${location.pathname}${location.search}${location.hash}`
+    const next = validateAuthNext(location.pathname) ?? '/app'
     return <Navigate replace to={`/login?next=${encodeURIComponent(next)}`} />
   }
 

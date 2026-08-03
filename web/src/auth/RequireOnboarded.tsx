@@ -1,5 +1,10 @@
 import type { ReactNode } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
+import {
+  validateAuthNext,
+  validateFriendContinuation,
+  withFriendContinuation,
+} from './friendContinuation'
 import { useSession } from './useSession'
 
 type RequireOnboardedProps = {
@@ -19,12 +24,18 @@ export function RequireOnboarded({ children }: RequireOnboardedProps) {
   }
 
   if (!session?.authenticated) {
-    const next = `${location.pathname}${location.search}${location.hash}`
+    const next = validateAuthNext(location.pathname) ?? '/app'
     return <Navigate replace to={`/login?next=${encodeURIComponent(next)}`} />
   }
 
   if (needsOnboarding(session.state, session.onboarding !== null)) {
-    return <Navigate replace to="/onboarding" />
+    const continuation = validateFriendContinuation(location.pathname)
+    return (
+      <Navigate
+        replace
+        to={withFriendContinuation('/onboarding', continuation)}
+      />
+    )
   }
 
   return children ?? <Outlet />

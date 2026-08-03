@@ -1,17 +1,29 @@
 {
-    "generic":  "Algo saliÃ³ mal.",
-    "auth":  {
-                 "lastMethod":  "Necesitas al menos un mÃ©todo de inicio de sesiÃ³n.",
-                 "methodNotRemovable":  "Este método de inicio de sesión no se puede eliminar.",
-                 "reauthRequired":  "Confirma que eres tú antes de continuar."
-             },
-    "username":  {
-                     "taken":  "Ese nombre de usuario no estÃ¡ disponible.",
-                     "cooldown":  "Ese nombre de usuario aÃºn no se puede cambiar.",
-                     "reserved":  "Ese nombre de usuario estÃ¡ reservado."
-                 },
-    "text":  {
-                 "profanity":  "Este texto no estÃ¡ permitido.",
-                 "invalid":  "Este texto no es vÃ¡lido."
-             }
+  "generic": "Algo salió mal.",
+  "auth": {
+    "lastMethod": "Necesitas al menos un método de inicio de sesión.",
+    "methodNotRemovable": "Este método de inicio de sesión no se puede eliminar.",
+    "reauthRequired": "Confirma que eres tú antes de continuar."
+  },
+  "username": {
+    "taken": "Ese nombre de usuario no está disponible.",
+    "cooldown": "Ese nombre de usuario aún no se puede cambiar.",
+    "reserved": "Ese nombre de usuario está reservado."
+  },
+  "text": {
+    "profanity": "Este texto no está permitido.",
+    "invalid": "Este texto no es válido."
+  },
+  "user_not_found": "No se encontró ese usuario.",
+  "friend_code_invalid": "Ingresa un código de amistad válido de 10 caracteres.",
+  "friend_request_self": "No puedes enviarte una solicitud de amistad.",
+  "block_self": "No puedes bloquearte a ti mismo.",
+  "friend_request_not_found": "No se encontró esa solicitud de amistad.",
+  "friendship_not_found": "No se encontró esa amistad.",
+  "block_not_found": "No se encontró ese bloqueo.",
+  "friend_request_already_exists": "Ya hay una solicitud de amistad pendiente.",
+  "friendship_already_exists": "Ya son amistades.",
+  "friend_request_not_pending": "Esa solicitud ya no está pendiente.",
+  "steam_not_linked": "Vincula Steam antes de importar amistades.",
+  "rate_limited": "Demasiados intentos. Inténtalo más tarde."
 }

@@ -1,0 +1,114 @@
+{
+  "pages": {
+    "list": "Friends",
+    "profile": "Profile",
+    "add": "Add a friend",
+    "share": "Share your PartyUp profile",
+    "importSteam": "Find Steam friends",
+    "blocked": "Blocked users"
+  },
+  "sections": {
+    "friends": "Friends",
+    "incoming": "Incoming requests",
+    "outgoing": "Sent requests",
+    "share": "Share with friends",
+    "findByCode": "Find by friend code"
+  },
+  "actions": {
+    "sendRequest": "Send friend request",
+    "resolve": "Find friend",
+    "accept": "Accept request",
+    "reject": "Reject request",
+    "cancelRequest": "Cancel request",
+    "unfriend": "Remove friend",
+    "confirmUnfriend": "Remove friend",
+    "block": "Block",
+    "unblock": "Unblock",
+    "importSteam": "Find Steam friends",
+    "retry": "Try again",
+    "copyCode": "Copy friend code",
+    "copyAddLink": "Copy add link",
+    "copyProfileLink": "Copy profile link",
+    "copyInvitationLink": "Copy invitation link",
+    "finishSetup": "Finish setup",
+    "skipForNow": "Skip for now"
+  },
+  "fields": {
+    "friendCode": "Friend code",
+    "username": "Username"
+  },
+  "labels": {
+    "friendCode": "Your friend code",
+    "friendCodeHelp": "Spaces and hyphens are removed; letters are capitalized.",
+    "qrCode": "Add-friend QR code",
+    "blockedOn": "Blocked {{date}}"
+  },
+  "status": {
+    "loading": "Loading…",
+    "none": "Not connected",
+    "incoming_pending": "Request received",
+    "outgoing_pending": "Request sent",
+    "accepted": "Friends",
+    "pendingIncoming": "Request received",
+    "pendingOutgoing": "Request sent",
+    "friends": "Friends",
+    "requestSent": "Friend request sent.",
+    "requestAccepted": "Friend request accepted.",
+    "requestRejected": "Friend request rejected.",
+    "requestCanceled": "Friend request canceled.",
+    "unfriended": "Friend removed.",
+    "blocked": "User blocked.",
+    "unblocked": "User unblocked."
+  },
+  "empty": {
+    "friends": "No friends yet.",
+    "incoming": "No incoming requests.",
+    "outgoing": "No sent requests.",
+    "blocked": "No blocked users."
+  },
+  "profile": {
+    "usernameOnly": "Only this username is shared until you become friends.",
+    "notFound": "This profile could not be found.",
+    "platforms": "Linked game platforms"
+  },
+  "share": {
+    "addLinkDescription": "Share this link so a friend can find you by code.",
+    "profileLinkDescription": "Share this link to your PartyUp profile."
+  },
+  "qr": {
+    "description": "Scan the QR code or use the visible add link below.",
+    "fallback": "Use the add link if you cannot scan the QR code."
+  },
+  "dialogs": {
+    "unfriendTitle": "Remove {{username}}?",
+    "unfriendBody": "You will no longer appear in each other's friends list."
+  },
+  "steam": {
+    "readyTitle": "Steam friends found",
+    "privateTitle": "Your Steam friends list is private",
+    "privateHelp": "Open Steam privacy settings in a new tab",
+    "zeroFriendsTitle": "No Steam friends found",
+    "zeroFriendsBody": "Steam returned an empty friends list.",
+    "zeroMatchesTitle": "No PartyUp matches yet",
+    "zeroMatchesBody": "Share your invitation link with your Steam friends.",
+    "notConfiguredTitle": "Steam import is unavailable",
+    "notConfiguredBody": "Try again later or share your invitation link.",
+    "upstreamFailureTitle": "Steam could not be reached",
+    "upstreamFailureBody": "Try the import again in a moment.",
+    "matchDescription": "PartyUp account: @{{username}}",
+    "unmatchedDescription": "Steam friend not yet matched to PartyUp"
+  },
+  "onboarding": {
+    "title": "Start with friends",
+    "body": "Finding friends is optional. Share your code, look someone up, or continue to PartyUp.",
+    "continuation": "The friend you opened",
+    "steamOptional": "Steam import is optional and always requires an explicit action.",
+    "refreshFailed": "Your profile is active, but PartyUp could not refresh your secure session."
+  },
+  "live": {
+    "copied": "{{label}} copied.",
+    "listUpdated": "Friends list updated.",
+    "requestUpdated": "Friend request updated.",
+    "blockUpdated": "Blocked users updated."
+  }
+}

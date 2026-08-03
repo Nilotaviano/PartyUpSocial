@@ -29,11 +29,15 @@ function session(overrides: Partial<Session> = {}): Session {
 
 function LocationIndicator() {
   const location = useLocation()
-  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>
+  return (
+    <output data-testid="location">{`${location.pathname}${location.search}`}</output>
+  )
 }
 
 function renderRoute(path: string) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[path]}>
@@ -45,7 +49,10 @@ function renderRoute(path: string) {
 }
 
 function setSession(value: Session) {
-  mockedUseSession.mockReturnValue({ data: value, isPending: false } as ReturnType<typeof useSession>)
+  mockedUseSession.mockReturnValue({
+    data: value,
+    isPending: false,
+  } as ReturnType<typeof useSession>)
 }
 
 afterEach(() => {
@@ -58,19 +65,34 @@ describe('route guards', () => {
     setSession(session())
     renderRoute('/app')
 
-    await waitFor(() => expect(screen.getByTestId('screen-login')).toBeInTheDocument())
-    expect(screen.getByTestId('location')).toHaveTextContent('/login?next=%2Fapp')
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-login')).toBeInTheDocument(),
+    )
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/login?next=%2Fapp',
+    )
   })
 
   it('redirects an onboarding session away from onboarded routes', async () => {
-    setSession(session({ authenticated: true, state: 'onboarding', onboarding: { completedSteps: [], nextStep: 'username' } }))
+    setSession(
+      session({
+        authenticated: true,
+        state: 'onboarding',
+        onboarding: { completedSteps: [], nextStep: 'username' },
+      }),
+    )
     renderRoute('/settings/profile')
 
-    await waitFor(() => expect(screen.getByTestId('screen-onboarding')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-onboarding')).toBeInTheDocument(),
+    )
   })
 
   it('does not render protected content while the session is loading', () => {
-    mockedUseSession.mockReturnValue({ data: undefined, isPending: true } as ReturnType<typeof useSession>)
+    mockedUseSession.mockReturnValue({
+      data: undefined,
+      isPending: true,
+    } as ReturnType<typeof useSession>)
     renderRoute('/app')
 
     expect(screen.queryByTestId('screen-app')).not.toBeInTheDocument()
@@ -79,27 +101,75 @@ describe('route guards', () => {
   it.each([
     ['RequireAuth', RequireAuth],
     ['RequireOnboarded', RequireOnboarded],
-  ])('%s does not render children while the session is loading', (_name, Guard) => {
-    mockedUseSession.mockReturnValue({ data: undefined, isPending: true } as ReturnType<typeof useSession>)
-    render(
-      <MemoryRouter>
-        <Guard>
-          <div data-testid="guard-child" />
-        </Guard>
-      </MemoryRouter>,
-    )
+  ])(
+    '%s does not render children while the session is loading',
+    (_name, Guard) => {
+      mockedUseSession.mockReturnValue({
+        data: undefined,
+        isPending: true,
+      } as ReturnType<typeof useSession>)
+      render(
+        <MemoryRouter>
+          <Guard>
+            <div data-testid="guard-child" />
+          </Guard>
+        </MemoryRouter>,
+      )
 
-    expect(screen.queryByTestId('guard-child')).not.toBeInTheDocument()
-  })
+      expect(screen.queryByTestId('guard-child')).not.toBeInTheDocument()
+    },
+  )
 
   it.each([
     [session(), 'screen-welcome'],
-    [session({ authenticated: true, state: 'onboarding', onboarding: { completedSteps: [], nextStep: 'username' } }), 'screen-onboarding'],
+    [
+      session({
+        authenticated: true,
+        state: 'onboarding',
+        onboarding: { completedSteps: [], nextStep: 'username' },
+      }),
+      'screen-onboarding',
+    ],
     [session({ authenticated: true, state: 'Active' }), 'screen-app'],
-  ])('redirects the root lifecycle route to %s', async (value, expectedScreen) => {
-    setSession(value)
-    renderRoute('/')
+  ])(
+    'redirects the root lifecycle route to %s',
+    async (value, expectedScreen) => {
+      setSession(value)
+      renderRoute('/')
 
-    await waitFor(() => expect(screen.getByTestId(expectedScreen)).toBeInTheDocument())
+      await waitFor(() =>
+        expect(screen.getByTestId(expectedScreen)).toBeInTheDocument(),
+      )
+    },
+  )
+})
+
+describe('Slice 7 friend route reachability', () => {
+  it.each([
+    ['/u/friend.one', 'screen-friend-profile'],
+    ['/add/23456789AB', 'screen-add-friend'],
+  ])('renders %s only for an Active session_D031', async (path, testId) => {
+    setSession(session({ authenticated: true, state: 'active' }))
+    renderRoute(path)
+
+    await waitFor(() => expect(screen.getByTestId(testId)).toBeInTheDocument())
+  })
+
+  it('preserves a canonical friend route when onboarding is required_D031', async () => {
+    setSession(
+      session({
+        authenticated: true,
+        state: 'onboarding',
+        onboarding: { completedSteps: [], nextStep: 'username' },
+      }),
+    )
+    renderRoute('/u/Friend.One')
+
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-onboarding')).toBeInTheDocument(),
+    )
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/onboarding/username?next=%2Fu%2Ffriend.one',
+    )
   })
 })

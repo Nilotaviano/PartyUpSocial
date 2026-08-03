@@ -3,7 +3,20 @@ import { useTranslation } from 'react-i18next'
 import { RequireAuth } from './auth/RequireAuth'
 import { RequireOnboarded } from './auth/RequireOnboarded'
 import { useSession } from './auth/useSession'
-import { AgeGate, AuthCallback, ConfirmIdentity, EmailChange, Login, MagicLink, Register, ResetPassword, VerifyEmail, Welcome } from './features/auth/AuthScreens'
+import {
+  AgeGate,
+  AuthCallback,
+  ConfirmIdentity,
+  EmailChange,
+  Login,
+  MagicLink,
+  Register,
+  ResetPassword,
+  VerifyEmail,
+  Welcome,
+} from './features/auth/AuthScreens'
+import { AddFriendPage } from './features/friends/AddFriendPage'
+import { ProfilePage } from './features/friends/ProfilePage'
 import { OnboardingWizard } from './features/onboarding/OnboardingWizard'
 import { PublicDeletionConfirmPage } from './features/deletion/PublicDeletionConfirmPage'
 import { PublicDeletionRequestPage } from './features/deletion/PublicDeletionRequestPage'
@@ -16,7 +29,14 @@ type PlaceholderProps = {
 }
 
 function Placeholder({ testId, translationKey }: PlaceholderProps) {
-  const { t } = useTranslation(['common', 'auth', 'onboarding', 'profile', 'settings', 'errors'])
+  const { t } = useTranslation([
+    'common',
+    'auth',
+    'onboarding',
+    'profile',
+    'settings',
+    'errors',
+  ])
 
   return (
     <main data-testid={testId}>
@@ -58,7 +78,10 @@ function App() {
       <Route path="/auth/verify-email" element={<VerifyEmail />} />
       <Route path="/auth/email-change" element={<EmailChange />} />
       <Route path="/account-deletion" element={<PublicDeletionRequestPage />} />
-      <Route path="/account-deletion/confirm" element={<PublicDeletionConfirmPage />} />
+      <Route
+        path="/account-deletion/confirm"
+        element={<PublicDeletionConfirmPage />}
+      />
 
       <Route element={<RequireAuth />}>
         <Route path="/onboarding" element={<OnboardingWizard />} />
@@ -66,11 +89,21 @@ function App() {
         <Route path="/onboarding/display-name" element={<OnboardingWizard />} />
         <Route path="/onboarding/avatar" element={<OnboardingWizard />} />
         <Route path="/onboarding/time-zone" element={<OnboardingWizard />} />
-        <Route path="/onboarding/link-platforms" element={<OnboardingWizard />} />
+        <Route
+          path="/onboarding/link-platforms"
+          element={<OnboardingWizard />}
+        />
         <Route path="/onboarding/friends" element={<OnboardingWizard />} />
 
         <Route element={<RequireOnboarded />}>
-          <Route path="/app" element={<Placeholder testId="screen-app" translationKey="pages.app" />} />
+          <Route
+            path="/app"
+            element={
+              <Placeholder testId="screen-app" translationKey="pages.app" />
+            }
+          />
+          <Route path="/u/:username" element={<ProfilePage />} />
+          <Route path="/add/:code" element={<AddFriendPage />} />
           <Route path="/settings/profile" element={<ProfileSettingsPage />} />
           <Route path="/settings/account" element={<AccountSettingsPage />} />
         </Route>
