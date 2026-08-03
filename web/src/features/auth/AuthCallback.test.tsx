@@ -19,19 +19,38 @@ import { AuthCallback } from './AuthScreens'
 
 function Location() {
   const location = useLocation()
-  return <output data-testid="location">{location.pathname}</output>
+  return (
+    <output data-testid="location">
+      {location.pathname + location.search}
+    </output>
+  )
 }
 
 function renderCallback(search: string) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[`/auth/callback${search}`]}>
+      <MemoryRouter initialEntries={['/auth/callback' + search]}>
         <AuthCallback />
         <Location />
       </MemoryRouter>
     </QueryClientProvider>,
   )
+}
+
+function activeSession() {
+  return {
+    authenticated: true,
+    userId: 'u1',
+    providers: [],
+    state: 'active',
+    isAdmin: false,
+    onboarding: null,
+    pendingDeletion: null,
+    profile: null,
+  }
 }
 
 afterEach(() => {
@@ -44,22 +63,79 @@ afterEach(() => {
 
 describe('AuthCallback', () => {
   it('routes a reauth return with a pending platform unlink to profile settings even when next points at account', async () => {
-    api.get.mockResolvedValue({ data: { authenticated: true, userId: 'u1', providers: [], state: 'active', isAdmin: false, onboarding: null, pendingDeletion: null, profile: null } })
+    api.get.mockResolvedValue({ data: activeSession() })
     setPendingSettingsAction({ kind: 'unlinkPlatform', id: 'link-1' })
-    window.history.replaceState({}, '', '/auth/callback?next=%2Fsettings%2Faccount#reauth=proof-1')
+    window.history.replaceState(
+      {},
+      '',
+      '/auth/callback?next=%2Fsettings%2Faccount#reauth=proof-1',
+    )
 
     renderCallback('?next=%2Fsettings%2Faccount')
 
-    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/settings/profile'))
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/settings/profile',
+      ),
+    )
     expect(consumeReauthProof()).toBe('proof-1')
   })
 
-  it('still honors next for a plain authentication return', async () => {
-    api.get.mockResolvedValue({ data: { authenticated: true, userId: 'u1', providers: [], state: 'active', isAdmin: false, onboarding: null, pendingDeletion: null, profile: null } })
-    window.history.replaceState({}, '', '/auth/callback?next=%2Fapp')
+  it.each([
+    ['?next=%2Fu%2FFriend.One', '/u/friend.one'],
+    ['?next=%2Fadd%2F2345-6789-ab', '/add/23456789AB'],
+  ])(
+    'restores an active friend continuation_D031',
+    async (search, expected) => {
+      api.get.mockResolvedValue({ data: activeSession() })
+      window.history.replaceState({}, '', '/auth/callback' + search)
 
-    renderCallback('?next=%2Fapp')
+      renderCallback(search)
 
-    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/app'))
+      await waitFor(() =>
+        expect(screen.getByTestId('location')).toHaveTextContent(expected),
+      )
+    },
+  )
+
+  it('carries a friend continuation into onboarding for an incomplete account_D031', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        ...activeSession(),
+        state: 'onboarding',
+        onboarding: {
+          completedSteps: ['ageGate', 'auth'],
+          nextStep: 'username',
+        },
+      },
+    })
+    window.history.replaceState(
+      {},
+      '',
+      '/auth/callback?next=%2Fadd%2F23456789AB',
+    )
+
+    renderCallback('?next=%2Fadd%2F23456789AB')
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/onboarding?next=%2Fadd%2F23456789AB',
+      ),
+    )
+  })
+
+  it('drops a hostile authentication return_D031', async () => {
+    api.get.mockResolvedValue({ data: activeSession() })
+    window.history.replaceState(
+      {},
+      '',
+      '/auth/callback?next=https%3A%2F%2Fevil.test',
+    )
+
+    renderCallback('?next=https%3A%2F%2Fevil.test')
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('/app'),
+    )
   })
 })

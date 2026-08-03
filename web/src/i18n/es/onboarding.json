@@ -1,7 +1,25 @@
 {
-  "pages": { "root": "Configura tu perfil", "username": "Elige un nombre de usuario", "displayName": "Elige un nombre para mostrar", "avatar": "Elige un avatar", "timeZone": "Elige tu zona horaria", "linkPlatforms": "Vincula plataformas", "friends": "Encuentra amistades" },
-  "fields": { "username": "Nombre de usuario", "displayName": "Nombre para mostrar", "avatar": "Avatar", "timeZone": "Zona horaria" },
-  "actions": { "continue": "Continuar", "finish": "Finalizar configuración" },
-  "messages": { "platformLinksOptional": "La vinculación de plataformas es opcional.", "friendsPhaseThree": "La búsqueda de amistades llegará en la fase 3. Ya puedes finalizar la configuración." },
+  "pages": {
+    "root": "Configura tu perfil",
+    "username": "Elige un nombre de usuario",
+    "displayName": "Elige un nombre para mostrar",
+    "avatar": "Elige un avatar",
+    "timeZone": "Elige tu zona horaria",
+    "linkPlatforms": "Vincula plataformas",
+    "friends": "Encuentra amistades"
+  },
+  "fields": {
+    "username": "Nombre de usuario",
+    "displayName": "Nombre para mostrar",
+    "avatar": "Avatar",
+    "timeZone": "Zona horaria"
+  },
+  "actions": {
+    "continue": "Continuar",
+    "finish": "Finalizar configuración"
+  },
+  "messages": {
+    "platformLinksOptional": "La vinculación de plataformas es opcional."
+  },
   "progress": "Paso {{current}} de {{total}}: {{step}}"
 }

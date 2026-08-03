@@ -1,19 +1,18 @@
 using System.Collections.Concurrent;
-using System.Globalization;
 using System.Net;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
 using PartyUp.Api.Hosting;
 using PartyUp.Domain.Kernel;
 using PartyUp.Infrastructure.Identity;
 using PartyUp.Infrastructure.Persistence;
-using Serilog;
-using Serilog.Core;
-using Serilog.Events;
 
 namespace PartyUp.Api.IntegrationTests;
 
@@ -48,22 +47,22 @@ public sealed class AdminSeederTests : IAsyncLifetime, IDisposable
         UserId userId = await _factory.SeedUserAsync(
             email: email,
             emailConfirmed: false);
-        var sink = new CapturingSink();
+        var logger = new CapturingAdminSeederLogger();
         await using WebApplicationFactory<Program> configured = ConfigureSeeds(
             seedEmails: [email],
-            sink: sink);
+            logger: logger);
 
         AdminSeeder seeder = await RunSeederAsync(configured);
 
         Assert.False(await HasAdminRoleAsync(userId));
         Assert.True(await HasRefusalAsync(userId));
-        Assert.Contains(sink.Events, logEvent =>
-            logEvent.Level == LogEventLevel.Error &&
-            logEvent.RenderMessage(CultureInfo.InvariantCulture).Contains(
+        Assert.Contains(logger.Entries, entry =>
+            entry.Level == LogLevel.Error &&
+            entry.Message.Contains(
                 "unconfirmed account",
                 StringComparison.Ordinal));
-        Assert.DoesNotContain(sink.Events, logEvent =>
-            logEvent.RenderMessage(CultureInfo.InvariantCulture).Contains(
+        Assert.DoesNotContain(logger.Entries, entry =>
+            entry.Message.Contains(
                 email,
                 StringComparison.OrdinalIgnoreCase));
 
@@ -200,7 +199,7 @@ public sealed class AdminSeederTests : IAsyncLifetime, IDisposable
     private WebApplicationFactory<Program> ConfigureSeeds(
         IReadOnlyList<string>? seedUserIds = null,
         IReadOnlyList<string>? seedEmails = null,
-        CapturingSink? sink = null) =>
+        CapturingAdminSeederLogger? logger = null) =>
         _factory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureAppConfiguration((_, configuration) =>
@@ -210,12 +209,13 @@ public sealed class AdminSeederTests : IAsyncLifetime, IDisposable
                 AddValues(values, "Admin:SeedEmails", seedEmails);
                 configuration.AddInMemoryCollection(values);
             });
-            if (sink is not null)
+            if (logger is not null)
             {
-                builder.ConfigureServices(services =>
-                    services.AddSerilog((provider, logger) => logger
-                        .ReadFrom.Configuration(provider.GetRequiredService<IConfiguration>())
-                        .WriteTo.Sink(sink)));
+                builder.ConfigureTestServices(services =>
+                {
+                    services.RemoveAll<ILogger<AdminSeeder>>();
+                    services.AddSingleton<ILogger<AdminSeeder>>(logger);
+                });
             }
         });
 
@@ -290,12 +290,26 @@ public sealed class AdminSeederTests : IAsyncLifetime, IDisposable
             .Split(';', 2)[0];
     }
 
-    private sealed class CapturingSink : ILogEventSink
+    private sealed record CapturedLog(LogLevel Level, string Message);
+
+    private sealed class CapturingAdminSeederLogger : ILogger<AdminSeeder>
     {
-        private readonly ConcurrentQueue<LogEvent> _events = new();
+        private readonly ConcurrentQueue<CapturedLog> _entries = new();
 
-        internal IReadOnlyCollection<LogEvent> Events => _events;
+        internal IReadOnlyCollection<CapturedLog> Entries => _entries;
 
-        public void Emit(LogEvent logEvent) => _events.Enqueue(logEvent);
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull =>
+            null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter) =>
+            _entries.Enqueue(new CapturedLog(logLevel, formatter(state, exception)));
     }
 }

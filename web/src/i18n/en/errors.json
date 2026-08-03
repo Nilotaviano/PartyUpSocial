@@ -1,17 +1,29 @@
 {
-    "generic":  "Something went wrong.",
-    "auth":  {
-                 "lastMethod":  "You need at least one sign-in method.",
-                 "methodNotRemovable":  "This sign-in method cannot be removed.",
-                 "reauthRequired":  "Please confirm it is you before continuing."
-             },
-    "username":  {
-                     "taken":  "That username is unavailable.",
-                     "cooldown":  "That username cannot be changed yet.",
-                     "reserved":  "That username is reserved."
-                 },
-    "text":  {
-                 "profanity":  "This text is not allowed.",
-                 "invalid":  "This text is invalid."
-             }
+  "generic": "Something went wrong.",
+  "auth": {
+    "lastMethod": "You need at least one sign-in method.",
+    "methodNotRemovable": "This sign-in method cannot be removed.",
+    "reauthRequired": "Please confirm it is you before continuing."
+  },
+  "username": {
+    "taken": "That username is unavailable.",
+    "cooldown": "That username cannot be changed yet.",
+    "reserved": "That username is reserved."
+  },
+  "text": {
+    "profanity": "This text is not allowed.",
+    "invalid": "This text is invalid."
+  },
+  "user_not_found": "That user could not be found.",
+  "friend_code_invalid": "Enter a valid 10-character friend code.",
+  "friend_request_self": "You cannot send a friend request to yourself.",
+  "block_self": "You cannot block yourself.",
+  "friend_request_not_found": "That friend request could not be found.",
+  "friendship_not_found": "That friendship could not be found.",
+  "block_not_found": "That block could not be found.",
+  "friend_request_already_exists": "A friend request is already pending.",
+  "friendship_already_exists": "You are already friends.",
+  "friend_request_not_pending": "That request is no longer pending.",
+  "steam_not_linked": "Link Steam before importing friends.",
+  "rate_limited": "Too many attempts. Try again later."
 }
