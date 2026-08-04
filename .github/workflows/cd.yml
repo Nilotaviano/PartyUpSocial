@@ -19,7 +19,7 @@ jobs:
     steps:
       # workflow_run runs default to the branch head, which may already be ahead of the commit
       # CI validated; pin to that exact commit.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
