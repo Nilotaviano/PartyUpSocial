@@ -27,6 +27,80 @@ public sealed class DeletionFriendRaceTests : IAsyncLifetime, IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task GraceExpiryRacingSend_LeavesNoGraphRow_D092(bool deletionLocksFirst)
+    {
+        (UserId actorId, UserId subjectId, string subjectUsername) =
+            await SeedSendRacePairAsync();
+        _factory.Clock.Advance(User.DeletionGracePeriod);
+        await using AsyncServiceScope firstScope = _factory.Services.CreateAsyncScope();
+        await using AsyncServiceScope secondScope = _factory.Services.CreateAsyncScope();
+
+        if (deletionLocksFirst)
+        {
+            var deletionGate = new DeletionLockGate();
+            var provider = new HoldingDeletionScopeProvider(
+                firstScope.ServiceProvider.GetRequiredService<IDeletionScopeProvider>(),
+                deletionGate);
+            ExecuteDeletionForUserUseCase deletion = Phase3DeletionTestSupport.CreateUseCase(
+                firstScope.ServiceProvider,
+                scopeProvider: provider);
+            Task<bool> delete = deletion.ExecuteAsync(subjectId, default);
+            await deletionGate.Held.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            var attemptGate = new PairLockAttemptGate();
+            AppDbContext sendContext = secondScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Task<FriendGraphCommandResult> send = FriendCommandIntegration.SendAsync(
+                sendContext,
+                new AttemptingFriendPairLocker(
+                    new FriendPairLocker(sendContext),
+                    attemptGate),
+                actorId,
+                subjectUsername,
+                _factory.Clock);
+            await attemptGate.Attempted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.False(send.IsCompleted);
+            deletionGate.Release.TrySetResult();
+
+            Assert.True(await delete);
+            Assert.Equal("user_not_found", (await send).Code);
+        }
+        else
+        {
+            var pairGate = new PairLockGate();
+            AppDbContext sendContext = firstScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Task<FriendGraphCommandResult> send = FriendCommandIntegration.SendAsync(
+                sendContext,
+                new HoldingFriendPairLocker(new FriendPairLocker(sendContext), pairGate),
+                actorId,
+                subjectUsername,
+                _factory.Clock);
+            await pairGate.Held.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            var attemptGate = new DeletionLockAttemptGate();
+            var users = new AttemptingDeletionUserRepository(
+                secondScope.ServiceProvider.GetRequiredService<IUserRepository>(),
+                attemptGate);
+            ExecuteDeletionForUserUseCase deletion = Phase3DeletionTestSupport.CreateUseCase(
+                secondScope.ServiceProvider,
+                users: users);
+            Task<bool> delete = deletion.ExecuteAsync(subjectId, default);
+            await attemptGate.Attempted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.False(delete.IsCompleted);
+            pairGate.Release.TrySetResult();
+
+            Assert.True((await send).Succeeded);
+            Assert.True(await delete);
+        }
+
+        await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
+        AppDbContext context = verification.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.True((await context.DomainUsers.AsNoTracking()
+            .SingleAsync(user => user.Id == subjectId)).IsTombstoned);
+        Assert.Equal(0, await context.Friendships.CountAsync());
+        Assert.Equal(0, await context.Notifications.CountAsync());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task GraceExpiryRacingUnfriend_LeavesNoGraphRow_D092(bool deletionLocksFirst)
     {
         (UserId actorId, UserId subjectId, FriendshipId friendshipId) = await SeedRacePairAsync();
@@ -151,6 +225,28 @@ public sealed class DeletionFriendRaceTests : IAsyncLifetime, IDisposable
             .ReadSinceAsync(Instant.MinValue, 100, default);
         Assert.Contains(journal, entry => entry.UserId == firstId);
         Assert.Contains(journal, entry => entry.UserId == secondId);
+    }
+
+    private async Task<(UserId ActorId, UserId SubjectId, string SubjectUsername)>
+        SeedSendRacePairAsync()
+    {
+        string suffix = Guid.NewGuid().ToString("N");
+        UserId actorId = await _factory.SeedUserAsync(
+            email: $"send-race-actor-{suffix}@example.test");
+        UserId subjectId = await _factory.SeedUserAsync(
+            email: $"send-race-subject-{suffix}@example.test");
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        User actor = await context.DomainUsers.SingleAsync(user => user.Id == actorId);
+        User subject = await context.DomainUsers.SingleAsync(user => user.Id == subjectId);
+        actor.ChangeUsername(Username.Create($"senda{suffix[..12]}"), _factory.Clock);
+        subject.ChangeUsername(Username.Create($"sends{suffix[..12]}"), _factory.Clock);
+        context.UsernameRegistry.AddRange(
+            UsernameRegistryEntry.ClaimNew(actor.Username!.Value, actor.Id),
+            UsernameRegistryEntry.ClaimNew(subject.Username!.Value, subject.Id));
+        subject.RequestDeletion(_factory.Clock);
+        await context.SaveChangesAsync();
+        return (actor.Id, subject.Id, subject.Username.Value.Value);
     }
 
     private async Task<(UserId ActorId, UserId SubjectId, FriendshipId FriendshipId)>

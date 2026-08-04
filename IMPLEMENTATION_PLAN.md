@@ -77,17 +77,18 @@ Exit criteria: every **behavior-bearing** Confirmed decision (D-053..D-180) has 
 
 ## Phase 3 — Friends and blocking
 
-- Friend requests via profile link, friend code, QR (client-rendered friend code, D-144); pre-acceptance profile = username only (D-068).
-- Blocking end-to-end: mutual invisibility, friendship removal, session effects, masked rendering (D-065, D-076, D-077, D-086).
-- Steam friend-list import (from Spike B): match suggestions + invite links for unmatched (D-049). **Empty-import is a first-class UX path** — explain Steam privacy setting, offer invite links — not an error state.
-- Friend-request + Steam-match notifications (D-105): domain events + in-app records live now (principle 5).
-- Deletion effect added: friendship removal at grace expiry.
+- **Delivered:** request discovery/actions through profile links, canonical friend codes, client-rendered QR, and API-authoritative share URLs; pre-acceptance profiles and pending cards expose username only (D-031/D-068/D-144). Server-validated `/u/{username}` and `/add/{code}` continuations survive registration email links, Google/Steam callbacks, incomplete onboarding, and activation into the final optional friends step.
+- **Delivered:** friend/block persistence, API and UI; outbound block management from at-block username snapshots; mutual fail-closed lookup; friendship removal; bilateral deletion cleanup; and the always-invoked locked-scope executor seam (D-065/D-076/D-077/D-086). Phase 3 has empty session/poll scopes, so real content effects and masked roster rendering remain Phase 4/6 work.
+- **Delivered:** explicit-only Steam friend-list import with private/empty/no-match/unconfigured/upstream states, match suggestions, importer-owned invite links, lock-time identity revalidation, and no later-registration/link correlation (D-049).
+- **Delivered:** friend-request and first-observation Steam-match notification rows commit transactionally (D-105). Notification center, unread state, push, and preferences remain Phase 7. Blocking itself emits no notification or cause/actor; required derived session/poll state notifications survive when later phases materialize them with masking.
+- **Delivered:** grace expiry removes Pending/Accepted friendships, blocks in both directions, and notifications addressed to the deleted user while preserving actor-only rows for tombstone masking (D-092/D-148).
 
 ## Phase 4 — Fixed-time sessions end-to-end
 
 - Create/edit per §8.1 defaults and constraints (D-129, D-130, D-141, D-142); platform + game: Steam catalog-or-free-text, PS/Xbox/N-A free text (D-040, D-041, D-058, D-176).
-- Invitations, RSVP, join requests + approval, waitlist + manual promotion, confirmation transitions — domain core already tested; this phase wires HTTP + UI + sweeper jobs.
-- **Notification emission complete for all §8.4 session events** (in-app channel live; push transport arrives Phase 7). Includes edit-rule side effects (D-122, D-123) and reminder *scheduling/rescheduling* bookkeeping on RSVP and time changes.
+- Invitations, RSVP, join requests + approval, waitlist + manual promotion, confirmation transitions — domain core already tested; this phase wires HTTP + UI + sweeper jobs. Every organizer/counterpart invite/join/restore/approval command cites `P3-LK-01`, locks users → friendship/block graph → session parent → complete children, and must pass both block-race orderings before the session slice closes.
+- **Notification emission complete for all §8.4 session events** (in-app channel live; push transport arrives Phase 7). `P4-NOTIFY-01` materializes block-derived state events such as `SessionUnconfirmed` without block cause/actor and with blocked-pair masking; the block action itself remains silent (D-105). Includes edit-rule effects (D-122/D-123) and reminder scheduling/rescheduling.
+- **P4-REMIND-01:** reminder cancellation/schedule changes persist in the same scoped transaction (or equivalent transactional handoff); post-commit jobs revalidate current participation. Rollback and crash-boundary tests gate the session slice.
 - **Guest links as bearer credentials — security package:** ≥128-bit random tokens; first visit exchanges URL token for a guest session cookie (token not re-sent on navigation); `Referrer-Policy: no-referrer`; Caddy access-log scrubbing for guest paths; GET never mutates (link-preview bots must not consume or alter anything); rate limiting (D-150); revocation (D-044, D-174); last-write-wins multi-device (D-126); browser-detected timezone (D-169).
 - Session detail, roster, edit flows; dirty-form discard confirmation (D-162); upcoming list; Completed history with final roster (D-095).
 - Deletion effects added: future-session participation removal, owned-session cancellation, history anonymization via tombstone (D-092).
@@ -105,12 +106,12 @@ Exit criteria: every **behavior-bearing** Confirmed decision (D-053..D-180) has 
 ## Phase 6 — Polls
 
 - Poll creation (full details + 2..12 options, deadlines), voting grid (options × Available/Maybe/Unavailable — **second a11y hotspot; explicit keyboard/SR task**), suggestions, option deletion, deadline close, organizer selection, expiry, finalization → session with capacity allocation (whole §7.3/8.1 poll block), sweeper jobs for deadline/expiry.
-- Poll join requests during Polling (D-118), guest voting, private guest-only polls (D-125).
-- Poll notification events complete (D-120, D-170); deletion effect added: owned-poll expiry (D-092).
+- Poll join requests during Polling (D-118), guest voting, private guest-only polls (D-125). Registered-user attachment commands inherit `P3-LK-01` and cannot close until block-versus-join/invite orderings plus parent-before-occupancy reads are proven.
+- Poll notification events complete (D-120, D-170), including the poll extension of masked block-derived state materialization with no block cause/actor; deletion effect added: owned-poll expiry (D-092).
 
 ## Phase 7 — Notification transports + preferences
 
-Emission already exists everywhere (principle 5). This phase is transport and preference work only:
+Transactional in-app rows already exist at each owning mutation. This phase adds read/unread UX, preferences, and transports; it does not reinterpret D-105 silence or disclose block cause/actor:
 
 - Web Push delivery for the full §8.4 list; contextual enable prompt (D-147, D-159); subscription lifecycle.
 - **Idempotent dispatch:** send-log keyed on (event, recipient, channel) checked before delivery — Hangfire is at-least-once and deploys kill mid-flight jobs; duplicates must be swallowed, late delivery accepted.
@@ -127,6 +128,13 @@ Emission already exists everywhere (principle 5). This phase is transport and pr
 - Minimal first-party analytics events (D-151, D-161), and the **admin area** consuming them: usage dashboard (D-178), user list with stats + ban/unban UI incl. the optional content-removal action (D-179, D-180) — role-gated under `/api/v1/admin`.
 - Security pass: authz review of every endpoint against the visibility engine, guest-link handling re-check, OWASP basics, dependency audit.
 - Load sanity on the VM (k6: RSVP burst, overlap calc with many friends/blocks, sweeper under load).
+
+## Visual design pass — owner-sequenced, independent of Phases 4–8
+
+- Build and apply the app-wide palette, typography, spacing, motion, and component token system from the PartyUp thesis and owner-ratified Rallly/Luma/Sleeper references recorded in `PHASE3_DESIGN.md` §19.
+- Preserve the shipped Phase 3 constraints until migration: request cards remain username-only, accepted friends stay avatar-forward, QR/share remains the calm signature surface, masking looks ordinary, and WCAG 2.2 AA/reduced-motion/i18n remain the floor.
+
+---
 
 ## Phase 9 — Go live, private beta → public launch
 
