@@ -1,10 +1,13 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Net.Http.Headers;
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Identity;
@@ -60,9 +63,14 @@ public sealed class ProfileEndpointTests : IAsyncLifetime, IDisposable
         JsonElement root = profile.RootElement;
         Assert.Single(root.EnumerateObject());
         JsonElement view = root.GetProperty("profile");
+        Assert.Equal(
+            ["disclosure", "relationship", "username"],
+            view.EnumerateObject().Select(property => property.Name).Order().ToArray());
         Assert.Equal("username_only", view.GetProperty("disclosure").GetString());
         Assert.Equal(target.Username, view.GetProperty("username").GetString());
-        Assert.Equal("none", view.GetProperty("relationship").GetProperty("kind").GetString());
+        JsonElement relationship = view.GetProperty("relationship");
+        Assert.Equal(["kind"], relationship.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("none", relationship.GetProperty("kind").GetString());
         Assert.False(view.TryGetProperty("displayName", out _));
         Assert.False(view.TryGetProperty("friendCode", out _));
 
@@ -77,6 +85,81 @@ public sealed class ProfileEndpointTests : IAsyncLifetime, IDisposable
             share.RootElement.GetProperty("profileUrl").GetString(),
             UriKind.Absolute,
             out _));
+    }
+
+    [Fact]
+    public async Task OldUsernameFailsAndStableCodeStillResolvesAfterChange_D128()
+    {
+        FriendEndpointUser actor = await FriendEndpointTest.SeedAsync(_factory);
+        FriendEndpointUser target = await FriendEndpointTest.SeedAsync(_factory);
+        using FriendEndpointSession actorSession = await FriendEndpointTest.SignInAsync(
+            _factory,
+            actor.Id);
+        using FriendEndpointSession targetSession = await FriendEndpointTest.SignInAsync(
+            _factory,
+            target.Id);
+        _factory.Clock.Advance(User.UsernameChangeCooldown);
+        string replacement = $"renamed{Guid.NewGuid():N}"[..20];
+
+        HttpResponseMessage changed = await targetSession.SendUnsafeAsync(
+            HttpMethod.Put,
+            "/api/v1/me/username",
+            JsonContent.Create(new { username = replacement }));
+
+        Assert.Equal(HttpStatusCode.NoContent, changed.StatusCode);
+        string oldPath = $"/api/v1/users/by-username/{target.Username}";
+        await FriendEndpointTest.AssertProblemAsync(
+            await actorSession.GetAsync(oldPath),
+            HttpStatusCode.NotFound,
+            "user_not_found",
+            oldPath);
+        using JsonDocument resolved = await FriendEndpointTest.SuccessJsonAsync(
+            await actorSession.GetAsync($"/api/v1/friend-codes/{target.FriendCode}"));
+        Assert.Equal(
+            replacement,
+            resolved.RootElement.GetProperty("profile").GetProperty("username").GetString());
+    }
+
+    [Fact]
+    public async Task BannedStrangerIs404AndAcceptedFriendGetsFullProfile_D180()
+    {
+        FriendEndpointUser stranger = await FriendEndpointTest.SeedAsync(_factory);
+        FriendEndpointUser friend = await FriendEndpointTest.SeedAsync(_factory);
+        FriendEndpointUser target = await FriendEndpointTest.SeedAsync(_factory);
+        await using (AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            User friendUser = await context.DomainUsers.SingleAsync(user => user.Id == friend.Id);
+            User targetUser = await context.DomainUsers.SingleAsync(user => user.Id == target.Id);
+            Friendship friendship = Friendship.Request(friendUser, targetUser, _factory.Clock);
+            friendship.Accept(targetUser.Id, _factory.Clock);
+            _ = friendship.DequeueEvents();
+            context.Friendships.Add(friendship);
+            targetUser.Ban(_factory.Clock);
+            await context.SaveChangesAsync();
+        }
+
+        using FriendEndpointSession strangerSession = await FriendEndpointTest.SignInAsync(
+            _factory,
+            stranger.Id);
+        using FriendEndpointSession friendSession = await FriendEndpointTest.SignInAsync(
+            _factory,
+            friend.Id);
+        string path = $"/api/v1/users/by-username/{target.Username}";
+
+        await FriendEndpointTest.AssertProblemAsync(
+            await strangerSession.GetAsync(path),
+            HttpStatusCode.NotFound,
+            "user_not_found",
+            path);
+        using JsonDocument visible = await FriendEndpointTest.SuccessJsonAsync(
+            await friendSession.GetAsync(path));
+        JsonElement profile = visible.RootElement.GetProperty("profile");
+        Assert.Equal("full", profile.GetProperty("disclosure").GetString());
+        Assert.Equal(target.Username, profile.GetProperty("username").GetString());
+        Assert.True(profile.TryGetProperty("displayName", out _));
+        Assert.True(profile.TryGetProperty("avatar", out _));
+        Assert.True(profile.TryGetProperty("platforms", out _));
     }
 }
 

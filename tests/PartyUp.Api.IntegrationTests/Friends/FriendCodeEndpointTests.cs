@@ -26,6 +26,9 @@ public sealed class FriendCodeEndpointTests : IAsyncLifetime, IDisposable
 
         Assert.Single(response.RootElement.EnumerateObject());
         JsonElement profile = response.RootElement.GetProperty("profile");
+        Assert.Equal(
+            ["disclosure", "relationship", "username"],
+            profile.EnumerateObject().Select(property => property.Name).Order().ToArray());
         Assert.Equal(target.Username, profile.GetProperty("username").GetString());
         Assert.False(profile.TryGetProperty("friendCode", out _));
         Assert.False(profile.TryGetProperty("addUrl", out _));
