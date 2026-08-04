@@ -68,6 +68,20 @@ afterEach(async () => {
 })
 
 describe('route guards', () => {
+  it('shows configured Google and Steam sign-in methods_D067', () => {
+    setSession(
+      session({ providers: ['password', 'magicLink', 'google', 'steam'] }),
+    )
+    renderRoute('/login')
+
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }),
+    ).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Continue with Steam' }),
+    ).toBeVisible()
+  })
+
   it('redirects an unauthenticated protected route to login with next', async () => {
     setSession(session())
     renderRoute('/app')
@@ -201,22 +215,26 @@ describe('AppNavigationTests', () => {
       friends.focus()
       expect(friends).toHaveFocus()
       if (path.startsWith('/settings/')) {
-        expect(screen.getByRole('link', { name: 'Blocked users' })).toBeInTheDocument()
+        expect(
+          screen.getByRole('link', { name: 'Blocked users' }),
+        ).toBeInTheDocument()
       }
     },
   )
 
-  it('clicked entries render the guarded Friends and Blocked pages', async () => {
+  it('clicked entries render the guarded Friends, Account, and Blocked pages', async () => {
     setSession(session({ authenticated: true, state: 'active' }))
-    const first = renderRoute('/app')
+    renderRoute('/app')
 
     fireEvent.click(screen.getByRole('link', { name: 'Friends' }))
     expect(await screen.findByTestId('screen-friends')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Find Steam friends' }))
     expect(await screen.findByTestId('screen-steam-import')).toBeInTheDocument()
 
-    first.unmount()
-    renderRoute('/settings/account')
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }))
+    expect(
+      await screen.findByTestId('screen-settings-account'),
+    ).toBeInTheDocument()
     fireEvent.click(await screen.findByRole('link', { name: 'Blocked users' }))
     expect(
       await screen.findByTestId('screen-settings-blocked'),
@@ -224,18 +242,22 @@ describe('AppNavigationTests', () => {
   })
 
   it.each([
-    ['en', 'Friends'],
-    ['pt-BR', 'Amigos'],
-    ['es', 'Amistades'],
+    ['en', 'Friends', 'Settings'],
+    ['pt-BR', 'Amigos', 'Configurações'],
+    ['es', 'Amistades', 'Configuración'],
   ])(
     'PersistentEntries_HaveLocalizedAccessibleLabelsAndCurrentState_D139: %s',
-    async (locale, label) => {
+    async (locale, friendsLabel, settingsLabel) => {
       await i18n.changeLanguage(locale)
       setSession(session({ authenticated: true, state: 'active' }))
       renderRoute('/friends')
 
-      const link = await screen.findByRole('link', { name: label })
+      const link = await screen.findByRole('link', { name: friendsLabel })
       expect(link).toHaveAttribute('aria-current', 'page')
+      expect(screen.getByRole('link', { name: settingsLabel })).toHaveAttribute(
+        'href',
+        '/settings/account',
+      )
     },
   )
 })
