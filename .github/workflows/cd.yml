@@ -33,7 +33,7 @@ jobs:
       - id: image
         run: echo "repo=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/partyup" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: deploy/Dockerfile
