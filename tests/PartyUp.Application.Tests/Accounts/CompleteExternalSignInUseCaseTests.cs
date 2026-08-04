@@ -11,6 +11,75 @@ namespace PartyUp.Application.Tests.Accounts;
 
 public sealed class CompleteExternalSignInUseCaseTests
 {
+    [Theory]
+    [InlineData(ExternalProviderPolicy.Google)]
+    [InlineData(ExternalProviderPolicy.Steam)]
+    public async Task Execute_LinksAProviderToTheBoundAuthenticatedUser_D087(string provider)
+    {
+        TestContext context = Create();
+        UserId owner = UserId.New();
+        context.Users.Add(
+            User.BeginOnboarding(
+                owner,
+                FriendCode.Create("CDEFGHJKMN"),
+                AgeGateSource.SelfAttested,
+                new TestClock(Instant.FromUtc(2026, 7, 31, 12, 0))));
+
+        ExternalSignInResult result = await context.UseCase.ExecuteAsync(
+            new CompleteExternalSignInCommand(
+                provider,
+                "provider-key",
+                null,
+                false,
+                ExternalStartMode.Link,
+                false,
+                owner,
+                owner),
+            default);
+
+        Assert.True(result.Succeeded);
+        Assert.True(result.MethodLinked);
+        Assert.False(result.ShouldSignIn);
+        Assert.Contains(
+            context.Accounts.Logins,
+            login =>
+                login.Id == owner &&
+                login.Provider == provider &&
+                login.ProviderKey == "provider-key");
+        Assert.Empty(context.Accounts.Created);
+    }
+
+    [Theory]
+    [InlineData(ExternalProviderPolicy.Google)]
+    [InlineData(ExternalProviderPolicy.Steam)]
+    public async Task Execute_SignsInWithAnAlreadyLinkedProvider_D067(string provider)
+    {
+        TestContext context = Create();
+        UserId owner = UserId.New();
+        context.Accounts.LoginUsers[(provider, "provider-key")] = owner;
+        context.Users.Add(
+            User.BeginOnboarding(
+                owner,
+                FriendCode.Create("BCDEFGHJKM"),
+                AgeGateSource.SelfAttested,
+                new TestClock(Instant.FromUtc(2026, 7, 31, 12, 0))));
+
+        ExternalSignInResult result = await context.UseCase.ExecuteAsync(
+            LoginCommand(
+                provider: provider,
+                email: provider == ExternalProviderPolicy.Google
+                    ? "Player@Example.test"
+                    : null,
+                emailVerified: provider == ExternalProviderPolicy.Google),
+            default);
+
+        Assert.True(result.Succeeded);
+        Assert.True(result.ShouldSignIn);
+        Assert.Equal(owner, result.UserId);
+        Assert.Empty(context.Accounts.Created);
+        Assert.Empty(context.Accounts.Logins);
+    }
+
     [Fact]
     public async Task Execute_LinksGoogleToAMatchingVerifiedEmail_D067()
     {

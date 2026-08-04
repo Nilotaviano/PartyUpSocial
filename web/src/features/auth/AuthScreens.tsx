@@ -230,7 +230,7 @@ export function Login() {
             params: { header: { 'X-CSRF-TOKEN': '' } },
             body: {
               provider,
-              mode: 'authentication',
+              mode: 'login',
               returnTo: authNext ?? null,
               ageGateAttested: attested(),
               currentPassword: null,
