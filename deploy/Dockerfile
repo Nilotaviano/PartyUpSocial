@@ -4,7 +4,7 @@
 #   docker build -f deploy/Dockerfile .
 
 # --- web: build the SPA -----------------------------------------------------
-FROM node:24-alpine AS web-build
+FROM node:26-alpine AS web-build
 WORKDIR /web
 # .npmrc must be in place before `npm ci` — it carries legacy-peer-deps=true, without which
 # the install fails on openapi-typescript's TypeScript peer range (see web/.npmrc).
