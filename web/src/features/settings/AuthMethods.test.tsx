@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -9,7 +15,11 @@ const api = vi.hoisted(() => {
     readonly code: string
     readonly errors: Record<string, readonly string[]>
 
-    constructor(status: number, code: string, errors: Record<string, readonly string[]> = {}) {
+    constructor(
+      status: number,
+      code: string,
+      errors: Record<string, readonly string[]> = {},
+    ) {
       super(code)
       this.name = 'ApiError'
       this.status = status
@@ -27,7 +37,8 @@ vi.mock('../../api/client', () => ({
   isApiError: (error: unknown) => error instanceof api.ApiError,
 }))
 vi.mock('../../auth/externalIntent', () => ({
-  startExternalProviderWithRetry: (mintIntent: () => Promise<unknown>) => mintIntent(),
+  startExternalProviderWithRetry: (mintIntent: () => Promise<unknown>) =>
+    mintIntent(),
 }))
 vi.mock('../../auth/useSession', () => ({
   useSession: session.useSession,
@@ -41,7 +52,11 @@ import { setPendingSettingsAction } from './reauthAction'
 
 function renderPage() {
   return render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider
+      client={
+        new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      }
+    >
       <MemoryRouter>
         <AccountSettingsPage />
       </MemoryRouter>
@@ -77,13 +92,19 @@ describe('AuthMethods', () => {
 
     renderPage()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Unlink google' }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Unlink google' }),
+    )
     fireEvent.change(screen.getByLabelText('Current password'), {
       target: { value: 'correct-password' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm with password' }))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Confirm with password' }),
+    )
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('You need at least one sign-in method.')
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'You need at least one sign-in method.',
+    )
   })
 
   it('renders link buttons only for configured, unlinked providers and posts a link intent_D087', async () => {
@@ -108,18 +129,52 @@ describe('AuthMethods', () => {
 
     renderPage()
 
-    expect(await screen.findByRole('button', { name: 'Link Steam' })).toBeVisible()
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Link Google' })).not.toBeInTheDocument())
-    expect(screen.queryByRole('button', { name: /discord/i })).not.toBeInTheDocument()
+    const linkSteamButton = await screen.findByRole('button', {
+      name: 'Link Steam',
+    })
+    expect(linkSteamButton).toBeVisible()
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: 'Link Google' }),
+      ).not.toBeInTheDocument(),
+    )
+    expect(
+      screen.queryByRole('button', { name: /discord/i }),
+    ).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Link Steam' }))
+    linkSteamButton.focus()
+    fireEvent.click(linkSteamButton)
 
+    const reauthDialog = await screen.findByRole('dialog')
+    expect(reauthDialog).toBeVisible()
+    expect(reauthDialog).toHaveClass(
+      'fixed',
+      'left-1/2',
+      'top-1/2',
+      'z-50',
+      '-translate-x-1/2',
+      '-translate-y-1/2',
+    )
+    expect(screen.getByTestId('reauth-overlay')).toHaveClass(
+      'fixed',
+      'inset-0',
+      'z-40',
+    )
+    fireEvent.keyDown(reauthDialog, { key: 'Escape', code: 'Escape' })
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    )
+    expect(linkSteamButton).toHaveFocus()
+
+    fireEvent.click(linkSteamButton)
     expect(await screen.findByRole('dialog')).toBeVisible()
     expect(api.post).not.toHaveBeenCalled()
     fireEvent.change(screen.getByLabelText('Current password'), {
       target: { value: 'correct-password' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm with password' }))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Confirm with password' }),
+    )
 
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith(

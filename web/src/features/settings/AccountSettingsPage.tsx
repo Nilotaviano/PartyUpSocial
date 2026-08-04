@@ -50,6 +50,7 @@ export function AccountSettingsPage() {
   const [error, setError] = useState<unknown>()
   const [saved, setSaved] = useState(false)
   const [graceEndsAt, setGraceEndsAt] = useState<string | null>(null)
+  const [returnFocusTo, setReturnFocusTo] = useState<HTMLElement | null>(null)
 
   useEffect(() => {
     const accountLocale = session?.profile?.locale
@@ -188,12 +189,13 @@ export function AccountSettingsPage() {
                 <span>{method.detail ?? method.kind}</span>
                 {method.removable && (
                   <Button
-                    onClick={() =>
+                    onClick={(event) => {
+                      setReturnFocusTo(event.currentTarget)
                       setAction({
                         kind: 'unlinkAuthMethod',
                         method: method.kind,
                       })
-                    }
+                    }}
                   >
                     {t('authMethods.unlink', { method: method.kind })}
                   </Button>
@@ -206,7 +208,13 @@ export function AccountSettingsPage() {
           <div>
             <h3>{t('authMethods.linkTitle')}</h3>
             {unlinkedProviders.map((provider) => (
-              <Button key={provider} onClick={() => setAction({ kind: 'linkAuthMethod', provider })}>
+              <Button
+                key={provider}
+                onClick={(event) => {
+                  setReturnFocusTo(event.currentTarget)
+                  setAction({ kind: 'linkAuthMethod', provider })
+                }}
+              >
                 {t('authMethods.link', {
                   provider: provider === 'google' ? 'Google' : 'Steam',
                 })}
@@ -252,7 +260,14 @@ export function AccountSettingsPage() {
         <h2 id="delete-account-heading">{t('delete.title')}</h2>
         <p>{t('delete.grace')}</p>
         <p>{t('delete.loginCancels')}</p>
-        <Button onClick={() => setAction({ kind: 'deleteAccount' })}>{t('delete.start')}</Button>
+        <Button
+          onClick={(event) => {
+            setReturnFocusTo(event.currentTarget)
+            setAction({ kind: 'deleteAccount' })
+          }}
+        >
+          {t('delete.start')}
+        </Button>
         {graceEndsAt && <p role="status">{t('delete.scheduled', { graceEndsAt })}</p>}
       </section>
       {errorMessage && <p role="alert">{errorMessage}</p>}
@@ -266,6 +281,7 @@ export function AccountSettingsPage() {
           }
         }}
         onConfirmed={confirmAction}
+        returnFocusTo={returnFocusTo}
       />
     </main>
   )
