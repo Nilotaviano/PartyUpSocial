@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -26,42 +26,84 @@ vi.mock('../../api/client', () => ({
   ApiError: api.ApiError,
   isApiError: (error: unknown) => error instanceof api.ApiError,
 }))
-vi.mock('../../auth/externalIntent', () => ({ startExternalProviderWithRetry: (mintIntent: () => Promise<unknown>) => mintIntent() }))
-vi.mock('../../auth/useSession', () => ({ useSession: session.useSession, sessionQueryKey: ['session'] }))
+vi.mock('../../auth/externalIntent', () => ({
+  startExternalProviderWithRetry: (mintIntent: () => Promise<unknown>) => mintIntent(),
+}))
+vi.mock('../../auth/useSession', () => ({
+  useSession: session.useSession,
+  sessionQueryKey: ['session'],
+}))
 
 import '../../i18n'
+import { setReauthProof } from '../../auth/reauthProof'
 import { AccountSettingsPage } from './AccountSettingsPage'
+import { setPendingSettingsAction } from './reauthAction'
 
 function renderPage() {
-  return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter><AccountSettingsPage /></MemoryRouter></QueryClientProvider>)
+  return render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter>
+        <AccountSettingsPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
 }
 
-afterEach(() => vi.clearAllMocks())
+afterEach(() => {
+  cleanup()
+  vi.clearAllMocks()
+  sessionStorage.clear()
+})
 
 describe('AuthMethods', () => {
   it('shows the explicit API error when unlinking the last method_D137', async () => {
-    session.useSession.mockReturnValue({ data: { profile: null, providers: [] } })
-    api.get.mockResolvedValue({ data: { methods: [
-      { kind: 'password', linked: true, removable: false, detail: 'Password' },
-      { kind: 'google', linked: true, removable: true, detail: 'Google' },
-    ] } })
+    session.useSession.mockReturnValue({
+      data: { profile: null, providers: [] },
+    })
+    api.get.mockResolvedValue({
+      data: {
+        methods: [
+          {
+            kind: 'password',
+            linked: true,
+            removable: false,
+            detail: 'Password',
+          },
+          { kind: 'google', linked: true, removable: true, detail: 'Google' },
+        ],
+      },
+    })
     api.remove.mockRejectedValue(new api.ApiError(409, 'last_auth_method'))
 
     renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Unlink google' }))
-    fireEvent.change(screen.getByLabelText('Current password'), { target: { value: 'correct-password' } })
+    fireEvent.change(screen.getByLabelText('Current password'), {
+      target: { value: 'correct-password' },
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Confirm with password' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('You need at least one sign-in method.')
   })
 
   it('renders link buttons only for configured, unlinked providers and posts a link intent_D087', async () => {
-    session.useSession.mockReturnValue({ data: { profile: null, providers: ['google', 'steam', 'discord'] } })
-    api.get.mockResolvedValue({ data: { methods: [
-      { kind: 'google', linked: true, removable: true, detail: 'Google' },
-      { kind: 'steam', linked: false, removable: false, detail: 'Steam' },
-    ] } })
+    session.useSession.mockReturnValue({
+      data: { profile: null, providers: ['google', 'steam', 'discord'] },
+    })
+    api.get.mockResolvedValue({
+      data: {
+        methods: [
+          {
+            kind: 'password',
+            linked: true,
+            removable: true,
+            detail: 'Password',
+          },
+          { kind: 'google', linked: true, removable: true, detail: 'Google' },
+          { kind: 'steam', linked: false, removable: false, detail: 'Steam' },
+        ],
+      },
+    })
     api.post.mockResolvedValue({ data: { intent: 'link-intent' } })
 
     renderPage()
@@ -72,6 +114,64 @@ describe('AuthMethods', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Link Steam' }))
 
-    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/v1/auth/external/intent', expect.objectContaining({ body: expect.objectContaining({ provider: 'steam', mode: 'link' }) })))
+    expect(await screen.findByRole('dialog')).toBeVisible()
+    expect(api.post).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText('Current password'), {
+      target: { value: 'correct-password' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm with password' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/auth/external/intent',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            provider: 'steam',
+            mode: 'link',
+            currentPassword: 'correct-password',
+            reauthToken: null,
+          }),
+        }),
+      ),
+    )
+  })
+
+  it('resumes a persisted link action with an arriving external proof_D087', async () => {
+    session.useSession.mockReturnValue({
+      data: { profile: null, providers: ['google', 'steam'] },
+    })
+    api.get.mockResolvedValue({
+      data: {
+        methods: [
+          { kind: 'google', linked: true, removable: false, detail: 'Google' },
+          { kind: 'steam', linked: false, removable: false, detail: 'Steam' },
+        ],
+      },
+    })
+    api.post.mockResolvedValue({ data: { intent: 'link-intent' } })
+    setPendingSettingsAction({ kind: 'linkAuthMethod', provider: 'steam' })
+    setReauthProof('fresh-reauth-proof')
+
+    renderPage()
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Continue with confirmed identity',
+      }),
+    )
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/auth/external/intent',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            provider: 'steam',
+            mode: 'link',
+            currentPassword: null,
+            reauthToken: 'fresh-reauth-proof',
+          }),
+        }),
+      ),
+    )
   })
 })

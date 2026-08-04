@@ -10,7 +10,8 @@
   "navigation": {
     "label": "Navegação principal",
     "home": "Início",
-    "friends": "Amigos"
+    "friends": "Amigos",
+    "settings": "Configurações"
   },
   "pages": {
     "welcome": "Boas-vindas",

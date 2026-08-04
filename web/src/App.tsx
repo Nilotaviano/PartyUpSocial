@@ -78,6 +78,18 @@ function AuthenticatedShell() {
           >
             {t('navigation.friends')}
           </NavLink>
+          <NavLink
+            className={({ isActive }) =>
+              `inline-flex min-h-11 items-center rounded-md px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
+                isActive
+                  ? 'bg-indigo-100 font-semibold text-indigo-950'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`
+            }
+            to="/settings/account"
+          >
+            {t('navigation.settings')}
+          </NavLink>
         </nav>
       </header>
       <Outlet />

@@ -10,7 +10,8 @@
   "navigation": {
     "label": "Primary navigation",
     "home": "Home",
-    "friends": "Friends"
+    "friends": "Friends",
+    "settings": "Settings"
   },
   "pages": {
     "welcome": "Welcome",

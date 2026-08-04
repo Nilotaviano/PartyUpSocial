@@ -25,10 +25,14 @@ async function getAuthMethods() {
 function errorKey(error: unknown) {
   if (!isApiError(error)) return 'generic'
   switch (error.code) {
-    case 'last_auth_method': return 'auth.lastMethod'
-    case 'method_not_removable': return 'auth.methodNotRemovable'
-    case 'reauth_required': return 'auth.reauthRequired'
-    default: return error.code
+    case 'last_auth_method':
+      return 'auth.lastMethod'
+    case 'method_not_removable':
+      return 'auth.methodNotRemovable'
+    case 'reauth_required':
+      return 'auth.reauthRequired'
+    default:
+      return error.code
   }
 }
 
@@ -37,7 +41,10 @@ export function AccountSettingsPage() {
   const location = useLocation()
   const queryClient = useQueryClient()
   const { data: session } = useSession()
-  const { data: methods = [], isPending } = useQuery({ queryKey: methodsQueryKey, queryFn: getAuthMethods })
+  const { data: methods = [], isPending } = useQuery({
+    queryKey: methodsQueryKey,
+    queryFn: getAuthMethods,
+  })
   const [locale, setLocale] = useState(i18n.language)
   const [action, setAction] = useState<ReauthAction | null>(null)
   const [error, setError] = useState<unknown>()
@@ -61,7 +68,10 @@ export function AccountSettingsPage() {
     setError(undefined)
     setSaved(false)
     try {
-      await client.PUT('/api/v1/me/locale', { params: { header: { 'X-CSRF-TOKEN': '' } }, body: { locale: value } })
+      await client.PUT('/api/v1/me/locale', {
+        params: { header: { 'X-CSRF-TOKEN': '' } },
+        body: { locale: value },
+      })
       setLocale(value)
       await i18n.changeLanguage(value)
       await queryClient.invalidateQueries({ queryKey: sessionQueryKey })
@@ -76,7 +86,10 @@ export function AccountSettingsPage() {
     setError(undefined)
     try {
       const timeZone = String(new FormData(event.currentTarget).get('timeZone') ?? '')
-      await client.PUT('/api/v1/me/time-zone', { params: { header: { 'X-CSRF-TOKEN': '' } }, body: { timeZone } })
+      await client.PUT('/api/v1/me/time-zone', {
+        params: { header: { 'X-CSRF-TOKEN': '' } },
+        body: { timeZone },
+      })
       await queryClient.invalidateQueries({ queryKey: sessionQueryKey })
     } catch (caught) {
       setError(caught)
@@ -85,10 +98,13 @@ export function AccountSettingsPage() {
   async function confirmAction(proof: { currentPassword?: string; reauthToken?: string }) {
     setError(undefined)
     if (action?.kind === 'deleteAccount') {
-      const result = await client.POST('/api/v1/me/deletion', {
+      const result = (await client.POST('/api/v1/me/deletion', {
         params: { header: { 'X-CSRF-TOKEN': '' } },
-        body: { currentPassword: proof.currentPassword ?? null, reauthToken: proof.reauthToken ?? null },
-      } as never) as { data?: { graceEndsAt?: string } }
+        body: {
+          currentPassword: proof.currentPassword ?? null,
+          reauthToken: proof.reauthToken ?? null,
+        },
+      } as never)) as { data?: { graceEndsAt?: string } }
       setGraceEndsAt(result.data?.graceEndsAt ?? null)
       clearPendingSettingsAction()
       await queryClient.invalidateQueries({ queryKey: sessionQueryKey })
@@ -96,36 +112,57 @@ export function AccountSettingsPage() {
     }
     if (action?.kind === 'unlinkAuthMethod') {
       await client.DELETE('/api/v1/auth/methods/{kind}', {
-        params: { header: { 'X-CSRF-TOKEN': '' }, path: { kind: action.method } },
-        body: { currentPassword: proof.currentPassword ?? null, reauthToken: proof.reauthToken ?? null },
+        params: {
+          header: { 'X-CSRF-TOKEN': '' },
+          path: { kind: action.method },
+        },
+        body: {
+          currentPassword: proof.currentPassword ?? null,
+          reauthToken: proof.reauthToken ?? null,
+        },
       } as never)
       clearPendingSettingsAction()
       await queryClient.invalidateQueries({ queryKey: methodsQueryKey })
+      return
+    }
+    if (action?.kind === 'linkAuthMethod') {
+      await linkProvider(action.provider, proof)
     }
   }
 
-  async function linkProvider(provider: string) {
+  async function linkProvider(provider: string, proof: { currentPassword?: string; reauthToken?: string }) {
     setError(undefined)
-    try {
-      await startExternalProviderWithRetry(async () => {
+    await startExternalProviderWithRetry(
+      async () => {
         const { data } = await client.POST('/api/v1/auth/external/intent', {
           params: { header: { 'X-CSRF-TOKEN': '' } },
-          body: { provider, mode: 'link', returnTo: '/settings/account', ageGateAttested: null, currentPassword: null, reauthToken: null },
+          body: {
+            provider,
+            mode: 'link',
+            returnTo: '/settings/account',
+            ageGateAttested: null,
+            currentPassword: proof.currentPassword ?? null,
+            reauthToken: proof.reauthToken ?? null,
+          },
         })
         if (!data) throw new ApiError(500, 'request_failed')
         return data
-      }, async (intent) => {
+      },
+      async (intent) => {
         window.location.assign(`/api/v1/auth/external/${provider}/start?intent=${encodeURIComponent(intent)}`)
-      })
-    } catch (caught) {
-      setError(caught)
-    }
+      },
+    )
   }
 
   const emailMethod = methods.find((method) => method.kind.toLowerCase().includes('magic'))
   const configuredProviders = (session?.providers ?? []).filter((provider) => ['google', 'steam'].includes(provider.toLowerCase()))
   const unlinkedProviders = configuredProviders.filter((provider) => !methods.some((method) => method.linked && method.kind.toLowerCase() === provider.toLowerCase()))
-  const errorMessage = error ? t(errorKey(error), { ns: 'errors', defaultValue: t('generic', { ns: 'errors' }) }) : null
+  const errorMessage = error
+    ? t(errorKey(error), {
+        ns: 'errors',
+        defaultValue: t('generic', { ns: 'errors' }),
+      })
+    : null
 
   return (
     <main data-testid="screen-settings-account">
@@ -142,27 +179,64 @@ export function AccountSettingsPage() {
       </section>
       <section aria-labelledby="auth-methods-heading">
         <h2 id="auth-methods-heading">{t('authMethods.title')}</h2>
-        {isPending ? <p>{t('loading')}</p> : <ul>{methods.map((method) => (
-          <li key={method.kind}>
-            <span>{method.detail ?? method.kind}</span>
-            {method.removable && <Button onClick={() => setAction({ kind: 'unlinkAuthMethod', method: method.kind })}>{t('authMethods.unlink', { method: method.kind })}</Button>}
-          </li>
-        ))}</ul>}
-        {unlinkedProviders.length > 0 && <div>
-          <h3>{t('authMethods.linkTitle')}</h3>
-          {unlinkedProviders.map((provider) => <Button key={provider} onClick={() => void linkProvider(provider)}>{t('authMethods.link', { provider: provider === 'google' ? 'Google' : 'Steam' })}</Button>)}
-        </div>}
+        {isPending ? (
+          <p>{t('loading')}</p>
+        ) : (
+          <ul>
+            {methods.map((method) => (
+              <li key={method.kind}>
+                <span>{method.detail ?? method.kind}</span>
+                {method.removable && (
+                  <Button
+                    onClick={() =>
+                      setAction({
+                        kind: 'unlinkAuthMethod',
+                        method: method.kind,
+                      })
+                    }
+                  >
+                    {t('authMethods.unlink', { method: method.kind })}
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {unlinkedProviders.length > 0 && (
+          <div>
+            <h3>{t('authMethods.linkTitle')}</h3>
+            {unlinkedProviders.map((provider) => (
+              <Button key={provider} onClick={() => setAction({ kind: 'linkAuthMethod', provider })}>
+                {t('authMethods.link', {
+                  provider: provider === 'google' ? 'Google' : 'Steam',
+                })}
+              </Button>
+            ))}
+          </div>
+        )}
       </section>
       <section aria-labelledby="language-heading">
         <h2 id="language-heading">{t('language.title')}</h2>
         <Label htmlFor="locale">{t('language.label')}</Label>
         <Select.Root value={locale} onValueChange={(value) => void saveLocale(value)}>
-          <Select.Trigger id="locale" aria-label={t('language.label')}><Select.Value /></Select.Trigger>
-          <Select.Portal><Select.Content><Select.Viewport>
-            <Select.Item value="en"><Select.ItemText>{t('language.en')}</Select.ItemText></Select.Item>
-            <Select.Item value="pt-BR"><Select.ItemText>{t('language.ptBR')}</Select.ItemText></Select.Item>
-            <Select.Item value="es"><Select.ItemText>{t('language.es')}</Select.ItemText></Select.Item>
-          </Select.Viewport></Select.Content></Select.Portal>
+          <Select.Trigger id="locale" aria-label={t('language.label')}>
+            <Select.Value />
+          </Select.Trigger>
+          <Select.Portal>
+            <Select.Content>
+              <Select.Viewport>
+                <Select.Item value="en">
+                  <Select.ItemText>{t('language.en')}</Select.ItemText>
+                </Select.Item>
+                <Select.Item value="pt-BR">
+                  <Select.ItemText>{t('language.ptBR')}</Select.ItemText>
+                </Select.Item>
+                <Select.Item value="es">
+                  <Select.ItemText>{t('language.es')}</Select.ItemText>
+                </Select.Item>
+              </Select.Viewport>
+            </Select.Content>
+          </Select.Portal>
         </Select.Root>
         {saved && <p role="status">{t('language.saved')}</p>}
       </section>
@@ -182,7 +256,17 @@ export function AccountSettingsPage() {
         {graceEndsAt && <p role="status">{t('delete.scheduled', { graceEndsAt })}</p>}
       </section>
       {errorMessage && <p role="alert">{errorMessage}</p>}
-      <ReauthPrompt action={action} methods={methods} onOpenChange={(open) => { if (!open) { clearPendingSettingsAction(); setAction(null) } }} onConfirmed={confirmAction} />
+      <ReauthPrompt
+        action={action}
+        methods={methods}
+        onOpenChange={(open) => {
+          if (!open) {
+            clearPendingSettingsAction()
+            setAction(null)
+          }
+        }}
+        onConfirmed={confirmAction}
+      />
     </main>
   )
 }
