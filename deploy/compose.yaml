@@ -61,7 +61,7 @@ services:
       - internal
 
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     logging: *default-logging
     environment:
       POSTGRES_USER: "${POSTGRES_USER}"
@@ -79,7 +79,7 @@ services:
       - internal
 
   backup:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     logging: *default-logging
     environment:
       PGHOST: postgres

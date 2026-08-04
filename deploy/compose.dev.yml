@@ -3,7 +3,7 @@
 #   Host=localhost;Port=5432;Database=partyup;Username=partyup;Password=partyup
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: partyup
       POSTGRES_PASSWORD: partyup
