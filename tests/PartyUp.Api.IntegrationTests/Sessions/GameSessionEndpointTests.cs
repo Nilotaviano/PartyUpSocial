@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Net.Http.Headers;
 using NodaTime;
+using PartyUp.Api;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
@@ -33,6 +34,11 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
 
     public void Dispose() => _factory.Dispose();
 
+    /// <summary>
+    /// PHASE4_DESIGN.md §8/§8.1 tables, verbatim: every row's method, path, and operation id. This
+    /// asserts the CLOSED set — an extra path, an extra method on a documented path, or a drifted
+    /// operation id all fail the test, not just a missing one.
+    /// </summary>
     [Fact]
     public async Task InventoryHasExactOperationIdsAndSchemas()
     {
@@ -42,37 +48,118 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
         using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         JsonElement paths = document.RootElement.GetProperty("paths");
 
-        string[] expectedPaths =
-        [
-            "/api/v1/sessions",
-            "/api/v1/sessions/{sessionId}",
-            "/api/v1/sessions/{sessionId}/invites",
-            "/api/v1/sessions/{sessionId}/guest-links",
-            "/api/v1/sessions/{sessionId}/guest-links/{guestLinkId}",
-            "/api/v1/sessions/{sessionId}/participations/{participationId}/guest",
-            "/api/v1/sessions/{sessionId}/my-participation",
-            "/api/v1/sessions/{sessionId}/join-requests",
-            "/api/v1/sessions/{sessionId}/join-requests/mine",
-            "/api/v1/sessions/{sessionId}/join-requests/{requestId}/approve",
-            "/api/v1/sessions/{sessionId}/join-requests/{requestId}/reject",
-            "/api/v1/sessions/{sessionId}/participations/{participationId}/promote",
-            "/api/v1/sessions/{sessionId}/participations/{participationId}/reject",
-            "/api/v1/sessions/{sessionId}/my-reminder",
-            "/api/v1/guest/{guestLinkId}/session",
-            "/api/v1/guest/{guestLinkId}/claim",
-            "/api/v1/guest/{guestLinkId}/display-name",
-            "/api/v1/guest/{guestLinkId}/participation",
-        ];
-        foreach (string path in expectedPaths)
+        // path -> (HTTP method -> operation id), §8/§8.1 verbatim.
+        Dictionary<string, Dictionary<string, string>> expected = new()
         {
-            Assert.True(paths.TryGetProperty(path, out _), $"Missing path {path}");
-        }
+            ["/api/v1/sessions"] = new()
+            {
+                ["post"] = ApiOperationIds.CreateSession,
+                ["get"] = ApiOperationIds.ListSessions,
+            },
+            ["/api/v1/sessions/{sessionId}"] = new()
+            {
+                ["get"] = ApiOperationIds.GetSessionDetail,
+                ["patch"] = ApiOperationIds.EditSession,
+                ["delete"] = ApiOperationIds.CancelSession,
+            },
+            ["/api/v1/sessions/{sessionId}/invites"] = new()
+            {
+                ["post"] = ApiOperationIds.InviteSessionUsers,
+            },
+            ["/api/v1/sessions/{sessionId}/guest-links"] = new()
+            {
+                ["post"] = ApiOperationIds.CreateSessionGuestLinks,
+            },
+            ["/api/v1/sessions/{sessionId}/guest-links/{guestLinkId}"] = new()
+            {
+                ["delete"] = ApiOperationIds.RevokeSessionGuestLink,
+            },
+            ["/api/v1/sessions/{sessionId}/participations/{participationId}/guest"] = new()
+            {
+                ["delete"] = ApiOperationIds.RemoveSessionGuest,
+            },
+            ["/api/v1/sessions/{sessionId}/my-participation"] = new()
+            {
+                ["put"] = ApiOperationIds.RespondToSessionInvitation,
+                ["delete"] = ApiOperationIds.LeaveSession,
+            },
+            ["/api/v1/sessions/{sessionId}/join-requests"] = new()
+            {
+                ["post"] = ApiOperationIds.RequestSessionJoin,
+                ["get"] = ApiOperationIds.ListSessionJoinRequests,
+            },
+            ["/api/v1/sessions/{sessionId}/join-requests/mine"] = new()
+            {
+                ["delete"] = ApiOperationIds.WithdrawSessionJoinRequest,
+            },
+            ["/api/v1/sessions/{sessionId}/join-requests/{requestId}/approve"] = new()
+            {
+                ["post"] = ApiOperationIds.ApproveSessionJoinRequest,
+            },
+            ["/api/v1/sessions/{sessionId}/join-requests/{requestId}/reject"] = new()
+            {
+                ["post"] = ApiOperationIds.RejectSessionJoinRequest,
+            },
+            ["/api/v1/sessions/{sessionId}/participations/{participationId}/promote"] = new()
+            {
+                ["post"] = ApiOperationIds.PromoteSessionWaitlistParticipant,
+            },
+            ["/api/v1/sessions/{sessionId}/participations/{participationId}/reject"] = new()
+            {
+                ["post"] = ApiOperationIds.RejectSessionWaitlistParticipant,
+            },
+            ["/api/v1/sessions/{sessionId}/my-reminder"] = new()
+            {
+                ["put"] = ApiOperationIds.SetSessionReminder,
+            },
+            ["/api/v1/guest/{guestLinkId}/session"] = new()
+            {
+                ["get"] = ApiOperationIds.GetGuestSession,
+            },
+            ["/api/v1/guest/{guestLinkId}/claim"] = new()
+            {
+                ["post"] = ApiOperationIds.ClaimGuestSessionLink,
+            },
+            ["/api/v1/guest/{guestLinkId}/display-name"] = new()
+            {
+                ["put"] = ApiOperationIds.RenameGuestSessionIdentity,
+            },
+            ["/api/v1/guest/{guestLinkId}/participation"] = new()
+            {
+                ["put"] = ApiOperationIds.RespondAsGuest,
+            },
+        };
 
-        Assert.True(paths.GetProperty("/api/v1/sessions").TryGetProperty("post", out _));
-        Assert.True(paths.GetProperty("/api/v1/sessions").TryGetProperty("get", out _));
-        Assert.True(paths.GetProperty("/api/v1/sessions/{sessionId}").TryGetProperty("get", out _));
-        Assert.True(paths.GetProperty("/api/v1/sessions/{sessionId}").TryGetProperty("patch", out _));
-        Assert.True(paths.GetProperty("/api/v1/sessions/{sessionId}").TryGetProperty("delete", out _));
+        // Exact path set: no extras, nothing missing (this is the S4 session/guest surface only —
+        // Slice 1-3 routes live under a distinct prefix and are not part of this inventory).
+        string[] sessionScopedActualPaths = paths.EnumerateObject()
+            .Select(p => p.Name)
+            .Where(name => name.StartsWith("/api/v1/sessions", StringComparison.Ordinal)
+                || name.StartsWith("/api/v1/guest/", StringComparison.Ordinal))
+            .Order()
+            .ToArray();
+        Assert.Equal(expected.Keys.Order().ToArray(), sessionScopedActualPaths);
+
+        foreach ((string path, Dictionary<string, string> methods) in expected)
+        {
+            JsonElement pathItem = paths.GetProperty(path);
+
+            // Exact method set per path: only HTTP-verb keys count (a shared "parameters" sibling,
+            // if present, is not a method and must not inflate the set).
+            string[] httpVerbs = ["get", "post", "put", "patch", "delete"];
+            string[] actualMethods = pathItem.EnumerateObject()
+                .Select(p => p.Name)
+                .Where(name => httpVerbs.Contains(name))
+                .Order()
+                .ToArray();
+            Assert.Equal(methods.Keys.Order().ToArray(), actualMethods);
+
+            foreach ((string method, string operationId) in methods)
+            {
+                string actualOperationId = pathItem.GetProperty(method).GetProperty("operationId").GetString()!;
+                Assert.Equal(operationId, actualOperationId);
+            }
+        }
     }
 
     [Fact]
@@ -112,7 +199,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
-    public async Task CreateAppliesDefaultsAndRejectsInvalidBounds_D129_D130_D142()
+    public async Task CreateAppliesDefaultsAndRejectsInvalidBounds_D129_D130_D141_D142()
     {
         SessionHttpUser organizer = await SessionEndpointTestSupport.SeedAsync(_factory);
         SessionHttpUser friend = await SessionEndpointTestSupport.SeedAsync(_factory);
@@ -163,6 +250,33 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 isPrivate = true,
             }));
         await SessionEndpointTestSupport.AssertProblemAsync(badDuration, HttpStatusCode.BadRequest, "session_validation");
+
+        // D-141: maxCapacity below minAttendance.
+        HttpResponseMessage badCapacity = await session.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Bad capacity bound",
+                startTime = SessionEndpointTestSupport.Iso(validStart),
+                minAttendance = 3,
+                maxCapacity = 2,
+                isPrivate = true,
+            }));
+        await SessionEndpointTestSupport.AssertProblemAsync(badCapacity, HttpStatusCode.BadRequest, "session_validation");
+
+        // D-141: minAttendance below 1.
+        HttpResponseMessage badMinimum = await session.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Bad minimum bound",
+                startTime = SessionEndpointTestSupport.Iso(validStart),
+                minAttendance = 0,
+                isPrivate = true,
+            }));
+        await SessionEndpointTestSupport.AssertProblemAsync(badMinimum, HttpStatusCode.BadRequest, "session_validation");
     }
 
     [Fact]
@@ -573,6 +687,484 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 })),
             HttpStatusCode.BadRequest,
             "session_validation");
+
+        // session_time_locked (422): the start time cannot be edited after the session starts (D-168).
+        Instant timeLockedStart = _factory.Clock.GetCurrentInstant() + Duration.FromMinutes(20);
+        HttpResponseMessage timeLockedCreated = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Time-locked edit",
+                startTime = SessionEndpointTestSupport.Iso(timeLockedStart),
+                minAttendance = 1,
+                isPrivate = true,
+            }));
+        Assert.Equal(HttpStatusCode.Created, timeLockedCreated.StatusCode);
+        using JsonDocument timeLockedBody = await SessionEndpointTestSupport.SuccessJsonAsync(timeLockedCreated);
+        JsonElement timeLockedDetail = timeLockedBody.RootElement.GetProperty("session");
+        Guid timeLockedSessionId = timeLockedDetail.GetProperty("id").GetGuid();
+        string timeLockedVersion = timeLockedDetail.GetProperty("version").GetString()!;
+
+        _factory.Clock.Advance(Duration.FromMinutes(25));
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(
+                HttpMethod.Patch,
+                $"/api/v1/sessions/{timeLockedSessionId:D}",
+                JsonContent.Create(new
+                {
+                    startTime = SessionEndpointTestSupport.Iso(timeLockedStart + Duration.FromMinutes(30)),
+                    ifMatch = timeLockedVersion,
+                })),
+            HttpStatusCode.UnprocessableEntity,
+            "session_time_locked");
+
+        // capacity_below_occupancy (422): shrinking maxCapacity below active occupancy (D-121).
+        SessionHttpUser capacityFriend = await SessionEndpointTestSupport.SeedAsync(_factory);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizer.Id, capacityFriend.Id);
+        using SessionHttpSession capacityFriendSession =
+            await SessionEndpointTestSupport.SignInAsync(_factory, capacityFriend.Id);
+
+        HttpResponseMessage capacityCreated = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Capacity below occupancy",
+                startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
+                minAttendance = 1,
+                maxCapacity = 2,
+                isPrivate = true,
+                inviteeUserIds = new[] { capacityFriend.Id.Value },
+            }));
+        Assert.Equal(HttpStatusCode.Created, capacityCreated.StatusCode);
+        Guid capacitySessionId = (await SessionEndpointTestSupport.SuccessJsonAsync(capacityCreated))
+            .RootElement.GetProperty("session").GetProperty("id").GetGuid();
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await capacityFriendSession.SendUnsafeAsync(
+                HttpMethod.Put,
+                $"/api/v1/sessions/{capacitySessionId:D}/my-participation",
+                JsonContent.Create(new { response = "Going" }))).StatusCode);
+
+        using JsonDocument capacityDetailAfterRsvp = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/sessions/{capacitySessionId:D}"));
+        string capacityVersion = capacityDetailAfterRsvp.RootElement.GetProperty("version").GetString()!;
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(
+                HttpMethod.Patch,
+                $"/api/v1/sessions/{capacitySessionId:D}",
+                JsonContent.Create(new { maxCapacity = 1, ifMatch = capacityVersion })),
+            HttpStatusCode.UnprocessableEntity,
+            "capacity_below_occupancy");
+
+        // waitlist_requires_capacity (422): clearing maxCapacity while a waitlisted row still exists (D-091, §12-1).
+        SessionHttpUser waitlistFriend = await SessionEndpointTestSupport.SeedAsync(_factory);
+        SessionHttpUser waitlistFiller = await SessionEndpointTestSupport.SeedAsync(_factory);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizer.Id, waitlistFriend.Id);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizer.Id, waitlistFiller.Id);
+        using SessionHttpSession waitlistFriendSession =
+            await SessionEndpointTestSupport.SignInAsync(_factory, waitlistFriend.Id);
+
+        HttpResponseMessage waitlistCreated = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Waitlist requires capacity",
+                startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
+                minAttendance = 1,
+                maxCapacity = 1,
+                isPrivate = false,
+                // D-099: a non-private session needs at least one directly invited friend at creation;
+                // this filler stays Pending and never consumes a slot, so it does not affect the
+                // maxCapacity=1/waitlist mechanics under test.
+                inviteeUserIds = new[] { waitlistFiller.Id.Value },
+            }));
+        Assert.Equal(HttpStatusCode.Created, waitlistCreated.StatusCode);
+        Guid waitlistSessionId = (await SessionEndpointTestSupport.SuccessJsonAsync(waitlistCreated))
+            .RootElement.GetProperty("session").GetProperty("id").GetGuid();
+
+        HttpResponseMessage waitlistJoinRequested = await waitlistFriendSession.SendUnsafeAsync(
+            HttpMethod.Post, $"/api/v1/sessions/{waitlistSessionId:D}/join-requests");
+        Assert.Equal(HttpStatusCode.Created, waitlistJoinRequested.StatusCode);
+        Guid waitlistRequestId = (await SessionEndpointTestSupport.SuccessJsonAsync(waitlistJoinRequested))
+            .RootElement.GetProperty("id").GetGuid();
+
+        using JsonDocument waitlistApproved = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.SendUnsafeAsync(
+                HttpMethod.Post,
+                $"/api/v1/sessions/{waitlistSessionId:D}/join-requests/{waitlistRequestId:D}/approve"));
+        Assert.True(waitlistApproved.RootElement.GetProperty("isWaitlisted").GetBoolean());
+
+        using JsonDocument waitlistSessionDetail = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/sessions/{waitlistSessionId:D}"));
+        string waitlistVersion = waitlistSessionDetail.RootElement.GetProperty("version").GetString()!;
+
+        string[] waitlistClearMaxCapacity = ["maxCapacity"];
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(
+                HttpMethod.Patch,
+                $"/api/v1/sessions/{waitlistSessionId:D}",
+                JsonContent.Create(new { clear = waitlistClearMaxCapacity, ifMatch = waitlistVersion })),
+            HttpStatusCode.UnprocessableEntity,
+            "waitlist_requires_capacity");
+
+        // session_invites_closed (422): invitations close at the session start (§12-8, D-081).
+        SessionHttpUser inviteClosedFriend = await SessionEndpointTestSupport.SeedAsync(_factory);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizer.Id, inviteClosedFriend.Id);
+
+        Instant inviteClosedStart = _factory.Clock.GetCurrentInstant() + Duration.FromMinutes(20);
+        HttpResponseMessage inviteClosedCreated = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Invites closed",
+                startTime = SessionEndpointTestSupport.Iso(inviteClosedStart),
+                minAttendance = 1,
+                isPrivate = true,
+            }));
+        Assert.Equal(HttpStatusCode.Created, inviteClosedCreated.StatusCode);
+        Guid inviteClosedSessionId = (await SessionEndpointTestSupport.SuccessJsonAsync(inviteClosedCreated))
+            .RootElement.GetProperty("session").GetProperty("id").GetGuid();
+
+        _factory.Clock.Advance(Duration.FromMinutes(25));
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(
+                HttpMethod.Post,
+                $"/api/v1/sessions/{inviteClosedSessionId:D}/invites",
+                JsonContent.Create(new { userIds = new[] { inviteClosedFriend.Id.Value } })),
+            HttpStatusCode.UnprocessableEntity,
+            "session_invites_closed");
+
+        // session_responses_closed (422): invitation responses close at the session start (D-081/D-089).
+        SessionHttpUser responseClosedFriend = await SessionEndpointTestSupport.SeedAsync(_factory);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizer.Id, responseClosedFriend.Id);
+        using SessionHttpSession responseClosedFriendSession =
+            await SessionEndpointTestSupport.SignInAsync(_factory, responseClosedFriend.Id);
+
+        Instant responseClosedStart = _factory.Clock.GetCurrentInstant() + Duration.FromMinutes(20);
+        HttpResponseMessage responseClosedCreated = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Responses closed",
+                startTime = SessionEndpointTestSupport.Iso(responseClosedStart),
+                minAttendance = 1,
+                isPrivate = true,
+                inviteeUserIds = new[] { responseClosedFriend.Id.Value },
+            }));
+        Assert.Equal(HttpStatusCode.Created, responseClosedCreated.StatusCode);
+        Guid responseClosedSessionId = (await SessionEndpointTestSupport.SuccessJsonAsync(responseClosedCreated))
+            .RootElement.GetProperty("session").GetProperty("id").GetGuid();
+
+        _factory.Clock.Advance(Duration.FromMinutes(25));
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await responseClosedFriendSession.SendUnsafeAsync(
+                HttpMethod.Put,
+                $"/api/v1/sessions/{responseClosedSessionId:D}/my-participation",
+                JsonContent.Create(new { response = "Going" })),
+            HttpStatusCode.UnprocessableEntity,
+            "session_responses_closed");
+
+        // session_leave_closed (422): leaving closes at the session start (§12-3).
+        SessionHttpUser leaveClosedFriend = await SessionEndpointTestSupport.SeedAsync(_factory);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizer.Id, leaveClosedFriend.Id);
+        using SessionHttpSession leaveClosedFriendSession =
+            await SessionEndpointTestSupport.SignInAsync(_factory, leaveClosedFriend.Id);
+
+        Instant leaveClosedStart = _factory.Clock.GetCurrentInstant() + Duration.FromMinutes(20);
+        HttpResponseMessage leaveClosedCreated = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Leave closed",
+                startTime = SessionEndpointTestSupport.Iso(leaveClosedStart),
+                minAttendance = 1,
+                isPrivate = true,
+                inviteeUserIds = new[] { leaveClosedFriend.Id.Value },
+            }));
+        Assert.Equal(HttpStatusCode.Created, leaveClosedCreated.StatusCode);
+        Guid leaveClosedSessionId = (await SessionEndpointTestSupport.SuccessJsonAsync(leaveClosedCreated))
+            .RootElement.GetProperty("session").GetProperty("id").GetGuid();
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await leaveClosedFriendSession.SendUnsafeAsync(
+                HttpMethod.Put,
+                $"/api/v1/sessions/{leaveClosedSessionId:D}/my-participation",
+                JsonContent.Create(new { response = "Going" }))).StatusCode);
+
+        _factory.Clock.Advance(Duration.FromMinutes(25));
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await leaveClosedFriendSession.SendUnsafeAsync(
+                HttpMethod.Delete,
+                $"/api/v1/sessions/{leaveClosedSessionId:D}/my-participation"),
+            HttpStatusCode.UnprocessableEntity,
+            "session_leave_closed");
+
+        // session_guest_removal_closed (422): guest removal is only rejected once the roster is no
+        // longer mutable — terminal (or post-end) sessions share the same code as the live window.
+        Instant guestRemovalStart = _factory.Clock.GetCurrentInstant() + Duration.FromMinutes(20);
+        HttpResponseMessage guestRemovalCreated = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Guest removal closed",
+                startTime = SessionEndpointTestSupport.Iso(guestRemovalStart),
+                durationMinutes = 15,
+                minAttendance = 1,
+                isPrivate = true,
+                guestLinkCount = 1,
+            }));
+        Assert.Equal(HttpStatusCode.Created, guestRemovalCreated.StatusCode);
+        using JsonDocument guestRemovalBody = await SessionEndpointTestSupport.SuccessJsonAsync(guestRemovalCreated);
+        Guid guestRemovalSessionId = guestRemovalBody.RootElement.GetProperty("session").GetProperty("id").GetGuid();
+        string guestRemovalUrl = guestRemovalBody.RootElement.GetProperty("guestLinks")[0].GetProperty("url").GetString()!;
+        string guestRemovalToken = guestRemovalUrl[(guestRemovalUrl.LastIndexOf('/') + 1)..];
+
+        using HttpClient guestRemovalExchangeClient = _factory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false,
+                HandleCookies = false,
+                BaseAddress = new Uri("https://localhost"),
+            });
+        HttpResponseMessage guestRemovalExchange = await guestRemovalExchangeClient.GetAsync($"/g/{guestRemovalToken}");
+        SetCookieHeaderValue guestRemovalCookie = GuestExchangeTests.SetCookiesOf(guestRemovalExchange)
+            .Single(c => c.Name.Value!.StartsWith("pu.g.", StringComparison.Ordinal));
+        Guid guestRemovalLinkId = Guid.Parse(guestRemovalCookie.Name.Value!["pu.g.".Length..]);
+        HttpResponseMessage guestRemovalClaim = await AntiforgeryTestClient.SendAsync(
+            guestRemovalExchangeClient,
+            HttpMethod.Post,
+            $"/api/v1/guest/{guestRemovalLinkId:N}/claim",
+            JsonContent.Create(new { displayName = "Guest To Remove", response = "Going" }),
+            GuestExchangeTests.CookieHeader(guestRemovalCookie));
+        Assert.Equal(HttpStatusCode.OK, guestRemovalClaim.StatusCode);
+
+        using JsonDocument guestRemovalDetail = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/sessions/{guestRemovalSessionId:D}"));
+        Guid guestRemovalParticipationId = guestRemovalDetail.RootElement.GetProperty("roster").EnumerateArray()
+            .Single(entry => entry.TryGetProperty("guestIdentityId", out JsonElement gid)
+                && gid.ValueKind != JsonValueKind.Null)
+            .GetProperty("participationId").GetGuid();
+
+        _factory.Clock.Advance(Duration.FromMinutes(40));
+        await SessionEndpointTestSupport.RunDueSweepAsync(_factory);
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(
+                HttpMethod.Delete,
+                $"/api/v1/sessions/{guestRemovalSessionId:D}/participations/{guestRemovalParticipationId:D}/guest"),
+            HttpStatusCode.UnprocessableEntity,
+            "session_guest_removal_closed");
+
+        // join_request_exists (409): one open join request per user per session.
+        SessionHttpUser joinExistsFriend = await SessionEndpointTestSupport.SeedAsync(_factory);
+        SessionHttpUser joinExistsFiller = await SessionEndpointTestSupport.SeedAsync(_factory);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizer.Id, joinExistsFriend.Id);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizer.Id, joinExistsFiller.Id);
+        using SessionHttpSession joinExistsFriendSession =
+            await SessionEndpointTestSupport.SignInAsync(_factory, joinExistsFriend.Id);
+
+        HttpResponseMessage joinExistsCreated = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Join request exists",
+                startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
+                minAttendance = 1,
+                isPrivate = false,
+                // D-099: a non-private session needs at least one directly invited friend at creation.
+                inviteeUserIds = new[] { joinExistsFiller.Id.Value },
+            }));
+        Assert.Equal(HttpStatusCode.Created, joinExistsCreated.StatusCode);
+        Guid joinExistsSessionId = (await SessionEndpointTestSupport.SuccessJsonAsync(joinExistsCreated))
+            .RootElement.GetProperty("session").GetProperty("id").GetGuid();
+
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await joinExistsFriendSession.SendUnsafeAsync(
+                HttpMethod.Post, $"/api/v1/sessions/{joinExistsSessionId:D}/join-requests")).StatusCode);
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await joinExistsFriendSession.SendUnsafeAsync(
+                HttpMethod.Post, $"/api/v1/sessions/{joinExistsSessionId:D}/join-requests"),
+            HttpStatusCode.Conflict,
+            "join_request_exists");
+
+        // join_request_not_pending (409): approving an already-approved request a second time.
+        SessionHttpUser notPendingFriend = await SessionEndpointTestSupport.SeedAsync(_factory);
+        SessionHttpUser notPendingFiller = await SessionEndpointTestSupport.SeedAsync(_factory);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizer.Id, notPendingFriend.Id);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizer.Id, notPendingFiller.Id);
+        using SessionHttpSession notPendingFriendSession =
+            await SessionEndpointTestSupport.SignInAsync(_factory, notPendingFriend.Id);
+
+        HttpResponseMessage notPendingCreated = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Join request not pending",
+                startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
+                minAttendance = 1,
+                isPrivate = false,
+                // D-099: a non-private session needs at least one directly invited friend at creation.
+                inviteeUserIds = new[] { notPendingFiller.Id.Value },
+            }));
+        Assert.Equal(HttpStatusCode.Created, notPendingCreated.StatusCode);
+        Guid notPendingSessionId = (await SessionEndpointTestSupport.SuccessJsonAsync(notPendingCreated))
+            .RootElement.GetProperty("session").GetProperty("id").GetGuid();
+
+        HttpResponseMessage notPendingRequested = await notPendingFriendSession.SendUnsafeAsync(
+            HttpMethod.Post, $"/api/v1/sessions/{notPendingSessionId:D}/join-requests");
+        Assert.Equal(HttpStatusCode.Created, notPendingRequested.StatusCode);
+        Guid notPendingRequestId = (await SessionEndpointTestSupport.SuccessJsonAsync(notPendingRequested))
+            .RootElement.GetProperty("id").GetGuid();
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await organizerSession.SendUnsafeAsync(
+                HttpMethod.Post,
+                $"/api/v1/sessions/{notPendingSessionId:D}/join-requests/{notPendingRequestId:D}/approve")).StatusCode);
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(
+                HttpMethod.Post,
+                $"/api/v1/sessions/{notPendingSessionId:D}/join-requests/{notPendingRequestId:D}/approve"),
+            HttpStatusCode.Conflict,
+            "join_request_not_pending");
+
+        // join_request_closed (422): requests close once the session is no longer roster-mutable
+        // (D-173 keeps them open in progress; this reaches the same code once terminal).
+        SessionHttpUser joinClosedFriend = await SessionEndpointTestSupport.SeedAsync(_factory);
+        SessionHttpUser joinClosedFiller = await SessionEndpointTestSupport.SeedAsync(_factory);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizer.Id, joinClosedFriend.Id);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizer.Id, joinClosedFiller.Id);
+        using SessionHttpSession joinClosedFriendSession =
+            await SessionEndpointTestSupport.SignInAsync(_factory, joinClosedFriend.Id);
+
+        HttpResponseMessage joinClosedCreated = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Join request closed",
+                startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromMinutes(20)),
+                durationMinutes = 15,
+                // D-099: a non-private session needs at least one directly invited friend at creation.
+                inviteeUserIds = new[] { joinClosedFiller.Id.Value },
+                minAttendance = 1,
+                isPrivate = false,
+            }));
+        Assert.Equal(HttpStatusCode.Created, joinClosedCreated.StatusCode);
+        Guid joinClosedSessionId = (await SessionEndpointTestSupport.SuccessJsonAsync(joinClosedCreated))
+            .RootElement.GetProperty("session").GetProperty("id").GetGuid();
+
+        _factory.Clock.Advance(Duration.FromMinutes(40));
+        await SessionEndpointTestSupport.RunDueSweepAsync(_factory);
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await joinClosedFriendSession.SendUnsafeAsync(
+                HttpMethod.Post, $"/api/v1/sessions/{joinClosedSessionId:D}/join-requests"),
+            HttpStatusCode.UnprocessableEntity,
+            "join_request_closed");
+
+        // guest_link_claimed (409): a second claim of an already-claimed guest link.
+        Instant claimedTwiceStart = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
+        HttpResponseMessage claimedTwiceCreated = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Guest link claimed twice",
+                startTime = SessionEndpointTestSupport.Iso(claimedTwiceStart),
+                minAttendance = 1,
+                isPrivate = true,
+                guestLinkCount = 1,
+            }));
+        Assert.Equal(HttpStatusCode.Created, claimedTwiceCreated.StatusCode);
+        using JsonDocument claimedTwiceBody = await SessionEndpointTestSupport.SuccessJsonAsync(claimedTwiceCreated);
+        string claimedTwiceUrl = claimedTwiceBody.RootElement.GetProperty("guestLinks")[0].GetProperty("url").GetString()!;
+        string claimedTwiceToken = claimedTwiceUrl[(claimedTwiceUrl.LastIndexOf('/') + 1)..];
+
+        using HttpClient claimedTwiceClient = _factory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false,
+                HandleCookies = false,
+                BaseAddress = new Uri("https://localhost"),
+            });
+        HttpResponseMessage claimedTwiceExchange = await claimedTwiceClient.GetAsync($"/g/{claimedTwiceToken}");
+        SetCookieHeaderValue claimedTwiceCookie = GuestExchangeTests.SetCookiesOf(claimedTwiceExchange)
+            .Single(c => c.Name.Value!.StartsWith("pu.g.", StringComparison.Ordinal));
+        Guid claimedTwiceLinkId = Guid.Parse(claimedTwiceCookie.Name.Value!["pu.g.".Length..]);
+        string claimedTwiceCookieHeader = GuestExchangeTests.CookieHeader(claimedTwiceCookie);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await AntiforgeryTestClient.SendAsync(
+                claimedTwiceClient,
+                HttpMethod.Post,
+                $"/api/v1/guest/{claimedTwiceLinkId:N}/claim",
+                JsonContent.Create(new { displayName = "Guest One", response = "Pending" }),
+                claimedTwiceCookieHeader)).StatusCode);
+
+        HttpResponseMessage secondClaim = await AntiforgeryTestClient.SendAsync(
+            claimedTwiceClient,
+            HttpMethod.Post,
+            $"/api/v1/guest/{claimedTwiceLinkId:N}/claim",
+            JsonContent.Create(new { displayName = "Guest Two", response = "Pending" }),
+            claimedTwiceCookieHeader);
+        await SessionEndpointTestSupport.AssertProblemAsync(secondClaim, HttpStatusCode.Conflict, "guest_link_claimed");
+
+        // reminder_not_eligible (422): a Declined row is not eligible for a reminder.
+        SessionHttpUser reminderFriend = await SessionEndpointTestSupport.SeedAsync(_factory);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizer.Id, reminderFriend.Id);
+        using SessionHttpSession reminderFriendSession =
+            await SessionEndpointTestSupport.SignInAsync(_factory, reminderFriend.Id);
+
+        HttpResponseMessage reminderCreated = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Reminder not eligible",
+                startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
+                minAttendance = 1,
+                isPrivate = true,
+                inviteeUserIds = new[] { reminderFriend.Id.Value },
+            }));
+        Assert.Equal(HttpStatusCode.Created, reminderCreated.StatusCode);
+        Guid reminderSessionId = (await SessionEndpointTestSupport.SuccessJsonAsync(reminderCreated))
+            .RootElement.GetProperty("session").GetProperty("id").GetGuid();
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await reminderFriendSession.SendUnsafeAsync(
+                HttpMethod.Put,
+                $"/api/v1/sessions/{reminderSessionId:D}/my-participation",
+                JsonContent.Create(new { response = "Declined" }))).StatusCode);
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await reminderFriendSession.SendUnsafeAsync(
+                HttpMethod.Put,
+                $"/api/v1/sessions/{reminderSessionId:D}/my-reminder",
+                JsonContent.Create(new { choice = "Hours1" })),
+            HttpStatusCode.UnprocessableEntity,
+            "reminder_not_eligible");
     }
 
     // ---- shared fixtures ----------------------------------------------------------------------

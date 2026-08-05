@@ -83,6 +83,71 @@ public sealed class CaddyAccessLoggingTests
         }
     }
 
+    /// <summary>
+    /// PHASE4_DESIGN.md §9.2/§9.1: a guest bearer link is redacted from the access log the same way
+    /// as the other identifier-bearing routes, and the request's <c>Referer</c> header — the vector a
+    /// browser navigation away from <c>/g/&lt;token&gt;</c> could otherwise use to leak the token to a
+    /// third party — is stripped entirely from the captured event, never merely masked.
+    /// </summary>
+    [Fact]
+    public async Task GuestExchangeRoute_IsRedactedAndRefererIsStrippedFromAccessEvents_D031_A044()
+    {
+        string caddyfile = Path.Combine(FindRepositoryRoot(), "deploy", "Caddyfile");
+        await using IContainer caddy = new ContainerBuilder("caddy:2")
+            .WithPortBinding(80, assignRandomHostPort: true)
+            .WithBindMount(caddyfile, "/etc/caddy/Caddyfile", AccessMode.ReadOnly)
+            .WithWaitStrategy(
+                Wait.ForUnixContainer().UntilMessageIsLogged("serving initial configuration"))
+            .Build();
+        await caddy.StartAsync();
+
+        const string guestTokenMarker = "guest-bearer-token-marker";
+        const string refererMarker = "referer-leaked-token-marker";
+
+        using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+        using var client = new HttpClient(handler)
+        {
+            BaseAddress = new Uri($"http://{caddy.Hostname}:{caddy.GetMappedPublicPort(80)}"),
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/g/{guestTokenMarker}");
+        request.Headers.Host = "partyup.social";
+        request.Headers.Referrer = new Uri($"https://partyup.social/g/{refererMarker}");
+        using HttpResponseMessage response = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.PermanentRedirect, response.StatusCode);
+
+        await Task.Delay(250);
+        (string stdout, string stderr) = await caddy.GetLogsAsync(
+            DateTime.UtcNow.AddMinutes(-2),
+            DateTime.UtcNow.AddMinutes(1),
+            timestampsEnabled: false);
+        string combined = stdout + Environment.NewLine + stderr;
+        JsonElement[] accessEvents = combined
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(TryParse)
+            .Where(element => element is { } &&
+                element.Value.TryGetProperty("request", out _))
+            .Select(element => element!.Value)
+            .ToArray();
+
+        JsonElement guestEvent = Assert.Single(accessEvents);
+        Assert.Equal("/g/REDACTED", AccessUri(guestEvent));
+
+        // The Referer field is deleted outright by the log pipeline — not merely redacted — so it
+        // must not appear at all under the event's headers.
+        if (guestEvent.GetProperty("request").TryGetProperty("headers", out JsonElement headers))
+        {
+            Assert.False(headers.TryGetProperty("Referer", out _));
+        }
+
+        Assert.DoesNotContain(guestTokenMarker, combined, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(refererMarker, combined, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(
+            Uri.EscapeDataString(refererMarker),
+            combined,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     private static JsonElement? TryParse(string line)
     {
         try
