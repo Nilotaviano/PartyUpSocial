@@ -186,6 +186,8 @@ builder.Services.AddAntiforgery(options =>
         ? CookieSecurePolicy.SameAsRequest
         : CookieSecurePolicy.Always;
 });
+builder.Services.AddSingleton<GuestLinkCredentialProtector>();
+builder.Services.AddSingleton<SessionVersionProtector>();
 builder.Services.AddSingleton<RateLimitPartitionPepper>();
 builder.Services.AddRateLimiter(_ => { });
 builder.Services.AddOptions<RateLimiterOptions>()
@@ -271,6 +273,18 @@ if (!app.Environment.IsEnvironment("Testing"))
 }
 
 app.UseForwardedHeaders();
+// PHASE4_DESIGN.md §9.2: a global response policy sets Referrer-Policy: no-referrer everywhere; the
+// A-064 exchange route also sets it explicitly (belt-and-suspenders on the one route the token
+// itself lives in the URL for).
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        return Task.CompletedTask;
+    });
+    await next(context);
+});
 app.UseExceptionHandler();
 app.UseSerilogRequestLogging(options =>
 {
@@ -287,7 +301,8 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseRateLimitEmailPartitioning();
 app.UseWhen(
-    context => context.Request.Path.StartsWithSegments(ApiRoutes.V1),
+    context => context.Request.Path.StartsWithSegments(ApiRoutes.V1) ||
+        context.Request.Path.StartsWithSegments("/g"),
     branch => branch.UseRateLimiter());
 app.UseAuthorization();
 app.UseMiddleware<RequestContentTypeMiddleware>();
@@ -312,6 +327,13 @@ api.MapOnboardingEndpoints();
 api.MapMeEndpoints();
 api.MapFriendEndpoints();
 api.MapAdminMaintenanceEndpoints();
+api.MapSessionEndpoints();
+api.MapGuestSessionEndpoints();
+
+// PHASE4_DESIGN.md P4-HTTP-01: A-064/A-065 are ratified in ARCHITECTURE.md before this route is
+// mapped. It sits outside the /api/v1 group by design (A-064: a transport exception, not a REST
+// resource) and is therefore excluded from /openapi/v1.json.
+app.MapGuestExchangeEndpoints();
 
 if (app.Environment.IsEnvironment("Testing"))
 {

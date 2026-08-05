@@ -74,6 +74,7 @@ public static class DependencyInjection
         services.AddScoped<IDeletionResultApplier, DeletionResultApplier>();
         services.AddScoped<ISessionNotificationMaterializer, SessionNotificationMaterializer>();
         services.AddScoped<ISessionReminderHandoffWriter, SessionReminderHandoffStore>();
+        services.AddScoped<IGuestLinkResolver, PartyUp.Infrastructure.Sessions.GuestLinkResolver>();
         services.AddScoped<CreateSessionUseCase>();
         services.AddScoped<EditSessionUseCase>();
         services.AddScoped<SessionInvitationUseCases>();

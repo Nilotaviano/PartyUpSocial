@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -31,6 +32,12 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
     private readonly CapturingEmailSender _emailSender = new();
     private readonly CountingPasswordHasher _passwordHasher = new();
     private readonly PostAuthenticationGateProbe _postAuthenticationGateProbe = new();
+
+    // PHASE4_DESIGN.md §9.2: an ephemeral in-memory Data Protection key ring re-keys whenever the
+    // host restarts inside this factory, which would make guest-cookie assertions flaky. Each factory
+    // instance gets its own on-disk key directory instead, cleaned up on disposal.
+    private readonly string _dataProtectionKeyPath =
+        Path.Combine(Path.GetTempPath(), "partyup-dp-" + Guid.NewGuid().ToString("N"));
 
     internal MutableClock Clock { get; } =
         new(Instant.FromUtc(2026, 7, 31, 12, 0));
@@ -74,7 +81,18 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
 
         if (completeProfile)
         {
-            string suffix = user.Id.Value.ToString("N")[..8];
+            // A v7 UserId's leading hex chars are its millisecond timestamp: users seeded within the
+            // same test run collide on it, silently, because nothing here enforced uniqueness. Draw
+            // the suffix from fresh entropy instead so concurrently seeded users never collide.
+            //
+            // This deliberately stops short of mirroring ChangeUsernameUseCase's
+            // UsernameRegistryEntry.ClaimNew insert: several existing Sessions test fixtures
+            // (SessionAttachmentRaceTests/SessionBlockScopeTests/SessionJoinRequestInheritedAccessTests'
+            // own EnsureDistinctUsernamesAsync helpers) already claim a registry row for a seeded user
+            // via that exact pattern without first reserving this one, so an unconditional insert here
+            // collides with theirs on ux_username_registry_owner_id_active. Those helpers are outside
+            // this ticket's write set; entropy alone resolves the actual collision this fixes.
+            string suffix = Guid.NewGuid().ToString("N")[..8];
             user.CompleteOnboarding(
                 Username.Create($"user{suffix}"),
                 DisplayName.Create("Test Player"),
@@ -178,7 +196,30 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
                 new ProbingUserRepository(
                     provider.GetRequiredService<UserRepository>(),
                     _postAuthenticationGateProbe));
+
+            Directory.CreateDirectory(_dataProtectionKeyPath);
+            services.AddDataProtection()
+                .PersistKeysToFileSystem(new DirectoryInfo(_dataProtectionKeyPath));
         });
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing)
+        {
+            try
+            {
+                if (Directory.Exists(_dataProtectionKeyPath))
+                {
+                    Directory.Delete(_dataProtectionKeyPath, recursive: true);
+                }
+            }
+            catch (IOException)
+            {
+                // Best-effort cleanup: a locked handle on a temp directory is not worth failing a test run over.
+            }
+        }
     }
 }
 

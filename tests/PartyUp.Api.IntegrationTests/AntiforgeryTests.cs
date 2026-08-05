@@ -136,6 +136,44 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 JsonContent.Create(new { removeContent = false })),
             ["POST /api/v1/admin/users/{id:guid}/unban"] = Admin(() => null),
             ["POST /api/v1/admin/maintenance/deletion-sweep"] = Admin(() => null),
+            ["POST /api/v1/sessions"] = Onboarded(() => JsonContent.Create(new
+            {
+                title = "Antiforgery probe",
+                startTime = "2027-01-01T00:00:00Z",
+                isPrivate = true,
+            })),
+            ["PATCH /api/v1/sessions/{sessionId:guid}"] = Onboarded(() =>
+                JsonContent.Create(new { title = "Antiforgery probe", ifMatch = "probe" })),
+            ["DELETE /api/v1/sessions/{sessionId:guid}"] = Onboarded(() => null),
+            ["POST /api/v1/sessions/{sessionId:guid}/invites"] = Onboarded(() =>
+                JsonContent.Create(new { userIds = Array.Empty<Guid>() })),
+            ["POST /api/v1/sessions/{sessionId:guid}/guest-links"] = Onboarded(() =>
+                JsonContent.Create(new { count = 1 })),
+            ["DELETE /api/v1/sessions/{sessionId:guid}/guest-links/{guestLinkId:guid}"] =
+                Onboarded(() => null),
+            ["DELETE /api/v1/sessions/{sessionId:guid}/participations/{participationId:guid}/guest"] =
+                Onboarded(() => null),
+            ["PUT /api/v1/sessions/{sessionId:guid}/my-participation"] = Onboarded(() =>
+                JsonContent.Create(new { response = "Going" })),
+            ["DELETE /api/v1/sessions/{sessionId:guid}/my-participation"] = Onboarded(() => null),
+            ["POST /api/v1/sessions/{sessionId:guid}/join-requests"] = Onboarded(() => null),
+            ["DELETE /api/v1/sessions/{sessionId:guid}/join-requests/mine"] = Onboarded(() => null),
+            ["POST /api/v1/sessions/{sessionId:guid}/join-requests/{requestId:guid}/approve"] =
+                Onboarded(() => null),
+            ["POST /api/v1/sessions/{sessionId:guid}/join-requests/{requestId:guid}/reject"] =
+                Onboarded(() => null),
+            ["POST /api/v1/sessions/{sessionId:guid}/participations/{participationId:guid}/promote"] =
+                Onboarded(() => null),
+            ["POST /api/v1/sessions/{sessionId:guid}/participations/{participationId:guid}/reject"] =
+                Onboarded(() => null),
+            ["PUT /api/v1/sessions/{sessionId:guid}/my-reminder"] = Onboarded(() =>
+                JsonContent.Create(new { choice = "Off" })),
+            ["POST /api/v1/guest/{guestLinkId:guid}/claim"] = Public(() =>
+                JsonContent.Create(new { displayName = "Probe Guest", response = "Pending" })),
+            ["PUT /api/v1/guest/{guestLinkId:guid}/display-name"] = Public(() =>
+                JsonContent.Create(new { displayName = "Probe Guest" })),
+            ["PUT /api/v1/guest/{guestLinkId:guid}/participation"] = Public(() =>
+                JsonContent.Create(new { response = "Going" })),
         };
 
     private readonly PartyUpApiFactory _factory = new();
@@ -340,7 +378,11 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             .Replace("{id:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
             .Replace("{friendshipId}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
             .Replace("{blockId}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
-            .Replace("{kind}", "password", StringComparison.Ordinal);
+            .Replace("{kind}", "password", StringComparison.Ordinal)
+            .Replace("{sessionId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
+            .Replace("{guestLinkId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
+            .Replace("{participationId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
+            .Replace("{requestId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal);
 
     private static HttpMethod MethodFromKey(string key) =>
         new(key[..key.IndexOf(' ')]);

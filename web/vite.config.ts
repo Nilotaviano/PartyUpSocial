@@ -10,6 +10,8 @@ export default defineConfig({
       '/api': { target: 'http://localhost:5000', changeOrigin: true },
       '/health': { target: 'http://localhost:5000', changeOrigin: true },
       '/openapi': { target: 'http://localhost:5000', changeOrigin: true },
+      // PHASE4_DESIGN.md §8.1: the A-064 guest bearer-link exchange lives outside /api/v1.
+      '/g': { target: 'http://localhost:5000', changeOrigin: true },
     },
   },
   test: {

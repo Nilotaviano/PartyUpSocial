@@ -64,6 +64,30 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
             ],
             ["friend-request-send"] = ["SendFriendRequest"],
             ["steam-friend-import"] = ["ImportSteamFriends"],
+            ["session-write"] =
+            [
+                "CreateSession",
+                "EditSession",
+                "CancelSession",
+                "InviteSessionUsers",
+                "CreateSessionGuestLinks",
+                "RevokeSessionGuestLink",
+                "RemoveSessionGuest",
+                "RespondToSessionInvitation",
+                "LeaveSession",
+                "RequestSessionJoin",
+                "WithdrawSessionJoinRequest",
+                "SetSessionReminder",
+            ],
+            ["session-attach"] =
+            [
+                "ApproveSessionJoinRequest",
+                "RejectSessionJoinRequest",
+                "PromoteSessionWaitlistParticipant",
+                "RejectSessionWaitlistParticipant",
+            ],
+            ["guest-link-exchange"] = ["ExchangeGuestLink"],
+            ["guest-write"] = ["ClaimGuestSessionLink", "RenameGuestSessionIdentity", "RespondAsGuest"],
             ["default"] = [],
         };
 
@@ -78,7 +102,7 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
     [Fact]
     public void EveryDimensionCoversItsDocumentedRoutes()
     {
-        Assert.Equal(17, RateLimitPolicies.Dimensions.Count);
+        Assert.Equal(21, RateLimitPolicies.Dimensions.Count);
         Assert.Equal(ExpectedRoutes.Keys, RateLimitPolicies.Dimensions.Select(value => value.Name));
         foreach (RateLimitDimension dimension in RateLimitPolicies.Dimensions)
         {

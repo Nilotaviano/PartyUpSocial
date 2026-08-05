@@ -10,6 +10,12 @@ using Microsoft.Extensions.Primitives;
 using Microsoft.Net.Http.Headers;
 using PartyUp.Api.ErrorHandling;
 
+// Exposes RateLimitPolicies' otherwise-private partitioning internals to
+// GuestRateLimitTests.MissingOrMalformedLinkRouteValueFallsBackToTheIpPartition_A073 — the shipped
+// guest routes always carry a route-constrained guid, so that fallback branch is only reachable by
+// calling the partition function directly rather than through an HTTP request.
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("PartyUp.Api.IntegrationTests")]
+
 namespace PartyUp.Api.Security;
 
 public enum RateLimitPartitionKind
@@ -17,6 +23,14 @@ public enum RateLimitPartitionKind
     Ip,
     Email,
     User,
+
+    /// <summary>
+    /// A-073's <c>guest-write</c> dimension: keyed on the <c>{guestLinkId}</c> route value (an
+    /// unauthenticated caller has no validated credential at partition time, since this runs before
+    /// <c>UseAuthorization</c> — see <see cref="RateLimitPolicies.PartitionFor"/>), falling back to
+    /// the caller's IP when that route value is absent or unparseable.
+    /// </summary>
+    GuestLink,
 }
 
 public sealed record RateLimitDimension(
@@ -173,6 +187,49 @@ public static class RateLimitPolicies
             RateLimitPartitionKind.User,
             Operations(ApiOperationIds.ImportSteamFriends)),
         new(
+            "session-write",
+            30,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.User,
+            Operations(
+                ApiOperationIds.CreateSession,
+                ApiOperationIds.EditSession,
+                ApiOperationIds.CancelSession,
+                ApiOperationIds.InviteSessionUsers,
+                ApiOperationIds.CreateSessionGuestLinks,
+                ApiOperationIds.RevokeSessionGuestLink,
+                ApiOperationIds.RemoveSessionGuest,
+                ApiOperationIds.RespondToSessionInvitation,
+                ApiOperationIds.LeaveSession,
+                ApiOperationIds.RequestSessionJoin,
+                ApiOperationIds.WithdrawSessionJoinRequest,
+                ApiOperationIds.SetSessionReminder)),
+        new(
+            "session-attach",
+            60,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.User,
+            Operations(
+                ApiOperationIds.ApproveSessionJoinRequest,
+                ApiOperationIds.RejectSessionJoinRequest,
+                ApiOperationIds.PromoteSessionWaitlistParticipant,
+                ApiOperationIds.RejectSessionWaitlistParticipant)),
+        new(
+            "guest-link-exchange",
+            20,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.Ip,
+            Operations(ApiOperationIds.ExchangeGuestLink)),
+        new(
+            "guest-write",
+            20,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.GuestLink,
+            Operations(
+                ApiOperationIds.ClaimGuestSessionLink,
+                ApiOperationIds.RenameGuestSessionIdentity,
+                ApiOperationIds.RespondAsGuest)),
+        new(
             "default",
             300,
             TimeSpan.FromMinutes(1),
@@ -271,7 +328,7 @@ public static class RateLimitPolicies
         return Convert.ToHexString(SHA256.HashData(input));
     }
 
-    private static RateLimitPartition<string> PartitionFor(
+    internal static RateLimitPartition<string> PartitionFor(
         HttpContext context,
         RateLimitDimension dimension,
         byte[] pepper)
@@ -294,6 +351,9 @@ public static class RateLimitPolicies
             RateLimitPartitionKind.User when context.User.Identity?.IsAuthenticated == true =>
                 context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value,
             RateLimitPartitionKind.User => null,
+            RateLimitPartitionKind.GuestLink => GuestLinkRouteValue(context)
+                ?? context.Connection.RemoteIpAddress?.ToString()
+                ?? IPAddress.None.ToString(),
             _ => null,
         };
 
@@ -314,6 +374,18 @@ public static class RateLimitPolicies
                 Window = dimension.Window,
             });
     }
+
+    /// <summary>
+    /// A-073: the raw <c>{guestLinkId}</c> route value, normalized to lowercase <c>N</c> form —
+    /// available because this runs after <c>UseRouting</c>, but before <c>UseAuthorization</c>, so it
+    /// cannot validate the guest cookie (that is the point: an unauthenticated caller can consume
+    /// another link's bucket, bounded by the <c>default</c> IP ceiling, per A-073's accepted residual).
+    /// </summary>
+    internal static string? GuestLinkRouteValue(HttpContext context) =>
+        context.Request.RouteValues.TryGetValue("guestLinkId", out object? value) &&
+        Guid.TryParse(value as string, out Guid guestLinkId)
+            ? guestLinkId.ToString("N")
+            : null;
 
     private static HashSet<string> Operations(params string[] operationIds) =>
         new HashSet<string>(operationIds, StringComparer.Ordinal);

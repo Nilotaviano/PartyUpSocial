@@ -45,4 +45,34 @@ public static class ApiOperationIds
     public const string BlockUser = "BlockUser";
     public const string UnblockUser = "UnblockUser";
     public const string ImportSteamFriends = "ImportSteamFriends";
+
+    // PHASE4_DESIGN.md §8: session HTTP surface, relative to the /api/v1 group.
+    public const string CreateSession = "CreateSession";
+    public const string ListSessions = "ListSessions";
+    public const string GetSessionDetail = "GetSessionDetail";
+    public const string EditSession = "EditSession";
+    public const string CancelSession = "CancelSession";
+    public const string InviteSessionUsers = "InviteSessionUsers";
+    public const string CreateSessionGuestLinks = "CreateSessionGuestLinks";
+    public const string RevokeSessionGuestLink = "RevokeSessionGuestLink";
+    public const string RemoveSessionGuest = "RemoveSessionGuest";
+    public const string RespondToSessionInvitation = "RespondToSessionInvitation";
+    public const string LeaveSession = "LeaveSession";
+    public const string RequestSessionJoin = "RequestSessionJoin";
+    public const string WithdrawSessionJoinRequest = "WithdrawSessionJoinRequest";
+    public const string ListSessionJoinRequests = "ListSessionJoinRequests";
+    public const string ApproveSessionJoinRequest = "ApproveSessionJoinRequest";
+    public const string RejectSessionJoinRequest = "RejectSessionJoinRequest";
+    public const string PromoteSessionWaitlistParticipant = "PromoteSessionWaitlistParticipant";
+    public const string RejectSessionWaitlistParticipant = "RejectSessionWaitlistParticipant";
+    public const string SetSessionReminder = "SetSessionReminder";
+
+    // PHASE4_DESIGN.md §8.1: the guest bearer surface. ExchangeGuestLink is the A-064 transport
+    // exception outside /api/v1 and outside the OpenAPI document; the rest are ordinary /api/v1
+    // guest resource operations.
+    public const string ExchangeGuestLink = "ExchangeGuestLink";
+    public const string GetGuestSession = "GetGuestSession";
+    public const string ClaimGuestSessionLink = "ClaimGuestSessionLink";
+    public const string RenameGuestSessionIdentity = "RenameGuestSessionIdentity";
+    public const string RespondAsGuest = "RespondAsGuest";
 }

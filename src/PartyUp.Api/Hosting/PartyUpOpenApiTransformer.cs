@@ -28,6 +28,31 @@ public sealed class PartyUpOpenApiTransformer :
         "unsupported_media_type",
         "rate_limited",
         "internal_error",
+
+        // PHASE4_DESIGN.md §8: the closed 25-code Phase 4 problem-code inventory.
+        "session_not_found",
+        "session_validation",
+        "invalid_if_match",
+        "invalid_scope",
+        "invalid_cursor",
+        "session_conflict",
+        "session_terminal",
+        "session_time_locked",
+        "capacity_below_occupancy",
+        "waitlist_requires_capacity",
+        "session_invites_closed",
+        "session_responses_closed",
+        "session_leave_closed",
+        "session_guest_removal_closed",
+        "join_request_exists",
+        "join_request_not_pending",
+        "join_request_closed",
+        "no_session_capacity",
+        "not_waitlisted",
+        "guest_link_terminal",
+        "guest_link_claimed",
+        "reminder_not_eligible",
+        "transient_conflict",
     ];
 
     private static readonly HashSet<string> FriendOperationIds =
