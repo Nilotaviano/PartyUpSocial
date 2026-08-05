@@ -21,6 +21,7 @@ public sealed class ListFriendsUseCaseTests
             .ExecuteAsync(UserId.New(), default);
 
         FriendItem item = Assert.Single(result.Items);
+        Assert.Equal(friend.Id, item.UserId);
         Assert.Equal("alex", item.Username);
         Assert.Equal("Alex", item.DisplayName);
         Assert.Equal(friend.Avatar, item.Avatar);

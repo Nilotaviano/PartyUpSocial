@@ -1399,6 +1399,8 @@ export interface components {
         FriendItemResponse: {
             /** Format: uuid */
             friendshipId: string;
+            /** Format: uuid */
+            userId: string;
             username: string;
             displayName: string;
             avatar: components["schemas"]["AvatarResponse"];

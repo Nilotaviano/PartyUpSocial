@@ -32,6 +32,7 @@ function renderComponents() {
             items={[
               {
                 friendshipId: 'friendship-1',
+                userId: 'user-1',
                 username: 'friend.one',
                 displayName: 'Friend One',
                 avatar: {

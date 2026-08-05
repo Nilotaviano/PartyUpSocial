@@ -74,6 +74,7 @@ beforeEach(() => {
           items: [
             {
               friendshipId: 'friendship-1',
+              userId: 'user-1',
               username: 'friend.one',
               displayName: 'Friend One',
               avatar: { kind: 'emoji', emoji: '🎮', sourcePlatformLinkId: null },
@@ -104,7 +105,7 @@ describe('SessionInvitePage', () => {
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith(
         '/api/v1/sessions/{sessionId}/invites',
-        expect.objectContaining({ body: { userIds: ['friendship-1'] } }),
+        expect.objectContaining({ body: { userIds: ['user-1'] } }),
       ),
     )
   })

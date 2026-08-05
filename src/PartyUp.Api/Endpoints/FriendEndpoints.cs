@@ -567,6 +567,7 @@ public sealed record FriendListResponse(IReadOnlyList<FriendItemResponse> Items)
 
 public sealed record FriendItemResponse(
     Guid FriendshipId,
+    Guid UserId,
     string Username,
     string DisplayName,
     AvatarResponse Avatar,
@@ -575,6 +576,7 @@ public sealed record FriendItemResponse(
     public static FriendItemResponse From(FriendItem item) =>
         new(
             item.FriendshipId.Value,
+            item.UserId.Value,
             item.Username,
             item.DisplayName,
             AvatarResponse.From(item.Avatar),

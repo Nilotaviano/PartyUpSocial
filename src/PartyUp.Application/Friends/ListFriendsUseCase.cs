@@ -20,6 +20,7 @@ public sealed class ListFriendsUseCase(IFriendshipRepository friendships)
         User user = row.Counterpart;
         return new FriendItem(
             row.FriendshipId,
+            user.Id,
             user.Username!.Value.Value,
             user.DisplayName!.Value.Value,
             user.Avatar!.Value,
@@ -33,6 +34,7 @@ public sealed record FriendList(IReadOnlyList<FriendItem> Items);
 
 public sealed record FriendItem(
     FriendshipId FriendshipId,
+    UserId UserId,
     string Username,
     string DisplayName,
     Avatar Avatar,

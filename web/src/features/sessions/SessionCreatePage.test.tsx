@@ -94,6 +94,7 @@ describe('SessionCreatePage', () => {
         items: [
           {
             friendshipId: 'friendship-1',
+            userId: 'user-1',
             username: 'friend.one',
             displayName: 'Friend One',
             avatar: { kind: 'emoji', emoji: '🎮', sourcePlatformLinkId: null },
@@ -121,7 +122,12 @@ describe('SessionCreatePage', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
 
-    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/v1/sessions', expect.anything()))
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/sessions',
+        expect.objectContaining({ body: expect.objectContaining({ inviteeUserIds: ['user-1'] }) }),
+      ),
+    )
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/sessions/session-1'))
   })
 

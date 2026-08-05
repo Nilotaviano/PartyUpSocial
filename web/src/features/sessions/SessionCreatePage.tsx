@@ -484,16 +484,16 @@ export function SessionCreatePage() {
               <li key={friend.friendshipId}>
                 <label className="inline-flex min-h-11 items-center gap-2">
                   <input
-                    checked={form.inviteeUserIds.includes(friend.friendshipId)}
+                    checked={form.inviteeUserIds.includes(friend.userId)}
                     type="checkbox"
                     onChange={(event) => {
                       const checked = event.target.checked
                       update(
                         'inviteeUserIds',
                         checked
-                          ? [...form.inviteeUserIds, friend.friendshipId]
+                          ? [...form.inviteeUserIds, friend.userId]
                           : form.inviteeUserIds.filter(
-                              (id) => id !== friend.friendshipId,
+                              (id) => id !== friend.userId,
                             ),
                       )
                     }}

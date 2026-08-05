@@ -116,14 +116,14 @@ export function SessionInvitePage() {
             <li key={friend.friendshipId}>
               <label className="inline-flex min-h-11 items-center gap-2">
                 <input
-                  checked={selected.includes(friend.friendshipId)}
+                  checked={selected.includes(friend.userId)}
                   type="checkbox"
                   onChange={(event) => {
                     const checked = event.target.checked
                     setSelected((current) =>
                       checked
-                        ? [...current, friend.friendshipId]
-                        : current.filter((id) => id !== friend.friendshipId),
+                        ? [...current, friend.userId]
+                        : current.filter((id) => id !== friend.userId),
                     )
                   }}
                 />
