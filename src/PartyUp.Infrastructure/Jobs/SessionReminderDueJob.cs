@@ -23,7 +23,12 @@ public sealed class SessionReminderDueJob(
     IUnitOfWork unitOfWork,
     IClock clock)
 {
-    /// <summary>A row that reaches its fifth execution attempt without resolving is dead-lettered (§4.1).</summary>
+    /// <summary>
+    /// A row still not deliverable on its fifth recorded execution attempt is dead-lettered instead of
+    /// canceled (§4.1). Delivery is always attempted normally regardless of attempt count — a row that
+    /// is genuinely deliverable on its fifth attempt still delivers; only a fifth attempt that also
+    /// fails to be deliverable is dead-lettered.
+    /// </summary>
     private const int MaxAttempts = 5;
 
     /// <summary>Mirrors <see cref="SessionDueSweepJob.ExecuteAsync"/>'s overlap contract (A-066).</summary>
@@ -42,6 +47,27 @@ public sealed class SessionReminderDueJob(
             SessionId sessionId = group.Key;
             List<DueReminderCandidate> sessionCandidates = [.. group];
 
+            // F3: the attempt is recorded in its own committed statement, with no ambient transaction,
+            // BEFORE the per-session transaction below even opens — so a later crash/rollback in that
+            // transaction still leaves the attempt durably recorded rather than erased. A row already
+            // resolved or replanned since discovery (guard mismatch) is dropped here rather than
+            // processed further.
+            List<(DueReminderCandidate Candidate, int Attempts)> attempted = [];
+            foreach (DueReminderCandidate candidate in sessionCandidates)
+            {
+                int? recordedAttempts = await candidates.RecordAttemptAsync(
+                    candidate.HandoffId, candidate.Version, now, cancellationToken);
+                if (recordedAttempts is int recorded)
+                {
+                    attempted.Add((candidate, recorded));
+                }
+            }
+
+            if (attempted.Count == 0)
+            {
+                continue;
+            }
+
             await unitOfWork.ExecuteAsync(
                 async ct =>
                 {
@@ -56,9 +82,9 @@ public sealed class SessionReminderDueJob(
                         return true;
                     }
 
-                    foreach (DueReminderCandidate candidate in sessionCandidates)
+                    foreach ((DueReminderCandidate candidate, int recordedAttempts) in attempted)
                     {
-                        await ProcessAsync(session, candidate, now, ct);
+                        await ProcessAsync(session, candidate, recordedAttempts, now, ct);
                     }
 
                     return true;
@@ -70,6 +96,7 @@ public sealed class SessionReminderDueJob(
     private async Task ProcessAsync(
         Session session,
         DueReminderCandidate candidate,
+        int recordedAttempts,
         Instant now,
         CancellationToken cancellationToken)
     {
@@ -84,12 +111,12 @@ public sealed class SessionReminderDueJob(
             return;
         }
 
-        handoff.Attempts++;
-        handoff.LastAttemptAt = now;
-
-        if (handoff.Attempts >= MaxAttempts)
+        if (handoff.DueAt > now)
         {
-            handoff.State = SessionReminderHandoffState.Failed;
+            // A replan landed in the unlocked gap between discovery and this lock and pushed the due
+            // instant into the future while leaving state/version looking unchanged at this candidate's
+            // captured snapshot (F1) — leave it Pending for its own future due_at rather than deliver
+            // early or cancel a row that has not actually come due.
             return;
         }
 
@@ -107,14 +134,23 @@ public sealed class SessionReminderDueJob(
                 cancellationToken);
             handoff.State = SessionReminderHandoffState.Delivered;
             handoff.DeliveredAt = now;
+            return;
         }
-        else
+
+        // now >= start_time, the session is terminal, or the participant is no longer eligible — the
+        // DOMAIN_MODEL.md §9 "already past is skipped, never fired late" rule applied to the session
+        // start, which is the instant the reminder was about. §4.1/A-066: attempts is recorded durably
+        // before this transaction opens (see ExecuteAsync), so reaching the fifth recorded attempt here
+        // means this row has genuinely failed to resolve five times over — dead-letter it instead of
+        // canceling it silently forever.
+        if (recordedAttempts >= MaxAttempts)
         {
-            // now >= start_time, the session is terminal, or the participant is no longer eligible —
-            // the DOMAIN_MODEL.md §9 "already past is skipped, never fired late" rule applied to the
-            // session start, which is the instant the reminder was about.
-            handoff.State = SessionReminderHandoffState.Canceled;
+            handoff.State = SessionReminderHandoffState.Failed;
             handoff.DeliveredAt = null;
+            return;
         }
+
+        handoff.State = SessionReminderHandoffState.Canceled;
+        handoff.DeliveredAt = null;
     }
 }

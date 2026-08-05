@@ -153,11 +153,11 @@ builder.Services.AddHangfire((services, config) => config
             services.GetRequiredService<IConfiguration>().GetConnectionString("Db")),
         new PostgreSqlStorageOptions { SchemaName = "hangfire" }));
 
-// The "Testing" environment (WebApplicationFactory) never runs the actual worker: recurring rows
-// are still registered against the test container's own `hangfire` schema below, but with no server
-// polling them, S3's tests exercise SessionDueSweepJob/SessionReminderDueJob directly through DI —
-// the same pattern every other Phase 4 use-case test already uses — instead of racing a real
-// one-minute cadence against the test's own transactions.
+// The "Testing" environment (WebApplicationFactory) never runs the actual worker, and (see the
+// matching guard below) never registers the recurring rows either: S3's tests exercise
+// SessionDueSweepJob/SessionReminderDueJob directly through DI — the same pattern every other
+// Phase 4 use-case test already uses — instead of racing a real one-minute cadence against the
+// test's own transactions.
 if (!builder.Environment.IsEnvironment("Testing"))
 {
     builder.Services.AddHangfireServer();
@@ -255,9 +255,9 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 
 if (!app.Environment.IsEnvironment("Testing"))
 {
-    // Registered rows are what a server processes, not what triggers a tick on its own — with no
-    // server running in "Testing" (see AddHangfireServer above) this only writes recurring-job rows
-    // into the test container's own `hangfire` schema, so it stays skipped there too.
+    // Skipped entirely in "Testing" (see AddHangfireServer above): with no server there to ever poll
+    // them, registering recurring rows against the test container's own `hangfire` schema would just
+    // be dead weight — S3's tests call SessionDueSweepJob/SessionReminderDueJob directly through DI.
     using IServiceScope recurringScope = app.Services.CreateScope();
     var recurringJobs = recurringScope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
     recurringJobs.AddOrUpdate<SessionDueSweepJob>(

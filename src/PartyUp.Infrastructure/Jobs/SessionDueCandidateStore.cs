@@ -7,10 +7,13 @@ namespace PartyUp.Infrastructure.Jobs;
 
 /// <summary>
 /// The raw-SQL boundary the S3 jobs share (PHASE4_DESIGN.md §4.1, §7.2). Every discovery query here is
-/// unlocked and keyset-paged, bounded to <see cref="BatchSize"/> rows per tick — no offset paging, no
-/// EF-translated arithmetic over <c>start_time</c>. Locking and the reminder duplicate-suppression
-/// insert are also raw SQL, because both target rows the mapped LINQ surface does not expose a lock or
-/// <c>ON CONFLICT</c> path for.
+/// unlocked and bounded to <see cref="BatchSize"/> rows per tick via a single <c>ORDER BY … LIMIT</c> —
+/// no offset paging, no EF-translated arithmetic over <c>start_time</c>. There is no carried cursor
+/// between ticks: a row a tick processes moves out of terminal/resolved state (or, for reminders,
+/// Delivered/Canceled/Failed), so it simply stops matching the predicate on the next tick and progress
+/// is made by the predicate shrinking the candidate set, not by paging state. Locking and the reminder
+/// duplicate-suppression insert are also raw SQL, because both target rows the mapped LINQ surface does
+/// not expose a lock or <c>ON CONFLICT</c> path for.
 /// </summary>
 public sealed class SessionDueCandidateStore(AppDbContext context)
 {
@@ -43,38 +46,69 @@ public sealed class SessionDueCandidateStore(AppDbContext context)
     }
 
     /// <summary>
-    /// §7.2's unlocked reminder discovery: <c>state = Pending (0) AND due_at &lt;= now</c>, keyset-paged on
-    /// <c>(due_at, id)</c>. The <c>Version</c> captured here is what the job later compares against the
-    /// freshly locked row to detect a stale candidate (PHASE4_DESIGN.md §7.2's "version/state unchanged
-    /// since discovery" clause) — this query itself takes no lock.
+    /// §7.2's unlocked reminder discovery: <c>state = Pending (0) AND due_at &lt;= now</c>, ordered and
+    /// capped on <c>(due_at, id)</c> via a single <c>ORDER BY … LIMIT</c> — not a carried keyset cursor;
+    /// a row a tick delivers/cancels/dead-letters simply stops matching <c>state = Pending</c> on the
+    /// next tick. This is exactly ONE raw statement, so the <c>Version</c> and <c>DueAt</c>
+    /// captured here come from the same row snapshot the <c>due_at &lt;= now</c> predicate matched — a
+    /// second, separately-timed query reading <c>Version</c> could observe a replan that committed
+    /// between the two statements and hand the job a post-replan version that looks unchanged at the
+    /// locked re-read even though the row's real due instant had moved into the future. The job still
+    /// re-checks both <c>Version</c>/<c>State</c> and <c>DueAt</c> under the lock (PHASE4_DESIGN.md
+    /// §7.2's "version/state unchanged since discovery" clause plus the due-at recheck) because this
+    /// query itself takes no lock and a replan can still land in the gap between discovery and the lock.
     /// </summary>
     public async Task<IReadOnlyList<DueReminderCandidate>> GetDueReminderCandidatesAsync(
         Instant now,
         CancellationToken cancellationToken)
     {
-        List<Guid> orderedIds = await context.Database.SqlQuery<Guid>($"""
-            SELECT id
+        List<DueReminderDiscoveryRow> rows = await context.Database.SqlQuery<DueReminderDiscoveryRow>($"""
+            SELECT id, session_id, version, due_at
             FROM session_reminder_handoffs
             WHERE state = 0 AND due_at <= {now}
             ORDER BY due_at, id
             LIMIT {BatchSize}
             """).ToListAsync(cancellationToken);
 
-        if (orderedIds.Count == 0)
+        return [.. rows.Select(row =>
+            new DueReminderCandidate(row.Id, SessionId.From(row.SessionId), row.Version, row.DueAt))];
+    }
+
+    private sealed record DueReminderDiscoveryRow(Guid Id, Guid SessionId, int Version, Instant DueAt);
+
+    /// <summary>
+    /// §7.2's durable attempt bookkeeping: a single autocommitted statement, issued with no ambient
+    /// transaction, so the increment survives even when the caller's later per-session transaction
+    /// rolls back or crashes (F3: previously <c>Attempts++</c> shared that transaction and rollback
+    /// erased it, so a Pending row was never observably seen above zero attempts). Guarded on
+    /// <c>state = 0 AND version = expectedVersion</c> so an already-resolved or already-replanned row
+    /// (discovered stale) does not have a stray attempt recorded against a candidate it no longer is.
+    /// Returns the freshly committed attempts count, or <c>null</c> when the guard did not match.
+    /// </summary>
+    public async Task<int?> RecordAttemptAsync(
+        Guid handoffId,
+        int expectedVersion,
+        Instant now,
+        CancellationToken cancellationToken)
+    {
+        int rowsAffected = await context.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE session_reminder_handoffs
+            SET attempts = attempts + 1, last_attempt_at = {now}
+            WHERE id = {handoffId} AND state = 0 AND version = {expectedVersion}
+            """, cancellationToken);
+
+        if (rowsAffected == 0)
         {
-            return [];
+            return null;
         }
 
-        Dictionary<Guid, (SessionId SessionId, int Version)> byId = await context.SessionReminderHandoffs
-            .Where(handoff => orderedIds.Contains(handoff.Id))
-            .Select(handoff => new { handoff.Id, handoff.SessionId, handoff.Version })
-            .ToDictionaryAsync(row => row.Id, row => (row.SessionId, row.Version), cancellationToken);
+        List<int> attempts = await context.Database.SqlQuery<int>($"""
+            SELECT attempts
+            FROM session_reminder_handoffs
+            WHERE id = {handoffId}
+            """).ToListAsync(cancellationToken);
 
-        // Preserves the discovery query's (due_at, id) order; a row vanishing between the two
-        // queries (theoretically possible, never observed) is simply dropped rather than throwing.
-        return [.. orderedIds
-            .Where(byId.ContainsKey)
-            .Select(id => new DueReminderCandidate(id, byId[id].SessionId, byId[id].Version))];
+        return attempts.Count == 1 ? attempts[0] : null;
     }
 
     /// <summary>
@@ -124,6 +158,7 @@ public sealed class SessionDueCandidateStore(AppDbContext context)
 /// <summary>
 /// One row <see cref="SessionDueCandidateStore.GetDueReminderCandidatesAsync"/> discovered: the handoff
 /// id, the session it belongs to (jobs group candidates by this for the one-transaction-per-session
-/// rule), and the version discovered so the locked re-read can detect staleness.
+/// rule), the version discovered so the locked re-read can detect staleness, and the due instant
+/// discovered so the locked re-read can also detect a due instant that moved into the future.
 /// </summary>
-public sealed record DueReminderCandidate(Guid HandoffId, SessionId SessionId, int Version);
+public sealed record DueReminderCandidate(Guid HandoffId, SessionId SessionId, int Version, Instant DueAt);

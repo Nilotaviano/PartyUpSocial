@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
+using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Sessions;
@@ -157,6 +158,59 @@ public sealed class ReminderDueJobTests : IAsyncLifetime, IDisposable
     }
 
     /// <summary>
+    /// F1 regression: a replan that lands strictly between the unlocked discovery query and this job's
+    /// locked re-read must never be delivered early, even if it happens to leave the row's
+    /// <c>version</c> looking unchanged from what discovery captured. The replan is simulated by
+    /// mutating only <c>due_at</c> into the future while the job is blocked acquiring the session
+    /// parent lock (mirroring the verifier's scenario) — the job's post-lock re-read must see the
+    /// now-future due_at and leave the row exactly Pending with that future due_at, not deliver or
+    /// cancel it.
+    /// </summary>
+    [Fact]
+    public async Task ReplanBetweenDiscoveryAndLock_LeavesTheHandoffPendingWithItsFutureDueAt_D082()
+    {
+        (Session session, UserId recipient, Guid handoffId) =
+            await SeedEligibleDueHandoffAsync("replan-race", leadMinutes: 90, durationMinutes: 60);
+
+        Instant futureDueAt = _factory.Clock.GetCurrentInstant() + Duration.FromMinutes(30);
+
+        await using AsyncServiceScope holderScope = _factory.Services.CreateAsyncScope();
+        AppDbContext holderContext = holderScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await using var holderTransaction = await holderContext.Database.BeginTransactionAsync();
+        await holderContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM sessions WHERE id = {session.Id.Value} FOR NO KEY UPDATE");
+
+        await using AsyncServiceScope jobScope = _factory.Services.CreateAsyncScope();
+        var job = jobScope.ServiceProvider.GetRequiredService<SessionReminderDueJob>();
+        Task jobTask = job.ExecuteAsync(default);
+
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        Assert.False(jobTask.IsCompleted, "The job must still be blocked acquiring the held session parent lock.");
+
+        await using (AsyncServiceScope mutateScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = mutateScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            SessionReminderHandoff replanned = await context.SessionReminderHandoffs.SingleAsync(h => h.Id == handoffId);
+            replanned.DueAt = futureDueAt;
+            await context.SaveChangesAsync();
+        }
+
+        await holderTransaction.RollbackAsync();
+        await jobTask;
+
+        SessionReminderHandoff after = await ReloadHandoffAsync(handoffId);
+        Assert.Equal(SessionReminderHandoffState.Pending, after.State);
+        Assert.Equal(futureDueAt, after.DueAt);
+        Assert.Null(after.DeliveredAt);
+
+        await using AsyncServiceScope verify = _factory.Services.CreateAsyncScope();
+        AppDbContext verifyContext = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        bool notificationExists = await verifyContext.Notifications.AnyAsync(n =>
+            n.SessionId == session.Id && n.RecipientUserId == recipient && n.Type == NotificationType.SessionReminder);
+        Assert.False(notificationExists, "A due_at that moved into the future between discovery and the lock must never deliver early.");
+    }
+
+    /// <summary>
     /// The parent-lock-plus-version-recheck contract is what makes exactly-once delivery hold under
     /// two workers racing the same discovered candidate, not a special case in the job itself.
     /// </summary>
@@ -183,20 +237,72 @@ public sealed class ReminderDueJobTests : IAsyncLifetime, IDisposable
         Assert.Equal(1, notificationCount);
     }
 
-    /// <summary>A row that reaches its fifth execution attempt is dead-lettered instead of resolved (§4.1).</summary>
+    /// <summary>
+    /// F3 regression: attempts must be reachable through genuine, durably-recorded execution attempts
+    /// (not a hand-written <c>Attempts = 4</c>), and the fifth recorded attempt must still attempt
+    /// delivery normally — it dead-letters here because that attempt also resolves to "not
+    /// deliverable" (the participant left after the handoff was planned), the same outcome a single
+    /// attempt would reach on its own; attempts alone never forecloses a real delivery attempt.
+    /// </summary>
     [Fact]
     public async Task FifthFailureDeadLettersTheHandoff_A066()
     {
         (Session session, UserId recipient, Guid handoffId) =
             await SeedEligibleDueHandoffAsync("dead-letter", leadMinutes: 90, durationMinutes: 60);
 
-        await using (AsyncServiceScope mutateScope = _factory.Services.CreateAsyncScope())
+        // The participant leaves after the handoff was planned: still Pending/due, but no longer
+        // deliverable — every real attempt below resolves to "not deliverable", the same branch a
+        // single successful attempt would take straight to Canceled.
+        await using (AsyncServiceScope leaveScope = _factory.Services.CreateAsyncScope())
         {
-            AppDbContext context = mutateScope.ServiceProvider.GetRequiredService<AppDbContext>();
-            SessionReminderHandoff handoff = await context.SessionReminderHandoffs.SingleAsync(h => h.Id == handoffId);
-            handoff.Attempts = 4;
+            AppDbContext context = leaveScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Session tracked = await context.Sessions.Include(s => s.Participations).SingleAsync(s => s.Id == session.Id);
+            tracked.Leave(ParticipantRef.ForUser(recipient), _factory.Clock);
+            _ = tracked.DequeueEvents();
             await context.SaveChangesAsync();
         }
+
+        Instant now = _factory.Clock.GetCurrentInstant();
+
+        // Four genuine forced crashes, each mirroring exactly what SessionReminderDueJob does for one
+        // candidate: record the attempt in its own committed statement first (so it survives the crash
+        // below), then lock/read and fail before commit. This proves attempts is durably reachable in
+        // production instead of being erased by rollback (the F3 bug) — the counter really does reach
+        // 4 through real recorded attempts, not a hand-written field set.
+        for (int crash = 0; crash < 4; crash++)
+        {
+            await using AsyncServiceScope crashScope = _factory.Services.CreateAsyncScope();
+            var unitOfWork = crashScope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var sessionLocks = crashScope.ServiceProvider.GetRequiredService<ISessionLockRepository>();
+            var candidateStore = crashScope.ServiceProvider.GetRequiredService<SessionDueCandidateStore>();
+
+            int currentVersion;
+            await using (AsyncServiceScope readScope = _factory.Services.CreateAsyncScope())
+            {
+                AppDbContext context = readScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                currentVersion = await context.SessionReminderHandoffs.AsNoTracking()
+                    .Where(h => h.Id == handoffId)
+                    .Select(h => h.Version)
+                    .SingleAsync();
+            }
+
+            await candidateStore.RecordAttemptAsync(handoffId, currentVersion, now, default);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => unitOfWork.ExecuteAsync<bool>(
+                async ct =>
+                {
+                    await sessionLocks.LockSessionsAsync([session.Id], ct);
+                    await candidateStore.LockSessionHandoffsAsync(session.Id, ct);
+                    _ = await candidateStore.FindHandoffAsync(handoffId, ct)
+                        ?? throw new InvalidOperationException("Seed handoff missing.");
+                    throw new InvalidOperationException("Simulated crash before commit.");
+                },
+                default));
+        }
+
+        SessionReminderHandoff beforeFifth = await ReloadHandoffAsync(handoffId);
+        Assert.Equal(4, beforeFifth.Attempts);
+        Assert.Equal(SessionReminderHandoffState.Pending, beforeFifth.State);
 
         await RunJobAsync();
 
