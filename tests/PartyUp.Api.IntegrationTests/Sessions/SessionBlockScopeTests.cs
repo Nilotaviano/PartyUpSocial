@@ -1,0 +1,307 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using NodaTime;
+using PartyUp.Application.Abstractions;
+using PartyUp.Application.Friends;
+using PartyUp.Domain.Friendships;
+using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Sessions;
+using PartyUp.Domain.Users;
+using PartyUp.Infrastructure.Friends;
+using PartyUp.Infrastructure.Persistence;
+using PartyUp.Infrastructure.Persistence.Repositories;
+
+namespace PartyUp.Api.IntegrationTests.Sessions;
+
+/// <summary>
+/// S2a replaced the Phase 3 <c>EmptyBlockEffectScopeProvider</c> placeholder with the real
+/// <see cref="SessionBlockEffectScopeProvider"/> on the same <see cref="IBlockEffectScopeProvider"/>
+/// port. This proves the real scope actually feeds <see cref="BlockEffectsExecutor"/> real session
+/// state (not the placeholder's permanently empty scope) and that its A-068-ordered
+/// <c>LockSessionsAsync</c> statement lets two blocks that share session parents proceed without
+/// deadlocking each other.
+/// </summary>
+[Trait("Category", "Integration")]
+public sealed class SessionBlockScopeTests : IAsyncLifetime, IDisposable
+{
+    private readonly PartyUpApiFactory _factory = new();
+
+    public Task InitializeAsync() => _factory.StartAsync();
+
+    public Task DisposeAsync() => _factory.StopAsync();
+
+    public void Dispose() => _factory.Dispose();
+
+    [Fact]
+    public async Task RealScope_InvokesExistingExecutorOnce_D077()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: "scope-organizer@example.test");
+        UserId participantId = await _factory.SeedUserAsync(email: "scope-participant@example.test");
+        await EnsureDistinctUsernamesAsync(organizerId, participantId);
+
+        SessionId sessionId;
+        await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Session session = Session.Create(organizerId, SessionDetailsFor(), [], _factory.Clock);
+            session.Invite(participantId, _factory.Clock);
+            session.Rsvp(ParticipantRef.ForUser(participantId), ParticipationStatus.Going, _factory.Clock);
+            _ = session.DequeueEvents();
+            sessionId = session.Id;
+            context.Sessions.Add(session);
+
+            Friendship friendship = Friendship.Request(
+                await context.DomainUsers.SingleAsync(u => u.Id == organizerId),
+                await context.DomainUsers.SingleAsync(u => u.Id == participantId),
+                _factory.Clock);
+            friendship.Accept(participantId, _factory.Clock);
+            _ = friendship.DequeueEvents();
+            context.Friendships.Add(friendship);
+
+            await context.SaveChangesAsync();
+        }
+
+        await using AsyncServiceScope blockScope = _factory.Services.CreateAsyncScope();
+        AppDbContext blockContext = blockScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var counts = new ScopeLoadCounts();
+        var countingScope = new CountingBlockEffectScopeProvider(
+            new SessionBlockEffectScopeProvider(
+                blockContext,
+                blockScope.ServiceProvider.GetRequiredService<ISessionLockRepository>()),
+            counts);
+        var executor = new BlockEffectsExecutor(
+            countingScope,
+            blockScope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
+            blockScope.ServiceProvider.GetRequiredService<IReminderScheduleWriter>(),
+            _factory.Clock,
+            blockScope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>());
+        var useCase = new BlockUserUseCase(
+            blockScope.ServiceProvider.GetRequiredService<IUserGraphResolver>(),
+            blockScope.ServiceProvider.GetRequiredService<IFriendPairLocker>(),
+            blockScope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
+            blockScope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+            executor,
+            blockScope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
+            _factory.Clock);
+
+        string participantUsername = (await blockContext.DomainUsers.AsNoTracking()
+            .SingleAsync(u => u.Id == participantId)).Username!.Value.Value;
+
+        BlockGraphCommandResult result = await useCase.ExecuteAsync(organizerId, participantUsername, default);
+
+        Assert.True(result.Succeeded, result.Code);
+        Assert.Equal(1, counts.Loads);
+
+        await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
+        AppDbContext verify = verification.ServiceProvider.GetRequiredService<AppDbContext>();
+        Participation participation = await verify.SessionParticipations.AsNoTracking()
+            .SingleAsync(p => p.SessionId == sessionId && p.UserId == participantId);
+        Assert.True(participation.IsRemoved);
+        Assert.Equal(0, await verify.Friendships.CountAsync());
+    }
+
+    /// <summary>
+    /// Two blocks that both organizer <paramref name="userA"/> issues — one against
+    /// <paramref name="userB"/>, one against a third user — where both counterparts share the same two
+    /// sessions. Without the A-068-declared single-statement, database-ordered
+    /// <c>LockSessionsAsync</c>, two transactions each locking the same two session rows in
+    /// caller-dependent order could deadlock; this proves they do not, by holding the first block's
+    /// user-pair lock (which necessarily contends on the shared organizer row first) and only then
+    /// releasing it, so the second block's own session-parent lock acquisition — which the first
+    /// transaction has already released by then — proceeds cleanly.
+    /// </summary>
+    [Fact]
+    public async Task ConcurrentBlocksSharingSessionsDoNotDeadlock_A068()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: "shared-organizer@example.test");
+        UserId counterpartOneId = await _factory.SeedUserAsync(email: "shared-counterpart-one@example.test");
+        UserId counterpartTwoId = await _factory.SeedUserAsync(email: "shared-counterpart-two@example.test");
+        await EnsureDistinctUsernamesAsync(organizerId, counterpartOneId, counterpartTwoId);
+
+        SessionId sessionOneId;
+        SessionId sessionTwoId;
+        await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            Session sessionOne = Session.Create(organizerId, SessionDetailsFor(), [], _factory.Clock);
+            sessionOne.Invite(counterpartOneId, _factory.Clock);
+            sessionOne.Rsvp(ParticipantRef.ForUser(counterpartOneId), ParticipationStatus.Going, _factory.Clock);
+            sessionOne.Invite(counterpartTwoId, _factory.Clock);
+            sessionOne.Rsvp(ParticipantRef.ForUser(counterpartTwoId), ParticipationStatus.Going, _factory.Clock);
+            _ = sessionOne.DequeueEvents();
+            sessionOneId = sessionOne.Id;
+
+            Session sessionTwo = Session.Create(organizerId, SessionDetailsFor(), [], _factory.Clock);
+            sessionTwo.Invite(counterpartOneId, _factory.Clock);
+            sessionTwo.Rsvp(ParticipantRef.ForUser(counterpartOneId), ParticipationStatus.Going, _factory.Clock);
+            sessionTwo.Invite(counterpartTwoId, _factory.Clock);
+            sessionTwo.Rsvp(ParticipantRef.ForUser(counterpartTwoId), ParticipationStatus.Going, _factory.Clock);
+            _ = sessionTwo.DequeueEvents();
+            sessionTwoId = sessionTwo.Id;
+
+            context.Sessions.AddRange(sessionOne, sessionTwo);
+            await context.SaveChangesAsync();
+        }
+
+        await using AsyncServiceScope firstScope = _factory.Services.CreateAsyncScope();
+        await using AsyncServiceScope secondScope = _factory.Services.CreateAsyncScope();
+        var gate = new PairHoldGate();
+
+        Task<BlockGraphCommandResult> firstBlock = BlockAsync(
+            firstScope,
+            organizerId,
+            counterpartOneId,
+            new HoldingFriendPairLocker(
+                new FriendPairLocker(firstScope.ServiceProvider.GetRequiredService<AppDbContext>()),
+                gate));
+        await gate.Held.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var attemptGate = new PairAttemptGate();
+        Task<BlockGraphCommandResult> secondBlock = BlockAsync(
+            secondScope,
+            organizerId,
+            counterpartTwoId,
+            new AttemptingFriendPairLocker(
+                new FriendPairLocker(secondScope.ServiceProvider.GetRequiredService<AppDbContext>()),
+                attemptGate));
+        await attemptGate.Attempted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(secondBlock.IsCompleted, "The second block must still be waiting on the shared organizer row.");
+
+        gate.Release.TrySetResult();
+
+        BlockGraphCommandResult first = await firstBlock.WaitAsync(TimeSpan.FromSeconds(10));
+        BlockGraphCommandResult second = await secondBlock.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True(first.Succeeded);
+        Assert.True(second.Succeeded);
+
+        await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
+        AppDbContext verify = verification.ServiceProvider.GetRequiredService<AppDbContext>();
+        foreach (SessionId sessionId in new[] { sessionOneId, sessionTwoId })
+        {
+            Assert.True((await verify.SessionParticipations.AsNoTracking().SingleAsync(p =>
+                p.SessionId == sessionId && p.UserId == counterpartOneId)).IsRemoved);
+            Assert.True((await verify.SessionParticipations.AsNoTracking().SingleAsync(p =>
+                p.SessionId == sessionId && p.UserId == counterpartTwoId)).IsRemoved);
+        }
+
+        Assert.Equal(2, await verify.Blocks.CountAsync());
+    }
+
+    private async Task<BlockGraphCommandResult> BlockAsync(
+        AsyncServiceScope scope,
+        UserId actorId,
+        UserId targetId,
+        IFriendPairLocker locker)
+    {
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        string targetUsername = (await context.DomainUsers.AsNoTracking()
+            .SingleAsync(u => u.Id == targetId)).Username!.Value.Value;
+
+        var useCase = new BlockUserUseCase(
+            scope.ServiceProvider.GetRequiredService<IUserGraphResolver>(),
+            locker,
+            scope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
+            scope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+            scope.ServiceProvider.GetRequiredService<IBlockEffectsExecutor>(),
+            scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
+            _factory.Clock);
+        return await useCase.ExecuteAsync(actorId, targetUsername, default);
+    }
+
+    /// <summary>
+    /// <see cref="PartyUpApiFactory.SeedUserAsync"/> derives its default username from the first 8 hex
+    /// characters of the (version-7, timestamp-prefixed) user id, so two users seeded within the same
+    /// test can collide on username when created milliseconds apart. Block resolution goes by username,
+    /// so every test that blocks by username needs distinct ones — mirrors the
+    /// <c>ChangeUsername</c>/<c>UsernameRegistryEntry.ClaimNew</c> pattern
+    /// <c>Friends/DeletionFriendRaceTests.cs</c> already uses for the same reason.
+    /// </summary>
+    private async Task EnsureDistinctUsernamesAsync(params UserId[] userIds)
+    {
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        string batchSuffix = Guid.NewGuid().ToString("N");
+
+        for (int i = 0; i < userIds.Length; i++)
+        {
+            User user = await context.DomainUsers.SingleAsync(u => u.Id == userIds[i]);
+            Username username = Username.Create($"blk{i}{batchSuffix[..14]}");
+            user.ChangeUsername(username, _factory.Clock);
+            context.UsernameRegistry.Add(UsernameRegistryEntry.ClaimNew(username, user.Id));
+        }
+
+        await context.SaveChangesAsync();
+    }
+
+    private SessionDetails SessionDetailsFor() => new(
+        SessionTitle.Create("Shared block scope session"),
+        _factory.Clock.GetCurrentInstant() + Duration.FromHours(3),
+        Duration15.FromMinutes(90),
+        Platform.NotApplicable,
+        null,
+        SessionNotes.Empty,
+        minAttendance: 1,
+        maxCapacity: null,
+        isPrivate: true);
+}
+
+internal sealed class ScopeLoadCounts
+{
+    private int _loads;
+
+    internal int Loads => Volatile.Read(ref _loads);
+
+    internal void RecordLoad() => Interlocked.Increment(ref _loads);
+}
+
+internal sealed class CountingBlockEffectScopeProvider(
+    IBlockEffectScopeProvider inner,
+    ScopeLoadCounts counts) : IBlockEffectScopeProvider
+{
+    public Task<BlockEffectScope> LoadForUpdateAsync(
+        UserId first,
+        UserId second,
+        CancellationToken cancellationToken)
+    {
+        counts.RecordLoad();
+        return inner.LoadForUpdateAsync(first, second, cancellationToken);
+    }
+}
+
+internal sealed class PairHoldGate
+{
+    internal TaskCompletionSource Held { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    internal TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+}
+
+internal sealed class PairAttemptGate
+{
+    internal TaskCompletionSource Attempted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+}
+
+/// <summary>Holds after acquiring the pair lock, so a second, independent pair-lock attempt on a
+/// shared user blocks behind it — the real database contention point for two blocks sharing an
+/// organizer.</summary>
+internal sealed class HoldingFriendPairLocker(IFriendPairLocker inner, PairHoldGate gate) : IFriendPairLocker
+{
+    public async Task<LockedFriendPair?> LockAsync(UserId first, UserId second, CancellationToken cancellationToken)
+    {
+        LockedFriendPair? locked = await inner.LockAsync(first, second, cancellationToken);
+        gate.Held.TrySetResult();
+        await gate.Release.Task.WaitAsync(cancellationToken);
+        return locked;
+    }
+}
+
+internal sealed class AttemptingFriendPairLocker(IFriendPairLocker inner, PairAttemptGate gate) : IFriendPairLocker
+{
+    public async Task<LockedFriendPair?> LockAsync(UserId first, UserId second, CancellationToken cancellationToken)
+    {
+        Task<LockedFriendPair?> attempt = inner.LockAsync(first, second, cancellationToken);
+        gate.Attempted.TrySetResult();
+        return await attempt;
+    }
+}
