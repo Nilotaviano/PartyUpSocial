@@ -92,6 +92,20 @@ internal sealed class FakeSessionLockRepository : ISessionLockRepository
     }
 }
 
+/// <summary>
+/// Always matches unless a test sets <see cref="MatchesFunc"/> — the A-071 concurrency check the real
+/// <c>SessionVersionStamp</c> (Infrastructure) performs is opaque to <see cref="EditSessionUseCase"/>,
+/// which only ever calls the port it is given.
+/// </summary>
+internal sealed class FakeSessionVersionStamp : ISessionVersionStamp
+{
+    internal Func<Session, string, bool> MatchesFunc { get; set; } = (_, _) => true;
+
+    public string Issue(SessionId sessionId, uint xmin) => $"{sessionId.Value:N}:{xmin}";
+
+    public bool Matches(Session lockedSession, string token) => MatchesFunc(lockedSession, token);
+}
+
 internal sealed class RecordingSessionNotificationMaterializer : ISessionNotificationMaterializer
 {
     internal List<(Session Session, IReadOnlyList<IDomainEvent> Events)> Calls { get; } = [];
@@ -293,6 +307,8 @@ internal sealed class SessionTestFixture
 
     internal FakeSessionReadRepository Reads { get; }
 
+    internal FakeSessionVersionStamp VersionStamp { get; } = new();
+
     internal UserId OrganizerId { get; }
 
     internal UserId InviteeId { get; }
@@ -333,7 +349,7 @@ internal sealed class SessionTestFixture
             Clock);
 
     internal EditSessionUseCase EditUseCase() =>
-        new(Sessions, Locks, Materializer, Reminders, UnitOfWork, Clock);
+        new(Sessions, Locks, Materializer, Reminders, UnitOfWork, Clock, VersionStamp);
 
     internal SessionInvitationUseCases InvitationUseCases() =>
         new(Sessions, Locks, Friendships, Blocks, Materializer, Reminders, UnitOfWork, Clock);

@@ -25,7 +25,13 @@ public sealed record EditSessionCommand(
     int? MinAttendance,
     int? MaxCapacity,
     bool? IsPrivate,
-    IReadOnlyCollection<SessionEditClearField>? Clear);
+    IReadOnlyCollection<SessionEditClearField>? Clear,
+    /// <summary>
+    /// A-071's opaque <c>version</c> token, already format-validated by the endpoint's
+    /// <c>400 invalid_if_match</c> pre-check. Null only for internal callers (tests) that bypass HTTP
+    /// and do not need the concurrency check; every HTTP-originated command supplies one.
+    /// </summary>
+    string? IfMatch = null);
 
 public sealed record EditSessionResult(bool Succeeded, string? Code, Session? Session)
 {
@@ -45,7 +51,8 @@ public sealed class EditSessionUseCase(
     ISessionNotificationMaterializer materializer,
     ISessionReminderHandoffWriter reminders,
     IUnitOfWork unitOfWork,
-    IClock clock)
+    IClock clock,
+    ISessionVersionStamp versionStamp)
 {
     public async Task<EditSessionResult> ExecuteAsync(EditSessionCommand command, CancellationToken cancellationToken)
     {
@@ -75,6 +82,13 @@ public sealed class EditSessionUseCase(
                 if (session.OrganizerId != command.ActorId)
                 {
                     return EditSessionResult.Failed("session_not_found");
+                }
+
+                // A-071: the comparison point is this freshly locked row's own xmin, not any earlier,
+                // unlocked read — command.IfMatch is null only for internal callers that bypass HTTP.
+                if (command.IfMatch is { } ifMatch && !versionStamp.Matches(session, ifMatch))
+                {
+                    return EditSessionResult.Failed("session_conflict");
                 }
 
                 bool reschedule = false;

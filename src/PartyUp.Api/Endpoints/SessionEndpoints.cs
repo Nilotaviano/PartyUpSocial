@@ -1,7 +1,4 @@
 using System.Buffers.Text;
-using System.Buffers.Binary;
-using System.Security.Cryptography;
-using Microsoft.AspNetCore.DataProtection;
 using NodaTime;
 using NodaTime.Text;
 using PartyUp.Api.Auth;
@@ -162,7 +159,7 @@ public static class SessionEndpoints
         ICurrentUserAccessor currentUser,
         CreateSessionUseCase useCase,
         ISessionReadRepository reads,
-        SessionVersionProtector versionProtector,
+        ISessionVersionStamp versionStamp,
         IConfiguration configuration,
         HttpContext context,
         CancellationToken cancellationToken)
@@ -231,7 +228,7 @@ public static class SessionEndpoints
         }
 
         SessionDetailResponse detail = await BuildDetailResponseAsync(
-            reads, versionProtector, result.Session!.Id, cancellationToken);
+            reads, versionStamp, result.Session!.Id, cancellationToken);
         var guestLinks = result.GuestLinks!
             .Select(link => new GuestLinkInvitationResponse(
                 link.GuestLinkId.Value,
@@ -278,7 +275,7 @@ public static class SessionEndpoints
         Guid sessionId,
         ICurrentUserAccessor currentUser,
         SessionReadUseCases useCase,
-        SessionVersionProtector versionProtector,
+        ISessionVersionStamp versionStamp,
         HttpContext context,
         CancellationToken cancellationToken)
     {
@@ -295,7 +292,7 @@ public static class SessionEndpoints
             return Problem(context, StatusCodes.Status404NotFound, "session_not_found");
         }
 
-        string version = versionProtector.Compute(detail.Id, detail.ConcurrencyToken);
+        string version = versionStamp.Issue(detail.Id, detail.ConcurrencyToken);
         return Results.Ok(SessionDetailResponse.From(detail, version));
     }
 
@@ -305,7 +302,7 @@ public static class SessionEndpoints
         ICurrentUserAccessor currentUser,
         SessionReadUseCases reads,
         EditSessionUseCase useCase,
-        SessionVersionProtector versionProtector,
+        ISessionVersionStamp versionStamp,
         HttpContext context,
         CancellationToken cancellationToken)
     {
@@ -317,20 +314,9 @@ public static class SessionEndpoints
 
         var id = SessionId.From(sessionId);
 
-        if (!TryDecodeVersionToken(request.IfMatch, out byte[] ifMatchBytes))
+        if (!TryDecodeVersionToken(request.IfMatch))
         {
             return Problem(context, StatusCodes.Status400BadRequest, "invalid_if_match");
-        }
-
-        SessionDetail? current = await reads.GetSessionDetailAsync(id, actorId.Value, cancellationToken);
-        if (current is null)
-        {
-            return Problem(context, StatusCodes.Status404NotFound, "session_not_found");
-        }
-
-        if (!versionProtector.Matches(ifMatchBytes, id, current.ConcurrencyToken))
-        {
-            return Problem(context, StatusCodes.Status409Conflict, "session_conflict");
         }
 
         Instant? startTime = null;
@@ -382,7 +368,8 @@ public static class SessionEndpoints
             request.MinAttendance,
             request.MaxCapacity,
             request.IsPrivate,
-            clear);
+            clear,
+            request.IfMatch);
 
         EditSessionResult result;
         try
@@ -396,14 +383,17 @@ public static class SessionEndpoints
 
         if (!result.Succeeded)
         {
-            int status = result.Code == "session_not_found"
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
+            int status = result.Code switch
+            {
+                "session_not_found" => StatusCodes.Status404NotFound,
+                "session_conflict" => StatusCodes.Status409Conflict,
+                _ => StatusCodes.Status400BadRequest,
+            };
             return Problem(context, status, result.Code!);
         }
 
         SessionDetail refreshed = (await reads.GetSessionDetailAsync(id, actorId.Value, cancellationToken))!;
-        string version = versionProtector.Compute(id, refreshed.ConcurrencyToken);
+        string version = versionStamp.Issue(id, refreshed.ConcurrencyToken);
         return Results.Ok(SessionDetailResponse.From(refreshed, version));
     }
 
@@ -445,7 +435,7 @@ public static class SessionEndpoints
         ICurrentUserAccessor currentUser,
         SessionInvitationUseCases useCase,
         SessionReadUseCases reads,
-        SessionVersionProtector versionProtector,
+        ISessionVersionStamp versionStamp,
         HttpContext context,
         CancellationToken cancellationToken)
     {
@@ -485,7 +475,7 @@ public static class SessionEndpoints
         }
 
         SessionDetail detail = (await reads.GetSessionDetailAsync(id, actorId.Value, cancellationToken))!;
-        string version = versionProtector.Compute(id, detail.ConcurrencyToken);
+        string version = versionStamp.Issue(id, detail.ConcurrencyToken);
         return Results.Ok(SessionDetailResponse.From(detail, version));
     }
 
@@ -943,12 +933,12 @@ public static class SessionEndpoints
 
     private static async Task<SessionDetailResponse> BuildDetailResponseAsync(
         ISessionReadRepository reads,
-        SessionVersionProtector versionProtector,
+        ISessionVersionStamp versionStamp,
         SessionId sessionId,
         CancellationToken cancellationToken)
     {
         SessionDetail detail = (await reads.FindDetailAsync(sessionId, cancellationToken))!;
-        string version = versionProtector.Compute(sessionId, detail.ConcurrencyToken);
+        string version = versionStamp.Issue(sessionId, detail.ConcurrencyToken);
         return SessionDetailResponse.From(detail, version);
     }
 
@@ -986,22 +976,25 @@ public static class SessionEndpoints
         return decoded is not null;
     }
 
-    private static bool TryDecodeVersionToken(string? ifMatch, out byte[] bytes)
+    /// <summary>
+    /// The endpoint's own <c>400 invalid_if_match</c> pre-check (A-071): well-formed base64url, nothing
+    /// more — the actual comparison against the freshly locked row happens inside
+    /// <see cref="EditSessionUseCase"/>, never here against an unlocked read.
+    /// </summary>
+    private static bool TryDecodeVersionToken(string? ifMatch)
     {
         if (string.IsNullOrEmpty(ifMatch))
         {
-            bytes = [];
             return false;
         }
 
         try
         {
-            bytes = Base64Url.DecodeFromChars(ifMatch);
-            return bytes.Length == SessionVersionProtector.TokenByteLength;
+            _ = Base64Url.DecodeFromChars(ifMatch);
+            return true;
         }
         catch (FormatException)
         {
-            bytes = [];
             return false;
         }
     }
@@ -1048,39 +1041,4 @@ public static class SessionEndpoints
     private static RouteHandlerBuilder BodyOperation(RouteHandlerBuilder builder) =>
         Unsafe(builder)
             .ProducesPartyUpProblem(StatusCodes.Status415UnsupportedMediaType);
-}
-
-/// <summary>
-/// A-071's opaque <c>version</c> token: <c>base64url(HMAC-SHA256(key, sessionId ‖ xmin)[0..16])</c>,
-/// recomputed and fixed-time-compared rather than decoded. The HMAC key is derived once, at
-/// construction, from a dedicated ASP.NET Data Protection purpose — so it is process-secret without
-/// this class ever calling <c>Protect</c>/<c>Unprotect</c> on the token itself (Data Protection's
-/// ciphertexts are non-deterministic per call, which the "recompute and compare" contract requires).
-/// </summary>
-public sealed class SessionVersionProtector
-{
-    public const int TokenByteLength = 16;
-
-    private const string Purpose = "PartyUp.Sessions.Version.v1";
-
-    private readonly byte[] _key;
-
-    public SessionVersionProtector(IDataProtectionProvider provider) =>
-        _key = provider.CreateProtector(Purpose).Protect(new byte[32]);
-
-    public string Compute(SessionId sessionId, uint xmin)
-    {
-        Span<byte> input = stackalloc byte[16 + sizeof(uint)];
-        sessionId.Value.TryWriteBytes(input);
-        BinaryPrimitives.WriteUInt32BigEndian(input[16..], xmin);
-        byte[] hash = HMACSHA256.HashData(_key, input.ToArray());
-        return Base64Url.EncodeToString(hash.AsSpan(0, TokenByteLength));
-    }
-
-    public bool Matches(byte[] candidateHash, SessionId sessionId, uint xmin)
-    {
-        byte[] expected = Base64Url.DecodeFromChars(Compute(sessionId, xmin));
-        return candidateHash.Length == expected.Length &&
-            CryptographicOperations.FixedTimeEquals(candidateHash, expected);
-    }
 }

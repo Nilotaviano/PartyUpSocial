@@ -24,6 +24,7 @@ using PartyUp.Application.Deletion;
 using PartyUp.Application.Friends;
 using PartyUp.Application.Onboarding;
 using PartyUp.Application.Profile;
+using PartyUp.Application.Sessions;
 using PartyUp.Infrastructure;
 using PartyUp.Infrastructure.Email;
 using PartyUp.Infrastructure.Jobs;
@@ -187,7 +188,7 @@ builder.Services.AddAntiforgery(options =>
         : CookieSecurePolicy.Always;
 });
 builder.Services.AddSingleton<GuestLinkCredentialProtector>();
-builder.Services.AddSingleton<SessionVersionProtector>();
+builder.Services.AddScoped<ISessionVersionStamp, SessionVersionStamp>();
 builder.Services.AddSingleton<RateLimitPartitionPepper>();
 builder.Services.AddRateLimiter(_ => { });
 builder.Services.AddOptions<RateLimiterOptions>()

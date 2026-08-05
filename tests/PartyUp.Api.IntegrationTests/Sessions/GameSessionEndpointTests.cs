@@ -223,6 +223,41 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
         await SessionEndpointTestSupport.AssertProblemAsync(stale, HttpStatusCode.Conflict, "session_conflict");
     }
 
+    /// <summary>
+    /// A-071/PHASE4_DESIGN.md §4.2 step 2-3: the comparison point is the freshly locked row's own
+    /// <c>xmin</c>, not an earlier, unlocked read. Two PATCHes racing on the same initially-valid
+    /// <c>ifMatch</c> genuinely contend on the session's <c>FOR NO KEY UPDATE</c> parent lock inside
+    /// <c>EditSessionUseCase</c> — the loser only unblocks after the winner's transaction has committed
+    /// a new <c>xmin</c>, so its in-transaction comparison (not a stale pre-read) is what catches it.
+    /// </summary>
+    [Fact]
+    public async Task ConcurrentEditsWithTheSameInitialVersion_ExactlyOneWinsUnderLock_A071()
+    {
+        SessionHttpUser organizer = await SessionEndpointTestSupport.SeedAsync(_factory);
+        using SessionHttpSession session = await SessionEndpointTestSupport.SignInAsync(_factory, organizer.Id);
+        (JsonDocument created, _) = await CreatePrivateSessionAsync(session);
+        JsonElement detail = created.RootElement.GetProperty("session");
+        Guid sessionId = detail.GetProperty("id").GetGuid();
+        string version = detail.GetProperty("version").GetString()!;
+
+        Task<HttpResponseMessage> first = session.SendUnsafeAsync(
+            HttpMethod.Patch,
+            $"/api/v1/sessions/{sessionId:D}",
+            JsonContent.Create(new { title = "Racing edit A", ifMatch = version }));
+        Task<HttpResponseMessage> second = session.SendUnsafeAsync(
+            HttpMethod.Patch,
+            $"/api/v1/sessions/{sessionId:D}",
+            JsonContent.Create(new { title = "Racing edit B", ifMatch = version }));
+
+        HttpResponseMessage[] results = await Task.WhenAll(first, second);
+
+        Assert.Equal(1, results.Count(r => r.StatusCode == HttpStatusCode.OK));
+        Assert.Equal(1, results.Count(r => r.StatusCode == HttpStatusCode.Conflict));
+
+        HttpResponseMessage conflict = results.Single(r => r.StatusCode == HttpStatusCode.Conflict);
+        await SessionEndpointTestSupport.AssertProblemAsync(conflict, HttpStatusCode.Conflict, "session_conflict");
+    }
+
     [Fact]
     public async Task InviteIsAllOrNothingWithAUniformNotFound_D007()
     {

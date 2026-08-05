@@ -128,4 +128,43 @@ public sealed class SessionEditCommandTests
         Assert.Contains(fixture.Materializer.Calls[^1].Events, e => e is SessionRescheduled);
         Assert.NotEmpty(fixture.Reminders.Replans);
     }
+
+    [Fact]
+    public async Task VersionMismatchUnderLock_ReturnsSessionConflictAndWritesNothing_A071()
+    {
+        SessionTestFixture fixture = new();
+        Session session = fixture.SeedSession();
+        EditSessionUseCase useCase = fixture.EditUseCase();
+        fixture.VersionStamp.MatchesFunc = (_, _) => false;
+
+        EditSessionResult result = await useCase.ExecuteAsync(
+            new EditSessionCommand(
+                session.Id, fixture.OrganizerId, "New title", null, null, null, null, null,
+                null, null, null, null, IfMatch: "stale-token"),
+            default);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("session_conflict", result.Code);
+        Assert.NotEqual("New title", session.Title.Value);
+        Assert.Empty(fixture.Materializer.Calls);
+    }
+
+    [Fact]
+    public async Task MatchingVersion_UnderLockSucceeds_A071()
+    {
+        SessionTestFixture fixture = new();
+        Session session = fixture.SeedSession();
+        EditSessionUseCase useCase = fixture.EditUseCase();
+        fixture.VersionStamp.MatchesFunc = (lockedSession, token) =>
+            lockedSession.Id == session.Id && token == "current-token";
+
+        EditSessionResult result = await useCase.ExecuteAsync(
+            new EditSessionCommand(
+                session.Id, fixture.OrganizerId, "New title", null, null, null, null, null,
+                null, null, null, null, IfMatch: "current-token"),
+            default);
+
+        Assert.True(result.Succeeded, result.Code);
+        Assert.Equal("New title", session.Title.Value);
+    }
 }
