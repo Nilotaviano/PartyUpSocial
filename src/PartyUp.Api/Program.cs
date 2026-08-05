@@ -154,14 +154,18 @@ builder.Services.AddHangfire((services, config) => config
             services.GetRequiredService<IConfiguration>().GetConnectionString("Db")),
         new PostgreSqlStorageOptions { SchemaName = "hangfire" }));
 
-// The "Testing" environment (WebApplicationFactory) never runs the actual worker, and (see the
-// matching guard below) never registers the recurring rows either: S3's tests exercise
-// SessionDueSweepJob/SessionReminderDueJob directly through DI — the same pattern every other
-// Phase 4 use-case test already uses — instead of racing a real one-minute cadence against the
-// test's own transactions.
+// The "Testing" environment (WebApplicationFactory) never runs the actual worker, and never
+// registers the recurring rows either: S3's tests exercise SessionDueSweepJob/SessionReminderDueJob
+// directly through DI — the same pattern every other Phase 4 use-case test already uses — instead of
+// racing a real one-minute cadence against the test's own transactions. Recurring-row registration
+// happens in RecurringJobRegistrationService, a BackgroundService that retries with backoff instead
+// of dialing Hangfire storage synchronously on the startup path (that would make every non-"Testing"
+// host build, including WebApplicationFactory-based integration tests, fail whenever storage isn't
+// reachable yet).
 if (!builder.Environment.IsEnvironment("Testing"))
 {
     builder.Services.AddHangfireServer();
+    builder.Services.AddHostedService<RecurringJobRegistrationService>();
 }
 builder.Services.AddScoped<AuthenticateAndSignIn>();
 builder.Services.AddPartyUpCookieAuthentication(builder.Environment);
@@ -254,23 +258,6 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
     await using var scope = app.Services.CreateAsyncScope();
     await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
-}
-
-if (!app.Environment.IsEnvironment("Testing"))
-{
-    // Skipped entirely in "Testing" (see AddHangfireServer above): with no server there to ever poll
-    // them, registering recurring rows against the test container's own `hangfire` schema would just
-    // be dead weight — S3's tests call SessionDueSweepJob/SessionReminderDueJob directly through DI.
-    using IServiceScope recurringScope = app.Services.CreateScope();
-    var recurringJobs = recurringScope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
-    recurringJobs.AddOrUpdate<SessionDueSweepJob>(
-        "session-due-sweep",
-        job => job.ExecuteAsync(CancellationToken.None),
-        Cron.Minutely);
-    recurringJobs.AddOrUpdate<SessionReminderDueJob>(
-        "session-reminder-due",
-        job => job.ExecuteAsync(CancellationToken.None),
-        Cron.Minutely);
 }
 
 app.UseForwardedHeaders();
