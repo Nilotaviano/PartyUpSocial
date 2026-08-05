@@ -113,9 +113,21 @@ describe('SessionListPage', () => {
 
   it('renders session start times in the viewer profile time zone rather than the browser zone_D038_D046', async () => {
     const startTime = '2030-06-15T23:00:00Z'
+    const format = (timeZone?: string) =>
+      new Intl.DateTimeFormat('en', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone,
+      }).format(new Date(startTime))
+    const hostRender = format()
+    // A profile zone whose rendering provably differs from the host zone, so the
+    // assertion fails if the component silently falls back to the browser zone.
+    const profileZone = ['Asia/Tokyo', 'Pacific/Honolulu'].find(
+      (zone) => format(zone) !== hostRender,
+    )!
     api.get.mockImplementation((path: string) => {
       if (path === '/api/v1/me') {
-        return Promise.resolve({ data: { timeZone: 'America/Sao_Paulo' } })
+        return Promise.resolve({ data: { timeZone: profileZone } })
       }
       return Promise.resolve({
         data: { items: [session({ startTime })], nextCursor: null },
@@ -123,18 +135,6 @@ describe('SessionListPage', () => {
     })
     renderPage('upcoming')
 
-    const zoned = new Intl.DateTimeFormat('en', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-      timeZone: 'America/Sao_Paulo',
-    }).format(new Date(startTime))
-    const utc = new Intl.DateTimeFormat('en', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-      timeZone: 'UTC',
-    }).format(new Date(startTime))
-    expect(zoned).not.toBe(utc)
-
-    expect(await screen.findByText(zoned)).toBeInTheDocument()
+    expect(await screen.findByText(format(profileZone))).toBeInTheDocument()
   })
 })

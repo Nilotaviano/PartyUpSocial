@@ -249,29 +249,29 @@ describe('SessionDetailPage', () => {
   })
 
   it('renders the session start time in the viewer profile time zone rather than the browser zone_D038_D046', async () => {
+    const format = (timeZone?: string) =>
+      new Intl.DateTimeFormat('en', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone,
+      }).format(new Date('2030-09-01T18:00:00Z'))
+    const hostRender = format()
+    // A profile zone whose rendering provably differs from the host zone, so the
+    // assertion fails if the component silently falls back to the browser zone.
+    const profileZone = ['Asia/Tokyo', 'Pacific/Honolulu'].find(
+      (zone) => format(zone) !== hostRender,
+    )!
     api.get.mockImplementation((path: string) => {
       if (path === '/api/v1/sessions/{sessionId}')
         return Promise.resolve({ data: detail() })
       if (path === '/api/v1/sessions/{sessionId}/join-requests')
         return Promise.resolve({ data: { items: [], nextCursor: null } })
       if (path === '/api/v1/me')
-        return Promise.resolve({ data: { timeZone: 'America/Sao_Paulo' } })
+        return Promise.resolve({ data: { timeZone: profileZone } })
       throw new Error(`Unexpected GET ${path}`)
     })
     renderPage()
 
-    const zoned = new Intl.DateTimeFormat('en', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-      timeZone: 'America/Sao_Paulo',
-    }).format(new Date('2030-09-01T18:00:00Z'))
-    const utc = new Intl.DateTimeFormat('en', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-      timeZone: 'UTC',
-    }).format(new Date('2030-09-01T18:00:00Z'))
-    expect(zoned).not.toBe(utc)
-
-    expect(await screen.findByText(zoned)).toBeInTheDocument()
+    expect(await screen.findByText(format(profileZone))).toBeInTheDocument()
   })
 })
