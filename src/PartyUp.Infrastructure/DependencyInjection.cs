@@ -84,7 +84,8 @@ public static class DependencyInjection
         services.AddScoped<SessionTransitionUseCase>();
         services.AddScoped<SessionBlockEffectsUseCase>();
         // SessionDeletionEffectsUseCase depends on ExecuteDeletionForUserUseCase; both are registered
-        // here (rather than split with Program.cs) so AddInfrastructure alone resolves the whole graph.
+        // here (rather than split with Program.cs) so a caller only needs to add IClock (registered in
+        // Program.cs, not here) alongside AddInfrastructure to resolve the whole graph.
         services.AddScoped<PartyUp.Application.Deletion.ExecuteDeletionForUserUseCase>();
         services.AddScoped<SessionDeletionEffectsUseCase>();
         services.AddScoped<SendFriendRequestUseCase>();

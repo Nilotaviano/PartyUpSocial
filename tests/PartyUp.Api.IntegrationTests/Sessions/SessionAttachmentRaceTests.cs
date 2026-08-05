@@ -278,6 +278,101 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
         Assert.Equal(0, await verify.Notifications.CountAsync(n => n.SessionId == sessionId));
     }
 
+    /// <summary>
+    /// <see cref="SessionJoinRequestUseCases.RequestJoinAsync"/>'s pre-lock probe (its own step 1, no
+    /// locks taken) resolves visibility and passes -- the session is non-private (D-019: a private
+    /// session would already hide it from an uninvited stranger, which is a different, non-racing 404)
+    /// and the block does not exist yet. The block then commits entirely while the request is genuinely
+    /// contended on the block's held organizer row (the same <c>FriendPairLocker FOR UPDATE</c> vs.
+    /// <c>ISessionLockRepository.LockUsersAsync FOR NO KEY UPDATE</c> conflict the other block-first
+    /// tests use), landing strictly between the pre-lock probe and the parent-session lock. This must
+    /// fail if the post-lock <c>VisibilityEngine</c> recompute (SessionJoinRequestUseCases.cs:117-124)
+    /// is ever removed -- without it, the freshly locked block would never be observed and the request
+    /// would wrongly succeed.
+    /// </summary>
+    [Fact]
+    public async Task BlockThenRequestJoin_WritesNothingAndReturnsHidden_D065()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: "block-first-requestjoin-organizer@example.test");
+        UserId requesterId = await _factory.SeedUserAsync(email: "block-first-requestjoin-requester@example.test");
+        UserId invitedFriendId = await _factory.SeedUserAsync(email: "block-first-requestjoin-friend@example.test");
+        await EnsureDistinctUsernamesAsync(organizerId, requesterId);
+        SessionId sessionId = await SeedPublicSessionAsync(organizerId, invitedFriendId);
+
+        // The requester is an accepted friend of the organizer -- not invited or a participant -- so
+        // the non-private session's pre-lock probe grants rule-2 inherited access (DOMAIN_MODEL.md:184)
+        // through the organizer directly, without touching the D-099 invited-friend seeded above.
+        await using (AsyncServiceScope friendScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = friendScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Friendship friendship = Friendship.Request(
+                await context.DomainUsers.SingleAsync(u => u.Id == organizerId),
+                await context.DomainUsers.SingleAsync(u => u.Id == requesterId),
+                _factory.Clock);
+            friendship.Accept(requesterId, _factory.Clock);
+            _ = friendship.DequeueEvents();
+            context.Friendships.Add(friendship);
+            await context.SaveChangesAsync();
+        }
+
+        await using AsyncServiceScope blockerScope = _factory.Services.CreateAsyncScope();
+        await using AsyncServiceScope requestScope = _factory.Services.CreateAsyncScope();
+        var pairGate = new PairHoldGate();
+
+        Task<BlockGraphCommandResult> block = BlockAsync(
+            blockerScope,
+            organizerId,
+            requesterId,
+            new HoldingFriendPairLocker(
+                new FriendPairLocker(blockerScope.ServiceProvider.GetRequiredService<AppDbContext>()),
+                pairGate));
+        await pairGate.Held.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var lockAttemptGate = new AttemptGate();
+        Task<JoinRequestCommandResult> requestJoin = new SessionJoinRequestUseCases(
+                requestScope.ServiceProvider.GetRequiredService<ISessionRepository>(),
+                requestScope.ServiceProvider.GetRequiredService<ISessionReadRepository>(),
+                new AttemptingSessionLockRepository(
+                    requestScope.ServiceProvider.GetRequiredService<ISessionLockRepository>(),
+                    lockAttemptGate),
+                requestScope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
+                requestScope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+                requestScope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
+                requestScope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
+                requestScope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
+                requestScope.ServiceProvider.GetRequiredService<IClock>())
+            .RequestJoinAsync(sessionId, requesterId, default);
+
+        // The Attempted signal fires only once RequestJoin's step-2 LockUsersAsync call is made, which
+        // is strictly after its no-lock step-1 probe already resolved visibility successfully -- so by
+        // this point the pre-lock probe has already run and passed with no block on record yet.
+        await lockAttemptGate.Attempted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(
+            requestJoin.IsCompleted,
+            "RequestJoin must still be blocked behind the block's held organizer row.");
+
+        pairGate.Release.TrySetResult();
+
+        BlockGraphCommandResult blockResult = await block.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.True(blockResult.Succeeded);
+
+        JoinRequestCommandResult requestResult = await requestJoin.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(requestResult.Succeeded);
+        Assert.Equal("session_not_found", requestResult.Code);
+
+        await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
+        AppDbContext verify = verification.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(0, await verify.JoinRequests.CountAsync(r =>
+            r.SessionId == sessionId && r.RequesterId == requesterId));
+        Assert.Equal(0, await verify.SessionParticipations.CountAsync(p =>
+            p.SessionId == sessionId && p.UserId == requesterId));
+        Assert.Equal(0, await verify.SessionReminderHandoffs.CountAsync(h =>
+            h.SessionId == sessionId && h.RecipientUserId == requesterId));
+        Assert.Equal(1, await verify.Friendships.CountAsync());
+        Assert.Equal(1, await verify.Blocks.CountAsync());
+        Assert.Equal(0, await verify.Notifications.CountAsync(n => n.SessionId == sessionId));
+    }
+
     private async Task<SessionId> SeedAcceptedFriendshipSessionAsync(UserId organizerId, UserId counterpartId)
     {
         SessionId sessionId;
@@ -295,6 +390,43 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
         friendship.Accept(counterpartId, _factory.Clock);
         _ = friendship.DequeueEvents();
         context.Friendships.Add(friendship);
+
+        await context.SaveChangesAsync();
+        return sessionId;
+    }
+
+    /// <summary>A non-private session, so an uninvited requester's pre-lock visibility probe (D-019)
+    /// passes on its own -- distinct from <see cref="SeedAcceptedFriendshipSessionAsync"/>'s private
+    /// sessions, which an uninvited friend cannot yet see. D-099 requires a non-private session to have
+    /// at least one directly invited registered friend at creation, so <paramref name="invitedFriendId"/>
+    /// fills that requirement without being party to the race the test itself constructs.</summary>
+    private async Task<SessionId> SeedPublicSessionAsync(UserId organizerId, UserId invitedFriendId)
+    {
+        await using AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        Friendship friendship = Friendship.Request(
+            await context.DomainUsers.SingleAsync(u => u.Id == organizerId),
+            await context.DomainUsers.SingleAsync(u => u.Id == invitedFriendId),
+            _factory.Clock);
+        friendship.Accept(invitedFriendId, _factory.Clock);
+        _ = friendship.DequeueEvents();
+        context.Friendships.Add(friendship);
+
+        SessionDetails details = new(
+            SessionTitle.Create("Attachment race session (public)"),
+            _factory.Clock.GetCurrentInstant() + Duration.FromHours(3),
+            Duration15.FromMinutes(90),
+            Platform.NotApplicable,
+            null,
+            SessionNotes.Empty,
+            minAttendance: 1,
+            maxCapacity: null,
+            isPrivate: false);
+        Session session = Session.Create(organizerId, details, [invitedFriendId], _factory.Clock);
+        _ = session.DequeueEvents();
+        SessionId sessionId = session.Id;
+        context.Sessions.Add(session);
 
         await context.SaveChangesAsync();
         return sessionId;

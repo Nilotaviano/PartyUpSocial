@@ -267,6 +267,109 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
     }
 
     /// <summary>
+    /// Deterministic proof, same shape as
+    /// <see cref="BulkInviteAndApprovalLockInDatabaseOrderNotInputOrder_A068"/>: creation-time invite
+    /// bounds (D-129/D-130/D-142; PHASE4_DESIGN.md §6.1's "Bulk invite ... lock the union of ... in one
+    /// A-068-ordered statement, never in request-input order") apply at session creation too --
+    /// <see cref="CreateSessionUseCase"/> builds its lock set as
+    /// <c>{organizerId, invitee1, invitee2}</c> and hands the whole set to
+    /// <c>ISessionLockRepository.LockUsersAsync</c> in one statement. This holds the higher-id invitee's
+    /// row locked in one transaction, then creates a session with that invitee listed <em>before</em>
+    /// the lower-id one -- the opposite of the declared DB order -- and proves the lower-id row is
+    /// already locked (via a failing <c>NOWAIT</c> probe) before the caller ever blocks on the higher
+    /// one. A per-invitee caller-order lock loop would instead block on the higher-id row immediately,
+    /// never touching the lower one, so the probe would find it unlocked and this test would fail.
+    /// </summary>
+    [Fact]
+    public async Task CreateSessionLocksTheInviteeUnionInDatabaseOrderNotInputOrder_A068()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: "create-lock-organizer@example.test");
+        UserId userA = await _factory.SeedUserAsync(email: "create-lock-a@example.test");
+        UserId userB = await _factory.SeedUserAsync(email: "create-lock-b@example.test");
+
+        int order = userA.Value.ToByteArray(bigEndian: true).AsSpan()
+            .SequenceCompareTo(userB.Value.ToByteArray(bigEndian: true));
+        (UserId lowerId, UserId higherId) = order < 0 ? (userA, userB) : (userB, userA);
+
+        await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            foreach (UserId invitee in new[] { lowerId, higherId })
+            {
+                Friendship friendship = Friendship.Request(
+                    await context.DomainUsers.SingleAsync(u => u.Id == organizerId),
+                    await context.DomainUsers.SingleAsync(u => u.Id == invitee),
+                    _factory.Clock);
+                friendship.Accept(invitee, _factory.Clock);
+                _ = friendship.DequeueEvents();
+                context.Friendships.Add(friendship);
+            }
+
+            await context.SaveChangesAsync();
+        }
+
+        await using AsyncServiceScope holderScope = _factory.Services.CreateAsyncScope();
+        AppDbContext holderContext = holderScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await using var holderTransaction = await holderContext.Database.BeginTransactionAsync();
+        await holderContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM users WHERE id = {higherId.Value} FOR NO KEY UPDATE");
+
+        await using AsyncServiceScope callerScope = _factory.Services.CreateAsyncScope();
+        var createUseCase = new CreateSessionUseCase(
+            callerScope.ServiceProvider.GetRequiredService<ISessionRepository>(),
+            callerScope.ServiceProvider.GetRequiredService<ISessionLockRepository>(),
+            callerScope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
+            callerScope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+            callerScope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
+            callerScope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
+            callerScope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
+            callerScope.ServiceProvider.GetRequiredService<IClock>());
+
+        // Deliberately lists the already-locked higher-id invitee first -- the exact opposite of the
+        // DB's declared ORDER BY id -- so a per-invitee caller-order lock loop would block on the higher
+        // row immediately without ever touching the lower one.
+        Task<CreateSessionResult> callerTask = createUseCase.ExecuteAsync(
+            new CreateSessionCommand(
+                organizerId,
+                "Bulk create-lock session",
+                _factory.Clock.GetCurrentInstant() + Duration.FromHours(2),
+                DurationMinutes: 60,
+                Platform: Platform.NotApplicable,
+                Game: null,
+                Notes: null,
+                MinAttendance: 1,
+                MaxCapacity: null,
+                IsPrivate: true,
+                InviteeUserIds: [higherId, lowerId],
+                GuestLinkCount: 0),
+            default);
+
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        Assert.False(callerTask.IsCompleted, "The bulk lock must still be blocked on the contended higher-id row.");
+
+        await using (AsyncServiceScope probeScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext probeContext = probeScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await using var probeTransaction = await probeContext.Database.BeginTransactionAsync();
+
+            Exception? thrown = await Record.ExceptionAsync(() =>
+                probeContext.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT 1 FROM users WHERE id = {lowerId.Value} FOR NO KEY UPDATE NOWAIT"));
+
+            Assert.True(
+                thrown is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.LockNotAvailable },
+                "The lower-id invitee must already be locked by the blocked create-session call -- A-068 " +
+                "orders by id, so the lower row is acquired before the caller blocks on the higher one.");
+
+            await probeTransaction.RollbackAsync();
+        }
+
+        await holderTransaction.RollbackAsync();
+        CreateSessionResult result = await callerTask;
+        Assert.True(result.Succeeded, result.Code);
+    }
+
+    /// <summary>
     /// F3: approve's union lock is {organizer, requester}, not the organizer alone -- the whole
     /// counterpart-attaching pair is proven locked in one A-068-ordered statement, database order
     /// deciding acquisition regardless of which of the two happens to hold the higher id.

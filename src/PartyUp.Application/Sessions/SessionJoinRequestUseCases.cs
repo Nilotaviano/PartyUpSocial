@@ -23,12 +23,20 @@ public sealed record JoinRequestCommandResult(bool Succeeded, string? Code, Sess
 /// </summary>
 /// <remarks>
 /// <see cref="RequestJoinAsync"/> and <see cref="ApproveJoinRequestAsync"/> attach a requester to the
-/// session (a new registered counterpart), so both run the full <c>P4-LK-01</c> six-step sequence
-/// (§6.1): resolve visibility/authorization without locking arbitrary ids, lock the affected user set
-/// in one statement, lock the organizer/requester friendship and block rows in one statement per
-/// table, lock the session parent and reload, re-evaluate block eligibility under the fresh locks, then
-/// persist. A blocked pair — discovered either before or after the lock — returns the same
-/// <c>session_not_found</c> a stranger gets (D-065); it is indistinguishable and writes nothing.
+/// session (a new registered counterpart), so both run the full <c>P4-LK-01</c> sequence (§6.1):
+/// resolve visibility/authorization without locking arbitrary ids, lock the affected user set in one
+/// statement, lock the organizer/requester friendship and block rows in one statement per table, lock
+/// the session parent and reload its children, then re-evaluate visibility with the same
+/// <see cref="VisibilityEngine"/> the read side uses before persisting. That final recompute is not a
+/// single organizer-pair check: rule 2 (DOMAIN_MODEL.md:184) grants inherited access via ANY extending
+/// active registered participant, so once the parent lock has loaded the roster,
+/// <see cref="RequestJoinAsync"/> takes a second bulk graph lock (one statement per table, A-068 order)
+/// over the requester paired with every such extender, unions it with the pre-parent-lock
+/// organizer-pair locks, and resolves the full <see cref="Viewer"/> against it. A blocked pair —
+/// whether the organizer or any extender, discovered either before or after the parent lock — returns
+/// the same <c>session_not_found</c> a stranger gets (D-065); it is indistinguishable and writes
+/// nothing. <see cref="ApproveJoinRequestAsync"/> only ever attaches the already-known requester, so its
+/// re-check stays the single organizer/requester block lookup.
 /// <see cref="RejectJoinRequestAsync"/> shares the block re-check (so a block-first race also yields
 /// the indistinguishable 404 there) but never attaches anyone, so it locks only the block pair, not
 /// the friendship. Withdraw/list/promote/reject-waitlist act on an already-attached participant or
