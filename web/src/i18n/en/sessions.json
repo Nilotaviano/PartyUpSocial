@@ -1,0 +1,183 @@
+{
+  "nav": {
+    "sessions": "Sessions",
+    "upcoming": "Upcoming",
+    "history": "History"
+  },
+  "create": {
+    "heading": "New session",
+    "title": "Title",
+    "start": "Start time",
+    "duration": "Duration",
+    "platform": "Platform",
+    "game": "Game",
+    "gameCatalog": "Choose from Steam",
+    "gameFreeText": "Enter a game name",
+    "notes": "Notes",
+    "min": "Minimum attendance",
+    "max": "Maximum capacity",
+    "unlimited": "Unlimited capacity",
+    "private": "Private session",
+    "invitees": "Invite friends",
+    "guestLinks": "Guest links",
+    "defaults": "Defaults: 4 minimum, 4 maximum, 2 hours, no platform, not private.",
+    "submit": "Create session"
+  },
+  "edit": {
+    "heading": "Edit session",
+    "save": "Save changes",
+    "startLocked": "The start time can no longer be changed.",
+    "minLocked": "The minimum attendance can no longer be changed.",
+    "privacyDisclosure": "This change does not notify participants.",
+    "clearMax": "Remove capacity limit",
+    "clearNotes": "Remove notes",
+    "clearGame": "Remove game",
+    "conflictRetry": "This session changed elsewhere. We refreshed it and are retrying your save."
+  },
+  "validation": {
+    "required": "This field is required.",
+    "range": "Enter a value in the allowed range.",
+    "increment": "Choose a time in 15-minute increments.",
+    "minMax": "Minimum attendance cannot exceed maximum capacity.",
+    "capacity": "Capacity cannot be reduced below the number of people already going.",
+    "invitedFriend": "A non-private session needs at least one invited friend.",
+    "startWindow": "Choose a start time within the allowed scheduling window.",
+    "waitlistCapacity": "A waitlist requires a maximum capacity.",
+    "tooManyInvitees": "You can invite up to 50 friends.",
+    "tooManyGuestLinks": "You can create up to 20 guest links."
+  },
+  "detail": {
+    "organizer": "Organizer",
+    "roster": "Roster",
+    "status": "Status",
+    "notes": "Notes",
+    "going": "Going",
+    "maybe": "Maybe",
+    "declined": "Declined",
+    "pending": "Pending",
+    "waitlisted": "Waitlisted",
+    "anonymous": "Anonymous User",
+    "inProgress": "In progress"
+  },
+  "rsvp": {
+    "heading": "Your response",
+    "going": "Going",
+    "maybe": "Maybe",
+    "declined": "Declined",
+    "leave": "Leave session",
+    "updated": "Your response was updated."
+  },
+  "join": {
+    "request": "Request to join",
+    "withdraw": "Withdraw request",
+    "approve": "Approve",
+    "reject": "Reject",
+    "received": "Your join request was sent.",
+    "accepted": "Join request approved.",
+    "rejected": "Join request rejected."
+  },
+  "waitlist": {
+    "heading": "Waitlist",
+    "promote": "Promote",
+    "reject": "Remove from waitlist",
+    "vacancy": "A spot opened up.",
+    "added": "Added to the waitlist.",
+    "promoted": "Promoted from the waitlist."
+  },
+  "invite": {
+    "heading": "Invite",
+    "registered": "Invite friends",
+    "guest": "Guest links",
+    "createLink": "Create guest link",
+    "copyLink": "Copy link",
+    "revoke": "Revoke",
+    "removeGuest": "Remove guest",
+    "removeGuestConfirm": "Remove this guest from the session? They will lose access immediately.",
+    "copySuccess": "Link copied."
+  },
+  "cancel": {
+    "action": "Cancel session",
+    "title": "Cancel this session?",
+    "body": "Everyone with access will be notified. This cannot be undone.",
+    "confirm": "Cancel session"
+  },
+  "reminder": {
+    "label": "Reminder",
+    "off": "Off",
+    "minutes15": "15 minutes before",
+    "minutes30": "30 minutes before",
+    "hours1": "1 hour before",
+    "hours3": "3 hours before",
+    "hours12": "12 hours before",
+    "hours24": "24 hours before",
+    "accountDefault": "Use account default"
+  },
+  "list": {
+    "upcoming": "Upcoming sessions",
+    "history": "Session history",
+    "emptyUpcoming": "No upcoming sessions.",
+    "emptyHistory": "No completed sessions yet.",
+    "loadMore": "Load more",
+    "inProgress": "In progress"
+  },
+  "guest": {
+    "claimHeading": "Join this session",
+    "displayName": "Display name",
+    "respond": "Respond",
+    "live": "This session is live.",
+    "canceled": "This session was canceled.",
+    "revoked": "This link was revoked.",
+    "removed": "You were removed from this session.",
+    "ended": "This session has ended.",
+    "invalid": "This link is not valid.",
+    "linkExpiredReopen": "This link expired. Open your original invitation link again.",
+    "timezone": "Times are shown in your device's time zone."
+  },
+  "dirty": {
+    "title": "Discard unsaved changes?",
+    "body": "You have unsaved changes. If you leave now, they will be lost.",
+    "stay": "Cancel",
+    "discard": "Discard"
+  },
+  "errors": {
+    "notFound": "That session could not be found.",
+    "conflict": "This session changed elsewhere. Please try again.",
+    "rateLimited": "Too many attempts. Try again later.",
+    "generic": "Something went wrong.",
+    "codes": {
+      "session_not_found": "That session could not be found.",
+      "user_not_found": "That user could not be found.",
+      "session_validation": "Check the highlighted fields and try again.",
+      "invalid_if_match": "Reload the session and try again.",
+      "invalid_scope": "That session list is not valid.",
+      "invalid_cursor": "That page of results is no longer valid.",
+      "session_conflict": "This session changed elsewhere. Please try again.",
+      "session_terminal": "This session can no longer be changed.",
+      "session_time_locked": "The start time can no longer be changed.",
+      "capacity_below_occupancy": "Capacity cannot be reduced below the number of people already going.",
+      "waitlist_requires_capacity": "A waitlist requires a maximum capacity.",
+      "session_invites_closed": "This session is no longer accepting invitations.",
+      "session_responses_closed": "Responses are closed for this session.",
+      "session_leave_closed": "You can no longer leave this session.",
+      "session_guest_removal_closed": "Guests can no longer be removed from this session.",
+      "join_request_exists": "You already have a pending join request.",
+      "join_request_not_pending": "That join request is no longer pending.",
+      "join_request_closed": "This session is no longer accepting join requests.",
+      "no_session_capacity": "There is no capacity available.",
+      "not_waitlisted": "That person is not on the waitlist.",
+      "guest_link_terminal": "This guest link is no longer active.",
+      "guest_link_claimed": "This guest link has already been claimed.",
+      "reminder_not_eligible": "A reminder cannot be set for this session.",
+      "transient_conflict": "That did not go through. Please try again.",
+      "rate_limited": "Too many attempts. Try again later."
+    }
+  },
+  "a11y": {
+    "statusAnnounce": "Status updated",
+    "rosterLabel": "Session roster",
+    "waitlistLabel": "Session waitlist",
+    "validationSummary": "There were problems with your submission",
+    "dialogLabel": "Confirmation dialog",
+    "copyLink": "Copy link to clipboard"
+  }
+}

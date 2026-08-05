@@ -25,6 +25,11 @@ import { PublicDeletionRequestPage } from './features/deletion/PublicDeletionReq
 import { ProfileSettingsPage } from './features/profile/ProfileSettingsPage'
 import { AccountSettingsPage } from './features/settings/AccountSettingsPage'
 import { BlockedUsersPage } from './features/settings/BlockedUsersPage'
+import { SessionCreatePage } from './features/sessions/SessionCreatePage'
+import { SessionDetailPage } from './features/sessions/SessionDetailPage'
+import { SessionEditPage } from './features/sessions/SessionEditPage'
+import { SessionInvitePage } from './features/sessions/SessionInvitePage'
+import { SessionListPage } from './features/sessions/SessionListPage'
 
 type PlaceholderProps = {
   testId: string
@@ -39,6 +44,7 @@ function Placeholder({ testId, translationKey }: PlaceholderProps) {
     'profile',
     'settings',
     'errors',
+    'sessions',
   ])
 
   return (
@@ -49,7 +55,7 @@ function Placeholder({ testId, translationKey }: PlaceholderProps) {
 }
 
 function AuthenticatedShell() {
-  const { t } = useTranslation('common')
+  const { t } = useTranslation(['common', 'sessions'])
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">
@@ -77,6 +83,18 @@ function AuthenticatedShell() {
             to="/friends"
           >
             {t('navigation.friends')}
+          </NavLink>
+          <NavLink
+            className={({ isActive }) =>
+              `inline-flex min-h-11 items-center rounded-md px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
+                isActive
+                  ? 'bg-indigo-100 font-semibold text-indigo-950'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`
+            }
+            to="/sessions/upcoming"
+          >
+            {t('nav.sessions', { ns: 'sessions' })}
           </NavLink>
           <NavLink
             className={({ isActive }) =>
@@ -162,6 +180,24 @@ function App() {
             <Route path="/settings/profile" element={<ProfileSettingsPage />} />
             <Route path="/settings/account" element={<AccountSettingsPage />} />
             <Route path="/settings/blocked" element={<BlockedUsersPage />} />
+            <Route path="/sessions/new" element={<SessionCreatePage />} />
+            <Route
+              path="/sessions/upcoming"
+              element={<SessionListPage scope="upcoming" />}
+            />
+            <Route
+              path="/sessions/history"
+              element={<SessionListPage scope="history" />}
+            />
+            <Route path="/sessions/:sessionId" element={<SessionDetailPage />} />
+            <Route
+              path="/sessions/:sessionId/edit"
+              element={<SessionEditPage />}
+            />
+            <Route
+              path="/sessions/:sessionId/invite"
+              element={<SessionInvitePage />}
+            />
           </Route>
         </Route>
       </Route>

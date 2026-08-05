@@ -204,6 +204,9 @@ describe('AppNavigationTests', () => {
     ['/settings/profile', 'screen-settings-profile'],
     ['/settings/account', 'screen-settings-account'],
     ['/settings/blocked', 'screen-settings-blocked'],
+    ['/sessions/upcoming', 'screen-sessions-upcoming'],
+    ['/sessions/history', 'screen-sessions-history'],
+    ['/sessions/new', 'screen-session-create'],
   ])(
     'AuthenticatedEntries_ReachFriendsAndBlockedRoutes_D127: %s',
     async (path, testId) => {
@@ -241,13 +244,23 @@ describe('AppNavigationTests', () => {
     ).toBeInTheDocument()
   })
 
+  it('clicked Sessions entry renders the guarded upcoming sessions page_D006', async () => {
+    setSession(session({ authenticated: true, state: 'active' }))
+    renderRoute('/app')
+
+    fireEvent.click(screen.getByRole('link', { name: 'Sessions' }))
+    expect(
+      await screen.findByTestId('screen-sessions-upcoming'),
+    ).toBeInTheDocument()
+  })
+
   it.each([
-    ['en', 'Friends', 'Settings'],
-    ['pt-BR', 'Amigos', 'Configurações'],
-    ['es', 'Amistades', 'Configuración'],
+    ['en', 'Friends', 'Settings', 'Sessions'],
+    ['pt-BR', 'Amigos', 'Configurações', 'Sessões'],
+    ['es', 'Amistades', 'Configuración', 'Sesiones'],
   ])(
     'PersistentEntries_HaveLocalizedAccessibleLabelsAndCurrentState_D139: %s',
-    async (locale, friendsLabel, settingsLabel) => {
+    async (locale, friendsLabel, settingsLabel, sessionsLabel) => {
       await i18n.changeLanguage(locale)
       setSession(session({ authenticated: true, state: 'active' }))
       renderRoute('/friends')
@@ -257,6 +270,10 @@ describe('AppNavigationTests', () => {
       expect(screen.getByRole('link', { name: settingsLabel })).toHaveAttribute(
         'href',
         '/settings/account',
+      )
+      expect(screen.getByRole('link', { name: sessionsLabel })).toHaveAttribute(
+        'href',
+        '/sessions/upcoming',
       )
     },
   )

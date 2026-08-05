@@ -12,6 +12,38 @@ const namespaces = [
   'settings',
   'errors',
   'friends',
+  'sessions',
+] as const
+
+// Closed problem-code inventory (PHASE4_DESIGN.md §8): 23 endpoint codes plus
+// the two blanket codes (rate_limited, transient_conflict) applied to every
+// route. Every code below must render its own errors.codes.* message.
+const problemCodes = [
+  'session_not_found',
+  'user_not_found',
+  'session_validation',
+  'invalid_if_match',
+  'invalid_scope',
+  'invalid_cursor',
+  'session_conflict',
+  'session_terminal',
+  'session_time_locked',
+  'capacity_below_occupancy',
+  'waitlist_requires_capacity',
+  'session_invites_closed',
+  'session_responses_closed',
+  'session_leave_closed',
+  'session_guest_removal_closed',
+  'join_request_exists',
+  'join_request_not_pending',
+  'join_request_closed',
+  'no_session_capacity',
+  'not_waitlisted',
+  'guest_link_terminal',
+  'guest_link_claimed',
+  'reminder_not_eligible',
+  'transient_conflict',
+  'rate_limited',
 ] as const
 const registeredResources = resources as Record<
   string,
@@ -55,6 +87,56 @@ describe('friends namespace rendering D-060', () => {
         (resources[locale].friends as { actions: { resolve: string } }).actions
           .resolve,
       )
+    })
+  }
+})
+
+describe('sessions namespace parity and rendering D-060', () => {
+  for (const locale of locales) {
+    it(locale + ' renders sessions.create.heading', async () => {
+      await i18n.changeLanguage(locale)
+      expect(i18n.t('create.heading', { ns: 'sessions' })).toBe(
+        (resources[locale].sessions as { create: { heading: string } })
+          .create.heading,
+      )
+    })
+  }
+
+  it('has no guest.expired key (a session link is never "expired")', () => {
+    for (const locale of locales) {
+      const guest = (
+        registeredResources[locale].sessions as {
+          guest: Record<string, unknown>
+        }
+      ).guest
+      expect(guest).not.toHaveProperty('expired')
+    }
+  })
+})
+
+describe('sessions problem-code coverage D-060/D-146', () => {
+  it('errors.codes contains exactly the closed §8 problem-code inventory', () => {
+    const codes = Object.keys(
+      (
+        registeredResources.en.sessions as {
+          errors: { codes: Record<string, string> }
+        }
+      ).errors.codes,
+    ).sort()
+    expect(codes).toEqual([...problemCodes].sort())
+  })
+
+  for (const locale of locales) {
+    it(locale + ' has one message per documented problem code', () => {
+      const codes = (
+        registeredResources[locale].sessions as {
+          errors: { codes: Record<string, string> }
+        }
+      ).errors.codes
+      for (const code of problemCodes) {
+        expect(typeof codes[code]).toBe('string')
+        expect(codes[code].length).toBeGreaterThan(0)
+      }
     })
   }
 })

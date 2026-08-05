@@ -1,0 +1,183 @@
+{
+  "nav": {
+    "sessions": "Sessões",
+    "upcoming": "Próximas",
+    "history": "Histórico"
+  },
+  "create": {
+    "heading": "Nova sessão",
+    "title": "Título",
+    "start": "Horário de início",
+    "duration": "Duração",
+    "platform": "Plataforma",
+    "game": "Jogo",
+    "gameCatalog": "Escolher da Steam",
+    "gameFreeText": "Digite o nome do jogo",
+    "notes": "Notas",
+    "min": "Presença mínima",
+    "max": "Capacidade máxima",
+    "unlimited": "Capacidade ilimitada",
+    "private": "Sessão privada",
+    "invitees": "Convidar amigos",
+    "guestLinks": "Links de convidado",
+    "defaults": "Padrões: mínimo 4, máximo 4, 2 horas, sem plataforma, não privada.",
+    "submit": "Criar sessão"
+  },
+  "edit": {
+    "heading": "Editar sessão",
+    "save": "Salvar alterações",
+    "startLocked": "O horário de início não pode mais ser alterado.",
+    "minLocked": "A presença mínima não pode mais ser alterada.",
+    "privacyDisclosure": "Essa alteração não notifica os participantes.",
+    "clearMax": "Remover limite de capacidade",
+    "clearNotes": "Remover notas",
+    "clearGame": "Remover jogo",
+    "conflictRetry": "Esta sessão mudou em outro lugar. Nós a atualizamos e estamos tentando salvar novamente."
+  },
+  "validation": {
+    "required": "Este campo é obrigatório.",
+    "range": "Insira um valor dentro do intervalo permitido.",
+    "increment": "Escolha um horário em incrementos de 15 minutos.",
+    "minMax": "A presença mínima não pode exceder a capacidade máxima.",
+    "capacity": "A capacidade não pode ser reduzida abaixo do número de pessoas já confirmadas.",
+    "invitedFriend": "Uma sessão não privada precisa de pelo menos um amigo convidado.",
+    "startWindow": "Escolha um horário de início dentro da janela de agendamento permitida.",
+    "waitlistCapacity": "Uma lista de espera exige uma capacidade máxima.",
+    "tooManyInvitees": "Você pode convidar até 50 amigos.",
+    "tooManyGuestLinks": "Você pode criar até 20 links de convidado."
+  },
+  "detail": {
+    "organizer": "Organizador",
+    "roster": "Lista de participantes",
+    "status": "Status",
+    "notes": "Notas",
+    "going": "Confirmado",
+    "maybe": "Talvez",
+    "declined": "Recusado",
+    "pending": "Pendente",
+    "waitlisted": "Na lista de espera",
+    "anonymous": "Usuário Anônimo",
+    "inProgress": "Em andamento"
+  },
+  "rsvp": {
+    "heading": "Sua resposta",
+    "going": "Confirmado",
+    "maybe": "Talvez",
+    "declined": "Recusado",
+    "leave": "Sair da sessão",
+    "updated": "Sua resposta foi atualizada."
+  },
+  "join": {
+    "request": "Solicitar entrada",
+    "withdraw": "Retirar solicitação",
+    "approve": "Aprovar",
+    "reject": "Rejeitar",
+    "received": "Sua solicitação de entrada foi enviada.",
+    "accepted": "Solicitação de entrada aprovada.",
+    "rejected": "Solicitação de entrada rejeitada."
+  },
+  "waitlist": {
+    "heading": "Lista de espera",
+    "promote": "Promover",
+    "reject": "Remover da lista de espera",
+    "vacancy": "Uma vaga foi aberta.",
+    "added": "Adicionado à lista de espera.",
+    "promoted": "Promovido da lista de espera."
+  },
+  "invite": {
+    "heading": "Convidar",
+    "registered": "Convidar amigos",
+    "guest": "Links de convidado",
+    "createLink": "Criar link de convidado",
+    "copyLink": "Copiar link",
+    "revoke": "Revogar",
+    "removeGuest": "Remover convidado",
+    "removeGuestConfirm": "Remover este convidado da sessão? Ele perderá o acesso imediatamente.",
+    "copySuccess": "Link copiado."
+  },
+  "cancel": {
+    "action": "Cancelar sessão",
+    "title": "Cancelar esta sessão?",
+    "body": "Todos com acesso serão notificados. Esta ação não pode ser desfeita.",
+    "confirm": "Cancelar sessão"
+  },
+  "reminder": {
+    "label": "Lembrete",
+    "off": "Desativado",
+    "minutes15": "15 minutos antes",
+    "minutes30": "30 minutos antes",
+    "hours1": "1 hora antes",
+    "hours3": "3 horas antes",
+    "hours12": "12 horas antes",
+    "hours24": "24 horas antes",
+    "accountDefault": "Usar padrão da conta"
+  },
+  "list": {
+    "upcoming": "Próximas sessões",
+    "history": "Histórico de sessões",
+    "emptyUpcoming": "Nenhuma sessão próxima.",
+    "emptyHistory": "Nenhuma sessão concluída ainda.",
+    "loadMore": "Carregar mais",
+    "inProgress": "Em andamento"
+  },
+  "guest": {
+    "claimHeading": "Entrar nesta sessão",
+    "displayName": "Nome de exibição",
+    "respond": "Responder",
+    "live": "Esta sessão está ao vivo.",
+    "canceled": "Esta sessão foi cancelada.",
+    "revoked": "Este link foi revogado.",
+    "removed": "Você foi removido desta sessão.",
+    "ended": "Esta sessão terminou.",
+    "invalid": "Este link não é válido.",
+    "linkExpiredReopen": "Este link expirou. Abra novamente seu link de convite original.",
+    "timezone": "Os horários são exibidos no fuso horário do seu dispositivo."
+  },
+  "dirty": {
+    "title": "Descartar alterações não salvas?",
+    "body": "Você tem alterações não salvas. Se sair agora, elas serão perdidas.",
+    "stay": "Cancelar",
+    "discard": "Descartar"
+  },
+  "errors": {
+    "notFound": "Essa sessão não pôde ser encontrada.",
+    "conflict": "Esta sessão mudou em outro lugar. Tente novamente.",
+    "rateLimited": "Muitas tentativas. Tente novamente mais tarde.",
+    "generic": "Algo deu errado.",
+    "codes": {
+      "session_not_found": "Essa sessão não pôde ser encontrada.",
+      "user_not_found": "Esse usuário não pôde ser encontrado.",
+      "session_validation": "Verifique os campos destacados e tente novamente.",
+      "invalid_if_match": "Recarregue a sessão e tente novamente.",
+      "invalid_scope": "Essa lista de sessões não é válida.",
+      "invalid_cursor": "Essa página de resultados não é mais válida.",
+      "session_conflict": "Esta sessão mudou em outro lugar. Tente novamente.",
+      "session_terminal": "Esta sessão não pode mais ser alterada.",
+      "session_time_locked": "O horário de início não pode mais ser alterado.",
+      "capacity_below_occupancy": "A capacidade não pode ser reduzida abaixo do número de pessoas já confirmadas.",
+      "waitlist_requires_capacity": "Uma lista de espera exige uma capacidade máxima.",
+      "session_invites_closed": "Esta sessão não aceita mais convites.",
+      "session_responses_closed": "As respostas estão encerradas para esta sessão.",
+      "session_leave_closed": "Você não pode mais sair desta sessão.",
+      "session_guest_removal_closed": "Convidados não podem mais ser removidos desta sessão.",
+      "join_request_exists": "Você já tem uma solicitação de entrada pendente.",
+      "join_request_not_pending": "Essa solicitação de entrada não está mais pendente.",
+      "join_request_closed": "Esta sessão não aceita mais solicitações de entrada.",
+      "no_session_capacity": "Não há capacidade disponível.",
+      "not_waitlisted": "Essa pessoa não está na lista de espera.",
+      "guest_link_terminal": "Este link de convidado não está mais ativo.",
+      "guest_link_claimed": "Este link de convidado já foi utilizado.",
+      "reminder_not_eligible": "Não é possível definir um lembrete para esta sessão.",
+      "transient_conflict": "Isso não foi concluído. Tente novamente.",
+      "rate_limited": "Muitas tentativas. Tente novamente mais tarde."
+    }
+  },
+  "a11y": {
+    "statusAnnounce": "Status atualizado",
+    "rosterLabel": "Lista de participantes da sessão",
+    "waitlistLabel": "Lista de espera da sessão",
+    "validationSummary": "Houve problemas com seu envio",
+    "dialogLabel": "Diálogo de confirmação",
+    "copyLink": "Copiar link para a área de transferência"
+  }
+}
