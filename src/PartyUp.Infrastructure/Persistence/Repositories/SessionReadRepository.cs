@@ -37,6 +37,7 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
     }
 
     public async Task<SessionPage<SessionSummary>> ListUpcomingAsync(
+        UserId viewerId,
         SessionListCursor? cursor,
         int pageSize,
         CancellationToken cancellationToken)
@@ -44,18 +45,109 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
         short completed = (short)SessionStatus.Completed;
         short expired = (short)SessionStatus.Expired;
         short canceled = (short)SessionStatus.Canceled;
+        Guid viewer = viewerId.Value;
 
         List<Guid> ids = cursor is { } after
             ? await context.Database.SqlQuery<Guid>($"""
-                SELECT id FROM sessions
+                SELECT id FROM sessions s
                 WHERE status NOT IN ({canceled}, {expired}, {completed})
                   AND (start_time, id) > ({after.SortKey}, {after.Id})
+                  AND (
+                    NOT EXISTS (
+                        SELECT 1 FROM blocks b
+                        WHERE (b.blocker_id = {viewer} AND b.blocked_id = s.organizer_id)
+                           OR (b.blocker_id = s.organizer_id AND b.blocked_id = {viewer})
+                    )
+                    AND (
+                        s.organizer_id = {viewer}
+                        OR EXISTS (
+                            SELECT 1 FROM join_requests jr
+                            WHERE jr.session_id = s.id AND jr.requester_user_id = {viewer} AND jr.status = 0
+                        )
+                        OR EXISTS (
+                            SELECT 1 FROM session_participations sp
+                            WHERE sp.session_id = s.id AND sp.user_id = {viewer} AND sp.status <> 4
+                              AND (sp.origin = 0 OR sp.status IN (0, 1, 2))
+                        )
+                        OR (
+                            NOT s.is_private
+                            AND (
+                                EXISTS (
+                                    SELECT 1 FROM friendships f
+                                    WHERE f.status = 1
+                                      AND ((f.user_lo_id = {viewer} AND f.user_hi_id = s.organizer_id)
+                                        OR (f.user_hi_id = {viewer} AND f.user_lo_id = s.organizer_id))
+                                )
+                                OR EXISTS (
+                                    SELECT 1 FROM session_participations sp2
+                                    JOIN friendships f2
+                                      ON f2.status = 1
+                                     AND ((f2.user_lo_id = {viewer} AND f2.user_hi_id = sp2.user_id)
+                                       OR (f2.user_hi_id = {viewer} AND f2.user_lo_id = sp2.user_id))
+                                    WHERE sp2.session_id = s.id
+                                      AND sp2.user_id IS NOT NULL
+                                      AND sp2.status IN (0, 1, 2)
+                                      AND NOT EXISTS (
+                                          SELECT 1 FROM blocks b2
+                                          WHERE (b2.blocker_id = {viewer} AND b2.blocked_id = sp2.user_id)
+                                             OR (b2.blocker_id = sp2.user_id AND b2.blocked_id = {viewer})
+                                      )
+                                )
+                            )
+                        )
+                    )
+                  )
                 ORDER BY start_time, id
                 LIMIT {pageSize}
                 """).ToListAsync(cancellationToken)
             : await context.Database.SqlQuery<Guid>($"""
-                SELECT id FROM sessions
+                SELECT id FROM sessions s
                 WHERE status NOT IN ({canceled}, {expired}, {completed})
+                  AND (
+                    NOT EXISTS (
+                        SELECT 1 FROM blocks b
+                        WHERE (b.blocker_id = {viewer} AND b.blocked_id = s.organizer_id)
+                           OR (b.blocker_id = s.organizer_id AND b.blocked_id = {viewer})
+                    )
+                    AND (
+                        s.organizer_id = {viewer}
+                        OR EXISTS (
+                            SELECT 1 FROM join_requests jr
+                            WHERE jr.session_id = s.id AND jr.requester_user_id = {viewer} AND jr.status = 0
+                        )
+                        OR EXISTS (
+                            SELECT 1 FROM session_participations sp
+                            WHERE sp.session_id = s.id AND sp.user_id = {viewer} AND sp.status <> 4
+                              AND (sp.origin = 0 OR sp.status IN (0, 1, 2))
+                        )
+                        OR (
+                            NOT s.is_private
+                            AND (
+                                EXISTS (
+                                    SELECT 1 FROM friendships f
+                                    WHERE f.status = 1
+                                      AND ((f.user_lo_id = {viewer} AND f.user_hi_id = s.organizer_id)
+                                        OR (f.user_hi_id = {viewer} AND f.user_lo_id = s.organizer_id))
+                                )
+                                OR EXISTS (
+                                    SELECT 1 FROM session_participations sp2
+                                    JOIN friendships f2
+                                      ON f2.status = 1
+                                     AND ((f2.user_lo_id = {viewer} AND f2.user_hi_id = sp2.user_id)
+                                       OR (f2.user_hi_id = {viewer} AND f2.user_lo_id = sp2.user_id))
+                                    WHERE sp2.session_id = s.id
+                                      AND sp2.user_id IS NOT NULL
+                                      AND sp2.status IN (0, 1, 2)
+                                      AND NOT EXISTS (
+                                          SELECT 1 FROM blocks b2
+                                          WHERE (b2.blocker_id = {viewer} AND b2.blocked_id = sp2.user_id)
+                                             OR (b2.blocker_id = sp2.user_id AND b2.blocked_id = {viewer})
+                                      )
+                                )
+                            )
+                        )
+                    )
+                  )
                 ORDER BY start_time, id
                 LIMIT {pageSize}
                 """).ToListAsync(cancellationToken);
@@ -66,23 +158,115 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
     }
 
     public async Task<SessionPage<SessionSummary>> ListHistoryAsync(
+        UserId viewerId,
         SessionListCursor? cursor,
         int pageSize,
         CancellationToken cancellationToken)
     {
         short completed = (short)SessionStatus.Completed;
+        Guid viewer = viewerId.Value;
 
         List<Guid> ids = cursor is { } before
             ? await context.Database.SqlQuery<Guid>($"""
-                SELECT id FROM sessions
+                SELECT id FROM sessions s
                 WHERE status = {completed}
                   AND (start_time, id) < ({before.SortKey}, {before.Id})
+                  AND (
+                    NOT EXISTS (
+                        SELECT 1 FROM blocks b
+                        WHERE (b.blocker_id = {viewer} AND b.blocked_id = s.organizer_id)
+                           OR (b.blocker_id = s.organizer_id AND b.blocked_id = {viewer})
+                    )
+                    AND (
+                        s.organizer_id = {viewer}
+                        OR EXISTS (
+                            SELECT 1 FROM join_requests jr
+                            WHERE jr.session_id = s.id AND jr.requester_user_id = {viewer} AND jr.status = 0
+                        )
+                        OR EXISTS (
+                            SELECT 1 FROM session_participations sp
+                            WHERE sp.session_id = s.id AND sp.user_id = {viewer} AND sp.status <> 4
+                              AND (sp.origin = 0 OR sp.status IN (0, 1, 2))
+                        )
+                        OR (
+                            NOT s.is_private
+                            AND (
+                                EXISTS (
+                                    SELECT 1 FROM friendships f
+                                    WHERE f.status = 1
+                                      AND ((f.user_lo_id = {viewer} AND f.user_hi_id = s.organizer_id)
+                                        OR (f.user_hi_id = {viewer} AND f.user_lo_id = s.organizer_id))
+                                )
+                                OR EXISTS (
+                                    SELECT 1 FROM session_participations sp2
+                                    JOIN friendships f2
+                                      ON f2.status = 1
+                                     AND ((f2.user_lo_id = {viewer} AND f2.user_hi_id = sp2.user_id)
+                                       OR (f2.user_hi_id = {viewer} AND f2.user_lo_id = sp2.user_id))
+                                    WHERE sp2.session_id = s.id
+                                      AND sp2.user_id IS NOT NULL
+                                      AND sp2.status IN (0, 1, 2)
+                                      AND NOT EXISTS (
+                                          SELECT 1 FROM blocks b2
+                                          WHERE (b2.blocker_id = {viewer} AND b2.blocked_id = sp2.user_id)
+                                             OR (b2.blocker_id = sp2.user_id AND b2.blocked_id = {viewer})
+                                      )
+                                )
+                            )
+                        )
+                    )
+                  )
                 ORDER BY start_time DESC, id DESC
                 LIMIT {pageSize}
                 """).ToListAsync(cancellationToken)
             : await context.Database.SqlQuery<Guid>($"""
-                SELECT id FROM sessions
+                SELECT id FROM sessions s
                 WHERE status = {completed}
+                  AND (
+                    NOT EXISTS (
+                        SELECT 1 FROM blocks b
+                        WHERE (b.blocker_id = {viewer} AND b.blocked_id = s.organizer_id)
+                           OR (b.blocker_id = s.organizer_id AND b.blocked_id = {viewer})
+                    )
+                    AND (
+                        s.organizer_id = {viewer}
+                        OR EXISTS (
+                            SELECT 1 FROM join_requests jr
+                            WHERE jr.session_id = s.id AND jr.requester_user_id = {viewer} AND jr.status = 0
+                        )
+                        OR EXISTS (
+                            SELECT 1 FROM session_participations sp
+                            WHERE sp.session_id = s.id AND sp.user_id = {viewer} AND sp.status <> 4
+                              AND (sp.origin = 0 OR sp.status IN (0, 1, 2))
+                        )
+                        OR (
+                            NOT s.is_private
+                            AND (
+                                EXISTS (
+                                    SELECT 1 FROM friendships f
+                                    WHERE f.status = 1
+                                      AND ((f.user_lo_id = {viewer} AND f.user_hi_id = s.organizer_id)
+                                        OR (f.user_hi_id = {viewer} AND f.user_lo_id = s.organizer_id))
+                                )
+                                OR EXISTS (
+                                    SELECT 1 FROM session_participations sp2
+                                    JOIN friendships f2
+                                      ON f2.status = 1
+                                     AND ((f2.user_lo_id = {viewer} AND f2.user_hi_id = sp2.user_id)
+                                       OR (f2.user_hi_id = {viewer} AND f2.user_lo_id = sp2.user_id))
+                                    WHERE sp2.session_id = s.id
+                                      AND sp2.user_id IS NOT NULL
+                                      AND sp2.status IN (0, 1, 2)
+                                      AND NOT EXISTS (
+                                          SELECT 1 FROM blocks b2
+                                          WHERE (b2.blocker_id = {viewer} AND b2.blocked_id = sp2.user_id)
+                                             OR (b2.blocker_id = sp2.user_id AND b2.blocked_id = {viewer})
+                                      )
+                                )
+                            )
+                        )
+                    )
+                  )
                 ORDER BY start_time DESC, id DESC
                 LIMIT {pageSize}
                 """).ToListAsync(cancellationToken);

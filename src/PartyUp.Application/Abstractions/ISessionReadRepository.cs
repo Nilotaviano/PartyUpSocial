@@ -13,12 +13,21 @@ public interface ISessionReadRepository
 {
     Task<SessionDetail?> FindDetailAsync(SessionId sessionId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// A-072's <c>upcoming</c> keyset, scoped to what <paramref name="viewerId"/> may see (§7): the
+    /// predicate is applied in SQL rather than after paging, so a page never shrinks below
+    /// <paramref name="pageSize"/> because invisible rows were filtered out afterward (carried S1
+    /// verifier note — PHASE4_DESIGN.md §5.1).
+    /// </summary>
     Task<SessionPage<SessionSummary>> ListUpcomingAsync(
+        UserId viewerId,
         SessionListCursor? cursor,
         int pageSize,
         CancellationToken cancellationToken);
 
+    /// <summary>Same viewer-scoping contract as <see cref="ListUpcomingAsync"/>, over Completed history.</summary>
     Task<SessionPage<SessionSummary>> ListHistoryAsync(
+        UserId viewerId,
         SessionListCursor? cursor,
         int pageSize,
         CancellationToken cancellationToken);

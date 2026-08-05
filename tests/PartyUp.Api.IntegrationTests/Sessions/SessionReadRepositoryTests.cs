@@ -50,7 +50,7 @@ public sealed class SessionReadRepositoryTests : IAsyncLifetime
         // Include leaves every summary at zero).
         await InsertParticipationAsync(context, Guid.CreateVersion7(), distinct[0], organizerId);
 
-        SessionPage<SessionSummary> firstPage = await repository.ListUpcomingAsync(null, 3, default);
+        SessionPage<SessionSummary> firstPage = await repository.ListUpcomingAsync(organizerId, null, 3, default);
         Assert.Equal(3, firstPage.Items.Count);
         Assert.Equal(1, firstPage.Items[0].ActiveOccupancy);
         Assert.Equal(0, firstPage.Items[1].ActiveOccupancy);
@@ -62,7 +62,7 @@ public sealed class SessionReadRepositoryTests : IAsyncLifetime
         SessionListCursor? cursor = SessionListCursor.TryDecode(firstPage.NextCursor);
         Assert.NotNull(cursor);
 
-        SessionPage<SessionSummary> secondPage = await repository.ListUpcomingAsync(cursor, 3, default);
+        SessionPage<SessionSummary> secondPage = await repository.ListUpcomingAsync(organizerId, cursor, 3, default);
         Assert.Equal(2, secondPage.Items.Count);
         Assert.Equal(distinct[3], secondPage.Items[0].Id.Value);
         Assert.Equal(distinct[4], secondPage.Items[1].Id.Value);
@@ -88,7 +88,7 @@ public sealed class SessionReadRepositoryTests : IAsyncLifetime
         // A cursor pointing just past the last of the five distinct-start-time rows isolates the
         // three tied rows that follow it.
         SessionListCursor tieCursor = new(_baseInstant + Duration.FromHours(4), distinct[4]);
-        SessionPage<SessionSummary> tiePage = await repository.ListUpcomingAsync(tieCursor, 10, default);
+        SessionPage<SessionSummary> tiePage = await repository.ListUpcomingAsync(organizerId, tieCursor, 10, default);
 
         Assert.Equal(3, tiePage.Items.Count);
         Assert.Equal(expectedTieOrder, [.. tiePage.Items.Select(item => item.Id.Value)]);
@@ -118,7 +118,7 @@ public sealed class SessionReadRepositoryTests : IAsyncLifetime
 
         List<Guid> expectedDescending = [.. ascendingByStart.AsEnumerable().Reverse()];
 
-        SessionPage<SessionSummary> firstPage = await repository.ListHistoryAsync(null, 3, default);
+        SessionPage<SessionSummary> firstPage = await repository.ListHistoryAsync(organizerId, null, 3, default);
         Assert.Equal(3, firstPage.Items.Count);
         Assert.Equal(expectedDescending[0], firstPage.Items[0].Id.Value);
         Assert.Equal(expectedDescending[1], firstPage.Items[1].Id.Value);
@@ -128,7 +128,7 @@ public sealed class SessionReadRepositoryTests : IAsyncLifetime
         SessionListCursor? cursor = SessionListCursor.TryDecode(firstPage.NextCursor);
         Assert.NotNull(cursor);
 
-        SessionPage<SessionSummary> secondPage = await repository.ListHistoryAsync(cursor, 3, default);
+        SessionPage<SessionSummary> secondPage = await repository.ListHistoryAsync(organizerId, cursor, 3, default);
         Assert.Equal(2, secondPage.Items.Count);
         Assert.Equal(expectedDescending[3], secondPage.Items[0].Id.Value);
         Assert.Equal(expectedDescending[4], secondPage.Items[1].Id.Value);
@@ -139,7 +139,7 @@ public sealed class SessionReadRepositoryTests : IAsyncLifetime
         await InsertSessionAsync(context, organizerId, Guid.CreateVersion7(), _baseInstant, status: 3);
         await InsertSessionAsync(context, organizerId, Guid.CreateVersion7(), _baseInstant, status: 4);
 
-        SessionPage<SessionSummary> everything = await repository.ListHistoryAsync(null, 20, default);
+        SessionPage<SessionSummary> everything = await repository.ListHistoryAsync(organizerId, null, 20, default);
         Assert.Equal(5, everything.Items.Count);
     }
 
