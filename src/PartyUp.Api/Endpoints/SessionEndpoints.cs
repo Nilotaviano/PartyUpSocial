@@ -1011,8 +1011,9 @@ public static class SessionEndpoints
     }
 
     /// <summary>
-    /// The endpoint's own <c>400 invalid_if_match</c> pre-check (A-071): well-formed base64url, nothing
-    /// more — the actual comparison against the freshly locked row happens inside
+    /// The endpoint's own <c>400 invalid_if_match</c> pre-check (A-071): well-formed base64url of a
+    /// plausible Data Protection ciphertext length, nothing more — this never calls <c>Unprotect</c>;
+    /// the actual comparison against the freshly locked row happens inside
     /// <see cref="EditSessionUseCase"/>, never here against an unlocked read.
     /// </summary>
     private static bool TryDecodeVersionToken(string? ifMatch)
@@ -1022,15 +1023,22 @@ public static class SessionEndpoints
             return false;
         }
 
+        byte[] decoded;
         try
         {
-            _ = Base64Url.DecodeFromChars(ifMatch);
-            return true;
+            decoded = Base64Url.DecodeFromChars(ifMatch);
         }
         catch (FormatException)
         {
             return false;
         }
+
+        // A genuine token is a Data Protection ciphertext of the 20-byte sessionId‖xmin payload — the
+        // AES-CBC/HMAC-SHA256 default scheme alone adds well over 60 bytes of header/IV/MAC overhead, so
+        // anything shorter than this floor (e.g. a bare base64url string like "AA") is malformed shape,
+        // not a value worth handing to Unprotect.
+        const int MinTokenBytes = 32;
+        return decoded.Length >= MinTokenBytes;
     }
 
     private static async Task<UserId?> ActorIdAsync(

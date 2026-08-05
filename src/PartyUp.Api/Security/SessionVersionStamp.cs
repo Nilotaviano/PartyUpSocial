@@ -15,9 +15,7 @@ namespace PartyUp.Api.Security;
 /// <see cref="Issue"/> protects the <c>sessionId ‖ xmin</c> payload under a dedicated purpose; <see cref="Matches"/>
 /// unprotects the incoming token and fixed-time-compares the recovered payload against the freshly
 /// locked row's own <c>sessionId ‖ xmin</c> — never the token bytes against a value this process derived
-/// for itself, which is what made the previous <c>Protect(new byte[32])</c>-as-key-derivation scheme
-/// process-local (Data Protection's ciphertexts are non-deterministic per call, so no two processes, and
-/// no two calls in the same process, ever agreed on that "key").
+/// for itself.
 /// </summary>
 public sealed class SessionVersionStamp(AppDbContext context, IDataProtectionProvider provider)
     : ISessionVersionStamp

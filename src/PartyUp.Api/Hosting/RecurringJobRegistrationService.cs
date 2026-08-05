@@ -15,6 +15,8 @@ public sealed partial class RecurringJobRegistrationService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await Task.Yield();
+
         int attempt = 0;
         while (!stoppingToken.IsCancellationRequested)
         {

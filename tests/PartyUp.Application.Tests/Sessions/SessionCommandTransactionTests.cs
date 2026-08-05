@@ -94,8 +94,8 @@ internal sealed class FakeSessionLockRepository : ISessionLockRepository
 
 /// <summary>
 /// Always matches unless a test sets <see cref="MatchesFunc"/> — the A-071 concurrency check the real
-/// <c>SessionVersionStamp</c> (Infrastructure) performs is opaque to <see cref="EditSessionUseCase"/>,
-/// which only ever calls the port it is given.
+/// <c>SessionVersionStamp</c> (<c>src/PartyUp.Api/Security/SessionVersionStamp.cs</c>) performs is
+/// opaque to <see cref="EditSessionUseCase"/>, which only ever calls the port it is given.
 /// </summary>
 internal sealed class FakeSessionVersionStamp : ISessionVersionStamp
 {

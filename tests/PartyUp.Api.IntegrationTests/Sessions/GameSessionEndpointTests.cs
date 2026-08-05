@@ -1,11 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Reflection;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Net.Http.Headers;
 using NodaTime;
 using PartyUp.Api;
+using PartyUp.Api.Hosting;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
@@ -371,6 +373,14 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
             $"/api/v1/sessions/{sessionId:D}",
             JsonContent.Create(new { title = "New title", ifMatch = "not-a-valid-token!!" }));
         await SessionEndpointTestSupport.AssertProblemAsync(malformed, HttpStatusCode.BadRequest, "invalid_if_match");
+
+        // A well-formed-but-too-short base64url string decodes fine but is nowhere near the shape of a
+        // real Data Protection ciphertext.
+        HttpResponseMessage tooShort = await session.SendUnsafeAsync(
+            HttpMethod.Patch,
+            $"/api/v1/sessions/{sessionId:D}",
+            JsonContent.Create(new { title = "New title", ifMatch = "AA" }));
+        await SessionEndpointTestSupport.AssertProblemAsync(tooShort, HttpStatusCode.BadRequest, "invalid_if_match");
 
         HttpResponseMessage firstEdit = await session.SendUnsafeAsync(
             HttpMethod.Patch,
@@ -1212,6 +1222,113 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 JsonContent.Create(new { choice = "Hours1" })),
             HttpStatusCode.UnprocessableEntity,
             "reminder_not_eligible");
+
+        // guest_link_terminal (409, A-074 branch b): a mutation against a revoked guest link.
+        Instant terminalGuestStart = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
+        HttpResponseMessage terminalGuestCreated = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Guest link terminal",
+                startTime = SessionEndpointTestSupport.Iso(terminalGuestStart),
+                minAttendance = 1,
+                isPrivate = true,
+                guestLinkCount = 1,
+            }));
+        Assert.Equal(HttpStatusCode.Created, terminalGuestCreated.StatusCode);
+        using JsonDocument terminalGuestBody = await SessionEndpointTestSupport.SuccessJsonAsync(terminalGuestCreated);
+        Guid terminalGuestSessionId = terminalGuestBody.RootElement.GetProperty("session").GetProperty("id").GetGuid();
+        string terminalGuestUrl = terminalGuestBody.RootElement.GetProperty("guestLinks")[0].GetProperty("url").GetString()!;
+        string terminalGuestToken = terminalGuestUrl[(terminalGuestUrl.LastIndexOf('/') + 1)..];
+
+        using HttpClient terminalGuestClient = _factory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false,
+                HandleCookies = false,
+                BaseAddress = new Uri("https://localhost"),
+            });
+        HttpResponseMessage terminalGuestExchange = await terminalGuestClient.GetAsync($"/g/{terminalGuestToken}");
+        SetCookieHeaderValue terminalGuestCookie = GuestExchangeTests.SetCookiesOf(terminalGuestExchange)
+            .Single(c => c.Name.Value!.StartsWith("pu.g.", StringComparison.Ordinal));
+        Guid terminalGuestLinkId = Guid.Parse(terminalGuestCookie.Name.Value!["pu.g.".Length..]);
+        string terminalGuestCookieHeader = GuestExchangeTests.CookieHeader(terminalGuestCookie);
+
+        await using (AsyncServiceScope revokeScope = _factory.Services.CreateAsyncScope())
+        {
+            var invitations = revokeScope.ServiceProvider.GetRequiredService<SessionInvitationUseCases>();
+            SessionCommandResult revoked = await invitations.RevokeGuestLinkAsync(
+                SessionId.From(terminalGuestSessionId), organizer.Id, GuestLinkId.From(terminalGuestLinkId), default);
+            Assert.True(revoked.Succeeded);
+        }
+
+        HttpResponseMessage terminalGuestMutation = await AntiforgeryTestClient.SendAsync(
+            terminalGuestClient,
+            HttpMethod.Post,
+            $"/api/v1/guest/{terminalGuestLinkId:N}/claim",
+            JsonContent.Create(new { displayName = "Late Guest", response = "Going" }),
+            terminalGuestCookieHeader);
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            terminalGuestMutation, HttpStatusCode.Conflict, "guest_link_terminal");
+
+        // Closure: every code this test genuinely reproduces here, plus the codes proven by sibling
+        // tests in this file, plus documented untestable-over-HTTP residuals, must equal the exact
+        // documented Phase 4 problem-code inventory (PartyUpOpenApiTransformer.ProblemCodes) — so a
+        // future addition to that inventory fails this test until it lands in one of the three sets.
+        HashSet<string> exercisedInThisTest = new(StringComparer.Ordinal)
+        {
+            "session_not_found",
+            "invalid_scope",
+            "invalid_cursor",
+            "session_validation",
+            "session_time_locked",
+            "capacity_below_occupancy",
+            "waitlist_requires_capacity",
+            "session_invites_closed",
+            "session_responses_closed",
+            "session_leave_closed",
+            "session_guest_removal_closed",
+            "join_request_exists",
+            "join_request_not_pending",
+            "join_request_closed",
+            "guest_link_claimed",
+            "reminder_not_eligible",
+            "guest_link_terminal",
+        };
+        HashSet<string> exercisedBySiblingTestsInThisFile = new(StringComparer.Ordinal)
+        {
+            "invalid_if_match", // MalformedIfMatchIs400AndStaleIfMatchIs409_A071
+            "session_conflict", // MalformedIfMatchIs400AndStaleIfMatchIs409_A071 / ConcurrentEditsWithTheSameInitialVersion_ExactlyOneWinsUnderLock_A071
+            "session_terminal", // CancelIsIdempotentAndCompletedIsCancelable_D156_D157
+            "not_waitlisted", // PromoteAndRejectWaitlistRequireOrganizerAndAWaitlistedRow_D084
+            "no_session_capacity", // PromoteAndRejectWaitlistRequireOrganizerAndAWaitlistedRow_D084
+        };
+        // transient_conflict needs a genuine SQL 40001/40P01 retry-exhaustion under contention; not
+        // deterministically reproducible over HTTP, so it stays an accepted untested residual.
+        HashSet<string> acceptedUntestedResiduals = new(StringComparer.Ordinal) { "transient_conflict" };
+
+        HashSet<string> covered = new(exercisedInThisTest, StringComparer.Ordinal);
+        covered.UnionWith(exercisedBySiblingTestsInThisFile);
+        covered.UnionWith(acceptedUntestedResiduals);
+
+        Assert.Equal(
+            Phase4DocumentedProblemCodes().OrderBy(code => code, StringComparer.Ordinal),
+            covered.OrderBy(code => code, StringComparer.Ordinal));
+    }
+
+    /// <summary>
+    /// Reflects <see cref="PartyUpOpenApiTransformer"/>'s private problem-code registry so the closure
+    /// assertion above tracks the OpenAPI-declared inventory itself rather than a second, driftable
+    /// hand-maintained copy.
+    /// </summary>
+    private static string[] Phase4DocumentedProblemCodes()
+    {
+        FieldInfo field = typeof(PartyUpOpenApiTransformer).GetField(
+            "ProblemCodes", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var allCodes = (string[])field.GetValue(null)!;
+        int phase4Start = Array.IndexOf(allCodes, "session_not_found");
+        return allCodes[phase4Start..];
     }
 
     // ---- shared fixtures ----------------------------------------------------------------------

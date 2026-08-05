@@ -219,11 +219,17 @@ public static class GuestSessionEndpoints
             return Problem(context, StatusCodes.Status404NotFound, "session_not_found");
         }
 
-        if (resolved.View != GuestLinkView.LiveView || credential.Mode != GuestCredentialMode.Active)
+        if (resolved.View != GuestLinkView.LiveView)
         {
-            // A-074 (b)/(c)/(d): a terminal link/session, or a terminal-mode credential against a
-            // still-live link/session, never reaches the domain mutation — fail closed with 404
-            // rather than reveal the underlying state via a 409.
+            // A-074 (b)/(d): a terminal link/session never reaches the domain mutation — the
+            // caller already knows the link exists, so the terminal state is disclosed as a 409.
+            return Problem(context, StatusCodes.Status409Conflict, "guest_link_terminal");
+        }
+
+        if (credential.Mode != GuestCredentialMode.Active)
+        {
+            // A-074 (c): a terminal-mode credential against a still-Active, not-ended link/session is
+            // forged-or-stale — fail closed rather than reveal that the underlying link is fine.
             return Problem(context, StatusCodes.Status404NotFound, "session_not_found");
         }
 

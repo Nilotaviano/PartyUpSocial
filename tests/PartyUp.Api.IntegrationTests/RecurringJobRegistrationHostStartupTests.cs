@@ -1,4 +1,7 @@
+using System.Diagnostics;
 using System.Net;
+using Hangfire;
+using Hangfire.Common;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -6,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 using PartyUp.Api.Hosting;
 
 namespace PartyUp.Api.IntegrationTests;
@@ -13,13 +17,11 @@ namespace PartyUp.Api.IntegrationTests;
 [Trait("Category", "Integration")]
 public sealed class RecurringJobRegistrationHostStartupTests
 {
-    // Regression coverage for the CI failure fixed alongside this test: a host booted in a
-    // non-"Testing" environment (recurring-job registration is only skipped in "Testing") whose
-    // configured Db connection is unreachable must still finish starting and serve requests. Before
-    // the fix, Hangfire recurring-job registration ran synchronously on the startup path and any
-    // NpgsqlException there took the whole host down with it. Other hosted services (AdminSeeder,
-    // deletion sweep, email dispatch) are removed here so this test isolates the one behavior it
-    // exists to prove; none of them are in this ticket's scope.
+    // A host booted in a non-"Testing" environment (recurring-job registration is only skipped in
+    // "Testing") whose configured Db connection is unreachable must still finish starting and serve
+    // requests. Other hosted services (AdminSeeder, deletion sweep, email dispatch) are removed here
+    // so this test isolates the one behavior it exists to prove; none of them are in this ticket's
+    // scope.
     [Fact]
     public async Task HostStarts_AndServesRequests_WhenConfiguredDbIsUnreachable()
     {
@@ -49,5 +51,119 @@ public sealed class RecurringJobRegistrationHostStartupTests
             timeout.Token);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+}
+
+/// <summary>
+/// Unit-style coverage for <see cref="RecurringJobRegistrationService"/>'s retry loop, exercised
+/// directly against a throwing <see cref="IRecurringJobManager"/> fake rather than a full host boot
+/// (that host-level proof is <see cref="RecurringJobRegistrationHostStartupTests"/>). No
+/// <c>Category=Integration</c> trait: this needs no database or Docker.
+/// </summary>
+public sealed class RecurringJobRegistrationServiceRetryTests
+{
+    [Fact]
+    public async Task StartAsync_ReturnsPromptly_EvenWhenTheJobManagerThrowsSynchronously()
+    {
+        (RecurringJobRegistrationService service, ThrowingRecurringJobManager _) = CreateService();
+
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        await service.StartAsync(CancellationToken.None);
+        stopwatch.Stop();
+
+        Assert.True(
+            stopwatch.ElapsedMilliseconds < 1000,
+            $"StartAsync took {stopwatch.ElapsedMilliseconds}ms; the first attempt must run off the host-start thread.");
+
+        await service.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RetriesAfterAFailedAttempt()
+    {
+        (RecurringJobRegistrationService service, ThrowingRecurringJobManager manager) = CreateService();
+
+        await service.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => manager.AttemptCount >= 1, TimeSpan.FromSeconds(5));
+
+        Assert.True(manager.AttemptCount >= 1, "expected at least one registration attempt");
+
+        await service.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task StopAsync_CancelsPromptly_WithoutWaitingOutTheRetryDelay()
+    {
+        (RecurringJobRegistrationService service, ThrowingRecurringJobManager manager) = CreateService();
+
+        await service.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => manager.AttemptCount >= 1, TimeSpan.FromSeconds(5));
+
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        await service.StopAsync(CancellationToken.None);
+        stopwatch.Stop();
+
+        // The shortest retry delay is 5s; a prompt stop proves stoppingToken cancellation propagates
+        // through the Task.Delay wait rather than being ridden out.
+        Assert.True(
+            stopwatch.ElapsedMilliseconds < 4000,
+            $"StopAsync took {stopwatch.ElapsedMilliseconds}ms; cancellation should not wait out the retry delay.");
+    }
+
+    private static (RecurringJobRegistrationService Service, ThrowingRecurringJobManager Manager) CreateService()
+    {
+        var manager = new ThrowingRecurringJobManager();
+        ServiceProvider provider = new ServiceCollection()
+            .AddSingleton<IRecurringJobManager>(manager)
+            .BuildServiceProvider();
+        var service = new RecurringJobRegistrationService(
+            new FakeServiceScopeFactory(provider),
+            NullLogger<RecurringJobRegistrationService>.Instance);
+        return (service, manager);
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout)
+    {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        while (!condition())
+        {
+            if (stopwatch.Elapsed > timeout)
+            {
+                throw new TimeoutException("Condition was not met within the timeout.");
+            }
+
+            await Task.Delay(10);
+        }
+    }
+
+    private sealed class ThrowingRecurringJobManager : IRecurringJobManager
+    {
+        private int _attemptCount;
+
+        public int AttemptCount => _attemptCount;
+
+        public void AddOrUpdate(string recurringJobId, Job job, string cronExpression, RecurringJobOptions options)
+        {
+            Interlocked.Increment(ref _attemptCount);
+            throw new InvalidOperationException("Simulated Hangfire storage failure.");
+        }
+
+        public void Trigger(string recurringJobId) => throw new NotSupportedException();
+
+        public void RemoveIfExists(string recurringJobId) => throw new NotSupportedException();
+    }
+
+    private sealed class FakeServiceScopeFactory(IServiceProvider provider) : IServiceScopeFactory
+    {
+        public IServiceScope CreateScope() => new FakeServiceScope(provider);
+    }
+
+    private sealed class FakeServiceScope(IServiceProvider provider) : IServiceScope
+    {
+        public IServiceProvider ServiceProvider => provider;
+
+        public void Dispose()
+        {
+        }
     }
 }

@@ -86,9 +86,9 @@ public sealed class GuestSecurityTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new { displayName = "Late Guest", response = "Going" }),
             activeCookie);
 
-        Assert.Equal(HttpStatusCode.NotFound, mutation.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, mutation.StatusCode);
         using JsonDocument mutationBody = JsonDocument.Parse(await mutation.Content.ReadAsStringAsync());
-        Assert.Equal("session_not_found", mutationBody.RootElement.GetProperty("code").GetString());
+        Assert.Equal("guest_link_terminal", mutationBody.RootElement.GetProperty("code").GetString());
     }
 
     [Fact]

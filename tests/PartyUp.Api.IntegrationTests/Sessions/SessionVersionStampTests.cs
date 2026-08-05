@@ -12,8 +12,7 @@ namespace PartyUp.Api.IntegrationTests.Sessions;
 /// <summary>
 /// F2/A-071: the version token mechanism must be stable across every process sharing the persisted key
 /// ring, not just within the process that issued it. <see cref="SessionVersionStamp"/> proves this by
-/// using Data Protection's own Protect/Unprotect on the token payload rather than deriving a "key" from
-/// a single, non-deterministic <c>Protect</c> call at construction (the bug this test would have caught).
+/// using Data Protection's own Protect/Unprotect on the token payload.
 /// </summary>
 [Trait("Category", "Integration")]
 public sealed class SessionVersionStampTests : IAsyncLifetime, IDisposable
@@ -51,10 +50,7 @@ public sealed class SessionVersionStampTests : IAsyncLifetime, IDisposable
         try
         {
             // Two separate IDataProtectionProvider instances pointed at the same persisted key ring
-            // directory simulate two separate processes (e.g. across a restart or a second replica) --
-            // the bug this closes was that two such instances never agreed, because the old scheme
-            // derived its "key" from a single, non-deterministic Protect call rather than sharing keys
-            // through the ring itself.
+            // directory simulate two separate processes (e.g. across a restart or a second replica).
             IDataProtectionProvider providerA = DataProtectionProvider.Create(new DirectoryInfo(keyRingPath));
             IDataProtectionProvider providerB = DataProtectionProvider.Create(new DirectoryInfo(keyRingPath));
 
