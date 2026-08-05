@@ -86,13 +86,38 @@ public sealed class SessionJoinRequestUseCases(
 
                 Session session = forUpdate.Session;
 
-                // Step 5: re-evaluate visibility under the fresh locks -- a blocked pair yields the
-                // same NotFound as missing, writing and notifying nothing (D-065).
-                bool blocked = lockedBlocks.Any(b => b.Hides(organizerId, requesterId));
-                Viewer viewer = Viewer.Create(
+                // Step 5: re-evaluate visibility under the fresh locks. Rule 2 (DOMAIN_MODEL.md:184)
+                // grants inherited access via ANY extending active registered participant, not just the
+                // organizer -- the participant set is only known now that the parent lock has loaded the
+                // roster, so a second bulk graph-lock statement (one per table, A-068 order) covers the
+                // requester's pair with every extender. The pre-parent-lock organizer-pair statement
+                // above stays as the direct-access/organizer-inheritance lock.
+                HashSet<UserId> extenderIds = [];
+                foreach (Participation participation in session.Participations)
+                {
+                    if (participation.UserId is { } participantId
+                        && participantId != requesterId
+                        && participantId != organizerId
+                        && SessionVisibility.ExtendsAccess(participation))
+                    {
+                        extenderIds.Add(participantId);
+                    }
+                }
+
+                IReadOnlyList<Friendship> extenderFriendships = extenderIds.Count == 0
+                    ? []
+                    : await friendships.LockPairsAsync(requesterId, extenderIds, ct);
+                IReadOnlyList<Block> extenderBlocks = extenderIds.Count == 0
+                    ? []
+                    : await blocks.LockPairsAsync(requesterId, extenderIds, ct);
+
+                // Recompute visibility with the SAME VisibilityEngine rules the read side uses -- no
+                // hand-rolled subset. A block with the organizer yields NotFound (rule 4); a block with
+                // one extender only removes that extender from consideration while others still count.
+                Viewer viewer = Viewer.From(
                     requesterId,
-                    lockedFriendships.Where(f => f.IsAccepted).Select(f => f.Counterpart(requesterId)),
-                    blocked ? [organizerId] : []);
+                    [.. lockedFriendships, .. extenderFriendships],
+                    [.. lockedBlocks, .. extenderBlocks]);
                 if (!VisibilityEngine.ResolveSession(session, viewer).IsVisible)
                 {
                     return JoinRequestCommandResult.Failed("session_not_found");

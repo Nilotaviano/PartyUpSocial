@@ -458,11 +458,19 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
             $"SELECT 1 FROM blocks WHERE id = {blockId.Value} FOR UPDATE");
 
         await using AsyncServiceScope commandScope = _factory.Services.CreateAsyncScope();
-        Task commandTask = command switch
+        Task<SessionCommandResult>? inviteTask = null;
+        Task<JoinRequestCommandResult>? approveTask = null;
+        Task commandTask;
+        if (command is AttachmentCommand.Invite)
         {
-            AttachmentCommand.Invite => RunInviteAsync(commandScope, sessionId, organizerId, counterpartId),
-            _ => RunApproveAsync(commandScope, sessionId, organizerId, joinRequestId!.Value),
-        };
+            inviteTask = RunInviteAsync(commandScope, sessionId, organizerId, counterpartId);
+            commandTask = inviteTask;
+        }
+        else
+        {
+            approveTask = RunApproveAsync(commandScope, sessionId, organizerId, joinRequestId!.Value);
+            commandTask = approveTask;
+        }
 
         await Task.Delay(TimeSpan.FromMilliseconds(500));
         Assert.False(
@@ -475,6 +483,19 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
         // Once unblocked, the now-visible block is observed under the fresh locks and the command is
         // rejected -- indistinguishable from missing (D-065) -- rather than silently succeeding.
         await commandTask;
+
+        if (inviteTask is not null)
+        {
+            SessionCommandResult inviteResult = await inviteTask;
+            Assert.False(inviteResult.Succeeded, "The block must reject invite, not silently succeed.");
+            Assert.Equal("user_not_found", inviteResult.Code);
+        }
+        else
+        {
+            JoinRequestCommandResult approveResult = await approveTask!;
+            Assert.False(approveResult.Succeeded, "The block must reject approve, not silently succeed.");
+            Assert.Equal("session_not_found", approveResult.Code);
+        }
     }
 
     /// <summary>

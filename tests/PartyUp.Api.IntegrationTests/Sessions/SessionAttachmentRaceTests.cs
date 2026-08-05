@@ -195,6 +195,7 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
             h.SessionId == sessionId && h.RecipientUserId == inviteeId));
         Assert.Equal(0, await verify.Friendships.CountAsync());
         Assert.Equal(1, await verify.Blocks.CountAsync());
+        Assert.Equal(0, await verify.Notifications.CountAsync(n => n.SessionId == sessionId));
     }
 
     [Fact]
@@ -274,6 +275,7 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
             .SingleAsync(r => r.Id == joinRequestId);
         Assert.Equal(JoinRequestStatus.Lapsed, reloadedRequest.Status);
         Assert.Equal(1, await verify.Blocks.CountAsync());
+        Assert.Equal(0, await verify.Notifications.CountAsync(n => n.SessionId == sessionId));
     }
 
     private async Task<SessionId> SeedAcceptedFriendshipSessionAsync(UserId organizerId, UserId counterpartId)

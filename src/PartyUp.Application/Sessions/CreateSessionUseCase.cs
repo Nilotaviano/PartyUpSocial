@@ -48,16 +48,27 @@ public sealed class CreateSessionUseCase(
                 HashSet<UserId> lockSet = [command.OrganizerId, .. invitees];
                 await sessionLocks.LockUsersAsync(lockSet, ct);
 
-                foreach (UserId inviteeId in invitees)
+                // Bulk graph lock, one statement per table, A-068 order -- never a per-invitee loop in
+                // caller-input order (PHASE4_DESIGN.md §6.1, "Bulk invite ... lock the union of ... graph
+                // rows in one A-068-ordered statement, never in request-input order").
+                if (invitees.Count > 0)
                 {
-                    Friendship? friendship = await friendships.FindPairForUpdateAsync(
-                        command.OrganizerId, inviteeId, ct);
-                    IReadOnlyList<Block> pairBlocks = await blocks.FindPairForUpdateAsync(
-                        command.OrganizerId, inviteeId, ct);
+                    IReadOnlyList<Friendship> lockedFriendships =
+                        await friendships.LockPairsAsync(command.OrganizerId, invitees, ct);
+                    IReadOnlyList<Block> lockedBlocks =
+                        await blocks.LockPairsAsync(command.OrganizerId, invitees, ct);
 
-                    if (friendship?.IsAccepted != true || pairBlocks.Count != 0)
+                    HashSet<UserId> acceptedFriendIds =
+                        [.. lockedFriendships.Where(f => f.IsAccepted).Select(f => f.Counterpart(command.OrganizerId))];
+                    HashSet<UserId> blockedIds =
+                        [.. lockedBlocks.Select(b => b.BlockerId == command.OrganizerId ? b.BlockedId : b.BlockerId)];
+
+                    foreach (UserId inviteeId in invitees)
                     {
-                        return CreateSessionResult.Failed("user_not_found");
+                        if (!acceptedFriendIds.Contains(inviteeId) || blockedIds.Contains(inviteeId))
+                        {
+                            return CreateSessionResult.Failed("user_not_found");
+                        }
                     }
                 }
 

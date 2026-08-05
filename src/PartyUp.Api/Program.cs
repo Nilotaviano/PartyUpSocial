@@ -93,7 +93,6 @@ builder.Services.AddScoped<RequestAccountDeletionUseCase>();
 builder.Services.AddScoped<RequestPublicDeletionUseCase>();
 builder.Services.AddScoped<IssueSteamDeletionConfirmationUseCase>();
 builder.Services.AddScoped<ConfirmPublicDeletionUseCase>();
-builder.Services.AddScoped<ExecuteDeletionForUserUseCase>();
 builder.Services.AddScoped<ExecuteDueDeletionsUseCase>();
 builder.Services.AddScoped<PurgeExpiredAuthTokensUseCase>();
 builder.Services.AddScoped<ListUsersUseCase>();

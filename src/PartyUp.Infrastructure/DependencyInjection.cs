@@ -83,6 +83,9 @@ public static class DependencyInjection
         services.AddScoped<GuestSessionUseCases>();
         services.AddScoped<SessionTransitionUseCase>();
         services.AddScoped<SessionBlockEffectsUseCase>();
+        // SessionDeletionEffectsUseCase depends on ExecuteDeletionForUserUseCase; both are registered
+        // here (rather than split with Program.cs) so AddInfrastructure alone resolves the whole graph.
+        services.AddScoped<PartyUp.Application.Deletion.ExecuteDeletionForUserUseCase>();
         services.AddScoped<SessionDeletionEffectsUseCase>();
         services.AddScoped<SendFriendRequestUseCase>();
         services.AddScoped<AcceptFriendRequestUseCase>();
