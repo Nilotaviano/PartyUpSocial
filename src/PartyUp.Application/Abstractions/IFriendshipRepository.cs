@@ -26,6 +26,53 @@ public interface IFriendshipRepository
         FriendshipId friendshipId,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// A non-locking bulk read of every friendship row between <paramref name="userId"/> and any of
+    /// <paramref name="otherUserIds"/> — the set-based replacement for a per-counterpart
+    /// <see cref="FindPairAsync"/> loop on a GET path (PHASE4_DESIGN.md §6.1, F6). The default
+    /// composes <see cref="FindPairAsync"/> once per counterpart; a widened repository overrides this
+    /// with one SQL statement.
+    /// </summary>
+    Task<IReadOnlyList<Friendship>> FindPairsAmongAsync(
+        UserId userId,
+        IReadOnlyCollection<UserId> otherUserIds,
+        CancellationToken cancellationToken) =>
+        CollectPairsAsync(userId, otherUserIds, locking: false, cancellationToken);
+
+    /// <summary>
+    /// The A-068 bulk graph lock (§6.1 step 3): locks and returns every friendship row between
+    /// <paramref name="userId"/> and any of <paramref name="otherUserIds"/> in one statement, the
+    /// table's declared order. The default composes <see cref="FindPairForUpdateAsync"/> once per
+    /// counterpart (correct, not single-statement); a widened repository overrides this with the real
+    /// bulk-ordered lock.
+    /// </summary>
+    Task<IReadOnlyList<Friendship>> LockPairsAsync(
+        UserId userId,
+        IReadOnlyCollection<UserId> otherUserIds,
+        CancellationToken cancellationToken) =>
+        CollectPairsAsync(userId, otherUserIds, locking: true, cancellationToken);
+
+    private async Task<IReadOnlyList<Friendship>> CollectPairsAsync(
+        UserId userId,
+        IReadOnlyCollection<UserId> otherUserIds,
+        bool locking,
+        CancellationToken cancellationToken)
+    {
+        List<Friendship> results = [];
+        foreach (UserId other in otherUserIds)
+        {
+            Friendship? pair = locking
+                ? await FindPairForUpdateAsync(userId, other, cancellationToken)
+                : await FindPairAsync(userId, other, cancellationToken);
+            if (pair is not null)
+            {
+                results.Add(pair);
+            }
+        }
+
+        return results;
+    }
+
     Task<IReadOnlyList<AcceptedFriendProjection>> ListAcceptedAsync(
         UserId userId,
         CancellationToken cancellationToken);

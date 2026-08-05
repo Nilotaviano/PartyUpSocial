@@ -57,6 +57,9 @@ internal sealed class FakeSessionRepository : ISessionRepository
     public Task<Session?> FindAsync(SessionId id, CancellationToken cancellationToken) =>
         Task.FromResult(_sessions.TryGetValue(id, out Session? session) ? session : null);
 
+    public Task<Session?> FindNoTrackingAsync(SessionId id, CancellationToken cancellationToken) =>
+        FindAsync(id, cancellationToken);
+
     public Task<SessionForUpdate?> LoadForUpdateAsync(SessionId id, CancellationToken cancellationToken)
     {
         LoadForUpdateCalls.Add(id);
@@ -161,6 +164,32 @@ internal sealed class FakeFriendshipRepository : IFriendshipRepository
         _ = friendship.DequeueEvents();
         Items.Add(friendship);
         return (a.Id, b.Id);
+    }
+
+    /// <summary>
+    /// Adds an Accepted friendship between an already-existing user id (e.g. the fixture's organizer)
+    /// and a brand-new counterpart, returning the counterpart's id. The existing id is wrapped in a
+    /// throwaway <see cref="User"/> purely to satisfy <see cref="Friendship.Request"/>'s
+    /// <c>CanBeFriended</c> check — only the resulting friendship's lo/hi ids are kept.
+    /// </summary>
+    internal UserId MakeAcceptedWith(UserId existingUserId, IClock clock)
+    {
+        User existingStandIn = User.BeginOnboarding(
+            existingUserId, FriendCode.Create("23456789AB"), AgeGateSource.SelfAttested, clock);
+        existingStandIn.CompleteOnboarding(
+            Username.Create($"u{Guid.NewGuid():N}"[..12]),
+            DisplayName.Create("Existing"),
+            Avatar.FromEmoji("🎮"),
+            DateTimeZoneProviders.Tzdb["America/Fortaleza"],
+            Locale.Create("en"),
+            clock);
+
+        User counterpart = FriendTestData.Active($"u{Guid.NewGuid():N}"[..12], "Counterpart");
+        Friendship friendship = Friendship.Request(existingStandIn, counterpart, clock);
+        friendship.Accept(counterpart.Id, clock);
+        _ = friendship.DequeueEvents();
+        Items.Add(friendship);
+        return counterpart.Id;
     }
 }
 
@@ -313,7 +342,7 @@ internal sealed class SessionTestFixture
         new(Sessions, Locks, Materializer, Reminders, UnitOfWork, Clock);
 
     internal SessionJoinRequestUseCases JoinRequestUseCases() =>
-        new(Sessions, Reads, Locks, Materializer, Reminders, UnitOfWork, Clock);
+        new(Sessions, Reads, Locks, Friendships, Blocks, Materializer, Reminders, UnitOfWork, Clock);
 
     internal SetSessionReminderUseCase ReminderUseCase() =>
         new(Sessions, Locks, Reminders, UnitOfWork, Clock);

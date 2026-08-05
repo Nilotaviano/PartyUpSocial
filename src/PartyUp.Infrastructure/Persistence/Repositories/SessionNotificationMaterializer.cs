@@ -24,9 +24,21 @@ namespace PartyUp.Infrastructure.Persistence.Repositories;
 public sealed class SessionNotificationMaterializer(AppDbContext context, IClock clock)
     : ISessionNotificationMaterializer
 {
+    public Task MaterializeAsync(
+        Session session,
+        IReadOnlyList<IDomainEvent> events,
+        CancellationToken cancellationToken) =>
+        MaterializeAsync(session, events, excludeUserId: null, cancellationToken);
+
+    /// <summary>
+    /// DOMAIN_MODEL.md §11 step 5: <paramref name="excludeUserId"/> is the deletion subject when this
+    /// batch of events is deletion-derived, threaded straight into <see cref="RecipientFilter"/> so the
+    /// deleting user never receives a notification about their own deletion's effects.
+    /// </summary>
     public async Task MaterializeAsync(
         Session session,
         IReadOnlyList<IDomainEvent> events,
+        UserId? excludeUserId,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -41,7 +53,7 @@ public sealed class SessionNotificationMaterializer(AppDbContext context, IClock
             .Where(mute => mute.SessionId == session.Id)
             .ToListAsync(cancellationToken);
 
-        RecipientFilter filter = RecipientFilter.Create(MuteSet.Create(mutes));
+        RecipientFilter filter = RecipientFilter.Create(MuteSet.Create(mutes), excludeUserId);
 
         foreach (IDomainEvent domainEvent in events)
         {

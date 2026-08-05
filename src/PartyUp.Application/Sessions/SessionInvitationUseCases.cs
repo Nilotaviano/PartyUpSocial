@@ -56,10 +56,24 @@ public sealed class SessionInvitationUseCases(
         return await unitOfWork.ExecuteAsync(
             async ct =>
             {
+                // Step 1: resolve authorization without locking the arbitrary invitee ids; hidden/missing -> 404.
+                Session? probe = await sessions.FindNoTrackingAsync(sessionId, ct);
+                if (probe is null || probe.OrganizerId != organizerId)
+                {
+                    return SessionCommandResult.Failed("session_not_found");
+                }
+
+                // Step 2: lock the complete affected registered-user set in one statement.
                 HashSet<UserId> lockSet = [organizerId, .. invitees];
                 await sessionLocks.LockUsersAsync(lockSet, ct);
-                await sessionLocks.LockSessionsAsync([sessionId], ct);
 
+                // Step 3: lock relevant friendship rows and both block directions, one statement per
+                // table -- never a per-invitee loop (A-068).
+                IReadOnlyList<Friendship> lockedFriendships = await friendships.LockPairsAsync(organizerId, invitees, ct);
+                IReadOnlyList<Block> lockedBlocks = await blocks.LockPairsAsync(organizerId, invitees, ct);
+
+                // Step 4: lock the session parent, then load its children.
+                await sessionLocks.LockSessionsAsync([sessionId], ct);
                 SessionForUpdate? forUpdate = await sessions.LoadForUpdateAsync(sessionId, ct);
                 if (forUpdate is null)
                 {
@@ -72,15 +86,16 @@ public sealed class SessionInvitationUseCases(
                     return SessionCommandResult.Failed("session_not_found");
                 }
 
+                // Step 5: re-evaluate friendship/block eligibility under the fresh locks. Invite is
+                // all-or-nothing: any unusable invitee fails the whole command before anything mutates.
                 Dictionary<UserId, bool> blockedByInvitee = [];
                 foreach (UserId inviteeId in invitees)
                 {
-                    Friendship? friendship = await friendships.FindPairForUpdateAsync(organizerId, inviteeId, ct);
-                    IReadOnlyList<Block> pairBlocks = await blocks.FindPairForUpdateAsync(organizerId, inviteeId, ct);
-                    bool blocked = pairBlocks.Count != 0;
+                    bool isFriend = lockedFriendships.Any(f => f.IsBetween(organizerId, inviteeId) && f.IsAccepted);
+                    bool blocked = lockedBlocks.Any(b => b.Hides(organizerId, inviteeId));
                     blockedByInvitee[inviteeId] = blocked;
 
-                    if (friendship?.IsAccepted != true || blocked)
+                    if (!isFriend || blocked)
                     {
                         return SessionCommandResult.Failed("user_not_found");
                     }
@@ -91,6 +106,7 @@ public sealed class SessionInvitationUseCases(
                     session.Invite(inviteeId, clock, id => blockedByInvitee.GetValueOrDefault(id));
                 }
 
+                // Step 6: persist.
                 IReadOnlyList<IDomainEvent> events = session.DequeueEvents();
                 await materializer.MaterializeAsync(session, events, ct);
 

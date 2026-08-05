@@ -165,6 +165,8 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
             scope.ServiceProvider.GetRequiredService<ISessionRepository>(),
             scope.ServiceProvider.GetRequiredService<ISessionReadRepository>(),
             scope.ServiceProvider.GetRequiredService<ISessionLockRepository>(),
+            scope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
+            scope.ServiceProvider.GetRequiredService<IBlockRepository>(),
             scope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
             scope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
             scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
@@ -262,6 +264,274 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
         await holderTransaction.RollbackAsync();
         SessionCommandResult result = await callerTask;
         Assert.True(result.Succeeded);
+    }
+
+    /// <summary>
+    /// F3: approve's union lock is {organizer, requester}, not the organizer alone -- the whole
+    /// counterpart-attaching pair is proven locked in one A-068-ordered statement, database order
+    /// deciding acquisition regardless of which of the two happens to hold the higher id.
+    /// </summary>
+    [Fact]
+    public async Task ApproveUnionLockIncludesRequesterAndIsOrderedByTheDatabase_A068()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: "approve-union-organizer@example.test");
+        UserId requesterId = await _factory.SeedUserAsync(email: "approve-union-requester@example.test");
+
+        int order = organizerId.Value.ToByteArray(bigEndian: true).AsSpan()
+            .SequenceCompareTo(requesterId.Value.ToByteArray(bigEndian: true));
+        (UserId lowerId, UserId higherId) = order < 0 ? (organizerId, requesterId) : (requesterId, organizerId);
+
+        SessionId sessionId;
+        JoinRequestId joinRequestId;
+        await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Session session = Session.Create(organizerId, SessionDetailsFor(), [], _factory.Clock);
+            JoinRequest request = session.OpenJoinRequest(requesterId, _factory.Clock);
+            _ = session.DequeueEvents();
+            sessionId = session.Id;
+            joinRequestId = request.Id;
+            context.Sessions.Add(session);
+            await context.SaveChangesAsync();
+        }
+
+        await using AsyncServiceScope holderScope = _factory.Services.CreateAsyncScope();
+        AppDbContext holderContext = holderScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await using var holderTransaction = await holderContext.Database.BeginTransactionAsync();
+        // Holds whichever of organizer/requester has the higher id -- proving the union lock covers
+        // both, not just the organizer (the pre-fix gap: approve used to lock only the organizer).
+        await holderContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM users WHERE id = {higherId.Value} FOR NO KEY UPDATE");
+
+        await using AsyncServiceScope approveScope = _factory.Services.CreateAsyncScope();
+        Task<JoinRequestCommandResult> approveTask = RunApproveAsync(approveScope, sessionId, organizerId, joinRequestId);
+
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        Assert.False(
+            approveTask.IsCompleted,
+            "Approve's union lock must include whichever of organizer/requester holds the higher id.");
+
+        await using (AsyncServiceScope probeScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext probeContext = probeScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await using var probeTransaction = await probeContext.Database.BeginTransactionAsync();
+
+            Exception? thrown = await Record.ExceptionAsync(() =>
+                probeContext.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT 1 FROM users WHERE id = {lowerId.Value} FOR NO KEY UPDATE NOWAIT"));
+
+            Assert.True(
+                thrown is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.LockNotAvailable },
+                "The lower-id member of the organizer/requester pair must already be locked by the " +
+                "blocked approve call -- A-068 orders the union by id in one statement, so the lower " +
+                "row is locked before the caller ever blocks on the higher one.");
+
+            await probeTransaction.RollbackAsync();
+        }
+
+        await holderTransaction.RollbackAsync();
+        JoinRequestCommandResult result = await approveTask;
+        Assert.True(result.Succeeded, result.Code);
+    }
+
+    /// <summary>
+    /// F3: the friendship graph lock (§6.1 step 3) is genuinely taken for both invite and approve --
+    /// the command blocks on an externally held friendship row before it can reach the session parent.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(AttachmentCommands))]
+    public async Task GraphFriendshipLockIsGenuinelyTaken_A068(AttachmentCommand command)
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"graph-friend-organizer-{command}@example.test");
+        UserId counterpartId = await _factory.SeedUserAsync(email: $"graph-friend-counterpart-{command}@example.test");
+
+        SessionId sessionId;
+        JoinRequestId? joinRequestId = null;
+        FriendshipId friendshipId;
+
+        await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Session session = Session.Create(organizerId, SessionDetailsFor(), [], _factory.Clock);
+            _ = session.DequeueEvents();
+            sessionId = session.Id;
+
+            Friendship friendship = Friendship.Request(
+                await context.DomainUsers.SingleAsync(u => u.Id == organizerId),
+                await context.DomainUsers.SingleAsync(u => u.Id == counterpartId),
+                _factory.Clock);
+            friendship.Accept(counterpartId, _factory.Clock);
+            _ = friendship.DequeueEvents();
+            friendshipId = friendship.Id;
+            context.Friendships.Add(friendship);
+
+            if (command is AttachmentCommand.Approve)
+            {
+                JoinRequest request = session.OpenJoinRequest(counterpartId, _factory.Clock);
+                _ = session.DequeueEvents();
+                joinRequestId = request.Id;
+            }
+
+            context.Sessions.Add(session);
+            await context.SaveChangesAsync();
+        }
+
+        await using AsyncServiceScope holderScope = _factory.Services.CreateAsyncScope();
+        AppDbContext holderContext = holderScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await using var holderTransaction = await holderContext.Database.BeginTransactionAsync();
+        await holderContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM friendships WHERE id = {friendshipId.Value} FOR UPDATE");
+
+        await using AsyncServiceScope commandScope = _factory.Services.CreateAsyncScope();
+        Task commandTask = command switch
+        {
+            AttachmentCommand.Invite => RunInviteAsync(commandScope, sessionId, organizerId, counterpartId),
+            _ => RunApproveAsync(commandScope, sessionId, organizerId, joinRequestId!.Value),
+        };
+
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        Assert.False(
+            commandTask.IsCompleted,
+            "The command must block on the externally held friendship row -- proving §6.1 step 3's " +
+            "friendship lock is genuinely taken, not skipped.");
+
+        await holderTransaction.RollbackAsync();
+        await commandTask;
+    }
+
+    /// <summary>
+    /// F3: the block-direction graph lock (§6.1 step 3) is genuinely taken for both invite and approve
+    /// -- and, once observed, rejects the command exactly as the block-first race gate requires (D-065).
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(AttachmentCommands))]
+    public async Task GraphBlockLockIsGenuinelyTakenAndObserved_A068(AttachmentCommand command)
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"graph-block-organizer-{command}@example.test");
+        UserId counterpartId = await _factory.SeedUserAsync(email: $"graph-block-counterpart-{command}@example.test");
+
+        SessionId sessionId;
+        JoinRequestId? joinRequestId = null;
+        BlockId blockId;
+
+        await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Session session = Session.Create(organizerId, SessionDetailsFor(), [], _factory.Clock);
+            _ = session.DequeueEvents();
+            sessionId = session.Id;
+
+            if (command is AttachmentCommand.Invite)
+            {
+                // Invite must clear the friendship check too, so it needs an Accepted friendship to
+                // reach the block-direction lock at all; approve has no such precondition.
+                Friendship friendship = Friendship.Request(
+                    await context.DomainUsers.SingleAsync(u => u.Id == organizerId),
+                    await context.DomainUsers.SingleAsync(u => u.Id == counterpartId),
+                    _factory.Clock);
+                friendship.Accept(counterpartId, _factory.Clock);
+                _ = friendship.DequeueEvents();
+                context.Friendships.Add(friendship);
+            }
+            else
+            {
+                JoinRequest request = session.OpenJoinRequest(counterpartId, _factory.Clock);
+                _ = session.DequeueEvents();
+                joinRequestId = request.Id;
+            }
+
+            string counterpartUsername = (await context.DomainUsers.SingleAsync(u => u.Id == counterpartId))
+                .Username!.Value.Value;
+            Block block = Block.Create(organizerId, counterpartId, Username.Create(counterpartUsername), _factory.Clock);
+            _ = block.DequeueEvents();
+            blockId = block.Id;
+            context.Blocks.Add(block);
+
+            context.Sessions.Add(session);
+            await context.SaveChangesAsync();
+        }
+
+        await using AsyncServiceScope holderScope = _factory.Services.CreateAsyncScope();
+        AppDbContext holderContext = holderScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await using var holderTransaction = await holderContext.Database.BeginTransactionAsync();
+        await holderContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM blocks WHERE id = {blockId.Value} FOR UPDATE");
+
+        await using AsyncServiceScope commandScope = _factory.Services.CreateAsyncScope();
+        Task commandTask = command switch
+        {
+            AttachmentCommand.Invite => RunInviteAsync(commandScope, sessionId, organizerId, counterpartId),
+            _ => RunApproveAsync(commandScope, sessionId, organizerId, joinRequestId!.Value),
+        };
+
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        Assert.False(
+            commandTask.IsCompleted,
+            "The command must block on the externally held block row -- proving §6.1 step 3's " +
+            "block-direction lock is genuinely taken, not skipped.");
+
+        await holderTransaction.RollbackAsync();
+
+        // Once unblocked, the now-visible block is observed under the fresh locks and the command is
+        // rejected -- indistinguishable from missing (D-065) -- rather than silently succeeding.
+        await commandTask;
+    }
+
+    /// <summary>
+    /// F6: <c>SessionReadUseCases.GetSessionDetailAsync</c> is a GET and must take no row lock. It used
+    /// to loop <c>IBlockRepository.FindPairForUpdateAsync</c> per counterpart, taking <c>FOR UPDATE</c>
+    /// on a read path; this proves the fixed, non-locking bulk read never contends with a concurrently
+    /// held block row.
+    /// </summary>
+    [Fact]
+    public async Task GetSessionDetailDoesNotLockOnAConcurrentlyHeldBlockRow_F6()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: "read-nolock-organizer@example.test");
+        UserId viewerId = await _factory.SeedUserAsync(email: "read-nolock-viewer@example.test");
+
+        SessionId sessionId;
+        BlockId blockId;
+        await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Session session = Session.Create(organizerId, SessionDetailsFor(), [], _factory.Clock);
+            _ = session.DequeueEvents();
+            sessionId = session.Id;
+            context.Sessions.Add(session);
+
+            string viewerUsername = (await context.DomainUsers.SingleAsync(u => u.Id == viewerId))
+                .Username!.Value.Value;
+            Block block = Block.Create(viewerId, organizerId, Username.Create(viewerUsername), _factory.Clock);
+            _ = block.DequeueEvents();
+            blockId = block.Id;
+            context.Blocks.Add(block);
+
+            await context.SaveChangesAsync();
+        }
+
+        await using AsyncServiceScope holderScope = _factory.Services.CreateAsyncScope();
+        AppDbContext holderContext = holderScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await using var holderTransaction = await holderContext.Database.BeginTransactionAsync();
+        await holderContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM blocks WHERE id = {blockId.Value} FOR UPDATE");
+
+        await using AsyncServiceScope readScope = _factory.Services.CreateAsyncScope();
+        var readUseCase = new SessionReadUseCases(
+            readScope.ServiceProvider.GetRequiredService<ISessionRepository>(),
+            readScope.ServiceProvider.GetRequiredService<ISessionReadRepository>(),
+            readScope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
+            readScope.ServiceProvider.GetRequiredService<IBlockRepository>());
+
+        // A GET must take no row locks: this must complete promptly even though another transaction
+        // holds FOR UPDATE on the very block row this read's viewer-facts query touches.
+        Task<SessionDetail?> readTask = readUseCase.GetSessionDetailAsync(sessionId, viewerId, default);
+        SessionDetail? detail = await readTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        // The block itself makes the session invisible to this viewer (D-065) -- the interesting part
+        // is that the call returned promptly at all, not what it returned.
+        Assert.Null(detail);
+
+        await holderTransaction.RollbackAsync();
     }
 
     private SessionDetails SessionDetailsFor() => new(

@@ -14,4 +14,19 @@ public interface ISessionNotificationMaterializer
         Session session,
         IReadOnlyList<IDomainEvent> events,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The deletion executor's hook (DOMAIN_MODEL.md §11 step 5, PHASE4_DESIGN.md §6.3): excludes
+    /// <paramref name="excludeUserId"/> from every recipient this batch of events would otherwise
+    /// compute — the user whose own deletion drained them never receives a notification about it. The
+    /// default forwards to the unfiltered overload for a materializer that has no exclusion to apply;
+    /// the real adapter overrides this to thread <paramref name="excludeUserId"/> into
+    /// <c>RecipientFilter</c>.
+    /// </summary>
+    Task MaterializeAsync(
+        Session session,
+        IReadOnlyList<IDomainEvent> events,
+        UserId? excludeUserId,
+        CancellationToken cancellationToken) =>
+        MaterializeAsync(session, events, cancellationToken);
 }

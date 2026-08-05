@@ -238,6 +238,8 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
                 new AttemptingSessionLockRepository(
                     approveScope.ServiceProvider.GetRequiredService<ISessionLockRepository>(),
                     lockAttemptGate),
+                approveScope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
+                approveScope.ServiceProvider.GetRequiredService<IBlockRepository>(),
                 approveScope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
                 approveScope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
                 approveScope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
@@ -253,14 +255,14 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
         Assert.True(blockResult.Succeeded);
 
         // The block already lapsed the pending join request unconditionally (BlockEffects.Apply runs
-        // CollectPending + LapseJoinRequestsFrom before any terminal/ended check). By the time approve's
-        // lock unblocks and it reloads the session under its own lock, the request is no longer
-        // Pending — RequirePendingJoinRequest throws rather than returning a result, which is what the
-        // production code being frozen for this ticket does today; a future HTTP layer maps both this
-        // and a genuinely-missing request to the same 404 (§6.1's "indistinguishable 404").
-        DomainException thrown = await Assert.ThrowsAsync<DomainException>(
-            () => approve.WaitAsync(TimeSpan.FromSeconds(10)));
-        Assert.Equal(DomainError.InvalidTransition, thrown.Error);
+        // CollectPending + LapseJoinRequestsFrom before any terminal/ended check) and committed before
+        // approve's own user-row lock could clear. By the time approve's lock unblocks, it re-locks the
+        // organizer/requester block pair under its own P4-LK-01 step 3 and finds the fresh block first
+        // — block-first takes priority over "not pending", so approve returns the same
+        // session_not_found a missing session or request would (D-065), writing and notifying nothing.
+        JoinRequestCommandResult approveResult = await approve.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(approveResult.Succeeded);
+        Assert.Equal("session_not_found", approveResult.Code);
 
         await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
         AppDbContext verify = verification.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -318,6 +320,8 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
         scope.ServiceProvider.GetRequiredService<ISessionRepository>(),
         scope.ServiceProvider.GetRequiredService<ISessionReadRepository>(),
         scope.ServiceProvider.GetRequiredService<ISessionLockRepository>(),
+        scope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
+        scope.ServiceProvider.GetRequiredService<IBlockRepository>(),
         scope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
         scope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),

@@ -121,6 +121,54 @@ public sealed class SessionMaterializerAdapterTests : IAsyncLifetime, IDisposabl
         Assert.Null(organizerRow.ActorUserId);
     }
 
+    /// <summary>
+    /// F4/DOMAIN_MODEL.md §11 step 5, real adapter round trip: the excluded user gets no row for a
+    /// batch of events even though they would otherwise be an eligible recipient (the organizer, here,
+    /// for the SessionUnconfirmed broadcast) — the deletion executor's hook actually suppresses at
+    /// write time, not just in the pure <c>RecipientFilter</c> contract already proven in
+    /// <c>SessionNotificationMaterializerTests</c>.
+    /// </summary>
+    [Fact]
+    public async Task SessionNotificationMaterializer_ExcludedUserReceivesNoRowEvenIfOtherwiseEligible_D105()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: "materializer-exclude-organizer@example.test");
+        UserId participantId = await _factory.SeedUserAsync(email: "materializer-exclude-participant@example.test");
+
+        Session session = CreateSession(organizerId, minAttendance: 2);
+        session.Invite(participantId, _factory.Clock);
+        session.Rsvp(ParticipantRef.ForUser(participantId), ParticipationStatus.Going, _factory.Clock);
+        Assert.Equal(SessionStatus.Confirmed, session.Status);
+        _ = session.DequeueEvents();
+
+        await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            context.Sessions.Add(session);
+            await context.SaveChangesAsync();
+        }
+
+        session.RemoveParticipation(ParticipantRef.ForUser(participantId), _factory.Clock);
+        Assert.Equal(SessionStatus.Unconfirmed, session.Status);
+        IReadOnlyList<IDomainEvent> events = session.DequeueEvents();
+        Assert.Contains(events, e => e is SessionUnconfirmed);
+
+        await using (AsyncServiceScope materializeScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = materializeScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var materializer = new SessionNotificationMaterializer(context, _factory.Clock);
+            await materializer.MaterializeAsync(session, events, organizerId, default);
+            await context.SaveChangesAsync();
+        }
+
+        await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
+        AppDbContext verify = verification.ServiceProvider.GetRequiredService<AppDbContext>();
+        List<Notification> notifications = await verify.Notifications
+            .AsNoTracking()
+            .Where(n => n.SessionId == session.Id && n.Type == NotificationType.SessionUnconfirmed)
+            .ToListAsync();
+        Assert.DoesNotContain(notifications, n => n.RecipientUserId == organizerId);
+    }
+
     [Fact]
     public async Task SessionReminderHandoffStore_UpsertsAndIncrementsVersionAcrossReplans_D082()
     {

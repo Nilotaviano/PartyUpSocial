@@ -87,4 +87,29 @@ public sealed class SessionNotificationMaterializerTests
             session, new SessionConfirmed(session.Id), filter);
         Assert.Contains(confirmedRequests, request => request.RecipientUserId == fixture.InviteeId);
     }
+
+    /// <summary>
+    /// F4/DOMAIN_MODEL.md §11 step 5: the excluded user (the subject whose own deletion drained these
+    /// events) gets no row even though they would otherwise be an eligible recipient, while an
+    /// unexcluded recipient in the same audience is unaffected — the wiring
+    /// <see cref="Infrastructure.Persistence.Repositories.SessionNotificationMaterializer"/> threads
+    /// into <c>RecipientFilter</c>, proven here at the pure-contract level.
+    /// </summary>
+    [Fact]
+    public async Task ExcludedUserReceivesNoRowEvenIfOtherwiseEligible_D105()
+    {
+        SessionTestFixture fixture = new();
+        Session session = fixture.SeedSession(minAttendance: 1, maxCapacity: null);
+        SessionParticipationUseCases participation = fixture.ParticipationUseCases();
+        await participation.RespondToInvitationAsync(session.Id, fixture.InviteeId, ParticipationStatus.Going, default);
+        _ = session.DequeueEvents();
+
+        RecipientFilter filter = RecipientFilter.Create(MuteSet.Empty, fixture.OrganizerId);
+
+        IReadOnlyList<NotificationRequest> requests = RecipientComputer.ForSessionEvent(
+            session, new SessionConfirmed(session.Id), filter);
+
+        Assert.DoesNotContain(requests, request => request.RecipientUserId == fixture.OrganizerId);
+        Assert.Contains(requests, request => request.RecipientUserId == fixture.InviteeId);
+    }
 }

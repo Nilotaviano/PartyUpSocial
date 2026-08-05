@@ -29,6 +29,47 @@ public sealed class FriendshipRepository(AppDbContext context) : IFriendshipRepo
             cancellationToken);
     }
 
+    /// <summary>Non-locking bulk read (F6) — replaces a per-counterpart <see cref="FindPairAsync"/> loop on a GET path.</summary>
+    public async Task<IReadOnlyList<Friendship>> FindPairsAmongAsync(
+        UserId userId,
+        IReadOnlyCollection<UserId> otherUserIds,
+        CancellationToken cancellationToken) =>
+        await QueryPairsAmong(userId, otherUserIds).AsNoTracking().ToListAsync(cancellationToken);
+
+    /// <summary>
+    /// The A-068 bulk graph lock (§6.1 step 3): one statement, the table's declared order. A raw
+    /// lock-only statement first, then a plain LINQ hydrate — <see cref="Friendship"/> carries an
+    /// <c>xmin</c> concurrency shadow property that a <c>SELECT *</c>-based <c>FromSql</c> hydrate does
+    /// not satisfy, the same two-step idiom <see cref="FindPairForUpdateAsync"/> already uses.
+    /// </summary>
+    public async Task<IReadOnlyList<Friendship>> LockPairsAsync(
+        UserId userId,
+        IReadOnlyCollection<UserId> otherUserIds,
+        CancellationToken cancellationToken)
+    {
+        if (otherUserIds.Count == 0)
+        {
+            return [];
+        }
+
+        Guid[] others = [.. otherUserIds.Select(id => id.Value)];
+        await context.Database.ExecuteSqlInterpolatedAsync($"""
+            SELECT 1
+            FROM friendships
+            WHERE (user_lo_id = {userId.Value} AND user_hi_id = ANY({others}))
+               OR (user_hi_id = {userId.Value} AND user_lo_id = ANY({others}))
+            ORDER BY user_lo_id, user_hi_id, id
+            FOR UPDATE
+            """, cancellationToken);
+
+        return await QueryPairsAmong(userId, otherUserIds).ToListAsync(cancellationToken);
+    }
+
+    private IQueryable<Friendship> QueryPairsAmong(UserId userId, IReadOnlyCollection<UserId> otherUserIds) =>
+        context.Friendships.Where(f =>
+            (f.UserLoId == userId && otherUserIds.Contains(f.UserHiId)) ||
+            (f.UserHiId == userId && otherUserIds.Contains(f.UserLoId)));
+
     public Task<FriendshipPair?> FindOwnedPairAsync(
         FriendshipId friendshipId,
         UserId actorId,

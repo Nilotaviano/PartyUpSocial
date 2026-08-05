@@ -104,7 +104,9 @@ public sealed class ExecuteDeletionForUserUseCase(
                 IReadOnlyList<IDomainEvent> events = session.DequeueEvents();
                 if (events.Count > 0)
                 {
-                    await materializer.MaterializeAsync(session, events, cancellationToken);
+                    // DOMAIN_MODEL.md §11 step 5: the deleting user receives no notifications from
+                    // steps 1-3 of their own deletion's derived Session events.
+                    await materializer.MaterializeAsync(session, events, userId, cancellationToken);
                 }
             }
         }

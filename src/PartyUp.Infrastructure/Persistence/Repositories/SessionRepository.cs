@@ -22,6 +22,11 @@ public sealed class SessionRepository(AppDbContext context) : ISessionRepository
     public Task<Session?> FindAsync(SessionId id, CancellationToken cancellationToken) =>
         LoadWithChildren(context.Sessions).FirstOrDefaultAsync(session => session.Id == id, cancellationToken);
 
+    /// <summary>Untracked on purpose (A-069/§6.1 step 1) — see the interface doc for why.</summary>
+    public Task<Session?> FindNoTrackingAsync(SessionId id, CancellationToken cancellationToken) =>
+        LoadWithChildren(context.Sessions.AsNoTracking())
+            .FirstOrDefaultAsync(session => session.Id == id, cancellationToken);
+
     public async Task<SessionForUpdate?> LoadForUpdateAsync(SessionId id, CancellationToken cancellationToken)
     {
         await context.Database.ExecuteSqlInterpolatedAsync($"""

@@ -56,8 +56,10 @@ public sealed class SessionReadUseCases(
 
     /// <summary>
     /// Builds the minimal §7 viewer facts this one session needs: the organizer plus every other
-    /// registered participant, checked pairwise rather than as a bulk friend/block list — proportionate
-    /// for a single-session read (the list reads push the equivalent predicate into SQL instead).
+    /// registered participant, read as two bulk (not per-counterpart) queries — proportionate for a
+    /// single-session read, and never a row lock: a GET must take none (F6). The previous
+    /// implementation looped <see cref="IBlockRepository.FindPairForUpdateAsync"/> per counterpart,
+    /// which takes <c>FOR UPDATE</c> on a read path; this uses the non-locking bulk read instead.
     /// </summary>
     private async Task<Viewer> BuildViewerAsync(UserId viewerId, Session session, CancellationToken cancellationToken)
     {
@@ -72,23 +74,16 @@ public sealed class SessionReadUseCases(
 
         counterparts.Remove(viewerId);
 
-        List<UserId> friendIds = [];
-        List<UserId> blockedIds = [];
-
-        foreach (UserId counterpart in counterparts)
+        if (counterparts.Count == 0)
         {
-            Friendship? friendship = await friendships.FindPairAsync(viewerId, counterpart, cancellationToken);
-            if (friendship?.IsAccepted == true)
-            {
-                friendIds.Add(counterpart);
-            }
-
-            IReadOnlyList<Block> pairBlocks = await blocks.FindPairForUpdateAsync(viewerId, counterpart, cancellationToken);
-            if (pairBlocks.Count > 0)
-            {
-                blockedIds.Add(counterpart);
-            }
+            return Viewer.Create(viewerId);
         }
+
+        IReadOnlyList<Friendship> pairFriendships = await friendships.FindPairsAmongAsync(viewerId, counterparts, cancellationToken);
+        IReadOnlyList<Block> pairBlocks = await blocks.FindPairsAmongAsync(viewerId, counterparts, cancellationToken);
+
+        List<UserId> friendIds = [.. pairFriendships.Where(f => f.IsAccepted).Select(f => f.Counterpart(viewerId))];
+        List<UserId> blockedIds = [.. pairBlocks.Select(b => b.BlockerId == viewerId ? b.BlockedId : b.BlockerId)];
 
         return Viewer.Create(viewerId, friendIds, blockedIds);
     }

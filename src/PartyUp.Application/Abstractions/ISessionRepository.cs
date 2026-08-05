@@ -21,6 +21,16 @@ public interface ISessionRepository
     Task<Session?> FindAsync(SessionId id, CancellationToken cancellationToken);
 
     /// <summary>
+    /// A non-tracking read for a pre-lock authorization probe (PHASE4_DESIGN.md §6.1 step 1): the
+    /// returned aggregate is never entered into the change tracker, so a later
+    /// <see cref="LoadForUpdateAsync"/> call for the same id in the same unit of work is guaranteed to
+    /// see a fresh row under its own lock rather than EF's identity-map reuse of this earlier, untracked
+    /// probe. Callers that will reload the same aggregate for mutation later in the same transaction
+    /// must use this instead of <see cref="FindAsync"/>.
+    /// </summary>
+    Task<Session?> FindNoTrackingAsync(SessionId id, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Locks the session parent with <c>FOR NO KEY UPDATE</c> (A-069) before loading every child
     /// collection the aggregate owns, plus the sibling <c>notification_mutes</c> and
     /// <c>session_reminder_handoffs</c> rows for this session (§4.2) — neither is part of the
