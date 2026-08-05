@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Net.Http.Headers;
 using NodaTime;
+using PartyUp.Api.Security;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
 using PartyUp.Infrastructure.Persistence;
@@ -61,6 +62,42 @@ public sealed class GuestExchangeTests : IAsyncLifetime, IDisposable
         Assert.True(cookie.HttpOnly);
         Assert.Equal(Microsoft.Net.Http.Headers.SameSiteMode.Lax, cookie.SameSite);
         Assert.StartsWith("/api/v1/guest/", cookie.Path.Value);
+    }
+
+    [Fact]
+    public async Task StaleGuestCookieIsClearedWithThePathItWasSetWith_A065_D174()
+    {
+        // §9.1: browsers only clear a cookie when the delete Set-Cookie matches both name AND path.
+        // The stale cookie carries its own guest link id in its name (pu.g.{id:N}), and credentials are
+        // originally set with Path=/api/v1/guest/{id:N}, so the delete cookie must reconstruct and
+        // reuse that same path — a Path-less delete (or the request path) never actually clears it.
+        (_, string token) = await SeedSessionWithGuestLinkAsync();
+        using HttpClient client = CreateExchangeClient();
+
+        Guid staleGuestLinkId = Guid.NewGuid();
+        Instant now = _factory.Clock.GetCurrentInstant();
+        GuestLinkCredentialProtector protector;
+        await using (AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
+        {
+            protector = scope.ServiceProvider.GetRequiredService<GuestLinkCredentialProtector>();
+        }
+
+        string staleValue = protector.Protect(new GuestLinkCredential(
+            GuestLinkId.From(staleGuestLinkId),
+            SessionId.From(Guid.NewGuid()),
+            GuestCredentialMode.Active,
+            now - Duration.FromDays(2),
+            now - Duration.FromDays(1)));
+        string staleCookieName = $"pu.g.{staleGuestLinkId:N}";
+
+        var request = new HttpRequestMessage(HttpMethod.Get, $"/g/{token}");
+        request.Headers.Add(HeaderNames.Cookie, $"{staleCookieName}={staleValue}");
+        HttpResponseMessage response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        SetCookieHeaderValue deleteCookie = SetCookiesOf(response).Single(c => c.Name.Value == staleCookieName);
+        Assert.Equal($"/api/v1/guest/{staleGuestLinkId:N}", deleteCookie.Path.Value);
+        Assert.Equal(TimeSpan.Zero, deleteCookie.MaxAge);
     }
 
     [Fact]

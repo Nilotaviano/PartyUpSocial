@@ -221,9 +221,10 @@ public static class GuestSessionEndpoints
 
         if (resolved.View != GuestLinkView.LiveView || credential.Mode != GuestCredentialMode.Active)
         {
-            // A-074 (b)/(c)/(d): a terminal link/session or a terminal-mode credential never reaches
-            // the domain mutation — every guest write on either is 409 guest_link_terminal.
-            return Problem(context, StatusCodes.Status409Conflict, "guest_link_terminal");
+            // A-074 (b)/(c)/(d): a terminal link/session, or a terminal-mode credential against a
+            // still-live link/session, never reaches the domain mutation — fail closed with 404
+            // rather than reveal the underlying state via a 409.
+            return Problem(context, StatusCodes.Status404NotFound, "session_not_found");
         }
 
         GuestCommandResult result;

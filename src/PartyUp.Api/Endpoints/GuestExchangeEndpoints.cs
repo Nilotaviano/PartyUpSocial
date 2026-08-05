@@ -97,11 +97,21 @@ public static class GuestExchangeEndpoints
                     Secure = !context.RequestServices
                         .GetRequiredService<IWebHostEnvironment>().IsDevelopment(),
                     SameSite = SameSiteMode.Lax,
+                    Path = StaleCookiePath(name),
                     MaxAge = TimeSpan.Zero,
                 });
             }
         }
     }
+
+    /// <summary>
+    /// §9.1: browsers only clear a cookie when the delete <c>Set-Cookie</c> matches its original
+    /// name AND path. The stale cookie's own name carries its guest link id (<c>pu.g.{id:N}</c>), so
+    /// the path the credential was actually set with (<c>/api/v1/guest/{id:N}</c>) is reconstructed
+    /// from it rather than defaulting to the request path.
+    /// </summary>
+    private static string StaleCookiePath(string cookieName) =>
+        $"{ApiRoutes.V1}/guest/{cookieName["pu.g.".Length..]}";
 
     private static void SetGuestCookie(
         HttpContext context,

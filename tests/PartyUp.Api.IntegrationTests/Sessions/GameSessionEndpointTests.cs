@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Net.Http.Headers;
 using NodaTime;
+using PartyUp.Application.Sessions;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
@@ -336,6 +337,41 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
             .Select(item => InstantFromIso(item.GetProperty("startTime").GetString()!))
             .ToArray();
         Assert.Equal(starts.Order().ToArray(), starts);
+    }
+
+    [Fact]
+    public async Task CursorsAreBoundToTheirIssuingListAndRejectedAcrossLists_A072()
+    {
+        SessionHttpUser organizer = await SessionEndpointTestSupport.SeedAsync(_factory);
+        using SessionHttpSession session = await SessionEndpointTestSupport.SignInAsync(_factory, organizer.Id);
+        (JsonDocument created, _) = await CreatePrivateSessionAsync(session);
+        Guid sessionId = created.RootElement.GetProperty("session").GetProperty("id").GetGuid();
+
+        // A cursor genuinely issued for the "upcoming" session list must never be honored by the
+        // "history" list, even though both are decoded by the same shared TryDecodeCursor path.
+        string upcomingCursor = new SessionListCursor(
+            _factory.Clock.GetCurrentInstant(), Guid.NewGuid(), SessionListScope.Upcoming).Encode();
+        HttpResponseMessage upcomingIntoHistory = await session.GetAsync(
+            $"/api/v1/sessions?scope=history&cursor={Uri.EscapeDataString(upcomingCursor)}");
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            upcomingIntoHistory, HttpStatusCode.BadRequest, "invalid_cursor");
+
+        // A cursor issued for a session list (upcoming/history) must never be honored by the
+        // join-request list either.
+        string sessionListCursor = new SessionListCursor(
+            _factory.Clock.GetCurrentInstant(), Guid.NewGuid(), SessionListScope.History).Encode();
+        HttpResponseMessage sessionListIntoJoinRequests = await session.GetAsync(
+            $"/api/v1/sessions/{sessionId:D}/join-requests?cursor={Uri.EscapeDataString(sessionListCursor)}");
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            sessionListIntoJoinRequests, HttpStatusCode.BadRequest, "invalid_cursor");
+
+        // Sanity: a cursor genuinely scoped to its own list decodes and is accepted (no items match,
+        // but the request is not rejected as malformed).
+        string joinRequestsCursor = new SessionListCursor(
+            _factory.Clock.GetCurrentInstant(), Guid.NewGuid(), SessionListScope.JoinRequests).Encode();
+        HttpResponseMessage ownScope = await session.GetAsync(
+            $"/api/v1/sessions/{sessionId:D}/join-requests?cursor={Uri.EscapeDataString(joinRequestsCursor)}");
+        Assert.Equal(HttpStatusCode.OK, ownScope.StatusCode);
     }
 
     [Fact]

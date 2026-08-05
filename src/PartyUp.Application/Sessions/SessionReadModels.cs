@@ -77,15 +77,38 @@ public sealed record GuestSessionView(
 /// <summary>The constrained terminal notice A-074 renders for a revoked, canceled, or ended link.</summary>
 public sealed record GuestTerminalView(SessionId SessionId, GuestLinkView Notice);
 
-/// <summary>The A-072 keyset cursor: the list's sort-key instant plus the tie-breaking id.</summary>
-public readonly record struct SessionListCursor(Instant SortKey, Guid Id)
+/// <summary>
+/// The list a <see cref="SessionListCursor"/> was issued for (A-072). A cursor decoded for
+/// presentation to any list other than the one that issued it is rejected — <c>Unbound</c> is the
+/// zero value used only for the cursor's transient internal (pre-rebind) representation and is
+/// never a value a client-presented cursor may declare itself as.
+/// </summary>
+public enum SessionListScope
+{
+    Unbound = 0,
+    Upcoming = 1,
+    History = 2,
+    JoinRequests = 3,
+}
+
+/// <summary>The A-072 keyset cursor: the list's sort-key instant, the tie-breaking id, and the
+/// issuing list's <see cref="SessionListScope"/>.</summary>
+public readonly record struct SessionListCursor(Instant SortKey, Guid Id, SessionListScope Scope = SessionListScope.Unbound)
 {
     public string Encode() =>
         System.Buffers.Text.Base64Url.EncodeToString(
             System.Text.Encoding.UTF8.GetBytes(
-                FormattableString.Invariant($"{SortKey.ToUnixTimeTicks()}:{Id:N}")));
+                FormattableString.Invariant($"{(int)Scope}:{SortKey.ToUnixTimeTicks()}:{Id:N}")));
 
-    public static SessionListCursor? TryDecode(string? cursor)
+    /// <summary>Decodes without checking the scope — for internal rebinding of a freshly-issued,
+    /// not-yet-scoped cursor. Never use this overload to validate a client-presented cursor.</summary>
+    public static SessionListCursor? TryDecode(string? cursor) => TryDecodeCore(cursor, expectedScope: null);
+
+    /// <summary>Decodes a client-presented cursor, rejecting one issued for a different list.</summary>
+    public static SessionListCursor? TryDecode(string? cursor, SessionListScope expectedScope) =>
+        TryDecodeCore(cursor, expectedScope);
+
+    private static SessionListCursor? TryDecodeCore(string? cursor, SessionListScope? expectedScope)
     {
         if (string.IsNullOrEmpty(cursor))
         {
@@ -97,14 +120,22 @@ public readonly record struct SessionListCursor(Instant SortKey, Guid Id)
             string decoded = System.Text.Encoding.UTF8.GetString(
                 System.Buffers.Text.Base64Url.DecodeFromChars(cursor));
             string[] parts = decoded.Split(':');
-            if (parts.Length != 2
-                || !long.TryParse(parts[0], out long ticks)
-                || !Guid.TryParse(parts[1], out Guid id))
+            if (parts.Length != 3
+                || !int.TryParse(parts[0], out int scopeValue)
+                || !Enum.IsDefined(typeof(SessionListScope), scopeValue)
+                || !long.TryParse(parts[1], out long ticks)
+                || !Guid.TryParse(parts[2], out Guid id))
             {
                 return null;
             }
 
-            return new SessionListCursor(Instant.FromUnixTimeTicks(ticks), id);
+            var scope = (SessionListScope)scopeValue;
+            if (expectedScope is { } expected && scope != expected)
+            {
+                return null;
+            }
+
+            return new SessionListCursor(Instant.FromUnixTimeTicks(ticks), id, scope);
         }
         catch (FormatException)
         {

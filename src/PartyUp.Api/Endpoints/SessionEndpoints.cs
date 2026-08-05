@@ -259,7 +259,9 @@ public static class SessionEndpoints
             return Problem(context, StatusCodes.Status400BadRequest, "invalid_scope");
         }
 
-        if (!TryDecodeCursor(cursor, out SessionListCursor? decodedCursor))
+        SessionListScope listScope = scope == "upcoming" ? SessionListScope.Upcoming : SessionListScope.History;
+
+        if (!TryDecodeCursor(cursor, listScope, out SessionListCursor? decodedCursor))
         {
             return Problem(context, StatusCodes.Status400BadRequest, "invalid_cursor");
         }
@@ -267,6 +269,8 @@ public static class SessionEndpoints
         SessionPage<SessionSummary> page = scope == "upcoming"
             ? await useCase.ListUpcomingSessionsAsync(actorId.Value, decodedCursor, PageSize, cancellationToken)
             : await useCase.ListCompletedHistoryAsync(actorId.Value, decodedCursor, PageSize, cancellationToken);
+
+        page = RebindNextCursor(page, listScope);
 
         return Results.Ok(SessionPageResponse.From(page, SessionSummaryResponse.From));
     }
@@ -737,7 +741,7 @@ public static class SessionEndpoints
             return Problem(context, StatusCodes.Status401Unauthorized, "unauthorized");
         }
 
-        if (!TryDecodeCursor(cursor, out SessionListCursor? decodedCursor))
+        if (!TryDecodeCursor(cursor, SessionListScope.JoinRequests, out SessionListCursor? decodedCursor))
         {
             return Problem(context, StatusCodes.Status400BadRequest, "invalid_cursor");
         }
@@ -748,6 +752,8 @@ public static class SessionEndpoints
         {
             return Problem(context, StatusCodes.Status404NotFound, "session_not_found");
         }
+
+        page = RebindNextCursor(page, SessionListScope.JoinRequests);
 
         return Results.Ok(SessionPageResponse.From(page, JoinRequestViewResponse.From));
     }
@@ -964,7 +970,12 @@ public static class SessionEndpoints
         return false;
     }
 
-    private static bool TryDecodeCursor(string? cursor, out SessionListCursor? decoded)
+    /// <summary>
+    /// The A-072 shared decode path: a cursor is only accepted for the list that issued it — a
+    /// cursor decodes but declares a different <see cref="SessionListScope"/> (or a malformed/absent
+    /// scope) is rejected as invalid, never silently honored against the wrong list.
+    /// </summary>
+    private static bool TryDecodeCursor(string? cursor, SessionListScope expectedScope, out SessionListCursor? decoded)
     {
         if (string.IsNullOrEmpty(cursor))
         {
@@ -972,8 +983,31 @@ public static class SessionEndpoints
             return true;
         }
 
-        decoded = SessionListCursor.TryDecode(cursor);
+        decoded = SessionListCursor.TryDecode(cursor, expectedScope);
         return decoded is not null;
+    }
+
+    /// <summary>
+    /// The page's <c>NextCursor</c> is minted by the read repository without knowledge of which list
+    /// issued it (A-072); rebind it here to the calling endpoint's <see cref="SessionListScope"/>
+    /// before it ever reaches the client, so the token a client receives is provably bound to this
+    /// list.
+    /// </summary>
+    private static SessionPage<T> RebindNextCursor<T>(SessionPage<T> page, SessionListScope scope)
+    {
+        if (page.NextCursor is null)
+        {
+            return page;
+        }
+
+        SessionListCursor? inner = SessionListCursor.TryDecode(page.NextCursor);
+        if (inner is null)
+        {
+            return page;
+        }
+
+        string rebound = new SessionListCursor(inner.Value.SortKey, inner.Value.Id, scope).Encode();
+        return page with { NextCursor = rebound };
     }
 
     /// <summary>

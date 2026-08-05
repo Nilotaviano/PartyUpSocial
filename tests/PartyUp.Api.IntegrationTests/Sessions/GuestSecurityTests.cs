@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Net.Http.Headers;
 using NodaTime;
 using PartyUp.Api.Logging;
+using PartyUp.Api.Security;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
@@ -85,9 +86,74 @@ public sealed class GuestSecurityTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new { displayName = "Late Guest", response = "Going" }),
             activeCookie);
 
-        Assert.Equal(HttpStatusCode.Conflict, mutation.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, mutation.StatusCode);
         using JsonDocument mutationBody = JsonDocument.Parse(await mutation.Content.ReadAsStringAsync());
-        Assert.Equal("guest_link_terminal", mutationBody.RootElement.GetProperty("code").GetString());
+        Assert.Equal("session_not_found", mutationBody.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task TerminalModeCredentialAgainstAStillLiveLinkFailsClosedWith404OnMutation_A074()
+    {
+        // A-074 branch (c): the credential's own mode says terminal, but the underlying link/session
+        // is still live (never revoked, never ended) — a forged-or-stale terminal-mode credential must
+        // not be able to mutate, and must fail the same way as "not found" rather than a distinguishable
+        // 409, so it cannot be used to probe whether the link is actually fine.
+        UserId organizerId = await _factory.SeedUserAsync(email: $"guest-security-{Guid.NewGuid():N}@example.test");
+        SessionDetails details = new(
+            SessionTitle.Create("A-074 branch c session"),
+            _factory.Clock.GetCurrentInstant() + Duration.FromDays(1),
+            Duration15.FromMinutes(60),
+            Platform.NotApplicable,
+            null,
+            SessionNotes.Empty,
+            minAttendance: 1,
+            maxCapacity: null,
+            isPrivate: true);
+        Session session = Session.Create(organizerId, details, [], _factory.Clock);
+        (GuestLink link, _) = session.CreateGuestLink(_factory.Clock);
+        _ = session.DequeueEvents();
+
+        await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext seedContext = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            seedContext.Sessions.Add(session);
+            await seedContext.SaveChangesAsync();
+        }
+
+        // Forge a well-formed, correctly-protected credential whose Mode is Terminal even though the
+        // link/session it names is still Live — the only way branch (c) can occur, since the normal
+        // exchange/reissue flow never mints a Terminal credential for a Live link.
+        Instant now = _factory.Clock.GetCurrentInstant();
+        GuestLinkCredentialProtector protector;
+        await using (AsyncServiceScope protectorScope = _factory.Services.CreateAsyncScope())
+        {
+            protector = protectorScope.ServiceProvider.GetRequiredService<GuestLinkCredentialProtector>();
+        }
+
+        var forgedCredential = new GuestLinkCredential(
+            link.Id,
+            session.Id,
+            GuestCredentialMode.Terminal,
+            now,
+            now + GuestLinkCredentialProtector.TerminalLifetime);
+        string forgedCookieValue = protector.Protect(forgedCredential);
+        string forgedCookie = $"pu.g.{link.Id.Value:N}={forgedCookieValue}";
+
+        using HttpClient client = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = false,
+            BaseAddress = new Uri("https://localhost"),
+        });
+
+        HttpResponseMessage mutation = await AntiforgeryTestClient.SendAsync(
+            client, HttpMethod.Post, $"/api/v1/guest/{link.Id.Value:N}/claim",
+            JsonContent.Create(new { displayName = "Branch C Guest", response = "Going" }),
+            forgedCookie);
+
+        Assert.Equal(HttpStatusCode.NotFound, mutation.StatusCode);
+        using JsonDocument mutationBody = JsonDocument.Parse(await mutation.Content.ReadAsStringAsync());
+        Assert.Equal("session_not_found", mutationBody.RootElement.GetProperty("code").GetString());
     }
 
     [Fact]
