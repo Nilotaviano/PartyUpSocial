@@ -8,8 +8,16 @@ using PartyUp.Domain.Users.DeletionExecution;
 
 namespace PartyUp.Application.Tests.Deletion;
 
+// The Infrastructure.Friends.DeletionResultApplier adapter (which now also forwards
+// DeletionExecutionResult.CanceledReminders to IReminderScheduleWriter, PHASE4_DESIGN.md §5.3) cannot
+// be constructed here: PartyUp.Application.Tests does not and must not reference PartyUp.Infrastructure
+// (A-dependency-rule). That forwarding is covered by
+// tests/PartyUp.Api.IntegrationTests/Friends/FriendBlockConcurrencyTests.cs instead. This class keeps
+// exercising the shared DeletionResultApplication.ApplyAsync static helper, which is the part that is
+// reachable from the Application layer.
 public sealed class DeletionResultApplierTests
 {
+
     [Fact]
     public async Task Apply_DeletesFriendshipsBlocksAndRecipientNotificationsButPreservesActorOnlyRows_D092()
     {
@@ -179,6 +187,19 @@ public sealed class DeletionResultApplierTests
             DeletedRecipients.Add(recipientUserId);
             CancellationToken = cancellationToken;
             Rows.RemoveAll(notification => notification.RecipientUserId == recipientUserId);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingReminderScheduleWriter : IReminderScheduleWriter
+    {
+        internal List<SessionReminderCanceled> Applied { get; } = [];
+
+        public Task ApplyAsync(
+            SessionReminderCanceled cancellation,
+            CancellationToken cancellationToken)
+        {
+            Applied.Add(cancellation);
             return Task.CompletedTask;
         }
     }

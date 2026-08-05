@@ -3,7 +3,9 @@ using PartyUp.Application.Abstractions;
 using PartyUp.Application.Auth;
 using PartyUp.Application.Deletion;
 using PartyUp.Application.Email;
+using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users;
 using PartyUp.Domain.Users.DeletionExecution;
 
@@ -286,6 +288,113 @@ public sealed class ExecuteDeletionForUserUseCaseTests
         Assert.True(application.BeforeCredentialPurge);
     }
 
+    [Fact]
+    public async Task Execute_LocksDiscoveredCounterpartsAndMaterializesSessionEvents_WhenTheCandidateSetIsUnchanged()
+    {
+        var clock = new MutableClock(Instant.FromUtc(2026, 7, 31, 12, 0));
+        User user = User.BeginOnboarding(
+            UserId.New(),
+            FriendCode.Create("ABCDEFGHJK"),
+            AgeGateSource.SelfAttested,
+            clock);
+        RequestAccountDeletionUseCaseTests.Complete(user, clock);
+        user.RequestDeletion(clock);
+        clock.Advance(User.DeletionGracePeriod);
+        var users = new FakeUserRepository();
+        users.Users[user.Id] = user;
+        var friendId = UserId.New();
+        var scope = new StableDeletionScopeProvider(user.Id, friendId);
+        var sessionLocks = new RecordingSessionLockRepository();
+        var resultApplier = new FakeDeletionResultApplier(new FakeAccountGateway());
+        var useCase = new ExecuteDeletionForUserUseCase(
+            users,
+            scope,
+            resultApplier,
+            new FakeAccountGateway(),
+            new FakeDeletionJournal(),
+            new FakeDeletionJournalShipper(),
+            new FakeUnitOfWork(),
+            clock,
+            sessionLocks,
+            new RecordingSessionNotificationMaterializer());
+
+        Assert.True(await useCase.ExecuteAsync(user.Id, default));
+
+        Assert.Equal(1, scope.DiscoverCalls);
+        Assert.Equal(1, scope.ReloadCalls);
+        IReadOnlyCollection<UserId> lockedBatch = Assert.Single(sessionLocks.LockedUserBatches);
+        Assert.Equal(
+            new HashSet<UserId> { user.Id, friendId },
+            lockedBatch.ToHashSet());
+        Assert.Single(resultApplier.Applications);
+    }
+
+    [Fact]
+    public async Task Execute_RetriesOnceWhenTheCandidateSetChangedBetweenDiscoveryAndReload_D092()
+    {
+        var clock = new MutableClock(Instant.FromUtc(2026, 7, 31, 12, 0));
+        User user = User.BeginOnboarding(
+            UserId.New(),
+            FriendCode.Create("KLMNPQRSTU"),
+            AgeGateSource.SelfAttested,
+            clock);
+        RequestAccountDeletionUseCaseTests.Complete(user, clock);
+        user.RequestDeletion(clock);
+        clock.Advance(User.DeletionGracePeriod);
+        var users = new FakeUserRepository();
+        users.Users[user.Id] = user;
+        var friendId = UserId.New();
+        var scope = new RecoveringDeletionScopeProvider(user.Id, friendId, mismatchedAttempts: 1);
+        var resultApplier = new FakeDeletionResultApplier(new FakeAccountGateway());
+        var useCase = new ExecuteDeletionForUserUseCase(
+            users,
+            scope,
+            resultApplier,
+            new FakeAccountGateway(),
+            new FakeDeletionJournal(),
+            new FakeDeletionJournalShipper(),
+            new FakeUnitOfWork(),
+            clock);
+
+        Assert.True(await useCase.ExecuteAsync(user.Id, default));
+
+        Assert.Equal(2, scope.DiscoverCalls);
+        Assert.Single(resultApplier.Applications);
+    }
+
+    [Fact]
+    public async Task Execute_ExhaustsTheBoundedRetryAndReturnsFalse_WhenTheCandidateSetNeverStabilizes_D092()
+    {
+        var clock = new MutableClock(Instant.FromUtc(2026, 7, 31, 12, 0));
+        User user = User.BeginOnboarding(
+            UserId.New(),
+            FriendCode.Create("STUVWXYZ23"),
+            AgeGateSource.SelfAttested,
+            clock);
+        RequestAccountDeletionUseCaseTests.Complete(user, clock);
+        user.RequestDeletion(clock);
+        clock.Advance(User.DeletionGracePeriod);
+        var users = new FakeUserRepository();
+        users.Users[user.Id] = user;
+        var friendId = UserId.New();
+        var scope = new RecoveringDeletionScopeProvider(user.Id, friendId, mismatchedAttempts: int.MaxValue);
+        var resultApplier = new FakeDeletionResultApplier(new FakeAccountGateway());
+        var useCase = new ExecuteDeletionForUserUseCase(
+            users,
+            scope,
+            resultApplier,
+            new FakeAccountGateway(),
+            new FakeDeletionJournal(),
+            new FakeDeletionJournalShipper(),
+            new FakeUnitOfWork(),
+            clock);
+
+        Assert.False(await useCase.ExecuteAsync(user.Id, default));
+
+        Assert.Equal(3, scope.DiscoverCalls);
+        Assert.Empty(resultApplier.Applications);
+    }
+
     private static ExecutionContext Create()
     {
         var clock = new MutableClock(Instant.FromUtc(2026, 7, 31, 12, 0));
@@ -371,6 +480,128 @@ internal sealed class FakeDeletionScopeProvider(UsernameRegistryEntry username)
 {
     public Task<DeletionScope> LoadAsync(UserId id, CancellationToken cancellationToken) =>
         Task.FromResult(new DeletionScope([], [], [], [], username));
+}
+
+/// <summary>Discover and reload always agree — the §6.2 happy path (attempt 1 always succeeds).</summary>
+internal sealed class StableDeletionScopeProvider(UserId subject, UserId friendId)
+    : IDeletionScopeProvider
+{
+    private readonly DeletionScope _scope = BuildScope(subject, friendId);
+
+    internal int DiscoverCalls { get; private set; }
+
+    internal int ReloadCalls { get; private set; }
+
+    public Task<DeletionScope> LoadAsync(UserId id, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This test exercises the widened protocol only.");
+
+    public Task<IReadOnlyCollection<UserId>> DiscoverAffectedUserIdsAsync(
+        UserId id,
+        CancellationToken cancellationToken)
+    {
+        DiscoverCalls++;
+        return Task.FromResult(IDeletionScopeProvider.ExtractAffectedUserIds(subject, _scope));
+    }
+
+    public Task<DeletionScope> LoadForUpdateAsync(UserId id, CancellationToken cancellationToken)
+    {
+        ReloadCalls++;
+        return Task.FromResult(_scope);
+    }
+
+    private static DeletionScope BuildScope(UserId subject, UserId friendId)
+    {
+        var clock = new MutableClock(Instant.FromUtc(2026, 7, 31, 12, 0));
+        User subjectUser = MinimalUser(subject, "ABCDEFGHJK", clock);
+        User friendUser = MinimalUser(friendId, "KLMNPQRSTU", clock);
+        Friendship friendship = Friendship.Request(subjectUser, friendUser, clock);
+        _ = friendship.DequeueEvents();
+        return new DeletionScope([], [], [friendship], [], null);
+    }
+
+    private static User MinimalUser(UserId id, string friendCode, IClock clock)
+    {
+        User user = User.BeginOnboarding(id, FriendCode.Create(friendCode), AgeGateSource.SelfAttested, clock);
+        RequestAccountDeletionUseCaseTests.Complete(user, clock);
+        return user;
+    }
+}
+
+/// <summary>
+/// Discover disagrees with the reload's recomputed set for <paramref name="mismatchedAttempts"/>
+/// attempts, then agrees — proving the bounded outer retry of §6.2 and its eventual exhaustion.
+/// </summary>
+internal sealed class RecoveringDeletionScopeProvider(UserId subject, UserId friendId, int mismatchedAttempts)
+    : IDeletionScopeProvider
+{
+    private readonly DeletionScope _scope = StableScopeFor(subject, friendId);
+
+    internal int DiscoverCalls { get; private set; }
+
+    public Task<DeletionScope> LoadAsync(UserId id, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This test exercises the widened protocol only.");
+
+    public Task<IReadOnlyCollection<UserId>> DiscoverAffectedUserIdsAsync(
+        UserId id,
+        CancellationToken cancellationToken)
+    {
+        DiscoverCalls++;
+        IReadOnlyCollection<UserId> discovered = DiscoverCalls <= mismatchedAttempts
+            ? [subject]
+            : IDeletionScopeProvider.ExtractAffectedUserIds(subject, _scope);
+        return Task.FromResult(discovered);
+    }
+
+    public Task<DeletionScope> LoadForUpdateAsync(UserId id, CancellationToken cancellationToken) =>
+        Task.FromResult(_scope);
+
+    private static DeletionScope StableScopeFor(UserId subject, UserId friendId)
+    {
+        var clock = new MutableClock(Instant.FromUtc(2026, 7, 31, 12, 0));
+        User subjectUser = User.BeginOnboarding(
+            subject,
+            FriendCode.Create("STUVWXYZ23"),
+            AgeGateSource.SelfAttested,
+            clock);
+        RequestAccountDeletionUseCaseTests.Complete(subjectUser, clock);
+        User friendUser = User.BeginOnboarding(
+            friendId,
+            FriendCode.Create("YZ23456789"),
+            AgeGateSource.SelfAttested,
+            clock);
+        RequestAccountDeletionUseCaseTests.Complete(friendUser, clock);
+        Friendship friendship = Friendship.Request(subjectUser, friendUser, clock);
+        _ = friendship.DequeueEvents();
+        return new DeletionScope([], [], [friendship], [], null);
+    }
+}
+
+internal sealed class RecordingSessionLockRepository : ISessionLockRepository
+{
+    internal List<IReadOnlyCollection<UserId>> LockedUserBatches { get; } = [];
+
+    public Task LockUsersAsync(IReadOnlyCollection<UserId> userIds, CancellationToken cancellationToken)
+    {
+        LockedUserBatches.Add(userIds);
+        return Task.CompletedTask;
+    }
+
+    public Task LockSessionsAsync(IReadOnlyCollection<SessionId> sessionIds, CancellationToken cancellationToken) =>
+        Task.CompletedTask;
+}
+
+internal sealed class RecordingSessionNotificationMaterializer : ISessionNotificationMaterializer
+{
+    internal List<Session> Materialized { get; } = [];
+
+    public Task MaterializeAsync(
+        Session session,
+        IReadOnlyList<IDomainEvent> events,
+        CancellationToken cancellationToken)
+    {
+        Materialized.Add(session);
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class FakeDeletionJournal : IDeletionJournal

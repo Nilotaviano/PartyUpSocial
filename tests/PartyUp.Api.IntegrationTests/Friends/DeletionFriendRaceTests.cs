@@ -38,12 +38,12 @@ public sealed class DeletionFriendRaceTests : IAsyncLifetime, IDisposable
         if (deletionLocksFirst)
         {
             var deletionGate = new DeletionLockGate();
-            var provider = new HoldingDeletionScopeProvider(
-                firstScope.ServiceProvider.GetRequiredService<IDeletionScopeProvider>(),
+            var sessionLocks = new HoldingSessionLockRepository(
+                firstScope.ServiceProvider.GetRequiredService<ISessionLockRepository>(),
                 deletionGate);
             ExecuteDeletionForUserUseCase deletion = Phase3DeletionTestSupport.CreateUseCase(
                 firstScope.ServiceProvider,
-                scopeProvider: provider);
+                sessionLocks: sessionLocks);
             Task<bool> delete = deletion.ExecuteAsync(subjectId, default);
             await deletionGate.Held.Task.WaitAsync(TimeSpan.FromSeconds(10));
             var attemptGate = new PairLockAttemptGate();
@@ -75,12 +75,12 @@ public sealed class DeletionFriendRaceTests : IAsyncLifetime, IDisposable
                 _factory.Clock);
             await pairGate.Held.Task.WaitAsync(TimeSpan.FromSeconds(10));
             var attemptGate = new DeletionLockAttemptGate();
-            var users = new AttemptingDeletionUserRepository(
-                secondScope.ServiceProvider.GetRequiredService<IUserRepository>(),
+            var sessionLocks = new AttemptingSessionLockRepository(
+                secondScope.ServiceProvider.GetRequiredService<ISessionLockRepository>(),
                 attemptGate);
             ExecuteDeletionForUserUseCase deletion = Phase3DeletionTestSupport.CreateUseCase(
                 secondScope.ServiceProvider,
-                users: users);
+                sessionLocks: sessionLocks);
             Task<bool> delete = deletion.ExecuteAsync(subjectId, default);
             await attemptGate.Attempted.Task.WaitAsync(TimeSpan.FromSeconds(10));
             Assert.False(delete.IsCompleted);
@@ -111,12 +111,12 @@ public sealed class DeletionFriendRaceTests : IAsyncLifetime, IDisposable
         if (deletionLocksFirst)
         {
             var deletionGate = new DeletionLockGate();
-            var provider = new HoldingDeletionScopeProvider(
-                firstScope.ServiceProvider.GetRequiredService<IDeletionScopeProvider>(),
+            var sessionLocks = new HoldingSessionLockRepository(
+                firstScope.ServiceProvider.GetRequiredService<ISessionLockRepository>(),
                 deletionGate);
             ExecuteDeletionForUserUseCase deletion = Phase3DeletionTestSupport.CreateUseCase(
                 firstScope.ServiceProvider,
-                scopeProvider: provider);
+                sessionLocks: sessionLocks);
             Task<bool> delete = deletion.ExecuteAsync(subjectId, default);
             await deletionGate.Held.Task.WaitAsync(TimeSpan.FromSeconds(10));
             var attemptGate = new PairLockAttemptGate();
@@ -146,12 +146,12 @@ public sealed class DeletionFriendRaceTests : IAsyncLifetime, IDisposable
                 friendshipId);
             await pairGate.Held.Task.WaitAsync(TimeSpan.FromSeconds(10));
             var attemptGate = new DeletionLockAttemptGate();
-            var users = new AttemptingDeletionUserRepository(
-                secondScope.ServiceProvider.GetRequiredService<IUserRepository>(),
+            var sessionLocks = new AttemptingSessionLockRepository(
+                secondScope.ServiceProvider.GetRequiredService<ISessionLockRepository>(),
                 attemptGate);
             ExecuteDeletionForUserUseCase deletion = Phase3DeletionTestSupport.CreateUseCase(
                 secondScope.ServiceProvider,
-                users: users);
+                sessionLocks: sessionLocks);
             Task<bool> delete = deletion.ExecuteAsync(subjectId, default);
             await attemptGate.Attempted.Task.WaitAsync(TimeSpan.FromSeconds(10));
             Assert.False(delete.IsCompleted);
@@ -336,6 +336,29 @@ internal sealed class HoldingDeletionScopeProvider(
     }
 }
 
+/// <summary>
+/// §6.2: the bulk <see cref="ISessionLockRepository.LockUsersAsync"/> statement — covering the subject
+/// and every discovered counterpart — is now deletion's real, database-level contention point against a
+/// competing pair-lock command (it runs before <see cref="IDeletionScopeProvider.LoadForUpdateAsync"/>,
+/// which is where <see cref="HoldingDeletionScopeProvider"/> would otherwise hold). Holding here, not on
+/// the scope provider, is what makes a "deletion locks first" scenario actually block a concurrent
+/// <c>FriendPairLocker</c> attempt on the same subject row.
+/// </summary>
+internal sealed class HoldingSessionLockRepository(
+    ISessionLockRepository inner,
+    DeletionLockGate gate) : ISessionLockRepository
+{
+    public async Task LockUsersAsync(IReadOnlyCollection<UserId> userIds, CancellationToken cancellationToken)
+    {
+        await inner.LockUsersAsync(userIds, cancellationToken);
+        gate.Held.TrySetResult();
+        await gate.Release.Task.WaitAsync(cancellationToken);
+    }
+
+    public Task LockSessionsAsync(IReadOnlyCollection<SessionId> sessionIds, CancellationToken cancellationToken) =>
+        inner.LockSessionsAsync(sessionIds, cancellationToken);
+}
+
 internal sealed class AttemptingDeletionScopeProvider(
     IDeletionScopeProvider inner,
     DeletionLockAttemptGate gate) : IDeletionScopeProvider
@@ -348,27 +371,26 @@ internal sealed class AttemptingDeletionScopeProvider(
     }
 }
 
-internal sealed class AttemptingDeletionUserRepository(
-    IUserRepository inner,
-    DeletionLockAttemptGate gate) : IUserRepository
+/// <summary>
+/// §6.2: the subject and every discovered counterpart now lock in one bulk
+/// <see cref="ISessionLockRepository.LockUsersAsync"/> statement, ahead of
+/// <see cref="IUserRepository.FindForUpdateAsync"/> — so that bulk statement, not the single-row
+/// lookup, is deletion's first real lock attempt against a subject a competing friend command already
+/// holds.
+/// </summary>
+internal sealed class AttemptingSessionLockRepository(
+    ISessionLockRepository inner,
+    DeletionLockAttemptGate gate) : ISessionLockRepository
 {
-    public Task<User?> FindAsync(UserId id, CancellationToken cancellationToken) =>
-        inner.FindAsync(id, cancellationToken);
-
-    public async Task<User?> FindForUpdateAsync(UserId id, CancellationToken cancellationToken)
+    public async Task LockUsersAsync(IReadOnlyCollection<UserId> userIds, CancellationToken cancellationToken)
     {
-        Task<User?> attempt = inner.FindForUpdateAsync(id, cancellationToken);
+        Task attempt = inner.LockUsersAsync(userIds, cancellationToken);
         gate.Attempted.TrySetResult();
-        return await attempt;
+        await attempt;
     }
 
-    public Task<IReadOnlyList<UserId>> FindDueForDeletionAsync(
-        Instant now,
-        int max,
-        CancellationToken cancellationToken) =>
-        inner.FindDueForDeletionAsync(now, max, cancellationToken);
-
-    public void Add(User user) => inner.Add(user);
+    public Task LockSessionsAsync(IReadOnlyCollection<SessionId> sessionIds, CancellationToken cancellationToken) =>
+        inner.LockSessionsAsync(sessionIds, cancellationToken);
 }
 
 internal sealed class DeletionApplyCounts

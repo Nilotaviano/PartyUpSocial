@@ -4,10 +4,13 @@ using PartyUp.Application.Abstractions;
 using PartyUp.Application.Friends;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users;
+using PartyUp.Domain.Users.DeletionExecution;
 using PartyUp.Infrastructure.Friends;
 using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Persistence.Repositories;
+using PartyUp.Infrastructure.Sessions;
 
 namespace PartyUp.Api.IntegrationTests.Friends;
 
@@ -135,14 +138,106 @@ public sealed class FriendBlockConcurrencyTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Phase3ReminderWriter_ThrowsOnAnyUnexpectedCancellation_D077()
+    public async Task SessionReminderScheduleWriter_CancelsAPendingOrDeliveredHandoff_D077()
     {
-        var writer = new NoSessionReminderScheduleWriter();
+        Session session = CreateSession(_users[0].Id, _clock);
+        await using (AppDbContext seedContext = _database.CreateContext())
+        {
+            seedContext.Sessions.Add(session);
+            seedContext.SessionReminderHandoffs.Add(new SessionReminderHandoff
+            {
+                Id = Guid.NewGuid(),
+                SessionId = session.Id,
+                RecipientUserId = _users[1].Id,
+                DueAt = _clock.GetCurrentInstant() + Duration.FromMinutes(30),
+                State = SessionReminderHandoffState.Delivered,
+                PlannedAt = _clock.GetCurrentInstant(),
+                DeliveredAt = _clock.GetCurrentInstant(),
+                Version = 1,
+            });
+            await seedContext.SaveChangesAsync();
+        }
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            writer.ApplyAsync(
-                new SessionReminderCanceled(SessionId.New(), UserId.New()),
-                default));
+        await using (AppDbContext writeContext = _database.CreateContext())
+        {
+            var writer = new SessionReminderScheduleWriter(writeContext);
+            await writer.ApplyAsync(
+                new SessionReminderCanceled(session.Id, _users[1].Id),
+                default);
+            await writeContext.SaveChangesAsync();
+        }
+
+        await using AppDbContext verification = _database.CreateContext();
+        SessionReminderHandoff reloaded = await verification.SessionReminderHandoffs
+            .AsNoTracking()
+            .SingleAsync(handoff =>
+                handoff.SessionId == session.Id && handoff.RecipientUserId == _users[1].Id);
+        Assert.Equal(SessionReminderHandoffState.Canceled, reloaded.State);
+        Assert.Null(reloaded.DeliveredAt);
+        Assert.Equal(2, reloaded.Version);
+    }
+
+    [Fact]
+    public async Task DeletionResultApplier_ForwardsEachCanceledReminderToTheSharedWriterPort_D077()
+    {
+        var counts = new BlockEffectCounts();
+        await using AppDbContext context = _database.CreateContext();
+        var applier = new DeletionResultApplier(
+            new FriendshipRepository(context),
+            new BlockRepository(context),
+            new NotificationRepository(context),
+            new CountingReminderScheduleWriter(counts));
+        var result = new DeletionExecutionResult(
+            CanceledSessions: [],
+            ExpiredPolls: [],
+            RemovedFromSessions: [SessionId.New()],
+            RemovedFromPolls: [],
+            LapsedJoinRequests: [],
+            CanceledReminders:
+            [
+                new SessionReminderCanceled(SessionId.New(), _users[1].Id),
+                new SessionReminderCanceled(SessionId.New(), _users[0].Id),
+            ],
+            DeletedFriendships: [],
+            DeletedBlocks: [],
+            PurgedData: [],
+            ReservedUsername: null,
+            Journal: new DeletionJournalEntry(_users[0].Id, _clock.GetCurrentInstant()));
+
+        await applier.ApplyAsync(result, _users[0].Id, default);
+
+        Assert.Equal(2, counts.ReminderWrites);
+    }
+
+    [Fact]
+    public async Task SessionReminderScheduleWriter_IsANoOpWhenNoHandoffWasEverPlanned_D077()
+    {
+        await using AppDbContext context = _database.CreateContext();
+        var writer = new SessionReminderScheduleWriter(context);
+
+        await writer.ApplyAsync(
+            new SessionReminderCanceled(SessionId.New(), UserId.New()),
+            default);
+        await context.SaveChangesAsync();
+
+        Assert.Equal(0, await context.SessionReminderHandoffs.CountAsync());
+    }
+
+    private static Session CreateSession(UserId organizerId, MutableClock clock)
+    {
+        var details = new SessionDetails(
+            SessionTitle.Create("Reminder writer session"),
+            clock.GetCurrentInstant() + Duration.FromHours(24),
+            Duration15.FromMinutes(120),
+            Platform.NotApplicable,
+            null,
+            SessionNotes.Empty,
+            minAttendance: 1,
+            maxCapacity: null,
+            isPrivate: true);
+        Session session = Session.Create(organizerId, details, [], clock);
+        _ = session.DequeueEvents();
+        return session;
     }
 
     private async Task<Friendship> SeedPendingAsync()

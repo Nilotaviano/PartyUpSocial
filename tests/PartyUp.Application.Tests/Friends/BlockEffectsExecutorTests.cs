@@ -42,7 +42,7 @@ public sealed class BlockEffectsExecutorTests
     }
 
     [Fact]
-    public async Task Execute_DrainsBlockDerivedSessionEventsWithoutNotificationMaterialization_D105()
+    public async Task Execute_MaterializesBlockDerivedSessionEventsThroughTheNotificationPort_D105()
     {
         IClock clock = FriendTestData.Clock();
         User blocker = FriendTestData.Active("drain-blocker", "Drain Blocker");
@@ -59,6 +59,30 @@ public sealed class BlockEffectsExecutorTests
         Assert.NotEmpty(
             RecipientComputer.ForSessionEvent(control, derived, RecipientFilter.None));
 
+        Session actual = BlockExecutorTestData.Session(blocker.Id, blocked.Id, clock, makeGoing: true);
+        Block block = Block.Create(blocker.Id, blocked.Id, blocked.Username!.Value, clock);
+        var materializer = new RecordingSessionNotificationMaterializer();
+        var executor = new BlockEffectsExecutor(
+            new RecordingBlockEffectScopeProvider(new BlockEffectScope([actual], [])),
+            new BlockTestFriendshipRepository([]),
+            new RecordingReminderScheduleWriter(),
+            clock,
+            materializer);
+
+        await executor.ExecuteAsync(block, [], default);
+
+        Assert.Empty(actual.DequeueEvents());
+        (Session materialized, IReadOnlyList<IDomainEvent> events) = Assert.Single(materializer.Calls);
+        Assert.Same(actual, materialized);
+        Assert.Contains(events, domainEvent => domainEvent is SessionUnconfirmed);
+    }
+
+    [Fact]
+    public async Task Execute_SkipsMaterializationWhenNoMaterializerIsSupplied_D105()
+    {
+        IClock clock = FriendTestData.Clock();
+        User blocker = FriendTestData.Active("no-materializer-blocker", "No Materializer Blocker");
+        User blocked = FriendTestData.Active("no-materializer-blocked", "No Materializer Blocked");
         Session actual = BlockExecutorTestData.Session(blocker.Id, blocked.Id, clock, makeGoing: true);
         Block block = Block.Create(blocker.Id, blocked.Id, blocked.Username!.Value, clock);
         var executor = new BlockEffectsExecutor(
@@ -101,6 +125,20 @@ internal sealed class RecordingReminderScheduleWriter : IReminderScheduleWriter
         CancellationToken cancellationToken)
     {
         Applied.Add(cancellation);
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class RecordingSessionNotificationMaterializer : ISessionNotificationMaterializer
+{
+    internal List<(Session Session, IReadOnlyList<IDomainEvent> Events)> Calls { get; } = [];
+
+    public Task MaterializeAsync(
+        Session session,
+        IReadOnlyList<IDomainEvent> events,
+        CancellationToken cancellationToken)
+    {
+        Calls.Add((session, events));
         return Task.CompletedTask;
     }
 }

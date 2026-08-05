@@ -269,7 +269,9 @@ internal static class Phase3DeletionTestSupport
         IUserRepository? users = null,
         IDeletionScopeProvider? scopeProvider = null,
         IDeletionResultApplier? resultApplier = null,
-        IUserAccountGateway? accounts = null) =>
+        IUserAccountGateway? accounts = null,
+        ISessionLockRepository? sessionLocks = null,
+        ISessionNotificationMaterializer? materializer = null) =>
         new(
             users ?? services.GetRequiredService<IUserRepository>(),
             scopeProvider ?? services.GetRequiredService<IDeletionScopeProvider>(),
@@ -278,7 +280,9 @@ internal static class Phase3DeletionTestSupport
             services.GetRequiredService<IDeletionJournal>(),
             new NoOpDeletionJournalShipper(),
             services.GetRequiredService<IUnitOfWork>(),
-            services.GetRequiredService<IClock>());
+            services.GetRequiredService<IClock>(),
+            sessionLocks ?? services.GetRequiredService<ISessionLockRepository>(),
+            materializer ?? services.GetRequiredService<ISessionNotificationMaterializer>());
 }
 
 internal sealed class NoOpDeletionJournalShipper : IDeletionJournalShipper
