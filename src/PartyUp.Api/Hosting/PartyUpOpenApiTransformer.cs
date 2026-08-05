@@ -29,7 +29,8 @@ public sealed class PartyUpOpenApiTransformer :
         "rate_limited",
         "internal_error",
 
-        // PHASE4_DESIGN.md §8: the closed 25-code Phase 4 problem-code inventory.
+        // PHASE4_DESIGN.md §8: the closed Phase 4 problem-code inventory. The problem-code coverage
+        // test closes over this list — extending it without a repro fails that test.
         "session_not_found",
         "session_validation",
         "invalid_if_match",

@@ -73,7 +73,7 @@ public sealed class RecurringJobRegistrationServiceRetryTests
 
         Assert.True(
             stopwatch.ElapsedMilliseconds < 1000,
-            $"StartAsync took {stopwatch.ElapsedMilliseconds}ms; the first attempt must run off the host-start thread.");
+            $"StartAsync took {stopwatch.ElapsedMilliseconds}ms; registration attempts must not block host start.");
 
         await service.StopAsync(CancellationToken.None);
     }
@@ -81,12 +81,13 @@ public sealed class RecurringJobRegistrationServiceRetryTests
     [Fact]
     public async Task ExecuteAsync_RetriesAfterAFailedAttempt()
     {
-        (RecurringJobRegistrationService service, ThrowingRecurringJobManager manager) = CreateService();
+        (RecurringJobRegistrationService service, ThrowingRecurringJobManager manager) =
+            CreateService(retryDelays: [TimeSpan.FromMilliseconds(20)]);
 
         await service.StartAsync(CancellationToken.None);
-        await WaitUntilAsync(() => manager.AttemptCount >= 1, TimeSpan.FromSeconds(5));
+        await WaitUntilAsync(() => manager.AttemptCount >= 3, TimeSpan.FromSeconds(5));
 
-        Assert.True(manager.AttemptCount >= 1, "expected at least one registration attempt");
+        Assert.True(manager.AttemptCount >= 3, "expected the failed registration to be retried");
 
         await service.StopAsync(CancellationToken.None);
     }
@@ -110,7 +111,8 @@ public sealed class RecurringJobRegistrationServiceRetryTests
             $"StopAsync took {stopwatch.ElapsedMilliseconds}ms; cancellation should not wait out the retry delay.");
     }
 
-    private static (RecurringJobRegistrationService Service, ThrowingRecurringJobManager Manager) CreateService()
+    private static (RecurringJobRegistrationService Service, ThrowingRecurringJobManager Manager) CreateService(
+        TimeSpan[]? retryDelays = null)
     {
         var manager = new ThrowingRecurringJobManager();
         ServiceProvider provider = new ServiceCollection()
@@ -118,7 +120,8 @@ public sealed class RecurringJobRegistrationServiceRetryTests
             .BuildServiceProvider();
         var service = new RecurringJobRegistrationService(
             new FakeServiceScopeFactory(provider),
-            NullLogger<RecurringJobRegistrationService>.Instance);
+            NullLogger<RecurringJobRegistrationService>.Instance,
+            retryDelays);
         return (service, manager);
     }
 

@@ -5,13 +5,12 @@ namespace PartyUp.Api.Hosting;
 
 public sealed partial class RecurringJobRegistrationService(
     IServiceScopeFactory scopeFactory,
-    ILogger<RecurringJobRegistrationService> logger) : BackgroundService
+    ILogger<RecurringJobRegistrationService> logger,
+    TimeSpan[]? retryDelays = null) : BackgroundService
 {
-    private static readonly TimeSpan[] RetryDelays =
-    [
-        TimeSpan.FromSeconds(5),
-        TimeSpan.FromSeconds(30),
-    ];
+    private readonly TimeSpan[] _retryDelays = retryDelays is { Length: > 0 }
+        ? retryDelays
+        : [TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30)];
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -40,7 +39,7 @@ public sealed partial class RecurringJobRegistrationService(
             }
             catch (Exception exception)
             {
-                TimeSpan delay = RetryDelays[Math.Min(attempt, RetryDelays.Length - 1)];
+                TimeSpan delay = _retryDelays[Math.Min(attempt, _retryDelays.Length - 1)];
                 attempt++;
                 LogRegistrationFailed(logger, delay, exception);
                 try
