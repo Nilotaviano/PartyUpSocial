@@ -140,6 +140,7 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
         List<SessionId> ids = [.. orderedIds.Select(SessionId.From)];
         List<Session> sessions = await context.Sessions
             .AsNoTracking()
+            .Include(session => session.Participations)
             .Where(session => ids.Contains(session.Id))
             .ToListAsync(cancellationToken);
 

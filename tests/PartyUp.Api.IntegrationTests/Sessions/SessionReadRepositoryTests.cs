@@ -46,8 +46,14 @@ public sealed class SessionReadRepositoryTests : IAsyncLifetime
             distinct.Add(id);
         }
 
+        // One active Going row on the first session: occupancy must survive hydration (a missing
+        // Include leaves every summary at zero).
+        await InsertParticipationAsync(context, Guid.CreateVersion7(), distinct[0], organizerId);
+
         SessionPage<SessionSummary> firstPage = await repository.ListUpcomingAsync(null, 3, default);
         Assert.Equal(3, firstPage.Items.Count);
+        Assert.Equal(1, firstPage.Items[0].ActiveOccupancy);
+        Assert.Equal(0, firstPage.Items[1].ActiveOccupancy);
         Assert.Equal(distinct[0], firstPage.Items[0].Id.Value);
         Assert.Equal(distinct[1], firstPage.Items[1].Id.Value);
         Assert.Equal(distinct[2], firstPage.Items[2].Id.Value);
@@ -221,6 +227,14 @@ public sealed class SessionReadRepositoryTests : IAsyncLifetime
             VALUES
                 ({id}, {organizerId.Value}, 'Read repository test', {startTime}, 60, 3, '',
                  1, NULL, true, {status}, now())
+            """);
+
+    private static async Task InsertParticipationAsync(
+        AppDbContext context, Guid id, Guid sessionId, UserId userId) =>
+        await context.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO session_participations
+                (id, session_id, user_id, status, is_waitlisted, origin, created_at)
+            VALUES ({id}, {sessionId}, {userId.Value}, 1, false, 0, now())
             """);
 
     private static async Task InsertJoinRequestAsync(
