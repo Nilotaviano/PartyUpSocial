@@ -3,9 +3,14 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Users;
+using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Persistence.Converters;
 
 namespace PartyUp.Infrastructure.Persistence.Configurations;
+
+// This adapter type has no Domain footprint by design: `Notification` (`src/PartyUp.Domain/Notifications/Notification.cs`)
+// carries no `ReminderHandoffId` member, so the reminder link is declared as an EF shadow property here and is
+// written only by Infrastructure, never surfaced through a read model (PHASE4_DESIGN.md §4.1).
 
 public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notification>
 {
@@ -44,6 +49,8 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
             .HasColumnType("timestamp with time zone");
         builder.Property(notification => notification.ReadAt)
             .HasColumnType("timestamp with time zone");
+        builder.Property<Guid?>("ReminderHandoffId")
+            .HasColumnName("reminder_handoff_id");
 
         builder.Ignore(notification => notification.IsRead);
         builder.Ignore(notification => notification.Subject);
@@ -64,6 +71,10 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
             .IsUnique()
             .HasFilter("type = 24")
             .HasDatabaseName("ux_notifications_steam_match_once");
+        builder.HasIndex("ReminderHandoffId")
+            .IsUnique()
+            .HasFilter("type = 12")
+            .HasDatabaseName("ux_notifications_session_reminder_once");
 
         builder.HasOne<User>()
             .WithMany()
@@ -72,6 +83,10 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
         builder.HasOne<User>()
             .WithMany()
             .HasForeignKey(notification => notification.ActorUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<SessionReminderHandoff>()
+            .WithMany()
+            .HasForeignKey("ReminderHandoffId")
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

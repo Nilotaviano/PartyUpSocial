@@ -62,6 +62,9 @@ public static class DependencyInjection
         services.AddScoped<IUserGraphResolver, UserGraphResolver>();
         services.AddScoped<IFriendCodeGenerator, FriendCodeGenerator>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<ISessionRepository, SessionRepository>();
+        services.AddScoped<ISessionReadRepository, SessionReadRepository>();
+        services.AddScoped<ISessionLockRepository, SessionLockRepository>();
         services.AddScoped<IBlockEffectsExecutor, BlockEffectsExecutor>();
         services.AddScoped<IBlockEffectScopeProvider, EmptyBlockEffectScopeProvider>();
         services.AddScoped<IReminderScheduleWriter, NoSessionReminderScheduleWriter>();

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Notifications;
+using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Auth;
 using PartyUp.Infrastructure.Identity;
@@ -34,6 +35,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Block> Blocks => Set<Block>();
 
     public DbSet<Notification> Notifications => Set<Notification>();
+
+    public DbSet<Session> Sessions => Set<Session>();
+
+    public DbSet<Participation> SessionParticipations => Set<Participation>();
+
+    public DbSet<JoinRequest> JoinRequests => Set<JoinRequest>();
+
+    public DbSet<GuestIdentity> GuestIdentities => Set<GuestIdentity>();
+
+    public DbSet<GuestLink> GuestLinks => Set<GuestLink>();
+
+    public DbSet<NotificationMute> NotificationMutes => Set<NotificationMute>();
+
+    public DbSet<SessionReminderHandoff> SessionReminderHandoffs => Set<SessionReminderHandoff>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -82,5 +97,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.ApplyConfiguration(new FriendshipConfiguration());
         builder.ApplyConfiguration(new BlockConfiguration());
         builder.ApplyConfiguration(new NotificationConfiguration());
+        builder.ApplyConfiguration(new SessionConfiguration());
+        builder.ApplyConfiguration(new SessionParticipationConfiguration());
+        builder.ApplyConfiguration(new JoinRequestConfiguration());
+        builder.ApplyConfiguration(new GuestIdentityConfiguration());
+        builder.ApplyConfiguration(new GuestLinkConfiguration());
+        builder.ApplyConfiguration(new NotificationMuteConfiguration());
+        builder.ApplyConfiguration(new SessionReminderHandoffConfiguration());
     }
 }
