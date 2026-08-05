@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using NodaTime;
 using NodaTime.Text;
@@ -157,8 +158,23 @@ public sealed record GameResponse(string Name, long? SteamAppId)
     public static GameResponse From(SessionGame game) => new(game.Name.Value, game.SteamAppId);
 }
 
+/// <summary>
+/// Applies <see cref="JsonNamingPolicy.CamelCase"/> to an enum's string representation via
+/// <see cref="JsonStringEnumConverter{TEnum}"/> — that generic converter's own parameterless
+/// constructor (the only one <see cref="JsonConverterAttribute"/> can invoke) has no naming-policy
+/// overload, so this attribute builds the converter itself instead.
+/// </summary>
+public sealed class CamelCaseStringEnumConverterAttribute : JsonConverterAttribute
+{
+    public override JsonConverter CreateConverter(Type typeToConvert) =>
+        (JsonConverter)Activator.CreateInstance(
+            typeof(JsonStringEnumConverter<>).MakeGenericType(typeToConvert),
+            JsonNamingPolicy.CamelCase,
+            false)!;
+}
+
 /// <summary>A-070's closed clear-list vocabulary, exactly as declared in OpenAPI.</summary>
-[JsonConverter(typeof(JsonStringEnumConverter<ClearFieldRequest>))]
+[CamelCaseStringEnumConverter]
 public enum ClearFieldRequest
 {
     MaxCapacity,

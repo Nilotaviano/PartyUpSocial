@@ -1317,7 +1317,7 @@ export interface components {
             response: null | string;
         };
         /** @enum {unknown} */
-        ClearFieldRequest: "MaxCapacity" | "Notes" | "Game";
+        ClearFieldRequest: "maxCapacity" | "notes" | "game";
         ConsumeMagicLinkRequest: {
             token: string;
             ageGateAttested: null | boolean;

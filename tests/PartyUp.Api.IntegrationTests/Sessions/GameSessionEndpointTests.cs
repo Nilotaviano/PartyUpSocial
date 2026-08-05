@@ -26,6 +26,9 @@ namespace PartyUp.Api.IntegrationTests.Sessions;
 [Trait("Category", "Integration")]
 public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
 {
+    private static readonly string[] ExpectedClearFieldEnumValues = ["game", "maxCapacity", "notes"];
+    private static readonly string[] ClearNotesOnly = ["notes"];
+
     private readonly PartyUpApiFactory _factory = new();
 
     public Task InitializeAsync() => _factory.StartAsync();
@@ -160,6 +163,50 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 Assert.Equal(operationId, actualOperationId);
             }
         }
+    }
+
+    /// <summary>
+    /// F8 / A-070 / §8: the clear-list vocabulary is a closed camelCase enum on the wire and in the
+    /// OpenAPI document — never the PascalCase C# member names.
+    /// </summary>
+    [Fact]
+    public async Task ClearFieldEnumIsCamelCaseOnWireAndInOpenApiDocument()
+    {
+        using HttpClient client = _factory.CreateClient();
+        HttpResponseMessage response = await client.GetAsync("/openapi/v1.json");
+        response.EnsureSuccessStatusCode();
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        JsonElement schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+        JsonElement clearProperty = schemas.GetProperty("EditSessionRequest")
+            .GetProperty("properties").GetProperty("clear");
+        JsonElement items = clearProperty.GetProperty("items");
+        JsonElement enumSchema = items.TryGetProperty("$ref", out JsonElement refValue)
+            ? schemas.GetProperty(refValue.GetString()!.Split('/')[^1])
+            : items;
+        string[] documentedValues = enumSchema.GetProperty("enum")
+            .EnumerateArray()
+            .Select(v => v.GetString()!)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(ExpectedClearFieldEnumValues, documentedValues);
+
+        SessionHttpUser organizer = await SessionEndpointTestSupport.SeedAsync(_factory);
+        Session session = await SessionEndpointTestSupport.SeedSessionAsync(_factory, organizer.Id);
+        using SessionHttpSession organizerSession =
+            await SessionEndpointTestSupport.SignInAsync(_factory, organizer.Id);
+
+        HttpResponseMessage getDetail = await organizerSession.GetAsync(
+            $"/api/v1/sessions/{session.Id.Value:D}");
+        using JsonDocument detailBody = await SessionEndpointTestSupport.SuccessJsonAsync(getDetail);
+        string ifMatch = detailBody.RootElement.GetProperty("version").GetString()!;
+
+        HttpResponseMessage edit = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Patch,
+            $"/api/v1/sessions/{session.Id.Value:D}",
+            JsonContent.Create(new { clear = ClearNotesOnly, ifMatch }));
+        using JsonDocument editedBody = await SessionEndpointTestSupport.SuccessJsonAsync(edit);
+        Assert.Equal(string.Empty, editedBody.RootElement.GetProperty("notes").GetString());
     }
 
     [Fact]
