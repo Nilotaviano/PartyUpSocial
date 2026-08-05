@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Sessions;
 
 namespace PartyUp.Application.Sessions;
@@ -114,3 +115,28 @@ public readonly record struct SessionListCursor(Instant SortKey, Guid Id)
 
 /// <summary>The A-072 pagination envelope: <c>{ items, nextCursor }</c>, page size fixed by the caller.</summary>
 public sealed record SessionPage<T>(IReadOnlyList<T> Items, string? NextCursor);
+
+/// <summary>
+/// §4.2's locked handoff projection. <c>session_reminder_handoffs</c> is a persistence-only entity
+/// (`src/PartyUp.Infrastructure/Persistence/SessionReminderHandoff.cs`) that Application may not
+/// reference, so <see cref="ISessionRepository.LoadForUpdateAsync"/> exposes only the fields a
+/// planning use case needs; <see cref="State"/> mirrors the Infrastructure
+/// <c>SessionReminderHandoffState</c> enum's numeric values one-for-one.
+/// </summary>
+public sealed record SessionReminderHandoffLock(
+    Guid Id,
+    UserId RecipientUserId,
+    Instant DueAt,
+    int State,
+    int Version,
+    int Attempts);
+
+/// <summary>
+/// §4.2: what <c>LoadForUpdateAsync</c> returns once the session parent is locked — the aggregate
+/// itself plus the two sibling tables (mutes, handoffs) that are written only under that same lock
+/// but are not part of the Session aggregate's own child collections.
+/// </summary>
+public sealed record SessionForUpdate(
+    Session Session,
+    IReadOnlyList<NotificationMute> Mutes,
+    IReadOnlyList<SessionReminderHandoffLock> Handoffs);

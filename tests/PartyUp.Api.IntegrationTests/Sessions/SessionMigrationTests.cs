@@ -113,6 +113,31 @@ public sealed class SessionMigrationTests : IAsyncLifetime
                  1, NULL, true, 0, now())
             """);
 
+        // D-091's waitlist shape: `is_waitlisted` is an ordinary boolean column with no database-level
+        // tie to `max_capacity` — the schema stores whatever the application decided, and the waitlist
+        // rule itself is Domain (`Session.HasFreeSlot`), not a database constraint. What the boundary
+        // does own is that the column round-trips both values faithfully.
+        UserId waitlistedUserId = await SeedUserAsync(context);
+        Guid waitlistedParticipationId = Guid.CreateVersion7();
+        await ExecuteAsync(context, $"""
+            INSERT INTO session_participations
+                (id, session_id, user_id, status, is_waitlisted, origin, created_at)
+            VALUES
+                ({waitlistedParticipationId}, {unlimitedId}, {waitlistedUserId.Value}, 1, true, 0, now())
+            """);
+
+        UserId activeUserId = await SeedUserAsync(context);
+        Guid activeParticipationId = Guid.CreateVersion7();
+        await ExecuteAsync(context, $"""
+            INSERT INTO session_participations
+                (id, session_id, user_id, status, is_waitlisted, origin, created_at)
+            VALUES
+                ({activeParticipationId}, {unlimitedId}, {activeUserId.Value}, 1, false, 0, now())
+            """);
+
+        Assert.True(await IsWaitlistedAsync(context, waitlistedParticipationId));
+        Assert.False(await IsWaitlistedAsync(context, activeParticipationId));
+
         // An invalid capacity — max below min — fails at the database boundary (ck_sessions_capacity).
         Guid invalidId = Guid.CreateVersion7();
         PostgresException exception = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(context, $"""
@@ -125,6 +150,126 @@ public sealed class SessionMigrationTests : IAsyncLifetime
             """));
         Assert.Equal(PostgresErrorCodes.CheckViolation, exception.SqlState);
         Assert.Equal("ck_sessions_capacity", exception.ConstraintName);
+    }
+
+    [Fact]
+    public async Task DuplicateGuestLinkTokenHashIsRejected_D005()
+    {
+        await using AppDbContext context = CreateContext();
+        await context.Database.MigrateAsync();
+
+        UserId organizerId = await SeedUserAsync(context);
+        Guid sessionId = await InsertSessionAsync(context, organizerId);
+
+        const string tokenHash = "duplicate-token-hash-digest-000000000000";
+        await ExecuteAsync(context, $"""
+            INSERT INTO guest_links (id, session_id, token_hash, state, created_at)
+            VALUES ({Guid.CreateVersion7()}, {sessionId}, {tokenHash}, 0, now())
+            """);
+
+        PostgresException exception = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(context, $"""
+            INSERT INTO guest_links (id, session_id, token_hash, state, created_at)
+            VALUES ({Guid.CreateVersion7()}, {sessionId}, {tokenHash}, 0, now())
+            """));
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, exception.SqlState);
+        Assert.Equal("ux_guest_links_token_hash", exception.ConstraintName);
+    }
+
+    [Fact]
+    public async Task DuplicateSessionParticipantIsRejected_D005()
+    {
+        await using AppDbContext context = CreateContext();
+        await context.Database.MigrateAsync();
+
+        UserId organizerId = await SeedUserAsync(context);
+        UserId participantId = await SeedUserAsync(context);
+        Guid sessionId = await InsertSessionAsync(context, organizerId);
+
+        await ExecuteAsync(context, $"""
+            INSERT INTO session_participations (id, session_id, user_id, status, is_waitlisted, origin, created_at)
+            VALUES ({Guid.CreateVersion7()}, {sessionId}, {participantId.Value}, 0, false, 0, now())
+            """);
+
+        PostgresException exception = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(context, $"""
+            INSERT INTO session_participations (id, session_id, user_id, status, is_waitlisted, origin, created_at)
+            VALUES ({Guid.CreateVersion7()}, {sessionId}, {participantId.Value}, 0, false, 0, now())
+            """));
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, exception.SqlState);
+        Assert.Equal("ux_session_participations_session_user", exception.ConstraintName);
+    }
+
+    [Fact]
+    public async Task GuestLinkSessionXorPollIsRejected_D005()
+    {
+        await using AppDbContext context = CreateContext();
+        await context.Database.MigrateAsync();
+
+        UserId organizerId = await SeedUserAsync(context);
+        Guid sessionId = await InsertSessionAsync(context, organizerId);
+
+        PostgresException bothNull = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(context, $"""
+            INSERT INTO guest_links (id, session_id, poll_id, token_hash, state, created_at)
+            VALUES ({Guid.CreateVersion7()}, NULL, NULL, 'both-null-digest', 0, now())
+            """));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, bothNull.SqlState);
+        Assert.Equal("ck_guest_links_target", bothNull.ConstraintName);
+
+        PostgresException bothSet = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(context, $"""
+            INSERT INTO guest_links (id, session_id, poll_id, token_hash, state, created_at)
+            VALUES ({Guid.CreateVersion7()}, {sessionId}, {Guid.CreateVersion7()}, 'both-set-digest', 0, now())
+            """));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, bothSet.SqlState);
+        Assert.Equal("ck_guest_links_target", bothSet.ConstraintName);
+    }
+
+    [Fact]
+    public async Task JoinRequestSessionXorPollIsRejected_D005()
+    {
+        await using AppDbContext context = CreateContext();
+        await context.Database.MigrateAsync();
+
+        UserId organizerId = await SeedUserAsync(context);
+        UserId requesterId = await SeedUserAsync(context);
+        Guid sessionId = await InsertSessionAsync(context, organizerId);
+
+        PostgresException bothNull = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(context, $"""
+            INSERT INTO join_requests (id, session_id, poll_id, requester_user_id, status, created_at)
+            VALUES ({Guid.CreateVersion7()}, NULL, NULL, {requesterId.Value}, 0, now())
+            """));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, bothNull.SqlState);
+        Assert.Equal("ck_join_requests_target", bothNull.ConstraintName);
+
+        PostgresException bothSet = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(context, $"""
+            INSERT INTO join_requests (id, session_id, poll_id, requester_user_id, status, created_at)
+            VALUES ({Guid.CreateVersion7()}, {sessionId}, {Guid.CreateVersion7()}, {requesterId.Value}, 0, now())
+            """));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, bothSet.SqlState);
+        Assert.Equal("ck_join_requests_target", bothSet.ConstraintName);
+    }
+
+    [Fact]
+    public async Task NotificationMuteSessionXorPollIsRejected_D005()
+    {
+        await using AppDbContext context = CreateContext();
+        await context.Database.MigrateAsync();
+
+        UserId organizerId = await SeedUserAsync(context);
+        UserId mutingUserId = await SeedUserAsync(context);
+        Guid sessionId = await InsertSessionAsync(context, organizerId);
+
+        PostgresException bothNull = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(context, $"""
+            INSERT INTO notification_mutes (id, user_id, session_id, poll_id, created_at)
+            VALUES ({Guid.CreateVersion7()}, {mutingUserId.Value}, NULL, NULL, now())
+            """));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, bothNull.SqlState);
+        Assert.Equal("ck_notification_mutes_target", bothNull.ConstraintName);
+
+        PostgresException bothSet = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(context, $"""
+            INSERT INTO notification_mutes (id, user_id, session_id, poll_id, created_at)
+            VALUES ({Guid.CreateVersion7()}, {mutingUserId.Value}, {sessionId}, {Guid.CreateVersion7()}, now())
+            """));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, bothSet.SqlState);
+        Assert.Equal("ck_notification_mutes_target", bothSet.ConstraintName);
     }
 
     [Fact]
@@ -177,6 +322,20 @@ public sealed class SessionMigrationTests : IAsyncLifetime
         return user.Id;
     }
 
+    private static async Task<Guid> InsertSessionAsync(AppDbContext context, UserId organizerId)
+    {
+        Guid sessionId = Guid.CreateVersion7();
+        await ExecuteAsync(context, $"""
+            INSERT INTO sessions
+                (id, organizer_id, title, start_time, duration_minutes, platform, notes,
+                 min_attendance, max_capacity, is_private, status, created_at)
+            VALUES
+                ({sessionId}, {organizerId.Value}, 'Boundary test', now() + interval '1 day', 60, 3, '',
+                 1, NULL, true, 0, now())
+            """);
+        return sessionId;
+    }
+
     private static async Task ExecuteAsync(AppDbContext context, FormattableString sql) =>
         await context.Database.ExecuteSqlInterpolatedAsync(sql);
 
@@ -216,6 +375,20 @@ public sealed class SessionMigrationTests : IAsyncLifetime
         command.Parameters.Add(parameter);
 
         Assert.Equal(constraint, await command.ExecuteScalarAsync());
+    }
+
+    private static async Task<bool> IsWaitlistedAsync(AppDbContext context, Guid participationId)
+    {
+        DbConnection connection = context.Database.GetDbConnection();
+        await EnsureOpenAsync(connection);
+        await using DbCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT is_waitlisted FROM session_participations WHERE id = @id";
+        DbParameter parameter = command.CreateParameter();
+        parameter.ParameterName = "id";
+        parameter.Value = participationId;
+        command.Parameters.Add(parameter);
+
+        return (bool)(await command.ExecuteScalarAsync())!;
     }
 
     private static async Task<string?> ColumnTypeAsync(AppDbContext context, string table, string column)

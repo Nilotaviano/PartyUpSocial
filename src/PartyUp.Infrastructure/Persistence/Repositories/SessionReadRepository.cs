@@ -41,24 +41,26 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
         int pageSize,
         CancellationToken cancellationToken)
     {
-        IQueryable<Session> query = context.Sessions
-            .AsNoTracking()
-            .Where(session => session.Status != SessionStatus.Canceled
-                && session.Status != SessionStatus.Expired
-                && (session.Status != SessionStatus.Completed));
+        short completed = (short)SessionStatus.Completed;
+        short expired = (short)SessionStatus.Expired;
+        short canceled = (short)SessionStatus.Canceled;
 
-        if (cursor is { } after)
-        {
-            query = query.Where(session =>
-                session.StartTime > after.SortKey
-                || (session.StartTime == after.SortKey && session.Id.Value.CompareTo(after.Id) > 0));
-        }
+        List<Guid> ids = cursor is { } after
+            ? await context.Database.SqlQuery<Guid>($"""
+                SELECT id FROM sessions
+                WHERE status NOT IN ({canceled}, {expired}, {completed})
+                  AND (start_time, id) > ({after.SortKey}, {after.Id})
+                ORDER BY start_time, id
+                LIMIT {pageSize}
+                """).ToListAsync(cancellationToken)
+            : await context.Database.SqlQuery<Guid>($"""
+                SELECT id FROM sessions
+                WHERE status NOT IN ({canceled}, {expired}, {completed})
+                ORDER BY start_time, id
+                LIMIT {pageSize}
+                """).ToListAsync(cancellationToken);
 
-        List<Session> sessions = await query
-            .OrderBy(session => session.StartTime)
-            .ThenBy(session => session.Id.Value)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
+        List<Session> sessions = await HydrateSessionsInOrderAsync(ids, cancellationToken);
 
         return ToPage(sessions, pageSize, session => new SessionListCursor(session.StartTime, session.Id.Value));
     }
@@ -68,22 +70,24 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
         int pageSize,
         CancellationToken cancellationToken)
     {
-        IQueryable<Session> query = context.Sessions
-            .AsNoTracking()
-            .Where(session => session.Status == SessionStatus.Completed);
+        short completed = (short)SessionStatus.Completed;
 
-        if (cursor is { } before)
-        {
-            query = query.Where(session =>
-                session.StartTime < before.SortKey
-                || (session.StartTime == before.SortKey && session.Id.Value.CompareTo(before.Id) < 0));
-        }
+        List<Guid> ids = cursor is { } before
+            ? await context.Database.SqlQuery<Guid>($"""
+                SELECT id FROM sessions
+                WHERE status = {completed}
+                  AND (start_time, id) < ({before.SortKey}, {before.Id})
+                ORDER BY start_time DESC, id DESC
+                LIMIT {pageSize}
+                """).ToListAsync(cancellationToken)
+            : await context.Database.SqlQuery<Guid>($"""
+                SELECT id FROM sessions
+                WHERE status = {completed}
+                ORDER BY start_time DESC, id DESC
+                LIMIT {pageSize}
+                """).ToListAsync(cancellationToken);
 
-        List<Session> sessions = await query
-            .OrderByDescending(session => session.StartTime)
-            .ThenByDescending(session => session.Id.Value)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
+        List<Session> sessions = await HydrateSessionsInOrderAsync(ids, cancellationToken);
 
         return ToPage(sessions, pageSize, session => new SessionListCursor(session.StartTime, session.Id.Value));
     }
@@ -94,28 +98,70 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
         int pageSize,
         CancellationToken cancellationToken)
     {
-        IQueryable<JoinRequest> query = context.JoinRequests
-            .AsNoTracking()
-            .Where(request => request.SessionId == sessionId);
+        List<Guid> ids = cursor is { } after
+            ? await context.Database.SqlQuery<Guid>($"""
+                SELECT id FROM join_requests
+                WHERE session_id = {sessionId.Value}
+                  AND (created_at, id) > ({after.SortKey}, {after.Id})
+                ORDER BY created_at, id
+                LIMIT {pageSize}
+                """).ToListAsync(cancellationToken)
+            : await context.Database.SqlQuery<Guid>($"""
+                SELECT id FROM join_requests
+                WHERE session_id = {sessionId.Value}
+                ORDER BY created_at, id
+                LIMIT {pageSize}
+                """).ToListAsync(cancellationToken);
 
-        if (cursor is { } after)
-        {
-            query = query.Where(request =>
-                request.CreatedAt > after.SortKey
-                || (request.CreatedAt == after.SortKey && request.Id.Value.CompareTo(after.Id) > 0));
-        }
-
-        List<JoinRequest> requests = await query
-            .OrderBy(request => request.CreatedAt)
-            .ThenBy(request => request.Id.Value)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
+        List<JoinRequest> requests = await HydrateJoinRequestsInOrderAsync(ids, cancellationToken);
 
         return ToPage(
             requests,
             pageSize,
             request => new SessionListCursor(request.CreatedAt, request.Id.Value),
             request => new JoinRequestSummary(request.Id, request.RequesterId, request.Status, request.CreatedAt));
+    }
+
+    /// <summary>
+    /// A-072 keyset paging tie-breaks on <c>id</c>, which is a value-converted typed id: neither
+    /// <c>Guid.CompareTo</c> nor <c>OrderBy(session.Id.Value)</c> translates to SQL. The page's
+    /// ordered id list is therefore produced by a raw, Postgres-ordered row-value comparison
+    /// (<c>(sort_key, id) &gt; (@k, @i)</c>) and the full rows are hydrated afterwards through the
+    /// normal, translatable <c>Contains</c> shape, then re-sorted in memory to the id order the
+    /// database already decided.
+    /// </summary>
+    private async Task<List<Session>> HydrateSessionsInOrderAsync(List<Guid> orderedIds, CancellationToken cancellationToken)
+    {
+        if (orderedIds.Count == 0)
+        {
+            return [];
+        }
+
+        List<SessionId> ids = [.. orderedIds.Select(SessionId.From)];
+        List<Session> sessions = await context.Sessions
+            .AsNoTracking()
+            .Where(session => ids.Contains(session.Id))
+            .ToListAsync(cancellationToken);
+
+        Dictionary<Guid, Session> byId = sessions.ToDictionary(session => session.Id.Value);
+        return [.. orderedIds.Select(id => byId[id])];
+    }
+
+    private async Task<List<JoinRequest>> HydrateJoinRequestsInOrderAsync(List<Guid> orderedIds, CancellationToken cancellationToken)
+    {
+        if (orderedIds.Count == 0)
+        {
+            return [];
+        }
+
+        List<JoinRequestId> ids = [.. orderedIds.Select(JoinRequestId.From)];
+        List<JoinRequest> requests = await context.JoinRequests
+            .AsNoTracking()
+            .Where(request => ids.Contains(request.Id))
+            .ToListAsync(cancellationToken);
+
+        Dictionary<Guid, JoinRequest> byId = requests.ToDictionary(request => request.Id.Value);
+        return [.. orderedIds.Select(id => byId[id])];
     }
 
     public async Task<GuestSessionView?> FindGuestViewAsync(GuestLinkId guestLinkId, CancellationToken cancellationToken)

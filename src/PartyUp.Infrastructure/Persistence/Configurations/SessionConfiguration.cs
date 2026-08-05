@@ -44,7 +44,7 @@ public sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
         builder.Ignore(session => session.WaitlistCount);
         builder.Ignore(session => session.HasGoingWaitlistedCandidate);
         builder.Ignore(session => session.HasFreeSlot);
-        builder.HasMany(session => session.Participations).WithOne().HasForeignKey(participation => participation.SessionId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasMany(session => session.Participations).WithOne().HasForeignKey(participation => participation.SessionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(session => session.JoinRequests).WithOne().HasForeignKey(request => request.SessionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(session => session.GuestIdentities).WithOne().HasForeignKey(identity => identity.SessionId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(session => session.GuestLinks).WithOne().HasForeignKey(link => link.SessionId).OnDelete(DeleteBehavior.Cascade);

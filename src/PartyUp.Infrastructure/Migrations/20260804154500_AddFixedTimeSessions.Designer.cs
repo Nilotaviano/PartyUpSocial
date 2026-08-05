@@ -469,7 +469,7 @@ namespace PartyUp.Infrastructure.Migrations
 
                     b.Property<Guid>("RequesterId")
                         .HasColumnType("uuid")
-                        .HasColumnName("requester_id");
+                        .HasColumnName("requester_user_id");
 
                     b.Property<Instant?>("ResolvedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1298,7 +1298,7 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasForeignKey("RequesterId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_join_requests_users_requester_id");
+                        .HasConstraintName("fk_join_requests_users_requester_user_id");
 
                     b.HasOne("PartyUp.Domain.Sessions.Session", null)
                         .WithMany("JoinRequests")
@@ -1318,7 +1318,7 @@ namespace PartyUp.Infrastructure.Migrations
                     b.HasOne("PartyUp.Domain.Sessions.Session", null)
                         .WithMany("Participations")
                         .HasForeignKey("SessionId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_session_participations_sessions_session_id");
 
@@ -1416,7 +1416,7 @@ namespace PartyUp.Infrastructure.Migrations
                     b.HasOne("PartyUp.Domain.Sessions.Session", null)
                         .WithMany()
                         .HasForeignKey("SessionId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_session_reminder_handoffs_sessions_session_id");
                 });

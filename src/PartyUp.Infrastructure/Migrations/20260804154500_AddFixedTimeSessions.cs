@@ -109,7 +109,7 @@ namespace PartyUp.Infrastructure.Migrations
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     session_id = table.Column<Guid>(type: "uuid", nullable: true),
                     poll_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    requester_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    requester_user_id = table.Column<Guid>(type: "uuid", nullable: false),
                     status = table.Column<short>(type: "smallint", nullable: false),
                     created_at = table.Column<Instant>(type: "timestamp with time zone", nullable: false),
                     resolved_at = table.Column<Instant>(type: "timestamp with time zone", nullable: true)
@@ -125,8 +125,8 @@ namespace PartyUp.Infrastructure.Migrations
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "fk_join_requests_users_requester_id",
-                        column: x => x.requester_id,
+                        name: "fk_join_requests_users_requester_user_id",
+                        column: x => x.requester_user_id,
                         principalTable: "users",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
@@ -156,7 +156,7 @@ namespace PartyUp.Infrastructure.Migrations
                         column: x => x.session_id,
                         principalTable: "sessions",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "fk_session_reminder_handoffs_users_recipient_user_id",
                         column: x => x.recipient_user_id,
@@ -227,7 +227,7 @@ namespace PartyUp.Infrastructure.Migrations
                         column: x => x.session_id,
                         principalTable: "sessions",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "fk_session_participations_users_user_id",
                         column: x => x.user_id,
@@ -262,7 +262,7 @@ namespace PartyUp.Infrastructure.Migrations
             migrationBuilder.CreateIndex(
                 name: "ux_join_requests_session_pending_requester",
                 table: "join_requests",
-                columns: new[] { "session_id", "requester_id" },
+                columns: new[] { "session_id", "requester_user_id" },
                 unique: true,
                 filter: "session_id IS NOT NULL AND status = 0");
 

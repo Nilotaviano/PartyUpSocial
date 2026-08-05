@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
@@ -78,7 +79,7 @@ public sealed class SessionRepositoryLockTests : IAsyncLifetime, IDisposable
         await writerLockAcquired.WaitAsync();
 
         Stopwatch stopwatch = Stopwatch.StartNew();
-        Session? reloaded;
+        PartyUp.Application.Sessions.SessionForUpdate? reloaded;
         await using (AsyncServiceScope readerScope = _factory.Services.CreateAsyncScope())
         {
             var repository = readerScope.ServiceProvider.GetRequiredService<ISessionRepository>();
@@ -93,40 +94,73 @@ public sealed class SessionRepositoryLockTests : IAsyncLifetime, IDisposable
             stopwatch.ElapsedMilliseconds >= 300,
             $"LoadForUpdateAsync returned after only {stopwatch.ElapsedMilliseconds} ms; it must block on the " +
             "writer's parent lock rather than reading children ahead of it.");
-        Assert.Equal(2, reloaded!.Participations.Count);
-        Assert.Contains(reloaded.Participations, p => p.UserId == secondUserId);
+        Assert.Equal(2, reloaded!.Session.Participations.Count);
+        Assert.Contains(reloaded.Session.Participations, p => p.UserId == secondUserId);
     }
 
+    /// <summary>
+    /// Deterministic proof, not a timing-luck race (F5): A-068 declares <c>users</c> → <c>ORDER BY id</c>,
+    /// so a correct single-statement <c>LockUsersAsync</c> always acquires the lower-id row first and
+    /// only then blocks on a contended higher-id row — regardless of what order its caller's array held
+    /// the ids in. This holds the higher-id row locked in one transaction, calls
+    /// <see cref="ISessionLockRepository.LockUsersAsync"/> with ids in the array order
+    /// <c>[higher, lower]</c> (the opposite of the declared DB order) from a second, and while that call
+    /// is blocked, a third transaction attempts <c>FOR NO KEY UPDATE NOWAIT</c> on the lower-id row.
+    /// A correct implementation has already locked the lower row before blocking, so the probe must
+    /// fail with <c>55P03 lock_not_available</c>; a hypothetical per-row, caller-order implementation
+    /// would instead block on the higher row first without ever touching the lower one, and the probe
+    /// would wrongly succeed. That is the failure this test is built to catch.
+    /// </summary>
     [Fact]
     public async Task MultiRowLocksAreOrderedByTheDatabaseNotTheCaller_A068()
     {
         UserId userA = await _factory.SeedUserAsync(email: "order-a@example.test");
         UserId userB = await _factory.SeedUserAsync(email: "order-b@example.test");
 
-        Task first = LockAndReleaseAsync([userA, userB]);
-        Task second = LockAndReleaseAsync([userB, userA]);
+        // A-068's C#-side total order for diagnostics/assertions: big-endian byte comparison, which
+        // reproduces Postgres `uuid` ordering; `Guid.CompareTo` does not (ARCHITECTURE.md A-068).
+        int order = userA.Value.ToByteArray(bigEndian: true).AsSpan()
+            .SequenceCompareTo(userB.Value.ToByteArray(bigEndian: true));
+        (UserId lowerId, UserId higherId) = order < 0 ? (userA, userB) : (userB, userA);
 
-        Task both = Task.WhenAll(first, second);
-        Task winner = await Task.WhenAny(both, Task.Delay(TimeSpan.FromSeconds(15)));
+        await using AsyncServiceScope holderScope = _factory.Services.CreateAsyncScope();
+        AppDbContext holderContext = holderScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await using var holderTransaction = await holderContext.Database.BeginTransactionAsync();
+        await holderContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM users WHERE id = {higherId.Value} FOR NO KEY UPDATE");
 
-        Assert.True(
-            ReferenceEquals(winner, both),
-            "Two callers locking the same two users in opposite orders must never deadlock: A-068 " +
-            "requires the database's declared ORDER BY to decide acquisition order, not the caller's array.");
+        await using AsyncServiceScope callerScope = _factory.Services.CreateAsyncScope();
+        AppDbContext callerContext = callerScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var repository = callerScope.ServiceProvider.GetRequiredService<ISessionLockRepository>();
+        await using var callerTransaction = await callerContext.Database.BeginTransactionAsync();
 
-        // Observe any exception (e.g. a genuine deadlock) rather than swallowing it silently.
-        await both;
-    }
+        Task callerLock = repository.LockUsersAsync([higherId, lowerId], default);
 
-    private async Task LockAndReleaseAsync(IReadOnlyCollection<UserId> order)
-    {
-        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
-        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var repository = scope.ServiceProvider.GetRequiredService<ISessionLockRepository>();
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        Assert.False(
+            callerLock.IsCompleted,
+            "The multi-row lock must still be blocked on the contended higher-id row.");
 
-        await using var transaction = await context.Database.BeginTransactionAsync();
-        await repository.LockUsersAsync(order, default);
-        await Task.Delay(TimeSpan.FromMilliseconds(300));
-        await transaction.CommitAsync();
+        await using (AsyncServiceScope probeScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext probeContext = probeScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await using var probeTransaction = await probeContext.Database.BeginTransactionAsync();
+
+            Exception? thrown = await Record.ExceptionAsync(() =>
+                probeContext.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT 1 FROM users WHERE id = {lowerId.Value} FOR NO KEY UPDATE NOWAIT"));
+
+            Assert.True(
+                thrown is PostgresException { SqlState: PostgresErrorCodes.LockNotAvailable },
+                "The lower-id row must already be locked by the blocked caller — A-068 orders by id, so " +
+                "the lower row is acquired before the caller blocks on the higher one. A caller-order " +
+                "implementation would leave it unlocked while blocked on the higher row instead.");
+
+            await probeTransaction.RollbackAsync();
+        }
+
+        await holderTransaction.RollbackAsync();
+        await callerLock;
+        await callerTransaction.CommitAsync();
     }
 }

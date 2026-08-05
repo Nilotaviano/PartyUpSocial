@@ -25,7 +25,7 @@ public sealed class SessionReminderHandoffConfiguration : IEntityTypeConfigurati
         builder.Property(handoff => handoff.LastAttemptAt).HasColumnType("timestamp with time zone");
         builder.HasIndex(handoff => new { handoff.SessionId, handoff.RecipientUserId }).IsUnique().HasDatabaseName("ux_session_reminder_handoffs_session_recipient");
         builder.HasIndex(handoff => new { handoff.State, handoff.DueAt, handoff.Id }).HasDatabaseName("ix_session_reminder_handoffs_state_due_id");
-        builder.HasOne<Session>().WithMany().HasForeignKey(handoff => handoff.SessionId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<Session>().WithMany().HasForeignKey(handoff => handoff.SessionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<User>().WithMany().HasForeignKey(handoff => handoff.RecipientUserId).OnDelete(DeleteBehavior.Restrict);
     }
 }

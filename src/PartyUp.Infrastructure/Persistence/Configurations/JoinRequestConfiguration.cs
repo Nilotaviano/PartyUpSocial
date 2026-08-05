@@ -16,7 +16,7 @@ public sealed class JoinRequestConfiguration : IEntityTypeConfiguration<JoinRequ
         builder.Property(request => request.Id).HasConversion(new TypedIdConverter<JoinRequestId>()).ValueGeneratedNever();
         builder.Property(request => request.SessionId).HasConversion(new TypedIdConverter<SessionId>());
         builder.Property(request => request.PollId).HasConversion(new TypedIdConverter<PollId>());
-        builder.Property(request => request.RequesterId).HasConversion(new TypedIdConverter<UserId>());
+        builder.Property(request => request.RequesterId).HasConversion(new TypedIdConverter<UserId>()).HasColumnName("requester_user_id");
         builder.Property(request => request.Status).HasConversion<short>().HasColumnType("smallint");
         builder.Property(request => request.CreatedAt).HasColumnType("timestamp with time zone");
         builder.Property(request => request.ResolvedAt).HasColumnType("timestamp with time zone");
