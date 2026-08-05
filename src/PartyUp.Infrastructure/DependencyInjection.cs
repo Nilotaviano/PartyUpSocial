@@ -16,6 +16,7 @@ using PartyUp.Infrastructure.Email;
 using PartyUp.Infrastructure.Friends;
 using PartyUp.Infrastructure.Deletion;
 using PartyUp.Infrastructure.Identity;
+using PartyUp.Infrastructure.Jobs;
 using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Persistence.Repositories;
 using PartyUp.Infrastructure.Sessions;
@@ -83,6 +84,9 @@ public static class DependencyInjection
         services.AddScoped<GuestSessionUseCases>();
         services.AddScoped<SessionTransitionUseCase>();
         services.AddScoped<SessionBlockEffectsUseCase>();
+        services.AddScoped<SessionDueCandidateStore>();
+        services.AddScoped<SessionDueSweepJob>();
+        services.AddScoped<SessionReminderDueJob>();
         // SessionDeletionEffectsUseCase depends on ExecuteDeletionForUserUseCase; both are registered
         // here (rather than split with Program.cs) so a caller only needs to add IClock (registered in
         // Program.cs, not here) alongside AddInfrastructure to resolve the whole graph.

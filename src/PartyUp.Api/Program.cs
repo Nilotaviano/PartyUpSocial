@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Net;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Authentication;
@@ -24,6 +26,7 @@ using PartyUp.Application.Onboarding;
 using PartyUp.Application.Profile;
 using PartyUp.Infrastructure;
 using PartyUp.Infrastructure.Email;
+using PartyUp.Infrastructure.Jobs;
 using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Steam;
 using Serilog;
@@ -134,6 +137,31 @@ builder.Services.AddHostedService(services =>
 builder.Services.AddSingleton<AdminSeeder>();
 builder.Services.AddHostedService(services =>
     services.GetRequiredService<AdminSeeder>());
+
+// PHASE4_DESIGN.md §7.2: Hangfire.PostgreSql owns its own `hangfire` schema, created at storage
+// init, outside EF and outside the §4.3 round-trip gate — no EF migration ever references it. The
+// connection string is resolved from the service provider, not from `builder.Configuration`
+// directly, for the same reason the health check below does: WebApplicationFactory layers its
+// configuration in only after service registration has run. The dashboard is never mapped, so it
+// stays unreachable regardless of environment.
+builder.Services.AddHangfire((services, config) => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UsePostgreSqlStorage(
+        options => options.UseNpgsqlConnection(
+            services.GetRequiredService<IConfiguration>().GetConnectionString("Db")),
+        new PostgreSqlStorageOptions { SchemaName = "hangfire" }));
+
+// The "Testing" environment (WebApplicationFactory) never runs the actual worker: recurring rows
+// are still registered against the test container's own `hangfire` schema below, but with no server
+// polling them, S3's tests exercise SessionDueSweepJob/SessionReminderDueJob directly through DI —
+// the same pattern every other Phase 4 use-case test already uses — instead of racing a real
+// one-minute cadence against the test's own transactions.
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddHangfireServer();
+}
 builder.Services.AddScoped<AuthenticateAndSignIn>();
 builder.Services.AddPartyUpCookieAuthentication(builder.Environment);
 builder.Services.AddPartyUpGoogleAuthentication(
@@ -223,6 +251,23 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
     await using var scope = app.Services.CreateAsyncScope();
     await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+}
+
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    // Registered rows are what a server processes, not what triggers a tick on its own — with no
+    // server running in "Testing" (see AddHangfireServer above) this only writes recurring-job rows
+    // into the test container's own `hangfire` schema, so it stays skipped there too.
+    using IServiceScope recurringScope = app.Services.CreateScope();
+    var recurringJobs = recurringScope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+    recurringJobs.AddOrUpdate<SessionDueSweepJob>(
+        "session-due-sweep",
+        job => job.ExecuteAsync(CancellationToken.None),
+        Cron.Minutely);
+    recurringJobs.AddOrUpdate<SessionReminderDueJob>(
+        "session-reminder-due",
+        job => job.ExecuteAsync(CancellationToken.None),
+        Cron.Minutely);
 }
 
 app.UseForwardedHeaders();
