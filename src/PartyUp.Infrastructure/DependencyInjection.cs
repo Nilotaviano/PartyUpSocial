@@ -19,8 +19,6 @@ using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Persistence.Repositories;
 using PartyUp.Infrastructure.Sessions;
 using PartyUp.Infrastructure.Steam;
-using PartyUp.Domain.Kernel;
-using PartyUp.Domain.Sessions;
 
 namespace PartyUp.Infrastructure;
 
@@ -72,10 +70,8 @@ public static class DependencyInjection
         services.AddScoped<IBlockEffectScopeProvider, SessionBlockEffectScopeProvider>();
         services.AddScoped<IReminderScheduleWriter, SessionReminderScheduleWriter>();
         services.AddScoped<IDeletionResultApplier, DeletionResultApplier>();
-        // ISessionNotificationMaterializer's real adapter is a later Phase 4 slice (PHASE4_DESIGN.md
-        // §5.1); this no-op keeps every consumer (BlockEffectsExecutor, the deletion use case)
-        // resolvable and buildable in the meantime. Superseded in place once that slice ships.
-        services.AddScoped<ISessionNotificationMaterializer, NoOpSessionNotificationMaterializer>();
+        services.AddScoped<ISessionNotificationMaterializer, SessionNotificationMaterializer>();
+        services.AddScoped<ISessionReminderHandoffWriter, SessionReminderHandoffStore>();
         services.AddScoped<SendFriendRequestUseCase>();
         services.AddScoped<AcceptFriendRequestUseCase>();
         services.AddScoped<RejectFriendRequestUseCase>();
@@ -127,18 +123,4 @@ public static class DependencyInjection
 
         return services;
     }
-}
-
-/// <summary>
-/// A placeholder for <see cref="ISessionNotificationMaterializer"/> until the real adapter ships
-/// (PHASE4_DESIGN.md §5.1, §6.3): file-scoped so it stays a DI-registration detail, not a public type
-/// another slice could accidentally depend on.
-/// </summary>
-file sealed class NoOpSessionNotificationMaterializer : ISessionNotificationMaterializer
-{
-    public Task MaterializeAsync(
-        Session session,
-        IReadOnlyList<IDomainEvent> events,
-        CancellationToken cancellationToken) =>
-        Task.CompletedTask;
 }
