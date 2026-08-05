@@ -21,7 +21,9 @@
     "invitees": "Invite friends",
     "guestLinks": "Guest links",
     "defaults": "Defaults: 4 minimum, 4 maximum, 2 hours, no platform, not private.",
-    "submit": "Create session"
+    "submit": "Create session",
+    "platformOther": "Other",
+    "steamAppId": "Steam app ID"
   },
   "edit": {
     "heading": "Edit session",
@@ -93,6 +95,7 @@
     "revoke": "Revoke",
     "removeGuest": "Remove guest",
     "removeGuestConfirm": "Remove this guest from the session? They will lose access immediately.",
+    "revokeConfirm": "Revoke this guest link? It will stop working immediately.",
     "copySuccess": "Link copied."
   },
   "cancel": {

@@ -78,6 +78,18 @@ export function DiscardDialog({
   )
 }
 
+// Single source of truth for the validation-summary link targets: every
+// entry in `fieldErrors` must resolve to a real element id (H2).
+const fieldIds: Record<string, string> = {
+  title: 'field-title',
+  start: 'field-start',
+  durationMinutes: 'field-duration',
+  minAttendance: 'field-min',
+  maxCapacity: 'field-max',
+  inviteeUserIds: 'field-invitees',
+  guestLinkCount: 'field-guest-links',
+}
+
 const emptyForm = {
   title: '',
   start: '',
@@ -241,7 +253,7 @@ export function SessionCreatePage() {
           <ul className="mt-2 list-disc pl-5 text-sm text-red-800">
             {Object.entries(fieldErrors).map(([field, message]) => (
               <li key={field}>
-                <a href={`#field-${field}`}>{message}</a>
+                <a href={`#${fieldIds[field] ?? `field-${field}`}`}>{message}</a>
               </li>
             ))}
           </ul>
@@ -345,7 +357,7 @@ export function SessionCreatePage() {
             <option value="Steam">Steam</option>
             <option value="PlayStation">PlayStation</option>
             <option value="Xbox">Xbox</option>
-            <option value="Other">Other</option>
+            <option value="Other">{t('create.platformOther')}</option>
           </select>
         </div>
 
@@ -386,7 +398,7 @@ export function SessionCreatePage() {
           />
           {form.platform === 'Steam' && form.gameSource === 'catalog' && (
             <input
-              aria-label="Steam app id"
+              aria-label={t('create.steamAppId')}
               className="mt-2 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2"
               value={form.gameAppId}
               onChange={(event) => update('gameAppId', event.target.value)}
@@ -472,7 +484,7 @@ export function SessionCreatePage() {
           {t('create.private')}
         </label>
 
-        <fieldset>
+        <fieldset id="field-invitees">
           <legend className="font-medium text-slate-900">
             {t('create.invitees')}
           </legend>

@@ -11,6 +11,7 @@ import {
   cancelSession,
   getJoinRequests,
   getSessionDetail,
+  getViewerProfile,
   invalidateSessionQueries,
   isSessionInProgress,
   leaveSession,
@@ -22,6 +23,7 @@ import {
   respondToInvitation,
   sessionKeys,
   setReminder,
+  viewerProfileKey,
   withdrawJoinRequest,
   type ParticipationResponse,
   type ReminderChoiceValue,
@@ -179,7 +181,7 @@ function RemoveGuestDialog({
 }
 
 export function SessionDetailPage() {
-  const { t, i18n } = useTranslation(['sessions', 'errors'])
+  const { t, i18n } = useTranslation(['sessions', 'errors', 'common'])
   const { sessionId = '' } = useParams()
   const queryClient = useQueryClient()
   const heading = useRef<HTMLHeadingElement>(null)
@@ -192,6 +194,15 @@ export function SessionDetailPage() {
     enabled: Boolean(sessionId),
     retry: false,
   })
+
+  // D-038/D-046: times render in the viewer's profile time zone, not the
+  // browser's, falling back to the browser zone only until the profile
+  // query resolves.
+  const profile = useQuery({
+    queryKey: viewerProfileKey,
+    queryFn: getViewerProfile,
+  })
+  const viewerTimeZone = profile.data?.timeZone ?? undefined
 
   const isOrganizer =
     Boolean(detail.data) && detail.data?.organizerId === session?.userId
@@ -307,10 +318,11 @@ export function SessionDetailPage() {
     >
       <h1
         ref={heading}
+        aria-live="polite"
         tabIndex={-1}
         className="text-3xl font-bold tracking-tight text-slate-950 focus:outline-none"
       >
-        {data?.title ?? t('detail.status')}
+        {data?.title ?? t('common.loading', { ns: 'common' })}
       </h1>
 
       <p aria-live="polite" className="text-sm text-emerald-700">
@@ -332,6 +344,7 @@ export function SessionDetailPage() {
             {new Intl.DateTimeFormat(i18n.language, {
               dateStyle: 'medium',
               timeStyle: 'short',
+              timeZone: viewerTimeZone,
             }).format(new Date(data.startTime))}
             {inProgress && (
               <span className="ml-2 font-semibold text-emerald-700">
@@ -415,6 +428,7 @@ export function SessionDetailPage() {
               <select
                 className="mt-1 min-h-11 rounded-md border border-slate-300 px-3 py-2"
                 id="reminder-select"
+                value={viewerEntry?.reminderChoice ?? ''}
                 onChange={(event) =>
                   reminder.mutate(
                     (event.target.value || null) as ReminderChoiceValue,

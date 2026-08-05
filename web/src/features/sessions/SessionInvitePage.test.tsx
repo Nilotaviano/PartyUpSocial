@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -134,5 +134,44 @@ describe('SessionInvitePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Invite friends' }))
 
     expect(await screen.findByText('That user could not be found.')).toBeInTheDocument()
+  })
+
+  it('requires confirmation in a focused dialog before revoking a guest link_H7', async () => {
+    api.post.mockResolvedValue({
+      data: [{ guestLinkId: 'link-1', url: 'https://partyup.test/g/token' }],
+    })
+    renderPage()
+
+    await screen.findByLabelText('Friend One (@friend.one)')
+    fireEvent.click(screen.getByRole('button', { name: 'Create guest link' }))
+    const revokeTrigger = await screen.findByRole('button', { name: 'Revoke' })
+    revokeTrigger.focus()
+    fireEvent.click(revokeTrigger)
+
+    const dialog = await screen.findByRole('dialog')
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus(),
+    )
+    expect(api.delete).not.toHaveBeenCalled()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(revokeTrigger).toHaveFocus()
+    expect(api.delete).not.toHaveBeenCalled()
+
+    fireEvent.click(revokeTrigger)
+    const reopenedDialog = await screen.findByRole('dialog')
+    fireEvent.click(within(reopenedDialog).getByRole('button', { name: 'Revoke' }))
+
+    await waitFor(() =>
+      expect(api.delete).toHaveBeenCalledWith(
+        '/api/v1/sessions/{sessionId}/guest-links/{guestLinkId}',
+        expect.objectContaining({
+          params: expect.objectContaining({
+            path: { sessionId: 'session-1', guestLinkId: 'link-1' },
+          }),
+        }),
+      ),
+    )
   })
 })

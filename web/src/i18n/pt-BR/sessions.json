@@ -21,7 +21,9 @@
     "invitees": "Convidar amigos",
     "guestLinks": "Links de convidado",
     "defaults": "Padrões: mínimo 4, máximo 4, 2 horas, sem plataforma, não privada.",
-    "submit": "Criar sessão"
+    "submit": "Criar sessão",
+    "platformOther": "Outra",
+    "steamAppId": "ID do aplicativo Steam"
   },
   "edit": {
     "heading": "Editar sessão",
@@ -93,6 +95,7 @@
     "revoke": "Revogar",
     "removeGuest": "Remover convidado",
     "removeGuestConfirm": "Remover este convidado da sessão? Ele perderá o acesso imediatamente.",
+    "revokeConfirm": "Revogar este link de convidado? Ele deixará de funcionar imediatamente.",
     "copySuccess": "Link copiado."
   },
   "cancel": {

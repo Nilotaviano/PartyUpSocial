@@ -74,10 +74,9 @@ function detail() {
 }
 
 function renderPage() {
-  return render(
-    <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-    >
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const utils = render(
+    <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/sessions/session-1']}>
         <Routes>
           <Route
@@ -89,6 +88,7 @@ function renderPage() {
       </MemoryRouter>
     </QueryClientProvider>,
   )
+  return { ...utils, queryClient }
 }
 
 beforeEach(() => {
@@ -97,6 +97,8 @@ beforeEach(() => {
       return Promise.resolve({ data: detail() })
     if (path === '/api/v1/sessions/{sessionId}/join-requests')
       return Promise.resolve({ data: { items: [], nextCursor: null } })
+    if (path === '/api/v1/me')
+      return Promise.resolve({ data: { timeZone: null } })
     throw new Error(`Unexpected GET ${path}`)
   })
   api.put.mockResolvedValue({ data: {} })
@@ -118,7 +120,8 @@ describe('SessionDetailPage', () => {
   })
 
   it('RSVP responses invalidate the session detail and both list families_D006', async () => {
-    renderPage()
+    const { queryClient } = renderPage()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Going' }))
 
@@ -128,10 +131,20 @@ describe('SessionDetailPage', () => {
         expect.objectContaining({ body: { response: 'Going' } }),
       ),
     )
-    await waitFor(() => expect(api.get).toHaveBeenCalledTimes(4))
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: ['sessions'] }),
+      )
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: ['session', 'session-1'] }),
+      )
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: ['session', 'join-requests', 'session-1'] }),
+      )
+    })
   })
 
-  it('sends a join request_D084', async () => {
+  it('sends a join request', async () => {
     renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Request to join' }))
@@ -144,7 +157,7 @@ describe('SessionDetailPage', () => {
     )
   })
 
-  it('promotes a waitlisted participant', async () => {
+  it('promotes a waitlisted participant_D084', async () => {
     api.get.mockImplementation((path: string) => {
       if (path === '/api/v1/sessions/{sessionId}') {
         const data = detail()
@@ -153,6 +166,7 @@ describe('SessionDetailPage', () => {
       }
       if (path === '/api/v1/sessions/{sessionId}/join-requests')
         return Promise.resolve({ data: { items: [], nextCursor: null } })
+      if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
       throw new Error(`Unexpected GET ${path}`)
     })
     renderPage()
@@ -197,7 +211,7 @@ describe('SessionDetailPage', () => {
     )
   })
 
-  it('cancel confirmation removes the detail and returns to the upcoming list_D084', async () => {
+  it('cancel confirmation removes the detail and returns to the upcoming list', async () => {
     renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel session' }))
@@ -213,5 +227,51 @@ describe('SessionDetailPage', () => {
     await waitFor(() =>
       expect(screen.getByTestId('screen-sessions-upcoming')).toBeInTheDocument(),
     )
+  })
+
+  it('binds the reminder select to the viewer roster entry_H3', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/sessions/{sessionId}') {
+        const data = detail()
+        data.roster[0].userId = 'organizer-1'
+        ;(data.roster[0] as { reminderChoice: string | null }).reminderChoice = 'Hours1'
+        return Promise.resolve({ data })
+      }
+      if (path === '/api/v1/sessions/{sessionId}/join-requests')
+        return Promise.resolve({ data: { items: [], nextCursor: null } })
+      if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    renderPage()
+
+    const select = (await screen.findByLabelText('Reminder')) as HTMLSelectElement
+    await waitFor(() => expect(select.value).toBe('Hours1'))
+  })
+
+  it('renders the session start time in the viewer profile time zone rather than the browser zone_D038_D046', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/sessions/{sessionId}')
+        return Promise.resolve({ data: detail() })
+      if (path === '/api/v1/sessions/{sessionId}/join-requests')
+        return Promise.resolve({ data: { items: [], nextCursor: null } })
+      if (path === '/api/v1/me')
+        return Promise.resolve({ data: { timeZone: 'America/Sao_Paulo' } })
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    renderPage()
+
+    const zoned = new Intl.DateTimeFormat('en', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'America/Sao_Paulo',
+    }).format(new Date('2030-09-01T18:00:00Z'))
+    const utc = new Intl.DateTimeFormat('en', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'UTC',
+    }).format(new Date('2030-09-01T18:00:00Z'))
+    expect(zoned).not.toBe(utc)
+
+    expect(await screen.findByText(zoned)).toBeInTheDocument()
   })
 })

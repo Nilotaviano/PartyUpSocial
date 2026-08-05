@@ -131,6 +131,35 @@ describe('SessionCreatePage', () => {
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/sessions/session-1'))
   })
 
+  it('links every validation-summary entry to an existing field id_H2', async () => {
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText('Duration'), { target: { value: '10' } })
+    fireEvent.change(screen.getByLabelText('Minimum attendance'), { target: { value: '0' } })
+    fireEvent.change(screen.getByLabelText('Guest links'), { target: { value: '25' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
+
+    const summary = await screen.findByText('There were problems with your submission')
+    const links = within(summary.closest('div')!).getAllByRole('link')
+    expect(links.length).toBeGreaterThan(0)
+    for (const link of links) {
+      const targetId = link.getAttribute('href')!.slice(1)
+      expect(document.getElementById(targetId)).not.toBeNull()
+    }
+  })
+
+  it('renders the Steam app id field and the Other platform option through i18next_H5', async () => {
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.click(screen.getByLabelText('Choose from Steam'))
+
+    expect(screen.getByLabelText('Steam app ID')).toBeInTheDocument()
+    expect(
+      screen.getByRole('option', { name: 'Other' }),
+    ).toBeInTheDocument()
+  })
+
   it('warns before discarding dirty create-form values_D152_D162', async () => {
     renderPage()
 

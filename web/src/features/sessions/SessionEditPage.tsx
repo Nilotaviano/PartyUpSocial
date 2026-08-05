@@ -13,8 +13,16 @@ import {
   sessionKeys,
   useDirtyGuard,
   type ClearField,
+  type EditSessionRequest,
   type SessionDetail,
 } from './sessionQueries'
+
+// Single source of truth for the validation-summary link targets: every
+// entry in `fieldErrors` must resolve to a real element id (H2).
+const fieldIds: Record<string, string> = {
+  title: 'field-title',
+  minAttendance: 'field-min',
+}
 
 function formFrom(session: SessionDetail) {
   return {
@@ -27,16 +35,18 @@ function formFrom(session: SessionDetail) {
     minAttendance: String(session.minAttendance),
     maxCapacity:
       session.maxCapacity === null ? '' : String(session.maxCapacity),
-    unlimited: session.maxCapacity === null,
     isPrivate: session.isPrivate,
-    clearMax: false,
+    // The single unlimited-capacity control (A-070): pre-checked when the
+    // session already has no maximum, mapped onto the PATCH `clear` list
+    // rather than a competing `maxCapacity: null` body value.
+    clearMax: session.maxCapacity === null,
     clearNotes: false,
     clearGame: false,
   }
 }
 
 export function SessionEditPage() {
-  const { t } = useTranslation(['sessions', 'errors'])
+  const { t } = useTranslation(['sessions', 'errors', 'common'])
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { sessionId = '' } = useParams()
@@ -77,26 +87,33 @@ export function SessionEditPage() {
       if (form.clearNotes) clear.push('notes')
       if (form.clearGame) clear.push('game')
 
+      // A-070: a field named in `clear` must not also appear in the body.
+      // Cleared fields are therefore omitted here, never sent as `null`
+      // alongside their own `clear` entry.
+      const body: Record<string, unknown> = {
+        title: form.title,
+        startTime: new Date(form.start).toISOString(),
+        durationMinutes: Number(form.durationMinutes),
+        platform: form.platform || null,
+        minAttendance: Number(form.minAttendance),
+        isPrivate: form.isPrivate,
+        clear,
+        ifMatch: detail.data.version,
+      }
+      if (!form.clearMax) body.maxCapacity = Number(form.maxCapacity)
+      if (!form.clearNotes) body.notes = form.notes
+      if (!form.clearGame) {
+        body.game = form.gameName
+          ? { name: form.gameName, steamAppId: null }
+          : null
+      }
+
       try {
-        return await editSessionWithConflictRetry(queryClient, sessionId, {
-          title: form.title,
-          startTime: new Date(form.start).toISOString(),
-          durationMinutes: Number(form.durationMinutes),
-          platform: form.platform || null,
-          game:
-            form.gameName && !form.clearGame
-              ? { name: form.gameName, steamAppId: null }
-              : null,
-          notes: form.clearNotes ? null : form.notes,
-          minAttendance: Number(form.minAttendance),
-          maxCapacity:
-            form.unlimited || form.clearMax
-              ? null
-              : Number(form.maxCapacity),
-          isPrivate: form.isPrivate,
-          clear,
-          ifMatch: detail.data.version,
-        })
+        return await editSessionWithConflictRetry(
+          queryClient,
+          sessionId,
+          body as EditSessionRequest,
+        )
       } catch (error) {
         if (isApiError(error) && error.code === 'session_conflict') {
           setConflictNotice(true)
@@ -128,7 +145,7 @@ export function SessionEditPage() {
     if (!form) return errors
     if (!form.title.trim()) errors.title = t('validation.required')
     const min = Number(form.minAttendance)
-    const max = form.unlimited || form.clearMax ? undefined : Number(form.maxCapacity)
+    const max = form.clearMax ? undefined : Number(form.maxCapacity)
     if (!Number.isFinite(min) || min < 1) errors.minAttendance = t('validation.range')
     if (max !== undefined && min > max) errors.minAttendance = t('validation.minMax')
     return errors
@@ -169,7 +186,9 @@ export function SessionEditPage() {
         {t('edit.heading')}
       </h1>
 
-      {detail.isPending && <p aria-hidden="true">{t('list.upcoming')}</p>}
+      {detail.isPending && (
+        <p role="status">{t('common.loading', { ns: 'common' })}</p>
+      )}
       {detail.error && !form && (
         <p role="alert">
           {t(
@@ -198,7 +217,7 @@ export function SessionEditPage() {
           <ul className="mt-2 list-disc pl-5 text-sm text-red-800">
             {Object.entries(fieldErrors).map(([field, message]) => (
               <li key={field}>
-                <a href={`#field-${field}`}>{message}</a>
+                <a href={`#${fieldIds[field] ?? `field-${field}`}`}>{message}</a>
               </li>
             ))}
           </ul>
@@ -281,21 +300,13 @@ export function SessionEditPage() {
             </label>
             <input
               className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 disabled:bg-slate-100"
-              disabled={form.unlimited || form.clearMax}
+              disabled={form.clearMax}
               id="field-max"
               min={1}
               type="number"
               value={form.maxCapacity}
               onChange={(event) => update('maxCapacity', event.target.value)}
             />
-            <label className="mt-2 inline-flex min-h-11 items-center gap-2">
-              <input
-                checked={form.unlimited}
-                type="checkbox"
-                onChange={(event) => update('unlimited', event.target.checked)}
-              />
-              {t('create.unlimited')}
-            </label>
             <label className="mt-2 block inline-flex min-h-11 items-center gap-2">
               <input
                 checked={form.clearMax}

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Navigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { Dialog } from '../../components/ui/dialog'
 import { friendKeys, getFriends } from '../friends/friendGraph'
 import {
   createGuestLinks,
@@ -14,6 +15,74 @@ import {
   sessionKeys,
   type GuestLinkInvitation,
 } from './sessionQueries'
+
+type RevokeGuestLinkDialogProps = {
+  pending: boolean
+  onConfirm: () => void
+}
+
+function RevokeGuestLinkDialog({ pending, onConfirm }: RevokeGuestLinkDialogProps) {
+  const { t } = useTranslation('sessions')
+  const [open, setOpen] = useState(false)
+  const cancelButton = useRef<HTMLButtonElement>(null)
+
+  return (
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger asChild>
+        <button
+          className="min-h-11 rounded-md border border-red-300 px-3 py-2 text-sm text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          disabled={pending}
+          type="button"
+        >
+          {t('invite.revoke')}
+        </button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-slate-950/40" />
+        <Dialog.Content
+          aria-describedby="revoke-guest-link-description"
+          aria-label={t('a11y.dialogLabel')}
+          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-xl focus:outline-none"
+          onOpenAutoFocus={(event) => {
+            event.preventDefault()
+            cancelButton.current?.focus()
+          }}
+        >
+          <Dialog.Title className="text-lg font-semibold text-slate-950">
+            {t('invite.revoke')}
+          </Dialog.Title>
+          <Dialog.Description
+            id="revoke-guest-link-description"
+            className="mt-2 text-sm text-slate-700"
+          >
+            {t('invite.revokeConfirm')}
+          </Dialog.Description>
+          <div className="mt-6 flex flex-wrap justify-end gap-2">
+            <Dialog.Close asChild>
+              <button
+                ref={cancelButton}
+                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                type="button"
+              >
+                {t('dirty.stay')}
+              </button>
+            </Dialog.Close>
+            <button
+              className="min-h-11 rounded-md bg-red-700 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              type="button"
+              onClick={() => {
+                setOpen(false)
+                onConfirm()
+              }}
+            >
+              {t('invite.revoke')}
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  )
+}
 
 export function SessionInvitePage() {
   const { t } = useTranslation(['sessions', 'errors'])
@@ -184,13 +253,10 @@ export function SessionInvitePage() {
                   >
                     {t('invite.copyLink')}
                   </button>
-                  <button
-                    className="min-h-11 rounded-md border border-red-300 px-3 py-2 text-sm text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                    type="button"
-                    onClick={() => revoke.mutate(link.guestLinkId)}
-                  >
-                    {t('invite.revoke')}
-                  </button>
+                  <RevokeGuestLinkDialog
+                    pending={revoke.isPending}
+                    onConfirm={() => revoke.mutate(link.guestLinkId)}
+                  />
                 </span>
               </li>
             ))}

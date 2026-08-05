@@ -244,7 +244,7 @@ describe('AppNavigationTests', () => {
     ).toBeInTheDocument()
   })
 
-  it('clicked Sessions entry renders the guarded upcoming sessions page_D006', async () => {
+  it('clicked Sessions entry renders the guarded upcoming sessions page', async () => {
     setSession(session({ authenticated: true, state: 'active' }))
     renderRoute('/app')
 

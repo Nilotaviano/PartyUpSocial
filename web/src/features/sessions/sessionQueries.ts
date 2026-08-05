@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import type { components } from '../../api/schema'
 import { client, isApiError } from '../../api/client'
 
+export type ViewerProfile = components['schemas']['MyProfileResponse']
 export type SessionSummary = components['schemas']['SessionSummaryResponse']
 export type SessionDetail = components['schemas']['SessionDetailResponse']
 export type RosterEntry = components['schemas']['RosterEntryResponse']
@@ -35,6 +36,20 @@ export const sessionKeys = {
   detail: (sessionId: string) => ['session', sessionId] as const,
   joinRequests: (sessionId: string) =>
     ['session', 'join-requests', sessionId] as const,
+}
+
+/**
+ * Same query key and endpoint as the profile settings page's own query
+ * (`web/src/features/profile/ProfileSettingsPage.tsx`), so both share one
+ * cache entry rather than a second `/me` fetch (D-038/D-046: times render
+ * in the viewer's profile zone, not the browser zone).
+ */
+export const viewerProfileKey = ['my-profile'] as const
+
+export async function getViewerProfile() {
+  const { data } = await client.GET('/api/v1/me')
+  if (!data) throw new Error('Profile response was empty.')
+  return data
 }
 
 const csrf = { 'X-CSRF-TOKEN': '' }

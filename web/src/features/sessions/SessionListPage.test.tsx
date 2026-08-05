@@ -78,17 +78,22 @@ describe('SessionListPage', () => {
   })
 
   it('loads the next cursor page and appends results_D095', async () => {
-    api.get.mockImplementation((_path: string, options: { params: { query: { cursor?: string } } }) => {
-      const cursor = options.params.query.cursor
-      if (!cursor) {
+    api.get.mockImplementation(
+      (path: string, options?: { params: { query: { cursor?: string } } }) => {
+        if (path === '/api/v1/me') {
+          return Promise.resolve({ data: {} })
+        }
+        const cursor = options?.params.query.cursor
+        if (!cursor) {
+          return Promise.resolve({
+            data: { items: [session({ id: 'session-1', title: 'First' })], nextCursor: 'page-2' },
+          })
+        }
         return Promise.resolve({
-          data: { items: [session({ id: 'session-1', title: 'First' })], nextCursor: 'page-2' },
+          data: { items: [session({ id: 'session-2', title: 'Second' })], nextCursor: null },
         })
-      }
-      return Promise.resolve({
-        data: { items: [session({ id: 'session-2', title: 'Second' })], nextCursor: null },
-      })
-    })
+      },
+    )
     renderPage('upcoming')
 
     expect(await screen.findByText('First')).toBeInTheDocument()
@@ -104,5 +109,32 @@ describe('SessionListPage', () => {
     renderPage('upcoming')
 
     expect(await screen.findByText('No upcoming sessions.')).toBeInTheDocument()
+  })
+
+  it('renders session start times in the viewer profile time zone rather than the browser zone_D038_D046', async () => {
+    const startTime = '2030-06-15T23:00:00Z'
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') {
+        return Promise.resolve({ data: { timeZone: 'America/Sao_Paulo' } })
+      }
+      return Promise.resolve({
+        data: { items: [session({ startTime })], nextCursor: null },
+      })
+    })
+    renderPage('upcoming')
+
+    const zoned = new Intl.DateTimeFormat('en', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'America/Sao_Paulo',
+    }).format(new Date(startTime))
+    const utc = new Intl.DateTimeFormat('en', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'UTC',
+    }).format(new Date(startTime))
+    expect(zoned).not.toBe(utc)
+
+    expect(await screen.findByText(zoned)).toBeInTheDocument()
   })
 })

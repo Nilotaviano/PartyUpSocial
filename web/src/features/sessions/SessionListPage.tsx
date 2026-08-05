@@ -1,4 +1,4 @@
-import { useQueries } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
@@ -6,8 +6,10 @@ import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import {
   getSessionList,
+  getViewerProfile,
   isSessionInProgress,
   sessionKeys,
+  viewerProfileKey,
   type SessionScope,
 } from './sessionQueries'
 
@@ -16,8 +18,17 @@ type SessionListPageProps = {
 }
 
 export function SessionListPage({ scope }: SessionListPageProps) {
-  const { t, i18n } = useTranslation(['sessions', 'errors'])
+  const { t, i18n } = useTranslation(['sessions', 'errors', 'common'])
   const heading = useRef<HTMLHeadingElement>(null)
+
+  // D-038/D-046: times render in the viewer's profile time zone, not the
+  // browser's, falling back to the browser zone only until the profile
+  // query resolves.
+  const profile = useQuery({
+    queryKey: viewerProfileKey,
+    queryFn: getViewerProfile,
+  })
+  const viewerTimeZone = profile.data?.timeZone ?? undefined
 
   // Each scope is a distinct route in App.tsx, so react-router mounts a
   // fresh SessionListPage instance per scope: cursors always starts at the
@@ -70,8 +81,8 @@ export function SessionListPage({ scope }: SessionListPageProps) {
       </header>
 
       {isPending && (
-        <p aria-hidden="true" className="motion-safe:animate-pulse text-slate-500">
-          {t('list.loadMore')}
+        <p role="status" className="motion-safe:animate-pulse text-slate-500">
+          {t('common.loading', { ns: 'common' })}
         </p>
       )}
 
@@ -107,6 +118,7 @@ export function SessionListPage({ scope }: SessionListPageProps) {
                     {new Intl.DateTimeFormat(i18n.language, {
                       dateStyle: 'medium',
                       timeStyle: 'short',
+                      timeZone: viewerTimeZone,
                     }).format(new Date(session.startTime))}
                   </p>
                 </Link>

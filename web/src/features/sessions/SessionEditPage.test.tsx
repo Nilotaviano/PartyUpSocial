@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -72,7 +72,7 @@ afterEach(() => {
 })
 
 describe('SessionEditPage', () => {
-  it('maps the clear-max/notes/game checkboxes onto the clear list_D121', async () => {
+  it('maps the clear-max/notes/game checkboxes onto the clear list and omits the cleared keys from the body_A070', async () => {
     api.patch.mockResolvedValue({ data: detail({ maxCapacity: null, notes: null, game: null }) })
     renderPage()
 
@@ -91,6 +91,55 @@ describe('SessionEditPage', () => {
         }),
       ),
     )
+    const body = api.patch.mock.calls[0][1].body
+    expect(body).not.toHaveProperty('maxCapacity')
+    expect(body).not.toHaveProperty('notes')
+    expect(body).not.toHaveProperty('game')
+  })
+
+  it('routes the unlimited-capacity control through the A-070 clear list with no competing maxCapacity value_A070', async () => {
+    api.get.mockResolvedValue({ data: detail({ maxCapacity: 5 }) })
+    api.patch.mockResolvedValue({ data: detail({ maxCapacity: null }) })
+    renderPage()
+
+    fireEvent.click(await screen.findByLabelText('Remove capacity limit'))
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(1))
+    expect(api.patch).toHaveBeenCalledWith(
+      '/api/v1/sessions/{sessionId}',
+      expect.objectContaining({
+        body: {
+          title: 'Raid night',
+          startTime: new Date('2030-09-01T18:00').toISOString(),
+          durationMinutes: 120,
+          platform: 'Steam',
+          minAttendance: 4,
+          isPrivate: false,
+          notes: 'Bring snacks',
+          game: { name: 'Deep Rock Galactic', steamAppId: null },
+          clear: ['maxCapacity'],
+          ifMatch: 'v1',
+        },
+      }),
+    )
+    expect(api.patch.mock.calls[0][1].body).not.toHaveProperty('maxCapacity')
+  })
+
+  it('links every validation-summary entry to an existing field id_H2', async () => {
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Title'), { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText('Minimum attendance'), { target: { value: '0' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    const summary = await screen.findByText('There were problems with your submission')
+    const links = within(summary.closest('div')!).getAllByRole('link')
+    expect(links.length).toBeGreaterThan(0)
+    for (const link of links) {
+      const targetId = link.getAttribute('href')!.slice(1)
+      expect(document.getElementById(targetId)).not.toBeNull()
+    }
   })
 
   it('shows the silent-change disclosure next to the privacy control_D123', async () => {
@@ -99,7 +148,7 @@ describe('SessionEditPage', () => {
     expect(await screen.findByText('This change does not notify participants.')).toBeInTheDocument()
   })
 
-  it('retries exactly once after a session_conflict then surfaces the error on repeat failure_D121', async () => {
+  it('retries exactly once after a session_conflict then surfaces the error on repeat failure_A071', async () => {
     api.patch
       .mockRejectedValueOnce(new ApiError(409, 'session_conflict'))
       .mockRejectedValueOnce(new ApiError(409, 'session_conflict'))
@@ -118,7 +167,7 @@ describe('SessionEditPage', () => {
     expect(await screen.findByText('This session changed elsewhere. Please try again.')).toBeInTheDocument()
   })
 
-  it('succeeds after exactly one automatic refetch-and-retry on conflict_D121', async () => {
+  it('succeeds after exactly one automatic refetch-and-retry on conflict_A071', async () => {
     api.get
       .mockResolvedValueOnce({ data: detail({ version: 'v1' }) })
       .mockResolvedValueOnce({ data: detail({ version: 'v2' }) })
