@@ -85,7 +85,7 @@ export function GuestSessionPage() {
         <p>{t('guest.linkExpiredReopen')}</p>
         {extra != null && isApiError(extra) && extra.code !== 'session_not_found' && (
           <p role="alert">
-            {t(`errors.codes.${extra.code}`, { ns: 'errors', defaultValue: t('errors.generic', { ns: 'errors' }) })}
+            {t(extra.code, { ns: 'errors', defaultValue: t('generic', { ns: 'errors' }) })}
           </p>
         )}
       </main>

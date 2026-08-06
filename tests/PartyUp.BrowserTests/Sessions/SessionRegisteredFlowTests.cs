@@ -188,7 +188,12 @@ public sealed class SessionRegisteredFlowTests(PlaywrightFixture fixture)
         await page.WaitForURLAsync(url =>
             System.Text.RegularExpressions.Regex.IsMatch(url, @"/sessions/[0-9a-fA-F-]{36}$"));
 
-        string expected = start.ToLocalTime().ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
+        // The `#field-start` input is a browser-local datetime-local control: the app reads its
+        // literal wall-clock digits as the browser's own zone (`new Date(form.start)`), so the
+        // round-tripped render reproduces the same wall-clock digits typed in, not `start`
+        // reinterpreted through the test host's zone. The time-of-day is load-bearing here — a
+        // date-only assertion is host-offset-independent and would pass under any rendered zone.
+        string expected = start.ToString("MMM d, yyyy, h:mm tt", CultureInfo.InvariantCulture);
         await page.GetByText(expected, new PageGetByTextOptions { Exact = false }).WaitForAsync();
     }
 

@@ -152,4 +152,30 @@ describe('GuestSessionPage', () => {
       await screen.findByText("Times are shown in your device's time zone."),
     ).toBeTruthy()
   })
+
+  it('renders the localized message for a known error code on the invalid link', async () => {
+    const ApiErrorClass = class extends Error {
+      status = 429
+      code = 'rate_limited'
+    }
+    api.get.mockRejectedValue(new ApiErrorClass())
+    renderPage(`/guest/${linkId}`)
+
+    expect(
+      await screen.findByText('Too many attempts. Try again later.'),
+    ).toBeInTheDocument()
+  })
+
+  it('renders the generic message for an unknown error code on the invalid link', async () => {
+    const ApiErrorClass = class extends Error {
+      status = 500
+      code = 'totally_unknown_code'
+    }
+    api.get.mockRejectedValue(new ApiErrorClass())
+    renderPage(`/guest/${linkId}`)
+
+    expect(
+      await screen.findByText('Something went wrong.'),
+    ).toBeInTheDocument()
+  })
 })

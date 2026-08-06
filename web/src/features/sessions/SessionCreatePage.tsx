@@ -90,6 +90,13 @@ const fieldIds: Record<string, string> = {
   guestLinkCount: 'field-guest-links',
 }
 
+const platformWireValues: Record<string, string> = {
+  Steam: 'steam',
+  PlayStation: 'playStation',
+  Xbox: 'xbox',
+  Other: 'notApplicable',
+}
+
 const emptyForm = {
   title: '',
   start: '',
@@ -202,7 +209,7 @@ export function SessionCreatePage() {
       title: form.title,
       startTime: new Date(form.start).toISOString(),
       durationMinutes: Number(form.durationMinutes),
-      platform: form.platform || null,
+      platform: form.platform ? platformWireValues[form.platform] : null,
       game,
       notes: form.notes || null,
       minAttendance: Number(form.minAttendance),

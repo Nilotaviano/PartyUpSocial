@@ -10,7 +10,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import i18n from './i18n'
-import type { Session } from './api/client'
+import { client, type Session } from './api/client'
 import { RequireAuth } from './auth/RequireAuth'
 import { RequireOnboarded } from './auth/RequireOnboarded'
 import { useSession } from './auth/useSession'
@@ -281,14 +281,20 @@ describe('AppNavigationTests', () => {
 
 describe('Guest route reachability_S6', () => {
   it('renders /guest/invalid with no session and no query_D044', async () => {
-    renderRoute('/guest/invalid')
+    const getSpy = vi.spyOn(client, 'GET')
+    try {
+      renderRoute('/guest/invalid')
 
-    expect(
-      await screen.findByTestId('screen-guest-invalid'),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('heading', { name: 'This link is not valid.' }),
-    ).toBeInTheDocument()
+      expect(
+        await screen.findByTestId('screen-guest-invalid'),
+      ).toBeInTheDocument()
+      expect(
+        screen.getByRole('heading', { name: 'This link is not valid.' }),
+      ).toBeInTheDocument()
+      expect(getSpy).not.toHaveBeenCalled()
+    } finally {
+      getSpy.mockRestore()
+    }
   })
 
   it('reaches the tokenless guest route without any auth guard', async () => {
@@ -296,8 +302,7 @@ describe('Guest route reachability_S6', () => {
 
     await waitFor(() => {
       expect(
-        screen.queryByTestId('screen-welcome') ??
-          screen.queryByTestId('screen-guest-session') ??
+        screen.queryByTestId('screen-guest-session') ??
           screen.queryByTestId('screen-guest-invalid') ??
           screen.queryByTestId('screen-guest-terminal'),
       ).not.toBeNull()

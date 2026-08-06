@@ -11,7 +11,7 @@
 
 ## 2. Actual elapsed time, S1–S6
 
-All six slices were implemented, verified, and committed inside a single foreman-orchestrated session on **2026-08-05** — the entire slice program ran in one calendar day, not the 4–6 calendar weeks the original part-time-solo estimate assumed. Every timestamp below is a `git log` commit time on `main`; no timestamp is estimated.
+S1–S5 were implemented, verified, and committed inside a single foreman-orchestrated session on **2026-08-05**. S6 landed the next calendar day, **2026-08-06** (`bc022b2`, 11:14:47 -03:00) — the slice program spans two calendar days, not one, and not the 4–6 calendar weeks the original part-time-solo estimate assumed. Every timestamp below is a `git log` commit time on `main`; no timestamp is estimated.
 
 | Slice | First commit | Last commit (gate closed) | Elapsed (first→last) | Rework rounds |
 |---|---|---|---|---|
@@ -20,9 +20,9 @@ All six slices were implemented, verified, and committed inside a single foreman
 | S3 Hangfire jobs | `8694171` 15:11:45 | `84805e8` 15:58:40 | 0h47m | 1 round (PASS_WITH_NOTES, notes closed same wave) |
 | S4 HTTP/OpenAPI/guest security | `e6bcf59` 17:15:03 | `26fc4b1` 19:32:16 | 2h17m | 3 verification rounds (FAIL → FAIL narrow → PASS_WITH_NOTES) across 8 commits and 10 lettered fix waves — the heaviest rework of the phase |
 | S5 registered web | `289a4e6` 20:02:13 | `235ba26` 20:42:23 | 0h40m | 2 verification rounds (FAIL → PASS_WITH_NOTES) across 4 commits |
-| S6 guest web + closeout | this ticket | (this commit) | — | — |
+| S6 guest web + closeout | `bc022b2` 2026-08-06 11:14:47 | the round-1 fix commit (the commit that carries this table row; its own hash cannot be written into itself) | same-day | 1+ (round-1 blind verify FAIL, 7 findings, closed by one fix wave) |
 
-**Total calendar span, S1 start → S5 close:** `7ffbfd5` 01:39:54 → `235ba26` 20:42:23 = **19h02m**. S6 extends this span; its own end time is the commit timestamp of this slice's closing commit (see the git log at push time — this document does not guess it).
+**Total calendar span, S1 start → S5 close:** `7ffbfd5` 01:39:54 → `235ba26` 20:42:23 = **19h02m**. S6's first commit (`bc022b2`) landed 2026-08-06 11:14:47, 14h32m after S5's close — the next calendar day. S6's gate closes with the round-1 fix commit — the commit carrying this document; its timestamp is in `git log`.
 
 **Inter-slice gaps** (dispatch/verify handoff and lead review, not implementation time): S1→S2 51m, S2→S3 36m, S3→S4 1h16m, S4→S5 30m.
 
@@ -39,7 +39,7 @@ This document does not further decompose "focused work hours" below the gap-adju
 
 | | Planned (original sizing) | Actual |
 |---|---|---|
-| Elapsed calendar time | 4–6 weeks | 1 calendar day (2026-08-05), S1–S5; S6 same day |
+| Elapsed calendar time | 4–6 weeks | 1 calendar day (2026-08-05) for S1–S5; S6's first commit landed the following day, 2026-08-06 |
 | Basis of the planned figure | solo, part-time human implementation | foreman-orchestrated Claude worker/verifier seats, human-supervised, same session |
 
 **This ratio is not a valid extrapolation input for Phases 5–9.** The original 4–6 week estimate assumed one part-time human writing and testing the code directly. What actually happened was AI-agent implementation (Claude sonnet workers) under adversarial same-family blind verification (Claude opus), with the human as dispatcher/approver — a different production function, not a faster version of the same one. Treating "Phase 4 took 1 day instead of 5 weeks" as a ~35x multiplier and applying it to Phases 5–9 would overstate confidence with false precision. §6 below uses the *rework-round* and *defect-density* evidence from §5 to adjust the **original human-pace estimate**, not to replace it with an agent-pace one, because the human-pace estimate is what `IMPLEMENTATION_PLAN.md`'s existing Phase 5–9 sizing already assumes and what a claimed public launch date must be defensible against if the AI-assisted cadence is not sustained (illness, tooling regression, model/context changes, or a return to solo human implementation for any reason).
@@ -63,8 +63,8 @@ Source: `.foreman/ledger.md`, "Implementation program" table, session `2026-08-0
 
 - **Unit gate** (`dotnet build PartyUp.sln`; `dotnet test PartyUp.sln --filter "Category!=Integration"`): 0 warnings; 1053 Domain.Tests + 243 Application.Tests + 13 Api.IntegrationTests (non-`Category=Integration` subset) green at HEAD as of this slice; `PartyUp.BrowserTests` is present in the solution and correctly excluded by the filter (0 tests match `Category!=Integration` in that assembly).
 - **WSL full suite** (`dotnet test PartyUp.sln` against the Testcontainers/dev-Postgres integration lane): green at 84805e8 (S3 close, 1641 tests) and re-run green through 235ba26 (S5 close, 1053+243+390 = 1686 tests including Api.IntegrationTests). See this ticket's own report for the S6-inclusive run.
-- **Browser gate** (`dotnet test tests/PartyUp.BrowserTests`, Windows host, real API + Vite dev server + local dev Postgres): `SessionRegisteredFlowTests` 6/6 green across repeated clean runs. `SessionGuestFlowTests` builds and is correctly excluded from the unit-only filter, but is blocked from running green by a pre-existing `web/vite.config.ts` dev-proxy defect discovered while writing this slice (its `/g` proxy entry's string-prefix match also intercepts `/guest/*` SPA routes, so the guest page 404s in local `dotnet run`+`npm run dev` before React Router ever sees it — reproduced with `curl`, not a Phase 4 application bug). `vite.config.ts` is owned by S4's write set, not S6's; see this ticket's report and `TRACEABILITY.md`'s S6 section for the full reproduction and the one-line fix.
-- **CI/CD:** S4's CI regression (Hangfire recurring-job registration reaching a non-Testing environment without a reachable Postgres) was caught by the user reporting a live CI failure on already-pushed commits, fixed in the same slice (`f642293`), and confirmed green; S1–S5 are committed on `main` locally, with S4's fix range (`6bda605..26fc4b1`) pushed to `origin` after the CI regression (`.foreman/ledger.md` T-P4-S4 entry). S6's own push status is out of this ticket's scope (no commit/push instruction was given).
+- **Browser gate** (`dotnet test tests/PartyUp.BrowserTests`, Windows host, real API + Vite dev server + local dev Postgres): 12/12 green (`SessionRegisteredFlowTests` 6/6, `SessionGuestFlowTests` 6/6), most recently a cold run at 15s total duration after killing any port-5000/5173 listeners beforehand. The `web/vite.config.ts` `/g`-proxy defect that used to block the guest half of this gate (its old string-prefix match also intercepted `/guest/*` SPA routes) is fixed — the entry's key is now the `^/g/` regex. See `TRACEABILITY.md`'s S6 section for detail.
+- **CI/CD:** S4's CI regression (Hangfire recurring-job registration reaching a non-Testing environment without a reachable Postgres) was caught by the user reporting a live CI failure on already-pushed commits, fixed in the same slice (`f642293`), and confirmed green; S1–S5 are committed on `main` locally, with S4's fix range (`6bda605..26fc4b1`) pushed to `origin` after the CI regression (`.foreman/ledger.md` T-P4-S4 entry). As of this rewrite, local `main` carries `289a4e6..HEAD` unpushed (S5's four commits, S6's `bc022b2`, and the round-1 fix commit carrying this document); `origin/main` is at `235ba26` (S5 close). Pushing this range and observing CI green is the phase's final gate.
 
 ## 7. Remaining phases (5–9): re-forecast
 

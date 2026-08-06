@@ -160,6 +160,58 @@ describe('SessionCreatePage', () => {
     ).toBeInTheDocument()
   })
 
+  it('posts the wire-format platform value, not the UI label_F3', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        items: [
+          {
+            friendshipId: 'friendship-1',
+            userId: 'user-1',
+            username: 'friend.one',
+            displayName: 'Friend One',
+            avatar: { kind: 'emoji', emoji: '🎮', sourcePlatformLinkId: null },
+            platforms: [],
+          },
+        ],
+      },
+    })
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText('Title'), {
+      target: { value: 'Raid night' },
+    })
+    fireEvent.change(screen.getByLabelText('Start time'), {
+      target: { value: '2026-09-01T18:00' },
+    })
+    fireEvent.click(await screen.findByLabelText('Friend One (@friend.one)'))
+    fireEvent.change(screen.getByLabelText('Platform'), {
+      target: { value: 'Steam' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/sessions',
+        expect.objectContaining({ body: expect.objectContaining({ platform: 'steam' }) }),
+      ),
+    )
+
+    api.post.mockClear()
+    fireEvent.change(screen.getByLabelText('Platform'), {
+      target: { value: 'Other' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/sessions',
+        expect.objectContaining({
+          body: expect.objectContaining({ platform: 'notApplicable' }),
+        }),
+      ),
+    )
+  })
+
   it('warns before discarding dirty create-form values_D152_D162', async () => {
     renderPage()
 

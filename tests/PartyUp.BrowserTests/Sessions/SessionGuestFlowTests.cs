@@ -80,11 +80,16 @@ public sealed class SessionGuestFlowTests(PlaywrightFixture fixture)
         Assert.DoesNotContain("/g/", page.Url, StringComparison.Ordinal);
         Assert.DoesNotContain("token", page.Url, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("/guest/", page.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain(GuestLinkToken(guestLinkUrl), page.Url, StringComparison.Ordinal);
 
         IReadOnlyList<BrowserContextCookiesResult> cookies = await context.CookiesAsync();
         Assert.Contains(cookies, cookie => cookie.Name.StartsWith("pu.g.", StringComparison.Ordinal));
         return page;
     }
+
+    /// <summary>The bearer secret is the last path segment of the harvested `/g/&lt;token&gt;` link.</summary>
+    private static string GuestLinkToken(string guestLinkUrl) =>
+        new Uri(guestLinkUrl).Segments[^1].TrimEnd('/');
 
     [Fact]
     public async Task ClaimNeedsOnlyADisplayName_D017()
@@ -152,6 +157,13 @@ public sealed class SessionGuestFlowTests(PlaywrightFixture fixture)
             .GetByRole(AriaRole.Dialog)
             .GetByRole(AriaRole.Button, new() { Name = "Remove guest" })
             .ClickAsync();
+        // "Remove guest" text is ambiguous here (roster button, dialog title, and the success
+        // status all render the same string), so the discriminating post-mutation signal is the
+        // guest's own remove button leaving the roster — that requires the write to have landed
+        // and the refetch to have completed before the guest page is revisited.
+        await Assertions.Expect(organizer.Page
+                .GetByRole(AriaRole.Button, new() { Name = "Remove guest Removable Guest" }))
+            .ToBeHiddenAsync();
 
         // Revisiting the exact same tokenless URL (no `/g/{token}` round trip) now shows the
         // terminal notice — the removal revoked the credential's underlying link.
@@ -159,6 +171,7 @@ public sealed class SessionGuestFlowTests(PlaywrightFixture fixture)
         await guestPage.GetByText("This link was revoked.").WaitForAsync();
         Assert.DoesNotContain("token", guestPage.Url, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("/g/", guestPage.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain(GuestLinkToken(url), guestPage.Url, StringComparison.Ordinal);
     }
 
     [Fact]
