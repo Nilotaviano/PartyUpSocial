@@ -22,7 +22,7 @@ function session(overrides: Partial<Record<string, unknown>> = {}) {
     durationMinutes: 120,
     platform: 'Steam',
     game: null,
-    status: 'Confirmed',
+    status: 'confirmed',
     isPrivate: false,
     maxCapacity: 8,
     activeOccupancy: 2,
@@ -68,7 +68,7 @@ describe('SessionListPage', () => {
 
   it('renders only the Completed-only history list with no badge_D095', async () => {
     api.get.mockResolvedValue({
-      data: { items: [session({ status: 'Completed' })], nextCursor: null },
+      data: { items: [session({ status: 'completed' })], nextCursor: null },
     })
     renderPage('history')
 

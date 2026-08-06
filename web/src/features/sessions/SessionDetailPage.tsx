@@ -303,10 +303,10 @@ export function SessionDetailPage() {
     reminder.error
 
   const data = detail.data
-  const going = data?.roster.filter((r) => r.status === 'Going' && !r.isWaitlisted) ?? []
-  const maybe = data?.roster.filter((r) => r.status === 'Maybe' && !r.isWaitlisted) ?? []
-  const declined = data?.roster.filter((r) => r.status === 'Declined') ?? []
-  const pending = data?.roster.filter((r) => r.status === 'Pending') ?? []
+  const going = data?.roster.filter((r) => r.status === 'going' && !r.isWaitlisted) ?? []
+  const maybe = data?.roster.filter((r) => r.status === 'maybe' && !r.isWaitlisted) ?? []
+  const declined = data?.roster.filter((r) => r.status === 'declined') ?? []
+  const pending = data?.roster.filter((r) => r.status === 'pending') ?? []
   const waitlisted = data?.roster.filter((r) => r.isWaitlisted) ?? []
   const viewerEntry = data?.roster.find((r) => r.userId === session?.userId)
   const inProgress = data ? isSessionInProgress(data) : false
@@ -383,7 +383,7 @@ export function SessionDetailPage() {
               {(['Going', 'Maybe', 'Declined'] as const).map((choice) => (
                 <button
                   key={choice}
-                  aria-pressed={viewerEntry?.status === choice}
+                  aria-pressed={viewerEntry?.status === choice.toLowerCase()}
                   className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                   disabled={respond.isPending}
                   type="button"
@@ -504,7 +504,7 @@ export function SessionDetailPage() {
                       className="flex items-center justify-between gap-2 py-1"
                     >
                       <span>{entry.displayName ?? t('detail.anonymous')}</span>
-                      {isOrganizer && entry.origin === 'GuestLink' && (
+                      {isOrganizer && entry.origin === 'guestLink' && (
                         <RemoveGuestDialog
                           displayName={entry.displayName ?? t('detail.anonymous')}
                           pending={removeGuestParticipant.isPending}

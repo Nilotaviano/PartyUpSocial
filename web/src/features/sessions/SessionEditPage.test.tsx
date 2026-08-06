@@ -40,7 +40,7 @@ function detail(overrides: Partial<Record<string, unknown>> = {}) {
     minAttendance: 4,
     maxCapacity: 8,
     isPrivate: false,
-    status: 'Unconfirmed',
+    status: 'unconfirmed',
     createdAt: '2030-08-01T00:00:00Z',
     roster: [],
     version: 'v1',

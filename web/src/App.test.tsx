@@ -278,3 +278,30 @@ describe('AppNavigationTests', () => {
     },
   )
 })
+
+describe('Guest route reachability_S6', () => {
+  it('renders /guest/invalid with no session and no query_D044', async () => {
+    renderRoute('/guest/invalid')
+
+    expect(
+      await screen.findByTestId('screen-guest-invalid'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'This link is not valid.' }),
+    ).toBeInTheDocument()
+  })
+
+  it('reaches the tokenless guest route without any auth guard', async () => {
+    renderRoute('/guest/11111111-1111-1111-1111-111111111111')
+
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId('screen-welcome') ??
+          screen.queryByTestId('screen-guest-session') ??
+          screen.queryByTestId('screen-guest-invalid') ??
+          screen.queryByTestId('screen-guest-terminal'),
+      ).not.toBeNull()
+    })
+    expect(screen.queryByTestId('screen-welcome')).not.toBeInTheDocument()
+  })
+})

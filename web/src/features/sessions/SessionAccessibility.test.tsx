@@ -35,7 +35,7 @@ function detail() {
     minAttendance: 4,
     maxCapacity: 8,
     isPrivate: false,
-    status: 'Unconfirmed',
+    status: 'unconfirmed',
     createdAt: '2030-08-01T00:00:00Z',
     roster: [
       {
@@ -43,9 +43,9 @@ function detail() {
         userId: null,
         guestIdentityId: 'guest-1',
         displayName: 'Guest Bob',
-        status: 'Going',
+        status: 'going',
         isWaitlisted: false,
-        origin: 'GuestLink',
+        origin: 'guestLink',
         reminderChoice: null,
       },
     ],

@@ -25,6 +25,7 @@ import { PublicDeletionRequestPage } from './features/deletion/PublicDeletionReq
 import { ProfileSettingsPage } from './features/profile/ProfileSettingsPage'
 import { AccountSettingsPage } from './features/settings/AccountSettingsPage'
 import { BlockedUsersPage } from './features/settings/BlockedUsersPage'
+import { GuestSessionPage } from './features/sessions/GuestSessionPage'
 import { SessionCreatePage } from './features/sessions/SessionCreatePage'
 import { SessionDetailPage } from './features/sessions/SessionDetailPage'
 import { SessionEditPage } from './features/sessions/SessionEditPage'
@@ -152,6 +153,15 @@ function App() {
         path="/account-deletion/confirm"
         element={<PublicDeletionConfirmPage />}
       />
+
+      {/*
+        Guest routes (design §10.1): never gated by RequireAuth/RequireOnboarded — a
+        guest is never a registered, onboarded user, and never attempts account
+        onboarding or navigation that assumes identity. `GuestSessionPage` is the
+        single component behind both routes.
+      */}
+      <Route path="/guest/invalid" element={<GuestSessionPage />} />
+      <Route path="/guest/:guestLinkId" element={<GuestSessionPage />} />
 
       <Route element={<RequireAuth />}>
         <Route path="/onboarding" element={<OnboardingWizard />} />
