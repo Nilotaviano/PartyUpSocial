@@ -1,10 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Net.Http.Headers;
 using PartyUp.Api.Auth;
@@ -168,6 +171,37 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 Onboarded(() => null),
             ["PUT /api/v1/sessions/{sessionId:guid}/my-reminder"] = Onboarded(() =>
                 JsonContent.Create(new { choice = "Off" })),
+            // PHASE5_DESIGN.md §8: the unsafe /me/availability/** surface (round-2 fix, disclosed
+            // extension — Phase 4 S4 precedent for mechanical RateLimitTests/AntiforgeryTests
+            // inventory extensions).
+            ["POST /api/v1/me/availability/blocks"] = Onboarded(() => JsonContent.Create(new
+            {
+                startTime = "2027-01-01T00:00:00Z",
+                endTime = "2027-01-01T01:00:00Z",
+            })),
+            ["PATCH /api/v1/me/availability/blocks/{blockId:guid}"] = Onboarded(() => JsonContent.Create(new
+            {
+                startTime = "2027-01-01T00:00:00Z",
+                endTime = "2027-01-01T01:00:00Z",
+            })),
+            ["DELETE /api/v1/me/availability/blocks/{blockId:guid}"] = Onboarded(() => null),
+            ["POST /api/v1/me/availability/series"] = Onboarded(() => JsonContent.Create(new
+            {
+                dayOfWeek = 1,
+                startTime = "18:00",
+                durationMinutes = 60,
+                effectiveFrom = "2027-01-04",
+            })),
+            ["DELETE /api/v1/me/availability/series/{seriesId:guid}"] = Onboarded(() => null),
+            ["PATCH /api/v1/me/availability/series/{seriesId:guid}/occurrences/{occurrenceDate}"] =
+                Onboarded(() => JsonContent.Create(new
+                {
+                    scope = "onlyThis",
+                    startTime = "2027-01-01T00:00:00Z",
+                    endTime = "2027-01-01T01:00:00Z",
+                })),
+            ["DELETE /api/v1/me/availability/series/{seriesId:guid}/occurrences/{occurrenceDate}"] =
+                Onboarded(() => null),
             ["POST /api/v1/guest/{guestLinkId:guid}/claim"] = Public(() =>
                 JsonContent.Create(new { displayName = "Probe Guest", response = "Pending" })),
             ["PUT /api/v1/guest/{guestLinkId:guid}/display-name"] = Public(() =>
@@ -247,7 +281,24 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task EveryUnsafeRoute_RequiresAntiforgeryAndItsDocumentedAuthorization()
     {
-        using HttpClient client = CreateClient();
+        // round-2 fix: the "default" dimension chains onto every request regardless of operation
+        // (CoversEveryApiOperation: true, RateLimitPolicies.cs) — this matrix's setup-plus-two-loop
+        // shape already made ~4 HTTP calls per route against a single shared IP partition before the
+        // Phase 5 additions, and 69 routes push that past the 300/IP/minute default ceiling. Each
+        // route's whole sequence (sign-in, both loops) is pinned to its own synthetic
+        // X-Forwarded-For value instead, spreading the "default" partition across many buckets — the
+        // antiforgery/authorization behavior under test is unaffected by which IP a request claims.
+        await using Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> forwardedFactory =
+            ForwardedHeadersFactory();
+        using HttpClient client = CreateClient(forwardedFactory);
+
+        var forwardedIps = new Dictionary<string, string>(StringComparer.Ordinal);
+        int ipIndex = 0;
+        foreach (string key in UnsafeRoutes.Keys)
+        {
+            ipIndex++;
+            forwardedIps[key] = $"198.51.100.{ipIndex}";
+        }
 
         // One user per authorized route: several probed operations share the
         // user-partitioned reauth dimension (5 per 15 min), so a single shared
@@ -267,7 +318,7 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 admin: route.AuthorizationPolicy == AuthorizationPolicies.RequireAdmin,
                 email: $"antiforgery-matrix-{routeIndex}@example.test",
                 password: "current-password");
-            authCookies[key] = await SignInAsync(client, routeUser);
+            authCookies[key] = await SignInAsync(client, routeUser, forwardedIps[key]);
         }
 
         IReadOnlyDictionary<string, RouteEndpoint> mapped = MappedUnsafeRoutes();
@@ -288,6 +339,7 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
         foreach ((string key, UnsafeRouteCase route) in UnsafeRoutes)
         {
             using HttpRequestMessage request = CreateRequest(key, route.CreateBody());
+            request.Headers.Add("X-Forwarded-For", forwardedIps[key]);
             if (route.RequiresAuthorization)
             {
                 request.Headers.Add(HeaderNames.Cookie, authCookies[key]);
@@ -308,7 +360,8 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 client,
                 MethodFromKey(key),
                 RouteFromKey(key),
-                route.CreateBody());
+                route.CreateBody(),
+                forwardedFor: forwardedIps[key]);
             string body = await response.Content.ReadAsStringAsync();
             Assert.DoesNotContain("antiforgery_failed", body, StringComparison.Ordinal);
             if (route.RequiresAuthorization)
@@ -331,7 +384,37 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
         Assert.Equal(baseline, await SnapshotAsync());
     }
 
-    private HttpClient CreateClient() => _factory.CreateClient(
+    private Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> ForwardedHeadersFactory() =>
+        _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureAppConfiguration((_, configuration) =>
+                configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Network:TrustedProxies:0"] = "10.0.0.2",
+                }));
+            builder.ConfigureServices(services =>
+                services.AddSingleton<IStartupFilter>(new RemoteIpStartupFilter(
+                    IPAddress.Parse("10.0.0.2"))));
+        });
+
+    private sealed class RemoteIpStartupFilter(IPAddress proxyAddress) : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) =>
+            application =>
+            {
+                application.Use(async (context, following) =>
+                {
+                    context.Connection.RemoteIpAddress = proxyAddress;
+                    await following(context);
+                });
+                next(application);
+            };
+    }
+
+    private HttpClient CreateClient() => CreateClient(_factory);
+
+    private static HttpClient CreateClient(
+        Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory) => factory.CreateClient(
         new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
@@ -377,7 +460,10 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
         key[(key.IndexOf(' ') + 1)..]
             .Replace("{id:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
             .Replace("{friendshipId}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
+            .Replace("{blockId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
             .Replace("{blockId}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
+            .Replace("{seriesId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
+            .Replace("{occurrenceDate}", "2027-01-04", StringComparison.Ordinal)
             .Replace("{kind}", "password", StringComparison.Ordinal)
             .Replace("{sessionId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
             .Replace("{guestLinkId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
@@ -387,12 +473,13 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
     private static HttpMethod MethodFromKey(string key) =>
         new(key[..key.IndexOf(' ')]);
 
-    private static async Task<string> SignInAsync(HttpClient client, UserId userId)
+    private static async Task<string> SignInAsync(HttpClient client, UserId userId, string? forwardedFor = null)
     {
         HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
             client,
             $"/api/v1/_slice2/sign-in/{userId.Value:D}",
-            content: null);
+            content: null,
+            forwardedFor: forwardedFor);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         return Slice5HttpTest.AuthCookie(response);
     }

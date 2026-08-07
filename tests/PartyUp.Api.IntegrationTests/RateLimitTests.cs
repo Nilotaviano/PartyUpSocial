@@ -88,6 +88,23 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
             ],
             ["guest-link-exchange"] = ["ExchangeGuestLink"],
             ["guest-write"] = ["ClaimGuestSessionLink", "RenameGuestSessionIdentity", "RespondAsGuest"],
+            // PHASE5_DESIGN.md A-079 (round-2 fix, disclosed extension — Phase 4 S4 precedent for
+            // mechanical RateLimitTests/AntiforgeryTests inventory extensions): five new
+            // User-partitioned dimensions, assigned exhaustively so §8 has no unassigned route.
+            ["availability-write"] =
+            [
+                "CreateAvailabilityBlock",
+                "EditAvailabilityBlock",
+                "DeleteAvailabilityBlock",
+                "CreateAvailabilitySeries",
+                "DeleteAvailabilitySeries",
+                "EditAvailabilityOccurrence",
+                "DeleteAvailabilityOccurrence",
+            ],
+            ["overlap-search"] = ["FindOverlapWindows", "GetHomeSuggestions"],
+            ["calendar-read"] = ["GetCalendarView", "GetMyAvailability"],
+            ["home-read"] = ["GetActionableInbox"],
+            ["session-list-read"] = ["ListSessions"],
             ["default"] = [],
         };
 
@@ -102,7 +119,7 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
     [Fact]
     public void EveryDimensionCoversItsDocumentedRoutes()
     {
-        Assert.Equal(21, RateLimitPolicies.Dimensions.Count);
+        Assert.Equal(26, RateLimitPolicies.Dimensions.Count);
         Assert.Equal(ExpectedRoutes.Keys, RateLimitPolicies.Dimensions.Select(value => value.Name));
         foreach (RateLimitDimension dimension in RateLimitPolicies.Dimensions)
         {
