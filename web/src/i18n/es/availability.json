@@ -8,7 +8,16 @@
     "agenda": "Agenda",
     "previousWeek": "Semana anterior",
     "nextWeek": "Semana siguiente",
-    "agendaComingSoon": "La vista de agenda estará disponible pronto."
+    "agendaEmpty": "Nada programado en este período.",
+    "anonymousFriend": "Usuario Anónimo",
+    "layers": {
+      "heading": "Capas",
+      "myAvailability": "Mi disponibilidad",
+      "friendAvailability": "Disponibilidad de amistades",
+      "sessions": "Sesiones",
+      "pollOptions": "Opciones de encuesta",
+      "friendFilterHeading": "Amistades mostradas"
+    }
   },
   "block": {
     "editHeading": "Editar disponibilidad",
@@ -28,6 +37,7 @@
   },
   "a11y": {
     "gridLabel": "Disponibilidad semanal",
+    "agendaLabel": "Agenda",
     "busy": "Ocupado",
     "selectionStarted": "Selección iniciada a las {{time}}.",
     "selectionExtent": "Seleccionado de {{start}} a {{end}}.",

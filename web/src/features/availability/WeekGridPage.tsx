@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router'
 import { isApiError } from '../../api/client'
 import { getViewerProfile, viewerProfileKey } from '../sessions/sessionQueries'
+import { AgendaView, type AgendaEntry } from './AgendaView'
 import { BlockEditorDialog, type BlockEditorValue } from './BlockEditorDialog'
+import { CalendarLayers, type CalendarLayerState } from './CalendarLayers'
 import {
   OccurrenceScopeDialog,
   type OccurrenceScope,
@@ -144,6 +146,7 @@ export function WeekGridPage() {
     start: '',
     end: '',
   })
+  const [layers, setLayers] = useState<CalendarLayerState | null>(null)
   const editTrigger = useRef<HTMLElement | null>(null)
 
   const isAgenda = location.pathname.endsWith('/agenda')
@@ -212,20 +215,65 @@ export function WeekGridPage() {
     },
   })
 
-  const occurrences: GridOccurrence[] = (calendar.data?.myAvailability.occurrences ?? []).map(
-    (occurrence) => ({
-      id:
-        occurrence.origin.kind === 'block'
-          ? (occurrence.origin.blockId ?? '')
-          : `${occurrence.origin.seriesId}:${occurrence.origin.occurrenceDate}`,
-      start: instantToFakeLocal(occurrence.startTime, timeZone),
-      end: instantToFakeLocal(occurrence.endTime, timeZone),
-    }),
+  // D-111: every layer is a toggle over the same one `GET /calendar`
+  // response — never a second fetch. `layers` starts `null` until
+  // `CalendarLayers` reports its (component-state, D-135) defaults, so
+  // nothing is hidden before that first report lands.
+  const showMyAvailability = layers?.myAvailability ?? true
+  const showSessions = layers?.sessions ?? true
+
+  const occurrences: GridOccurrence[] = showMyAvailability
+    ? (calendar.data?.myAvailability.occurrences ?? []).map((occurrence) => ({
+        id:
+          occurrence.origin.kind === 'block'
+            ? (occurrence.origin.blockId ?? '')
+            : `${occurrence.origin.seriesId}:${occurrence.origin.occurrenceDate}`,
+        start: instantToFakeLocal(occurrence.startTime, timeZone),
+        end: instantToFakeLocal(occurrence.endTime, timeZone),
+      }))
+    : []
+  const merged: GridRange[] = showMyAvailability
+    ? (calendar.data?.myAvailability.merged ?? []).map((range) => ({
+        start: instantToFakeLocal(range.start, timeZone),
+        end: instantToFakeLocal(range.end, timeZone),
+      }))
+    : []
+
+  // Stabilized by reference (react-query keeps `data` referentially equal
+  // across renders that don't refetch) so `CalendarLayers`' state-report
+  // effect, which depends on this array, doesn't re-fire every render and
+  // loop with `setLayers` here.
+  const friendAvailabilityData = calendar.data?.friendAvailability
+  const friends = useMemo(
+    () => (friendAvailabilityData ?? []).map((entry) => entry.owner),
+    [friendAvailabilityData],
   )
-  const merged: GridRange[] = (calendar.data?.myAvailability.merged ?? []).map((range) => ({
-    start: instantToFakeLocal(range.start, timeZone),
-    end: instantToFakeLocal(range.end, timeZone),
-  }))
+
+  const agendaEntries: AgendaEntry[] = [
+    ...(showMyAvailability
+      ? (calendar.data?.myAvailability.occurrences ?? []).map((occurrence, index) => ({
+          id: `availability-${index}`,
+          kind: 'availability' as const,
+          start: instantToFakeLocal(occurrence.startTime, timeZone),
+          end: instantToFakeLocal(occurrence.endTime, timeZone),
+          title: t('calendar.layers.myAvailability'),
+        }))
+      : []),
+    ...(showSessions
+      ? (calendar.data?.sessions ?? []).map((session) => ({
+          id: `session-${session.id}`,
+          kind: 'session' as const,
+          start: instantToFakeLocal(session.startTime, timeZone),
+          end: instantToFakeLocal(
+            new Date(
+              new Date(session.startTime).getTime() + Number(session.durationMinutes) * 60_000,
+            ).toISOString(),
+            timeZone,
+          ),
+          title: session.title,
+        }))
+      : []),
+  ]
 
   // `timeZone: 'UTC'` here is not a bug: `weekStart`/grid dates hold the
   // profile-zone wall clock on their UTC accessors (D-046), so formatting
@@ -241,6 +289,13 @@ export function WeekGridPage() {
     new Intl.DateTimeFormat(i18n.language, {
       hour: 'numeric',
       minute: '2-digit',
+      timeZone: 'UTC',
+    }).format(date)
+  const dateLabelFormatter = (date: Date) =>
+    new Intl.DateTimeFormat(i18n.language, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
       timeZone: 'UTC',
     }).format(date)
 
@@ -414,8 +469,14 @@ export function WeekGridPage() {
         </button>
       </div>
 
+      <CalendarLayers friends={friends} onChange={setLayers} />
+
       {isAgenda ? (
-        <p>{t('calendar.agendaComingSoon')}</p>
+        <AgendaView
+          dateLabelFormatter={dateLabelFormatter}
+          entries={agendaEntries}
+          timeLabelFormatter={timeLabelFormatter}
+        />
       ) : (
         <WeekGrid
           dayLabels={dayLabels}

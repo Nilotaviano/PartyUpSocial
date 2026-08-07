@@ -266,6 +266,87 @@ describe('WeekGridPage occurrence editing', () => {
     expect(options.body.scope).toBe('onlyThis')
   })
 
+  it('saves the thisAndFuture scope end to end, including the original-null response branch_D143', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve({ data: profileResponse() })
+      if (path === '/api/v1/calendar') {
+        return Promise.resolve({
+          data: calendarResponse({
+            start: '2026-08-10T13:00:00.000Z',
+            end: '2026-08-10T13:30:00.000Z',
+          }),
+        })
+      }
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    // `original: null` — the §5.2/§8.1 branch where the split consumed the
+    // whole original series (`SeriesSplitResult.OriginalBecameEmpty`); the
+    // client must not assume `original` is ever present.
+    api.patch.mockResolvedValue({
+      data: {
+        scope: 'thisAndFuture',
+        original: null,
+        successor: {
+          seriesId: 'series-1',
+          dayOfWeek: 2,
+          startTime: '14:00:00',
+          durationMinutes: 45,
+          zoneId: 'UTC',
+          effectiveFrom: '2026-08-11',
+          effectiveUntil: null,
+        },
+      },
+    })
+
+    renderPage()
+
+    await screen.findAllByRole('gridcell', { name: /Busy/ })
+    const busyCell = screen.getAllByRole('gridcell', { name: /Busy/ })[0]
+    busyCell.focus()
+    fireEvent.keyDown(busyCell, { key: 'Enter' })
+
+    await screen.findByRole('dialog')
+    fireEvent.click(screen.getByRole('radio', { name: 'This and future occurrences' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+
+    const editDialog = await screen.findByRole('dialog')
+    expect(editDialog).toHaveTextContent('Edit availability')
+
+    // Move both the day and the time of day — the `dayOfWeek` may
+    // legitimately differ from `occurrenceDate`'s weekday (design §8.1's
+    // ruling, `DOMAIN_MODEL.md:196`).
+    fireEvent.change(screen.getByLabelText('Start time'), {
+      target: { value: '2026-08-11T14:00' },
+    })
+    fireEvent.change(screen.getByLabelText('End time'), {
+      target: { value: '2026-08-11T14:45' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(1))
+    const [path, options] = api.patch.mock.calls[0]
+    expect(path).toBe(
+      '/api/v1/me/availability/series/{seriesId}/occurrences/{occurrenceDate}',
+    )
+    expect(options.params.path).toEqual({
+      seriesId: 'series-1',
+      occurrenceDate: '2026-08-10',
+    })
+    expect(options.body).toEqual({
+      scope: 'thisAndFuture',
+      dayOfWeek: 2, // Tuesday, ISO 1..7
+      startTime: '14:00:00',
+      durationMinutes: 45,
+      endTime: null,
+    })
+
+    // The discriminated `original: null` response is handled without
+    // throwing or leaving the dialog open, and without inventing UI for a
+    // field that legitimately isn't there.
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it.each([
     'availability_not_found',
     'availability_validation',

@@ -8,7 +8,16 @@
     "agenda": "Agenda",
     "previousWeek": "Previous week",
     "nextWeek": "Next week",
-    "agendaComingSoon": "Agenda view is coming soon."
+    "agendaEmpty": "Nothing scheduled in this range.",
+    "anonymousFriend": "Anonymous User",
+    "layers": {
+      "heading": "Layers",
+      "myAvailability": "My availability",
+      "friendAvailability": "Friends' availability",
+      "sessions": "Sessions",
+      "pollOptions": "Poll options",
+      "friendFilterHeading": "Friends shown"
+    }
   },
   "block": {
     "editHeading": "Edit availability",
@@ -28,6 +37,7 @@
   },
   "a11y": {
     "gridLabel": "Weekly availability",
+    "agendaLabel": "Agenda",
     "busy": "Busy",
     "selectionStarted": "Selection started at {{time}}.",
     "selectionExtent": "Selected {{start}} to {{end}}.",
