@@ -22,7 +22,6 @@ public sealed class CreateAvailabilitySeriesUseCase(IAvailabilityRepository avai
         unitOfWork.ExecuteAsync(
             async ct =>
             {
-                AvailabilityVisibility.RequireWrite(ownerId, Viewer.Create(ownerId));
                 await availability.LockOwnerAsync(ownerId, ct);
 
                 AvailabilitySeries series = AvailabilitySeries.Create(
@@ -45,7 +44,6 @@ public sealed class DeleteAvailabilitySeriesUseCase(IAvailabilityRepository avai
         unitOfWork.ExecuteAsync(
             async ct =>
             {
-                AvailabilityVisibility.RequireWrite(ownerId, Viewer.Create(ownerId));
                 await availability.LockOwnerAsync(ownerId, ct);
 
                 IReadOnlyList<AvailabilitySeries> lockedSeries = await availability.LockSeriesAsync([seriesId], ct);

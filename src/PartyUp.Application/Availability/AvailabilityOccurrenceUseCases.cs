@@ -51,7 +51,6 @@ public sealed class EditAvailabilityOccurrenceUseCase(IAvailabilityRepository av
         unitOfWork.ExecuteAsync(
             async ct =>
             {
-                AvailabilityVisibility.RequireWrite(ownerId, Viewer.Create(ownerId));
                 await availability.LockOwnerAsync(ownerId, ct);
 
                 IReadOnlyList<AvailabilitySeries> lockedSeries = await availability.LockSeriesAsync([seriesId], ct);
@@ -157,7 +156,6 @@ public sealed class DeleteAvailabilityOccurrenceUseCase(IAvailabilityRepository 
         unitOfWork.ExecuteAsync(
             async ct =>
             {
-                AvailabilityVisibility.RequireWrite(ownerId, Viewer.Create(ownerId));
                 await availability.LockOwnerAsync(ownerId, ct);
 
                 AvailabilitySeries? series = await availability.FindSeriesAsync(seriesId, ct);

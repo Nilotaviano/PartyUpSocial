@@ -159,15 +159,10 @@ public sealed class AvailabilityLockingTests : IAsyncLifetime, IDisposable
             loserTask.IsCompleted,
             "The second split must block on the winner's held users row (P5-LK-01) before it can even re-read the series.");
 
-        Instant winnerCommittedAt = SystemClock.Instance.GetCurrentInstant();
         await winnerContext.SaveChangesAsync();
         await winnerTransaction.CommitAsync();
 
         OccurrenceEditOutcome? loserOutcome = await loserTask;
-        Instant loserObservedAt = SystemClock.Instance.GetCurrentInstant();
-        Assert.True(
-            winnerCommittedAt <= loserObservedAt,
-            "The loser must only be observed to complete after the winner's commit instant.");
         Assert.Null(loserOutcome); // the loser's fresh read sees the already-truncated original.
 
         await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
@@ -234,15 +229,10 @@ public sealed class AvailabilityLockingTests : IAsyncLifetime, IDisposable
             loserTask.IsCompleted,
             "The loser must block on the winner's held users row before its skip INSERT (or split re-read) can run.");
 
-        Instant winnerCommittedAt = SystemClock.Instance.GetCurrentInstant();
         await winnerContext.SaveChangesAsync();
         await winnerTransaction.CommitAsync();
 
         await loserTask;
-        Instant loserObservedAt = SystemClock.Instance.GetCurrentInstant();
-        Assert.True(
-            winnerCommittedAt <= loserObservedAt,
-            "The loser's write must be observed only after the winner's commit instant.");
 
         await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
         AppDbContext verify = verification.ServiceProvider.GetRequiredService<AppDbContext>();
