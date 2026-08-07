@@ -71,7 +71,20 @@ public static class RateLimitPolicies
 {
     private const string EmailPartitionItem = "PartyUp.RateLimit.NormalizedEmail";
 
-    public static IReadOnlyList<RateLimitDimension> Dimensions { get; } =
+    /// <summary>
+    /// register-ip's permit count (5/hour/IP in production, unconditionally). Overridable via
+    /// <c>RateLimits:RegisterPerIpPerHour</c> — <c>Program.cs</c> reads that key once at startup and
+    /// assigns it here before <see cref="CreateGlobalLimiter"/> is ever called; with no configuration
+    /// key set (every production deployment) this stays exactly 5, byte-identical to before. The
+    /// only caller that sets it away from 5 is <c>PlaywrightFixture.cs</c>, in the environment of the
+    /// API process it spawns for the browser test lane — never in-process, never a second dimension.
+    /// A settable static (not a constructor parameter) because <see cref="Dimensions"/> is a plain
+    /// static list every existing caller (this class, its tests) already reads with no DI container
+    /// in between.
+    /// </summary>
+    public static int RegisterIpPermitLimit { get; set; } = 5;
+
+    public static IReadOnlyList<RateLimitDimension> Dimensions =>
     [
         new(
             "auth-ip",
@@ -91,7 +104,7 @@ public static class RateLimitPolicies
             Operations(ApiOperationIds.Login)),
         new(
             "register-ip",
-            5,
+            RegisterIpPermitLimit,
             TimeSpan.FromHours(1),
             RateLimitPartitionKind.Ip,
             Operations(ApiOperationIds.Register)),

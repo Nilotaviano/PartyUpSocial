@@ -136,6 +136,24 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
             endpoint => endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>() is not null);
     }
 
+    /// <summary>
+    /// PHASE5_DESIGN.md S6d structural fix: `register-ip`'s permit count now reads
+    /// `RateLimits:RegisterPerIpPerHour` (`Program.cs`), overridable so the browser test lane's one
+    /// shared API process (well more than 5 registrations across its own classes) doesn't 429 —
+    /// `PlaywrightFixture.cs` sets that key only in the environment of the API process it spawns.
+    /// `_factory` here is exactly what every other test in this class already starts and never sets
+    /// that key, so this is the guard that a missing override always yields the unchanged
+    /// production default, never a silently widened one.
+    /// </summary>
+    [Fact]
+    public void RegisterIpPermitLimit_DefaultsToFiveWithNoConfigurationOverride()
+    {
+        Assert.Equal(5, RateLimitPolicies.RegisterIpPermitLimit);
+        Assert.Equal(
+            5,
+            RateLimitPolicies.Dimensions.Single(dimension => dimension.Name == "register-ip").PermitLimit);
+    }
+
     [Fact]
     public async Task AnonymousExternalIntent_IsBoundedByIntentIp()
     {

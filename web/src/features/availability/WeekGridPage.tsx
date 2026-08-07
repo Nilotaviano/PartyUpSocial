@@ -11,7 +11,14 @@ import {
   OccurrenceScopeDialog,
   type OccurrenceScope,
 } from './OccurrenceScopeDialog'
-import { WeekGrid, type GridOccurrence, type GridRange } from './WeekGrid'
+import {
+  WeekGrid,
+  type GridFriendRange,
+  type GridOccurrence,
+  type GridRange,
+  type GridSessionEntry,
+  type GridViewerRelation,
+} from './WeekGrid'
 import {
   availabilityKeys,
   createAvailabilityBlock,
@@ -249,6 +256,43 @@ export function WeekGridPage() {
     [friendAvailabilityData],
   )
 
+  // A-080/D-117: friendAvailability carries ranges and a masked owner only
+  // (no id ever reaches the client) — the per-friend filter therefore keys
+  // on `ordinal`, which is only stable within this one response.
+  const showFriendAvailability = layers?.friendAvailability ?? true
+  const shownFriendOrdinals = layers?.shownFriendOrdinals ?? null
+  const friendRanges: GridFriendRange[] = showFriendAvailability
+    ? (friendAvailabilityData ?? []).flatMap((entry) => {
+        if (shownFriendOrdinals && !shownFriendOrdinals.has(Number(entry.owner.ordinal))) {
+          return []
+        }
+        const ownerLabel = entry.owner.displayName ?? t('calendar.anonymousFriend')
+        return entry.ranges.map((range) => ({
+          ownerLabel,
+          start: instantToFakeLocal(range.start, timeZone),
+          end: instantToFakeLocal(range.end, timeZone),
+        }))
+      })
+    : []
+
+  // A-077 at access-kind `any`: the sessions layer already includes
+  // inherited/discoverable rows (D-149), each carrying `viewerRelation` so
+  // the grid can style them distinctly — never a second fetch or filter.
+  const sessionEntries: GridSessionEntry[] = showSessions
+    ? (calendar.data?.sessions ?? []).map((session) => ({
+        id: session.id,
+        title: session.title,
+        start: instantToFakeLocal(session.startTime, timeZone),
+        end: instantToFakeLocal(
+          new Date(
+            new Date(session.startTime).getTime() + Number(session.durationMinutes) * 60_000,
+          ).toISOString(),
+          timeZone,
+        ),
+        viewerRelation: session.viewerRelation as GridViewerRelation,
+      }))
+    : []
+
   const agendaEntries: AgendaEntry[] = [
     ...(showMyAvailability
       ? (calendar.data?.myAvailability.occurrences ?? []).map((occurrence, index) => ({
@@ -259,20 +303,16 @@ export function WeekGridPage() {
           title: t('calendar.layers.myAvailability'),
         }))
       : []),
-    ...(showSessions
-      ? (calendar.data?.sessions ?? []).map((session) => ({
-          id: `session-${session.id}`,
-          kind: 'session' as const,
-          start: instantToFakeLocal(session.startTime, timeZone),
-          end: instantToFakeLocal(
-            new Date(
-              new Date(session.startTime).getTime() + Number(session.durationMinutes) * 60_000,
-            ).toISOString(),
-            timeZone,
-          ),
-          title: session.title,
-        }))
-      : []),
+    ...sessionEntries.map((session) => ({
+      id: `session-${session.id}`,
+      kind: 'session' as const,
+      start: session.start,
+      end: session.end,
+      title:
+        session.viewerRelation === 'inherited'
+          ? `${session.title} (${t('a11y.inherited')})`
+          : session.title,
+    })),
   ]
 
   // `timeZone: 'UTC'` here is not a bug: `weekStart`/grid dates hold the
@@ -370,7 +410,11 @@ export function WeekGridPage() {
         body: {
           scope: 'thisAndFuture',
           dayOfWeek,
-          startTime: `${pad(startLocal.getUTCHours())}:${pad(startLocal.getUTCMinutes())}:00`,
+          // "HH:mm" — the wire's `LocalTimePattern` is strict, no seconds
+          // (`AvailabilityWireFormat.cs`'s `TimePattern`); a trailing ":ss"
+          // fails server-side parsing (`availability_validation`, caught by
+          // the S6d browser lane, not by the mocked Vitest path).
+          startTime: `${pad(startLocal.getUTCHours())}:${pad(startLocal.getUTCMinutes())}`,
           durationMinutes,
           endTime: null,
         },
@@ -480,8 +524,10 @@ export function WeekGridPage() {
       ) : (
         <WeekGrid
           dayLabels={dayLabels}
+          friendRanges={friendRanges}
           merged={merged}
           occurrences={occurrences}
+          sessionEntries={sessionEntries}
           timeLabelFormatter={timeLabelFormatter}
           weekStart={weekStart}
           onCreateBlock={handleCreateBlock}

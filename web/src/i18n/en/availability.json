@@ -42,7 +42,12 @@
     "selectionStarted": "Selection started at {{time}}.",
     "selectionExtent": "Selected {{start}} to {{end}}.",
     "selectionCommitted": "Availability created from {{start}} to {{end}}.",
-    "selectionCanceled": "Selection canceled."
+    "selectionCanceled": "Selection canceled.",
+    "friendAvailable": "{{name}} available",
+    "friendsAvailable": "{{count}} friends available",
+    "sessionLabel": "{{title}}",
+    "sessionInherited": "{{title}} (discoverable)",
+    "inherited": "Discoverable"
   },
   "errors": {
     "codes": {

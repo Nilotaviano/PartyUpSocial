@@ -37,6 +37,16 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     private const string ApiBaseUrl = "http://localhost:5000";
 
     /// <summary>
+    /// The whole browser lane (every class in <see cref="PlaywrightSuite"/>, one shared API
+    /// process per `dotnet test` invocation) registers well more than production's 5/hour/IP
+    /// `register-ip` ceiling — this fixture spawns the API with that dimension overridden via
+    /// `RateLimits:RegisterPerIpPerHour` (`RateLimitPolicies.cs`, `Program.cs`) in both topologies,
+    /// so the CI `browser` job's built topology inherits it too. Production reads no such
+    /// configuration key, so its default (5) is untouched.
+    /// </summary>
+    private const string RegisterPerIpPerHourOverride = "100";
+
+    /// <summary>
     /// A-082's selector. Anything other than the literal <c>"built"</c> (unset included) is the
     /// local topology — the property is opt-in the same way <c>PartyUpBrowserTests</c> is, so a
     /// plain developer run never accidentally reaches for Docker.
@@ -151,6 +161,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
                 ["ASPNETCORE_ENVIRONMENT"] = "Development",
                 ["Database__MigrateOnStartup"] = "true",
                 ["Email__DropPath"] = _mailDropPath,
+                ["RateLimits__RegisterPerIpPerHour"] = RegisterPerIpPerHourOverride,
             },
             logName: "api");
         AssignToJob(_apiProcess);
@@ -213,6 +224,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
                 ["Email__DropPath"] = _mailDropPath,
                 ["ConnectionStrings__Db"] = _postgresContainer.GetConnectionString(),
                 ["PublicBaseUrl"] = ApiBaseUrl,
+                ["RateLimits__RegisterPerIpPerHour"] = RegisterPerIpPerHourOverride,
             },
             logName: "api");
         AssignToJob(_apiProcess);

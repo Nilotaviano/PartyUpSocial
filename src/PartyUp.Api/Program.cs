@@ -194,6 +194,13 @@ builder.Services.AddAntiforgery(options =>
 builder.Services.AddSingleton<GuestLinkCredentialProtector>();
 builder.Services.AddScoped<ISessionVersionStamp, SessionVersionStamp>();
 builder.Services.AddSingleton<RateLimitPartitionPepper>();
+// register-ip's permit count, overridable for the browser test lane only
+// (PlaywrightFixture.cs sets RateLimits__RegisterPerIpPerHour in the spawned API process's own
+// environment); unset in every production deployment, so this stays exactly 5. The fallback is
+// the literal 5, not the property's current value — RateLimitPolicies is a static class shared
+// across every in-process WebApplicationFactory<Program> an integration-test run creates, so a
+// self-referential fallback would let one factory's override leak into the next factory's default.
+RateLimitPolicies.RegisterIpPermitLimit = builder.Configuration.GetValue("RateLimits:RegisterPerIpPerHour", 5);
 builder.Services.AddRateLimiter(_ => { });
 builder.Services.AddOptions<RateLimiterOptions>()
     .Configure<RateLimitPartitionPepper>((options, pepper) =>

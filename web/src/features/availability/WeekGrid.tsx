@@ -12,6 +12,29 @@ export type GridRange = {
   end: Date
 }
 
+export type GridFriendRange = {
+  /** Already resolved by the caller from `MaskedParticipant` — a display
+   * name or the Anonymous User fallback (§8.1: no id ever crosses here). */
+  ownerLabel: string
+  start: Date
+  end: Date
+}
+
+export type GridViewerRelation =
+  | 'organizer'
+  | 'invitee'
+  | 'participant'
+  | 'requester'
+  | 'inherited'
+
+export type GridSessionEntry = {
+  id: string
+  title: string
+  start: Date
+  end: Date
+  viewerRelation: GridViewerRelation
+}
+
 export type WeekGridProps = {
   /** The grid's first visible day at local midnight — already in the
    * viewer's profile zone (D-046); WeekGrid itself never converts zones. */
@@ -22,6 +45,14 @@ export type WeekGridProps = {
   /** The server's merged ranges (D-101 visual half, A-076) — WeekGrid paints
    * from these; it never re-derives a merge from `occurrences`. */
   merged: GridRange[]
+  /** The `friendAvailability` layer (A-080) — ranges only, no authoring
+   * identity. Rendered as read-only content inside the covered cells, never
+   * as its own gridcell or tab stop (§10.3's ARIA audit). */
+  friendRanges?: GridFriendRange[]
+  /** The `sessions` layer (A-077/A-080), already access-kind `any` — an
+   * inherited row (D-149's discoverable sessions) renders with a distinct,
+   * non-color-only label, never a second gridcell. */
+  sessionEntries?: GridSessionEntry[]
   onCreateBlock: (range: GridRange) => void
   onEditOccurrence: (occurrenceId: string) => void
   dayLabels: string[]
@@ -63,6 +94,8 @@ export function WeekGrid({
   endHour = 24,
   occurrences,
   merged,
+  friendRanges = [],
+  sessionEntries = [],
   onCreateBlock,
   onEditOccurrence,
   dayLabels,
@@ -73,6 +106,14 @@ export function WeekGrid({
   const [focused, setFocused] = useState<Cursor>({ day: 0, slot: 0 })
   const [selection, setSelection] = useState<Selection | null>(null)
   const [liveMessage, setLiveMessage] = useState('')
+  // Mirrors `dragging.current` as render state, for exactly one purpose:
+  // gating `touch-action` on the grid container. Before a long-press fires,
+  // touch-action stays at its default so an ordinary touch-and-drag still
+  // scrolls the page natively — only once a press has been held long enough
+  // to become a selection does the container opt out of native panning, so
+  // the browser's own scroll gesture stops fighting the drag-extend
+  // handlers (§10.3's `touch-action:none` conflict, P5-TOUCH-01).
+  const [isTouchDragging, setIsTouchDragging] = useState(false)
   const dragging = useRef(false)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const touchOrigin = useRef<{ x: number; y: number } | null>(null)
@@ -107,6 +148,18 @@ export function WeekGrid({
     const start = cellTime(weekStart, day, slot, startHour)
     const end = cellTime(weekStart, day, slot + 1, startHour)
     return merged.some((range) => overlaps(range.start, range.end, start, end))
+  }
+
+  function friendsAt(day: number, slot: number) {
+    const start = cellTime(weekStart, day, slot, startHour)
+    const end = cellTime(weekStart, day, slot + 1, startHour)
+    return friendRanges.filter((range) => overlaps(range.start, range.end, start, end))
+  }
+
+  function sessionsAt(day: number, slot: number) {
+    const start = cellTime(weekStart, day, slot, startHour)
+    const end = cellTime(weekStart, day, slot + 1, startHour)
+    return sessionEntries.filter((session) => overlaps(session.start, session.end, start, end))
   }
 
   function announceExtent(day: number, anchorSlot: number, endSlot: number) {
@@ -278,6 +331,7 @@ export function WeekGrid({
     touchOrigin.current = { x: event.clientX, y: event.clientY }
     longPressTimer.current = setTimeout(() => {
       dragging.current = true
+      setIsTouchDragging(true)
       setFocused({ day, slot })
       beginSelection(day, slot)
     }, LONG_PRESS_MS)
@@ -311,6 +365,7 @@ export function WeekGrid({
     stopAutoScroll()
     if (dragging.current) {
       dragging.current = false
+      setIsTouchDragging(false)
       setSelection((current) => {
         if (current) commitSelection(current)
         return null
@@ -328,7 +383,8 @@ export function WeekGrid({
         aria-colcount={8}
         aria-label={t('a11y.gridLabel')}
         aria-rowcount={slots + 1}
-        className="max-h-[70vh] overflow-y-auto"
+        className={`max-h-[70vh] overflow-y-auto ${isTouchDragging ? 'touch-none' : ''}`}
+        data-touch-dragging={isTouchDragging}
         role="grid"
         onMouseUp={handleMouseUp}
       >
@@ -360,6 +416,8 @@ export function WeekGrid({
             {dayIndexes.map((day) => {
               const occurrence = occurrenceAt(day, slot)
               const busy = mergedAt(day, slot)
+              const cellFriends = friendsAt(day, slot)
+              const cellSessions = sessionsAt(day, slot)
               const inSelection =
                 selection &&
                 selection.day === day &&
@@ -369,6 +427,24 @@ export function WeekGrid({
               const key = `${day}:${slot}`
               const state = inSelection ? 'selected' : busy ? 'busy' : 'free'
 
+              // Every layer contributes to one accessible name per cell —
+              // never a color-only signal, and never a second gridcell for
+              // an overlay (§10.3).
+              const labelParts = [timeLabelFormatter(cellTime(weekStart, day, slot, startHour))]
+              if (busy) labelParts.push(t('a11y.busy'))
+              if (cellFriends.length === 1) {
+                labelParts.push(t('a11y.friendAvailable', { name: cellFriends[0].ownerLabel }))
+              } else if (cellFriends.length > 1) {
+                labelParts.push(t('a11y.friendsAvailable', { count: cellFriends.length }))
+              }
+              for (const session of cellSessions) {
+                labelParts.push(
+                  session.viewerRelation === 'inherited'
+                    ? t('a11y.sessionInherited', { title: session.title })
+                    : t('a11y.sessionLabel', { title: session.title }),
+                )
+              }
+
               return (
                 <div
                   key={key}
@@ -377,11 +453,7 @@ export function WeekGrid({
                     else cellRefs.current.delete(key)
                   }}
                   aria-colindex={day + 2}
-                  aria-label={
-                    busy
-                      ? `${timeLabelFormatter(cellTime(weekStart, day, slot, startHour))} – ${t('a11y.busy')}`
-                      : timeLabelFormatter(cellTime(weekStart, day, slot, startHour))
-                  }
+                  aria-label={labelParts.join(' – ')}
                   aria-rowindex={slot + 2}
                   className="min-h-11 min-w-11 border border-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                   data-state={state}
@@ -412,6 +484,32 @@ export function WeekGrid({
                     </span>
                   )}
                   {occurrence && <span className="sr-only">{t('a11y.busy')}</span>}
+                  {cellFriends.length > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className="block text-xs text-indigo-700"
+                      data-layer="friend"
+                    >
+                      &#9675;
+                    </span>
+                  )}
+                  {cellSessions.map((session) => (
+                    <span
+                      key={session.id}
+                      aria-hidden="true"
+                      className={`block truncate text-[10px] leading-tight ${
+                        session.viewerRelation === 'inherited'
+                          ? 'italic text-slate-600'
+                          : 'font-semibold text-emerald-800'
+                      }`}
+                      data-layer="session"
+                      data-viewer-relation={session.viewerRelation}
+                    >
+                      {session.viewerRelation === 'inherited'
+                        ? `${session.title} (${t('a11y.inherited')})`
+                        : session.title}
+                    </span>
+                  ))}
                 </div>
               )
             })}

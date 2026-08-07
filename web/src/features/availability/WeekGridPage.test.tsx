@@ -17,7 +17,13 @@ vi.mock('../../api/client', () => ({
 }))
 
 import '../../i18n'
-import { WeekGrid, type GridOccurrence, type GridRange } from './WeekGrid'
+import {
+  WeekGrid,
+  type GridFriendRange,
+  type GridOccurrence,
+  type GridRange,
+  type GridSessionEntry,
+} from './WeekGrid'
 import { WeekGridPage } from './WeekGridPage'
 
 // Fake-local convention (matches WeekGrid/WeekGridPage): the UTC accessors
@@ -36,6 +42,8 @@ const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 function renderGrid(props: {
   occurrences?: GridOccurrence[]
   merged?: GridRange[]
+  friendRanges?: GridFriendRange[]
+  sessionEntries?: GridSessionEntry[]
   onCreateBlock?: ReturnType<typeof vi.fn<(range: GridRange) => void>>
   onEditOccurrence?: ReturnType<typeof vi.fn<(id: string) => void>>
   startHour?: number
@@ -47,8 +55,10 @@ function renderGrid(props: {
     <WeekGrid
       dayLabels={dayLabels}
       endHour={props.endHour ?? 11}
+      friendRanges={props.friendRanges ?? []}
       merged={props.merged ?? []}
       occurrences={props.occurrences ?? []}
+      sessionEntries={props.sessionEntries ?? []}
       startHour={props.startHour ?? 9}
       timeLabelFormatter={timeLabelFormatter}
       weekStart={localDate(0)}
@@ -150,9 +160,69 @@ describe('WeekGrid keyboard flow', () => {
     fireEvent.keyDown(screen.getByRole('gridcell', { name: '9:30 – Busy' }), { key: 'Enter' })
     expect(onEditOccurrence).toHaveBeenCalledWith('block-b')
   })
+
+  it('paints friendAvailability and sessions layers without adding gridcells or breaking roving tabindex_A080', () => {
+    const friendRanges: GridFriendRange[] = [
+      { ownerLabel: 'Ana', start: localDate(9, 0), end: localDate(9, 30) },
+    ]
+    const sessionEntries: GridSessionEntry[] = [
+      {
+        id: 'session-organizer',
+        title: 'Raid night',
+        start: localDate(9, 0),
+        end: localDate(9, 30),
+        viewerRelation: 'organizer',
+      },
+      {
+        id: 'session-inherited',
+        title: 'Open lobby',
+        start: localDate(10, 0),
+        end: localDate(10, 30),
+        viewerRelation: 'inherited',
+      },
+    ]
+    renderGrid({ friendRanges, sessionEntries })
+
+    // Exactly 7 days × 8 slots (9:00–11:00 at 15-minute slots) — layers add
+    // no gridcell of their own, so the roving-tabindex model (one tab stop)
+    // is unchanged.
+    const cells = screen.getAllByRole('gridcell')
+    expect(cells).toHaveLength(56)
+    expect(cells.filter((cell) => cell.getAttribute('tabindex') === '0')).toHaveLength(1)
+
+    // Ana's range and the organizer's session both cover 9:00–9:30, so one
+    // cell carries both layers' markers plus one accessible name naming both.
+    const ownSessionCell = screen.getByRole('gridcell', { name: '9:00 – Ana available – Raid night' })
+    expect(ownSessionCell.querySelector('[data-layer="friend"]')).not.toBeNull()
+    const ownSessionLabel = ownSessionCell.querySelector('[data-layer="session"]')
+    expect(ownSessionLabel).toHaveAttribute('data-viewer-relation', 'organizer')
+    expect(ownSessionLabel).toHaveTextContent('Raid night')
+
+    // The inherited/discoverable row is visibly distinct, and not by color
+    // alone — a literal text label, not a class-only difference.
+    const inheritedCell = screen.getByRole('gridcell', {
+      name: '10:00 – Open lobby (discoverable)',
+    })
+    const inheritedLabel = inheritedCell.querySelector('[data-layer="session"]')
+    expect(inheritedLabel).toHaveAttribute('data-viewer-relation', 'inherited')
+    expect(inheritedLabel).toHaveTextContent('Open lobby (Discoverable)')
+  })
+
+  it('renders a friend-count summary label when more than one friend overlaps a cell', () => {
+    const friendRanges: GridFriendRange[] = [
+      { ownerLabel: 'Ana', start: localDate(9, 0), end: localDate(9, 15) },
+      { ownerLabel: 'Bruno', start: localDate(9, 0), end: localDate(9, 15) },
+    ]
+    renderGrid({ friendRanges })
+
+    expect(screen.getByRole('gridcell', { name: '9:00 – 2 friends available' })).toBeInTheDocument()
+  })
 })
 
-function calendarResponse(occurrenceIso: { start: string; end: string }) {
+function calendarResponse(
+  occurrenceIso: { start: string; end: string },
+  overrides: { friendAvailability?: unknown[]; sessions?: unknown[] } = {},
+) {
   return {
     myAvailability: {
       occurrences: [
@@ -170,8 +240,8 @@ function calendarResponse(occurrenceIso: { start: string; end: string }) {
       merged: [{ start: occurrenceIso.start, end: occurrenceIso.end }],
       range: { start: occurrenceIso.start, end: occurrenceIso.end },
     },
-    friendAvailability: [],
-    sessions: [],
+    friendAvailability: overrides.friendAvailability ?? [],
+    sessions: overrides.sessions ?? [],
     pollOptions: [],
   }
 }
@@ -289,7 +359,7 @@ describe('WeekGridPage occurrence editing', () => {
         successor: {
           seriesId: 'series-1',
           dayOfWeek: 2,
-          startTime: '14:00:00',
+          startTime: '14:00',
           durationMinutes: 45,
           zoneId: 'UTC',
           effectiveFrom: '2026-08-11',
@@ -335,7 +405,7 @@ describe('WeekGridPage occurrence editing', () => {
     expect(options.body).toEqual({
       scope: 'thisAndFuture',
       dayOfWeek: 2, // Tuesday, ISO 1..7
-      startTime: '14:00:00',
+      startTime: '14:00',
       durationMinutes: 45,
       endTime: null,
     })
@@ -371,5 +441,58 @@ describe('WeekGridPage occurrence editing', () => {
     }
 
     expect(await screen.findByRole('alert')).toHaveTextContent(expected[code])
+  })
+
+  it('paints friendAvailability and sessions on the grid, and layer toggles visibly add or remove them_A080', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve({ data: profileResponse() })
+      if (path === '/api/v1/calendar') {
+        return Promise.resolve({
+          data: calendarResponse(
+            { start: '2026-08-10T13:00:00.000Z', end: '2026-08-10T13:30:00.000Z' },
+            {
+              friendAvailability: [
+                {
+                  owner: { ordinal: 0, displayName: 'Ana' },
+                  ranges: [{ start: '2026-08-10T14:00:00.000Z', end: '2026-08-10T14:15:00.000Z' }],
+                },
+              ],
+              sessions: [
+                {
+                  id: 'session-1',
+                  organizerId: null,
+                  title: 'Raid night',
+                  startTime: '2026-08-10T15:00:00.000Z',
+                  durationMinutes: 15,
+                  platform: '',
+                  game: null,
+                  status: 'unconfirmed',
+                  isPrivate: false,
+                  maxCapacity: null,
+                  activeOccupancy: 1,
+                  organizer: { ordinal: 1, displayName: 'Ana' },
+                  viewerRelation: 'organizer',
+                },
+              ],
+            },
+          ),
+        })
+      }
+      throw new Error(`Unexpected GET ${path}`)
+    })
+
+    renderPage()
+
+    await screen.findAllByRole('gridcell', { name: /Busy/ })
+    expect(screen.getByRole('gridcell', { name: /Ana available/ })).toBeInTheDocument()
+    expect(screen.getByRole('gridcell', { name: /Raid night/ })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText("Friends' availability"))
+    expect(screen.queryByRole('gridcell', { name: /Ana available/ })).not.toBeInTheDocument()
+    // Toggling the friend layer never touches the sessions layer.
+    expect(screen.getByRole('gridcell', { name: /Raid night/ })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText('Sessions'))
+    expect(screen.queryByRole('gridcell', { name: /Raid night/ })).not.toBeInTheDocument()
   })
 })

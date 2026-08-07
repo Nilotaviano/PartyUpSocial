@@ -56,6 +56,8 @@ public static class AuditedRoutes
         new AuditedRoute("settings-account", "/settings/account"),
         new AuditedRoute("settings-blocked", "/settings/blocked"),
         new AuditedRoute("sessions-new", "/sessions/new"),
+        new AuditedRoute("calendar", "/calendar"),
+        new AuditedRoute("calendar-agenda", "/calendar/agenda"),
         new AuditedRoute("sessions-upcoming", "/sessions/upcoming"),
         new AuditedRoute("sessions-history", "/sessions/history"),
         new AuditedRoute("session-detail", "/sessions/{sessionId}"),
