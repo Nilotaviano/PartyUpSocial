@@ -326,10 +326,10 @@ public sealed record SessionSummaryResponse(
     MaskedParticipant Organizer,
     string ViewerRelation)
 {
-    // round-1 fix (F3): the organizer's MaskedParticipant now comes from a per-response
-    // MaskedParticipantAssigner shared across every summary/entry a response composes, instead of a
-    // hardcoded ordinal 0 — two distinct organizers in one page (or in one calendar response, or one
-    // that is also a friend-availability owner) get distinct-but-stable ordinals.
+    // The organizer's MaskedParticipant comes from a per-response MaskedParticipantAssigner shared
+    // across every summary/entry a response composes — two distinct organizers in one page (or in
+    // one calendar response, or one that is also a friend-availability owner) get
+    // distinct-but-stable ordinals, never a shared hardcoded one.
     public static SessionSummaryResponse From(SessionSummary summary, MaskedParticipantAssigner ordinals) =>
         new(
             summary.Id.Value,
@@ -428,8 +428,8 @@ public sealed record ActionableInboxResponse(
     bool HasMoreInvitations,
     bool HasMoreJoinRequests)
 {
-    // round-1 fix (F3): one shared assigner for the whole inbox response — an invitee organizer who
-    // also happens to be a join-request requester (or appears on two rows) keeps one ordinal.
+    // One shared assigner for the whole inbox response — an invitee organizer who also happens to
+    // be a join-request requester (or appears on two rows) keeps one ordinal.
     // ActionableJoinRequest (SessionReadModels.cs) carries no requester user id, only a resolved
     // display name, so its ordinal goes through MaskedParticipantAssigner.ForDisplayNameOnly — the
     // documented, disclosed exception (see that method's doc comment).

@@ -141,11 +141,11 @@ describe('WeekGrid keyboard flow', () => {
       { id: 'block-a', start: localDate(9, 0), end: localDate(9, 30) },
       { id: 'block-b', start: localDate(9, 15), end: localDate(9, 45) },
     ]
-    // Round 1's F5 finding: the true union of these two occurrences IS
-    // 9:00–9:45, so a fixture using that union can't discriminate the
-    // client trusting `merged` verbatim (A-076) from a client silently
-    // re-deriving the same merge itself — both would paint identically.
-    // `merged` is deliberately short of block-b's own tail here (an
+    // The true union of these two occurrences IS 9:00–9:45, so a fixture
+    // using that union can't discriminate the client trusting `merged`
+    // verbatim (A-076) from a client silently re-deriving the same merge
+    // itself — both would paint identically. `merged` is deliberately
+    // short of block-b's own tail here (an
     // internal detail the client is never supposed to reconstruct, e.g. a
     // trailing occurrence the merge engine coalesced differently); the
     // assertions below check the painted band follows this exact —
@@ -432,7 +432,7 @@ describe('WeekGridPage occurrence editing', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('rejects an end time at or before the start time locally, without a server round trip_F3', async () => {
+  it('rejects an end time at or before the start time locally, without a server round trip_D071', async () => {
     api.get.mockImplementation((path: string) => {
       if (path === '/api/v1/me') return Promise.resolve({ data: profileResponse() })
       if (path === '/api/v1/calendar') {

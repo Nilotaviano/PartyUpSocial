@@ -89,9 +89,9 @@ export function BlockEditorDialog({
             className="mt-4 space-y-4"
             onSubmit={(event) => {
               event.preventDefault()
-              // Local-only (F3): the server remains the authoritative
-              // validator (`availability_validation`, §8) — this just saves
-              // a doomed round trip and shows the reason before it happens.
+              // Local-only: the server remains the authoritative validator
+              // (`availability_validation`, §8) — this just saves a doomed
+              // round trip and shows the reason before it happens.
               if (isOffGrid(start) || isOffGrid(end)) {
                 setValidationError('offGrid')
                 return

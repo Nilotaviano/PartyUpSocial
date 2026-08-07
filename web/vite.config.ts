@@ -18,5 +18,13 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.ts'],
+    // Full process isolation per test file. The default `threads` pool does
+    // not fully isolate `vi.useFakeTimers`' global `Date` patch across
+    // concurrently-scheduled files under load — WeekGridPage.test.tsx and
+    // SessionCreatePage.test.tsx (the only two files faking `Date`) could
+    // observe each other's real/fake clock mid-run, intermittently failing
+    // date-anchored fixtures. `forks` runs each file in its own OS process,
+    // which removes that shared-global surface entirely.
+    pool: 'forks',
   },
 })

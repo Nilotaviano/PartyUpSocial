@@ -161,7 +161,7 @@ describe('SessionCreatePage', () => {
     ).toBeInTheDocument()
   })
 
-  it('posts the wire-format platform value, not the UI label_F3', async () => {
+  it('posts the wire-format platform value, not the UI label', async () => {
     api.get.mockResolvedValue({
       data: {
         items: [

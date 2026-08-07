@@ -85,10 +85,10 @@ public sealed record MaskedParticipant(int Ordinal, string? DisplayName);
 /// instance only (one instance per HTTP response composition, PHASE5_DESIGN.md §8.1) — a person seen
 /// twice in one response (a friend-availability owner who is also a visible session's organizer, a
 /// requester appearing on two join-request rows, …) carries the same ordinal both times; a different
-/// person always gets the next one. round-1 fix (F3): the prior <c>ForOne</c> hardcoded ordinal 0 for
-/// every single-person context, so two distinct organizers in one page both read as person 0 — a
-/// client correlating an inherited row's absent <c>organizerId</c> against a friend-layer owner could
-/// conclude they were the same person. Every allocation now goes through one shared counter.
+/// person always gets the next one — every allocation goes through one shared counter, so two
+/// distinct organizers in one page can never both read as person 0 (a client correlating an
+/// inherited row's absent <c>organizerId</c> against a friend-layer owner must never conclude they
+/// were the same person).
 /// </summary>
 public sealed class MaskedParticipantAssigner(IReadOnlyDictionary<UserId, DisplayName?>? knownDisplayNames = null)
 {
@@ -269,10 +269,9 @@ public sealed record AvailabilitySeriesView(
 
 /// <summary>
 /// PHASE5_DESIGN.md §8.1: the closed discriminated response for <c>PATCH
-/// …/occurrences/{occurrenceDate}</c>, wire-discriminated on <c>scope</c>. round-1 fix (F1): this
-/// replaced an untyped <c>Produces&lt;object&gt;()</c> + anonymous-object pair, which left
-/// <c>EditOccurrenceRequest</c>'s response side with no schema at all and a generated
-/// <c>unknown</c> client type. <c>OnlyThis</c> carries only <c>block</c>; <c>ThisAndFuture</c> carries
+/// …/occurrences/{occurrenceDate}</c>, wire-discriminated on <c>scope</c>, so
+/// <c>EditOccurrenceRequest</c>'s response side carries a real schema rather than an untyped
+/// <c>object</c>. <c>OnlyThis</c> carries only <c>block</c>; <c>ThisAndFuture</c> carries
 /// <c>original</c> (nullable — <c>null</c> exactly when the split emptied the source series) and
 /// <c>successor</c>; the two arms never share a payload shape (§8.1's table).
 /// </summary>

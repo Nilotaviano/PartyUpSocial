@@ -24,14 +24,25 @@ export type DirtyGuardOptions = {
  * neutralized by immediately re-pushing the current entry so history state
  * cannot drift out from under a dirty form during the confirmation.
  *
- * The listener-and-sentinel effect below depends on `[dirty]` alone — round
- * 1's F1 finding: every dirty page here passes an inline arrow for
- * `onBlockedNavigation`, a new function identity on every render, and a
- * `[dirty, onBlockedNavigation]` dependency array re-ran this effect (and
- * re-pushed the history sentinel) on every one of those renders — 24 typed
- * characters, 24 `pushState` calls, Back unusable after editing a form. The
- * callback is read through a ref, updated every render but never itself a
- * dependency, so exactly one sentinel is pushed per clean→dirty transition.
+ * The listener-and-sentinel effect below depends on `[dirty]` alone: every
+ * dirty page here passes an inline arrow for `onBlockedNavigation`, a new
+ * function identity on every render, so the callback is read through a ref
+ * (updated every render but never itself a dependency) — exactly one
+ * sentinel is pushed per clean→dirty transition, not once per keystroke.
+ *
+ * That sentinel is deliberately never popped back off on cleanup. A form
+ * session that goes dirty therefore leaves one surplus same-URL history
+ * entry behind — Back still works, it just costs one extra press on that
+ * page, and the popstate interceptor below is inert once the form is clean
+ * (this effect has already torn down). Removing it is unsafe, not merely
+ * unimplemented: by the time cleanup runs, `navigate()` may already have
+ * pushed the real destination on top of the sentinel, so popping or
+ * rewriting the current entry then would race an in-flight navigation or
+ * silently null out `location.state` (React Router's own `{usr,key,idx}`
+ * — a `replaceState(null, ...)` here once did exactly that, breaking every
+ * `location.state` consumer, e.g. `AuthScreens`' `returnTo`) and desync the
+ * router's own history index. The one-extra-press residual is accepted in
+ * trade for never touching history state this hook does not own.
  */
 export function useDirtyGuard(dirty: boolean, options: DirtyGuardOptions = {}) {
   const onBlockedNavigationRef = useRef(options.onBlockedNavigation)
@@ -87,12 +98,8 @@ export function useDirtyGuard(dirty: boolean, options: DirtyGuardOptions = {}) {
       window.removeEventListener('beforeunload', handleBeforeUnload)
       document.removeEventListener('click', handleClick, true)
       window.removeEventListener('popstate', handlePopState)
-      // Reconciles the sentinel this effect instance pushed, on every
-      // dirty→clean transition and on unmount: a same-URL `replaceState`
-      // collapses it without a real navigation. Never `history.back()`
-      // here — that fires a genuine `popstate` mid-cleanup, which would
-      // race a legitimate discard navigation already in flight.
-      window.history.replaceState(null, '', window.location.href)
+      // No history reconciliation here — see this hook's doc comment for
+      // why popping or rewriting the sentinel on cleanup is unsafe.
     }
   }, [dirty])
 }

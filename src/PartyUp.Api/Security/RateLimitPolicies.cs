@@ -83,10 +83,10 @@ public static class RateLimitPolicies
     /// API process it spawns for the browser test lane — never in-process, never a second dimension.
     /// A settable static (not a constructor parameter) because <see cref="Dimensions"/> is a plain
     /// static list every existing caller (this class, its tests) already reads with no DI container
-    /// in between. The setter invalidates <see cref="_cachedDimensions"/> (round-1 F4: <see cref="Dimensions"/>
-    /// is read inside per-request rate-limiting middleware — it must stay a build-once list, rebuilt
-    /// only on an actual change here, not 26 records and 26 <see cref="HashSet{T}"/>s allocated on
-    /// every request).
+    /// in between. The setter invalidates <see cref="_cachedDimensions"/>: <see cref="Dimensions"/>
+    /// is read inside per-request rate-limiting middleware, so it must stay a build-once list,
+    /// rebuilt only on an actual change here, not 26 records and 26 <see cref="HashSet{T}"/>s
+    /// allocated on every request.
     /// </summary>
     public static int RegisterIpPermitLimit
     {
