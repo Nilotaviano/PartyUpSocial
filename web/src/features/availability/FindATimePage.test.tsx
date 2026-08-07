@@ -111,6 +111,65 @@ describe('FindATimePage', () => {
     expect(items[2]).toHaveTextContent('Sep 3')
   })
 
+  it('renders the server-resolved considered friends for the all-friends selection_D110', async () => {
+    // A-078: the response never echoes a per-id resolution of an explicit
+    // selection, so the all-friends entry point's "whose calendars" answer
+    // must come from `consideredFriends`, not the (empty, since nothing was
+    // checked) local checkbox state.
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/availability/overlaps') {
+        return Promise.resolve({
+          data: {
+            windows: [],
+            range: { start: '', end: '' },
+            selectionSource: 'allFriends',
+            consideredFriends: [
+              { ordinal: 0, displayName: 'Ada' },
+              { ordinal: 1, displayName: null },
+            ],
+          },
+        })
+      }
+      return defaultGetHandler(path)
+    })
+    renderPage()
+
+    const considered = await screen.findByTestId('find-a-time-considered-friends')
+    expect(considered).toHaveTextContent('Ada')
+    expect(considered).toHaveTextContent('Anonymous User')
+  })
+
+  it('renders the local selection, not consideredFriends, for an explicit selection_D110', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/friends')
+        return Promise.resolve({
+          data: {
+            items: [
+              { friendshipId: 'f-1', userId: 'friend-1', username: 'ada', displayName: 'Ada' },
+            ],
+          },
+        })
+      if (path === '/api/v1/availability/overlaps') {
+        return Promise.resolve({
+          data: {
+            windows: [],
+            range: { start: '', end: '' },
+            selectionSource: 'explicit',
+            consideredFriends: null,
+          },
+        })
+      }
+      return defaultGetHandler(path)
+    })
+    renderPage()
+
+    const checkbox = await screen.findByRole('checkbox', { name: /Ada/ })
+    fireEvent.click(checkbox)
+
+    await screen.findByText('1 selected')
+    expect(screen.queryByTestId('find-a-time-considered-friends')).not.toBeInTheDocument()
+  })
+
   it('warns on an over-duration window without hiding it_D109', async () => {
     api.get.mockImplementation((path: string) => {
       if (path === '/api/v1/availability/overlaps') {

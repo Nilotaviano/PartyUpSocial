@@ -111,7 +111,14 @@ export function HomePage() {
     approve.error ??
     reject.error
 
-  const invitations = actionable.data?.invitations ?? []
+  // §10.1: region 1's invitation rows render from `viewerRelation == "invitee"`
+  // — the server-shipped contract already scopes `invitations[]` to that
+  // relation, but the client re-asserts it rather than trusting the array's
+  // name alone, so a differently-related row (e.g. already `Going`) never
+  // renders here with respond actions.
+  const invitations = (actionable.data?.invitations ?? []).filter(
+    ({ session }) => session.viewerRelation === 'invitee',
+  )
   const joinRequests = actionable.data?.joinRequests ?? []
   const hasActionable = invitations.length > 0 || joinRequests.length > 0
   const hasMoreActionable = Boolean(

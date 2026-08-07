@@ -139,6 +139,7 @@ export function FindATimePage() {
             ? t('findATime.friendsAllDefault')
             : t('findATime.friendsSelected', { count: selectedFriends.length })}
         </p>
+
         <ul className="mt-2 space-y-1">
           {(friends.data ?? []).map((friend) => (
             <li key={friend.friendshipId}>
@@ -160,6 +161,33 @@ export function FindATimePage() {
             </li>
           ))}
         </ul>
+
+        {/*
+          A-078: the server never echoes a per-id resolution of an explicit
+          selection, so an "explicit" response has nothing new to add beyond
+          the checkboxes above. An omitted selection ("allFriends") is
+          resolved server-side, and `consideredFriends` is the only source of
+          "whose calendars produced these windows" — the client never derives
+          that set itself.
+        */}
+        {overlaps.data?.selectionSource === 'allFriends' &&
+          overlaps.data.consideredFriends && (
+            <div className="mt-3">
+              <p className="text-sm font-medium text-slate-700">
+                {t('findATime.friendsAllDefault')}:
+              </p>
+              <ul
+                className="mt-1 space-y-1 text-sm text-slate-600"
+                data-testid="find-a-time-considered-friends"
+              >
+                {overlaps.data.consideredFriends.map((friend) => (
+                  <li key={friend.ordinal}>
+                    {friend.displayName ?? t('detail.anonymous', { ns: 'sessions' })}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
       </section>
 
       <section aria-labelledby="find-a-time-range-heading">

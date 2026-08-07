@@ -122,6 +122,16 @@ describe('HomePage', () => {
                 session: summary({ id: 'session-invited', title: 'Needs a response', viewerRelation: 'invitee' }),
                 invitedAt: '2030-08-01T00:00:00Z',
               },
+              // A polluted row: already `Going` (or otherwise not awaiting a
+              // response) never renders here — the client re-asserts
+              // `viewerRelation == "invitee"` itself rather than trusting
+              // the `invitations[]` array's name alone (§10.1). If this
+              // filter regressed to "render everything in `invitations[]`
+              // verbatim", this row would show up with respond actions too.
+              {
+                session: summary({ id: 'session-going', title: 'Already going', viewerRelation: 'participant' }),
+                invitedAt: '2030-08-01T00:00:00Z',
+              },
             ],
           }),
         })
@@ -131,15 +141,14 @@ describe('HomePage', () => {
     renderPage()
 
     const actionable = await screen.findByTestId('home-region-actionable')
-    // A pending invitation shows RSVP actions and its own heading — an
-    // already-`Going` session never reaches this region at all, since
-    // `GET /me/actionable` only ever returns `viewerRelation == "invitee"`
-    // rows here (§5.1); this proves the client renders that distinction
-    // rather than assuming it.
+    // A pending invitation shows RSVP actions and its own heading.
     expect(await within(actionable).findByText('Needs a response')).toBeInTheDocument()
     expect(within(actionable).getByRole('heading', { name: 'Invitations' })).toBeInTheDocument()
     expect(within(actionable).getByRole('button', { name: 'Going' })).toBeInTheDocument()
     expect(within(actionable).queryByRole('heading', { name: 'Join requests' })).not.toBeInTheDocument()
+    // The polluted `participant`-relation row never renders, respond
+    // actions included.
+    expect(within(actionable).queryByText('Already going')).not.toBeInTheDocument()
   })
 
   it('names the requester on each join request row_D103', async () => {

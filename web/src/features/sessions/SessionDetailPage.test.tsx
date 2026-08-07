@@ -316,10 +316,17 @@ describe('SessionDetailPage', () => {
     api.get.mockImplementation((path: string) => {
       if (path === '/api/v1/sessions/{sessionId}') {
         const data = detail()
+        // A named row, unaffected — proves the masked row's Anonymous
+        // rendering isn't just the fixture's own null-displayName row
+        // coincidentally satisfying the assertion (round-1 F4).
+        data.roster[0].displayName = 'Named Friend'
         // A blocked-pair-masked entry: `userId` is absent on the wire
-        // (JsonIgnore WhenWritingNull), not merely null (§5.1).
+        // (JsonIgnore WhenWritingNull), not merely null (§5.1). A unique
+        // participationId lets the assertion scope to this exact row —
+        // deleting it must fail the test, not just remove one match among
+        // several.
         data.roster.push({
-          participationId: 'p-masked',
+          participationId: 'p-masked-unique',
           guestIdentityId: null,
           displayName: null,
           status: 'going',
@@ -336,6 +343,38 @@ describe('SessionDetailPage', () => {
     })
     renderPage()
 
-    expect(await screen.findAllByText('Anonymous User')).not.toHaveLength(0)
+    const maskedRow = await screen.findByTestId('roster-entry-p-masked-unique')
+    expect(within(maskedRow).getByText('Anonymous User')).toBeInTheDocument()
+    expect(screen.getByText('Named Friend')).toBeInTheDocument()
+  })
+
+  it('names the requester on an organizer join-request row instead of the raw id_D103', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/sessions/{sessionId}')
+        return Promise.resolve({ data: detail() })
+      if (path === '/api/v1/sessions/{sessionId}/join-requests')
+        return Promise.resolve({
+          data: {
+            items: [
+              {
+                id: 'jr-1',
+                requesterId: '11111111-1111-1111-1111-111111111111',
+                status: 'pending',
+                createdAt: '2030-08-01T00:00:00Z',
+                requester: { ordinal: 0, displayName: 'Ada Requester' },
+              },
+            ],
+            nextCursor: null,
+          },
+        })
+      if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    renderPage()
+
+    expect(await screen.findByText('Ada Requester')).toBeInTheDocument()
+    expect(
+      screen.queryByText('11111111-1111-1111-1111-111111111111'),
+    ).not.toBeInTheDocument()
   })
 })

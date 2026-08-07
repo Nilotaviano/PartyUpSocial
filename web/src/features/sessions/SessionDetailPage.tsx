@@ -317,7 +317,9 @@ export function SessionDetailPage() {
   // A-077 (d): a Removed participation keeps whatever inherited access the viewer
   // still has, but the shipped join mutation refuses a request from it
   // (DomainError.RemovalIsPermanent) — the request-to-join action is not offered.
-  const canRequestJoin = viewerEntry?.status !== 'removed'
+  // Hidden by default until the roster has loaded — surfacing it early would flash
+  // it on for a Removed viewer whose status isn't knowable yet.
+  const canRequestJoin = Boolean(data) && viewerEntry?.status !== 'removed'
   const inProgress = data ? isSessionInProgress(data) : false
 
   return (
@@ -469,7 +471,9 @@ export function SessionDetailPage() {
                     key={request.id}
                     className="flex items-center justify-between gap-2 rounded-md border border-slate-200 p-3"
                   >
-                    <span>{request.requesterId}</span>
+                    <span>
+                      {request.requester?.displayName ?? t('detail.anonymous')}
+                    </span>
                     <span className="flex gap-2">
                       <button
                         className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
@@ -513,6 +517,7 @@ export function SessionDetailPage() {
                     <li
                       key={entry.participationId}
                       className="flex items-center justify-between gap-2 py-1"
+                      data-testid={`roster-entry-${entry.participationId}`}
                     >
                       <span>{entry.displayName ?? t('detail.anonymous')}</span>
                       {isOrganizer && entry.origin === 'guestLink' && (
