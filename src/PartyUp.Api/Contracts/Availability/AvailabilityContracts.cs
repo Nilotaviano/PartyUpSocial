@@ -95,7 +95,6 @@ public sealed class MaskedParticipantAssigner(IReadOnlyDictionary<UserId, Displa
     private readonly IReadOnlyDictionary<UserId, DisplayName?> _knownDisplayNames =
         knownDisplayNames ?? new Dictionary<UserId, DisplayName?>();
     private readonly Dictionary<UserId, int> _ordinalsByUserId = [];
-    private readonly Dictionary<string, int> _ordinalsByDisplayName = [];
     private int _nextOrdinal;
 
     /// <summary>Looks the display name up in the dictionary this assigner was built with (the friend-set
@@ -118,30 +117,6 @@ public sealed class MaskedParticipantAssigner(IReadOnlyDictionary<UserId, Displa
     }
 
     public IReadOnlyList<MaskedParticipant> For(IEnumerable<UserId> ids) => [.. ids.Select(id => For(id))];
-
-    /// <summary>
-    /// The one Phase 5 read model with no user id to correlate on at all —
-    /// <c>ActionableJoinRequest</c> (<c>SessionReadModels.cs</c>, outside this slice's write set beyond
-    /// F5) carries only a resolved display name. Keys the ordinal on that name instead: the best
-    /// identity signal that record exposes, not a true identity correlation — two different people
-    /// sharing a display name would collide. A null name never reuses another null name's ordinal,
-    /// since two different anonymous people are not "the same person" either.
-    /// </summary>
-    public MaskedParticipant ForDisplayNameOnly(DisplayName? displayName)
-    {
-        if (displayName is not { } name)
-        {
-            return new MaskedParticipant(_nextOrdinal++, null);
-        }
-
-        if (!_ordinalsByDisplayName.TryGetValue(name.Value, out int ordinal))
-        {
-            ordinal = _nextOrdinal++;
-            _ordinalsByDisplayName[name.Value] = ordinal;
-        }
-
-        return new MaskedParticipant(ordinal, name.Value);
-    }
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

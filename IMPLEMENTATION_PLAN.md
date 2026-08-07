@@ -97,17 +97,23 @@ Phase 4 shipped end-to-end across six slices (S1–S6), documented in `PHASE4_DE
 
 **Phase 4 checkpoint taken:** see `PHASE4_REFORECAST.md` for the baseline date, elapsed calendar/work time, gate-pass dates, defects/reruns by slice, and the resulting Phase 5–9 estimate and launch-date range. No scope was reduced (D-163).
 
-## Phase 5 — Availability + recommendations + calendar
+## Phase 5 — Availability + recommendations + calendar (delivered)
 
-- Availability CRUD on the Spike-A foundation: drag + keyboard entry, 15-min increments, one-time/weekly, occurrence vs series semantics (D-132, D-133, D-134, D-143).
-- Time-zone change migration of weekly blocks (D-061).
-- Find-a-time: friend selection, date range, ranked overlaps (D-035, D-100, D-108), prefill session or poll (D-102), over-duration warning (D-109).
-- Week-calendar + agenda views with layers/filters, reset-on-visit (D-104, D-111, D-117, D-135). Test Safari early — pointer-event quirks bite drag UIs.
-- Home: pending items, polls needing votes, upcoming sessions, top-5 suggestions + See all (D-103, D-110, D-116, D-136); Discover view (D-149).
+Phase 5 shipped end-to-end across eight slices (S1-S8), documented in `PHASE5_DESIGN.md` and reconciled in `TRACEABILITY.md`.
+
+- **Browser + axe lane (S1):** the Playwright lane runs on CI's built topology, gated by a dedicated `browser` job's own solution build and SPA placement; axe (`Deque.AxeCore.Playwright`, WCAG 2.2 A/AA tags) ran over every Phase 4 route at S1 close and recorded zero findings, so the exclusion list stayed empty through Phase 5 close (`P5-AXE-02`, discharged with nothing to dispose); a narrow WebKit pointer step runs alongside the Chromium flow+axe step, both filtered so no class runs twice.
+- **Availability persistence, commands, zone migration (S2-S3):** one-time blocks and weekly series on the 15-minute grid (D-071, D-132, D-133), occurrence-scoped edits (only-this / this-and-future, D-134/D-143), a time-zone change migrates every series' `ZoneId` inside the profile's own transaction, preserving local clock time and touching no block (D-061); every availability write locks the owner's row first, then the touched tables in one Postgres-imposed order per table (A-075); deletion effects remove availability through the shared executor.
+- **Read stack (S4):** overlap search and the top-5 suggestion ranking (D-035, D-052, D-108, D-110, D-116) never disclose a per-id resolution of a client-supplied friend selection (A-078); the calendar's four declared layers, Discover (`scope=discover`, A-077 (c)/(d), never an already-attached session), and the actionable inbox (`P5-HOME-01`) all reuse the one session-visibility SQL fragment (A-077); blocked-pair rosters are masked server-side (D-076) closing the Phase 4 gap.
+- **HTTP/OpenAPI (S5):** the full availability/calendar/Home/Discover surface ships under `/api/v1` with exact operation ids and a closed problem-code mapping (`P5-HTTP-01`); `npm run gen:api` runs last, after the A-079 payload budget is measured and held.
+- **Week grid, agenda, layers, dirty guard (S6):** a custom keyboard-and-pointer week grid (`role="grid"`, roving tabindex, live-region selection announcements) proves keyboard-only create/edit/delete and the occurrence scope dialog reachable without a pointer (`P5-CAL-01`); the WebKit pointer lane proves long-press selection, drag auto-scroll, and 15-minute snapping under real touch pointer events (`P5-TOUCH-01`, automated half); the dirty-form guard gains router interception alongside its existing `beforeunload` half.
+- **Find-a-time, Home, Discover (S7):** Home renders D-103's actionable-inbox-first region order, wired to the shipped Phase 4 respond/approve/reject mutations, then the declared-empty polls band, upcoming, Find-a-time + top-5 suggestions, and the discoverable region; Discover ships on all three D-149 surfaces, every row linking to the shipped session detail route (D-114).
+- **Closeout (S8):** a real-browser Discover→detail→join-request proof; blocked-pair-masking and ordinal-assignment carries closed; `P5-AXE-02` discharged in full (zero findings, zero exclusions); `P5-TOUCH-01`'s human real-device/NVDA checkpoint re-deferred to Phase 8 by explicit owner decision, 2026-08-07 — the automated WebKit lane stands as Phase 5's interim evidence; every `TRACEABILITY.md` row closed to a named test, none reading `Client | 5`.
+- Prefill session (D-102 session arm) — shipped in Phase 5 (A-083, unconditional); see the Phase 6 row below for the poll arm (§1.4 decision 1 of `PHASE5_DESIGN.md`, a relocation not a reduction, D-163).
 
 ## Phase 6 — Polls
 
 - Poll creation (full details + 2..12 options, deadlines), voting grid (options × Available/Maybe/Unavailable — **second a11y hotspot; explicit keyboard/SR task**), suggestions, option deletion, deadline close, organizer selection, expiry, finalization → session with capacity allocation (whole §7.3/8.1 poll block), sweeper jobs for deadline/expiry.
+- Prefill poll (D-102, poll arm — the session arm shipped in Phase 5, A-083; relocated here by owner decision, a relocation not a reduction, D-163).
 - Poll join requests during Polling (D-118), guest voting, private guest-only polls (D-125). Registered-user attachment commands inherit `P3-LK-01` and cannot close until block-versus-join/invite orderings plus parent-before-occupancy reads are proven.
 - Poll notification events complete (D-120, D-170), including the poll extension of masked block-derived state materialization with no block cause/actor; deletion effect added: owned-poll expiry (D-092).
 

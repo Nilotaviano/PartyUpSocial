@@ -104,6 +104,7 @@ public sealed record ActionableInvitation(SessionSummary Session, Instant Invite
 public sealed record ActionableJoinRequest(
     JoinRequestId Id,
     SessionSummary Session,
+    UserId RequesterId,
     DisplayName? RequesterDisplayName,
     Instant RequestedAt);
 

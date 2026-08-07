@@ -550,6 +550,7 @@ internal sealed class FakeSessionReadRepository(FakeSessionRepository store) : I
                     x.Session.Id, x.Session.OrganizerId, x.Session.Title, x.Session.StartTime, x.Session.Duration,
                     x.Session.Platform, x.Session.Game, x.Session.Status, x.Session.IsPrivate, x.Session.MaxCapacity,
                     x.Session.ActiveOccupancy),
+                x.Request.RequesterId,
                 null,
                 x.Request.CreatedAt))];
 

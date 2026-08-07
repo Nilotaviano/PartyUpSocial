@@ -137,6 +137,23 @@ describe('FindATimePage', () => {
     const considered = await screen.findByTestId('find-a-time-considered-friends')
     expect(considered).toHaveTextContent('Ada')
     expect(considered).toHaveTextContent('Anonymous User')
+
+    // The duplicated label is collapsed to one rendering — the summary text
+    // above the checkboxes is the only "All accepted friends" on the page,
+    // never repeated as a second label over the list.
+    expect(screen.getAllByText('All accepted friends')).toHaveLength(1)
+  })
+
+  it('renders no considered-friends label or list for an empty allFriends selection_S8', async () => {
+    // The default fixture already returns selectionSource 'allFriends' with
+    // an empty consideredFriends array — the list itself must not render,
+    // and "All accepted friends" must appear exactly once on the page (the
+    // summary text above the checkboxes), never a second time as a label
+    // over nothing.
+    renderPage()
+
+    expect(screen.queryByTestId('find-a-time-considered-friends')).not.toBeInTheDocument()
+    expect(await screen.findAllByText('All accepted friends')).toHaveLength(1)
   })
 
   it('renders the local selection, not consideredFriends, for an explicit selection_D110', async () => {

@@ -282,7 +282,7 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
         {
             SessionSummary summary = summariesBySessionId[request.SessionId!.Value.Value];
             DisplayName? requesterName = requesterNames.GetValueOrDefault(request.RequesterId.Value);
-            joinRequests.Add(new ActionableJoinRequest(request.Id, summary, requesterName, request.CreatedAt));
+            joinRequests.Add(new ActionableJoinRequest(request.Id, summary, request.RequesterId, requesterName, request.CreatedAt));
         }
 
         return new ActionableInbox(invitations, joinRequests, hasMoreInvitations, hasMoreJoinRequests);

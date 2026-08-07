@@ -1,9 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
 using PartyUp.Application.Sessions;
+using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
+using PartyUp.Infrastructure.Persistence;
 
 namespace PartyUp.Api.IntegrationTests.Sessions;
 
@@ -174,6 +178,9 @@ public sealed class DiscoverEndpointTests : IAsyncLifetime, IDisposable
             await viewerSession.GetAsync($"/api/v1/sessions/{blockedByOrganizerId:D}"), missing);
 
         // (4) Withdrawn join request, viewer otherwise unfriended with organizer (no other path).
+        // Isolated to the withdrawn state itself: unfriending (not blocking) removes the direct-
+        // friendship path without also rule-4-excluding the viewer, so the row proves that a
+        // withdrawn request alone — with no inherited path left standing — is what excludes.
         SessionHttpUser withdrawOrganizer = await SessionEndpointTestSupport.SeedAsync(_factory);
         using SessionHttpSession withdrawOrganizerSession =
             await SessionEndpointTestSupport.SignInAsync(_factory, withdrawOrganizer.Id);
@@ -189,15 +196,7 @@ public sealed class DiscoverEndpointTests : IAsyncLifetime, IDisposable
             HttpStatusCode.NoContent,
             (await viewerSession.SendUnsafeAsync(
                 HttpMethod.Delete, $"/api/v1/sessions/{withdrawnId:D}/join-requests/mine")).StatusCode);
-        // A withdrawn join request removes the requester's only path; the friendship above still grants
-        // inherited access via rule 2, so this row also needs the friendship removed — approximated
-        // here by blocking, which both removes the friendship and rule 4-excludes the viewer.
-        Assert.Equal(
-            HttpStatusCode.Created,
-            (await viewerSession.SendUnsafeAsync(
-                HttpMethod.Post,
-                "/api/v1/blocks",
-                JsonContent.Create(new { targetUsername = withdrawOrganizer.Username }))).StatusCode);
+        await UnfriendAsync(withdrawOrganizer.Id, viewer.Id);
         await AssertSameProblemShapeAsync(await viewerSession.GetAsync($"/api/v1/sessions/{withdrawnId:D}"), missing);
 
         // (5) No-extender: a non-private session the viewer has no friend path to at all.
@@ -246,13 +245,32 @@ public sealed class DiscoverEndpointTests : IAsyncLifetime, IDisposable
 
     private static readonly string[] ValidStatuses = ["unconfirmed", "confirmed"];
 
-    private static Duration _nextStartOffset = Duration.FromDays(1);
+    // Per-instance, not static: each fact gets its own offset sequence rather than sharing mutable
+    // state across every fact this test class ever runs.
+    private Duration _nextStartOffset = Duration.FromDays(1);
 
     private Instant NextStart()
     {
         Instant start = _factory.Clock.GetCurrentInstant() + _nextStartOffset;
         _nextStartOffset += Duration.FromHours(1);
         return start;
+    }
+
+    /// <summary>
+    /// Removes the friendship directly (bypassing HTTP, mirroring
+    /// <see cref="SessionEndpointTestSupport.MakeFriendsAsync"/>'s own DB-direct construction) — the
+    /// isolated (4) row needs exactly one effect (the friendship gone), never blocking's second,
+    /// rule-4 effect layered on top of it.
+    /// </summary>
+    private async Task UnfriendAsync(UserId a, UserId b)
+    {
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (UserId lo, UserId hi) = Friendship.CanonicalPair(a, b);
+        Friendship friendship = await context.Friendships
+            .SingleAsync(f => f.UserLoId == lo && f.UserHiId == hi);
+        context.Friendships.Remove(friendship);
+        await context.SaveChangesAsync();
     }
 
     private static async Task AssertSameProblemShapeAsync(HttpResponseMessage actual, HttpResponseMessage baseline)

@@ -429,10 +429,9 @@ public sealed record ActionableInboxResponse(
     bool HasMoreJoinRequests)
 {
     // One shared assigner for the whole inbox response — an invitee organizer who also happens to
-    // be a join-request requester (or appears on two rows) keeps one ordinal.
-    // ActionableJoinRequest (SessionReadModels.cs) carries no requester user id, only a resolved
-    // display name, so its ordinal goes through MaskedParticipantAssigner.ForDisplayNameOnly — the
-    // documented, disclosed exception (see that method's doc comment).
+    // be a join-request requester (or appears on two rows) keeps one ordinal. ActionableJoinRequest
+    // (SessionReadModels.cs) now carries the requester's user id, so its ordinal is keyed on that id
+    // exactly like every other MaskedParticipant in this response — no display-name approximation.
     public static ActionableInboxResponse From(ActionableInbox inbox, MaskedParticipantAssigner ordinals) =>
         new(
             [.. inbox.Invitations.Select(invitation => new ActionableInvitationResponse(
@@ -441,7 +440,7 @@ public sealed record ActionableInboxResponse(
             [.. inbox.JoinRequests.Select(request => new ActionableJoinRequestResponse(
                 request.Id.Value,
                 SessionSummaryResponse.From(request.Session, ordinals),
-                ordinals.ForDisplayNameOnly(request.RequesterDisplayName),
+                ordinals.For(request.RequesterId, request.RequesterDisplayName),
                 SessionWireFormat.Format(request.RequestedAt)))],
             inbox.HasMoreInvitations,
             inbox.HasMoreJoinRequests);

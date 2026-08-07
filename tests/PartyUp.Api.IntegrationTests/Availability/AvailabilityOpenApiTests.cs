@@ -29,17 +29,44 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
     ];
 
     /// <summary>
+    /// S8 hardening (closes the round-1/round-2 "swap-hole": a bare count anchor passes even when one
+    /// operation is silently swapped for another, so nothing short of the full set closes it).
     /// Every non-Phase-5 operation id in the shipped document uses a raw <c>.WithName("…")</c> string
     /// literal rather than an <c>ApiOperationIds</c> constant (the pre-Phase-4 surface predates that
-    /// convention), so the closed-set proof anchors on the document's own total count rather than
-    /// re-deriving the pre-existing ids from a constants class that does not enumerate them. Captured
-    /// against this test factory's own <c>Testing</c>-environment host (which additionally maps the
-    /// four <c>/api/v1/_slice2/*</c> sign-in helper routes <c>Program.cs</c> only registers under that
-    /// environment name): 101 total operation ids, of which exactly the 12 above are new. A deliberate
-    /// future change to either count must update this constant explicitly — it is not meant to
-    /// silently absorb drift.
+    /// convention), so this is a hand-authored closed list, not a re-derivation from a constants class
+    /// that does not enumerate them. Captured against this test factory's own <c>Testing</c>-environment
+    /// host (which additionally maps the four <c>/api/v1/_slice2/*</c> sign-in helper routes
+    /// <c>Program.cs</c> only registers under that environment name): the 89 operation ids the Phase 5
+    /// surface was built on top of, plus the 12 new ones in <see cref="NewPhase5OperationIds"/> above —
+    /// 101 total. A deliberate future change to the shipped surface must update this list explicitly;
+    /// it is not meant to silently absorb an added, removed, or renamed operation.
     /// </summary>
-    private const int ExpectedTotalOperationCount = 101;
+    private static readonly string[] PreExistingOperationIds =
+    [
+        "AcceptFriendRequest", "ApproveSessionJoinRequest", "BanAdminUser", "BlockUser",
+        "CancelFriendRequest", "CancelSession",
+        "ChangeEmail", "ChangeMyAvatar", "ChangeMyDisplayName", "ChangeMyLocale",
+        "ChangeMyReminderDefault", "ChangeMyTimeZone", "ChangeMyUsername", "ChangePassword",
+        "ChangePlatformHandle", "CheckUsernameAvailability", "ClaimGuestSessionLink",
+        "CompleteOnboarding", "CompleteSteamDeletion", "CompleteSteamExternal",
+        "ConfirmAccountDeletion", "ConsumeMagicLink", "CreateSession", "CreateSessionGuestLinks",
+        "DeleteAuthMethod", "DeleteMe", "DeletePlatformLink", "EditSession", "ForgotPassword",
+        "GetAdminUser", "GetAntiforgery", "GetAuthMethods", "GetFriendShare", "GetGuestSession",
+        "GetMyProfile", "GetOnboardingState", "GetPlatformLinks", "GetSession", "GetSessionDetail",
+        "GetUserProfile", "ImportSteamFriends", "InviteSessionUsers", "IssueExternalIntent",
+        "LeaveSession", "LinkPlatform", "ListAdminUsers", "ListBlocks", "ListFriendRequests",
+        "ListFriends", "ListSessionJoinRequests", "ListSessions", "Login", "Logout",
+        "PromoteSessionWaitlistParticipant", "ReadDeletionJournal", "Reauthenticate",
+        "ReauthenticateByEmail", "Register", "RejectFriendRequest", "RejectSessionJoinRequest",
+        "RejectSessionWaitlistParticipant", "RemoveSessionGuest", "RenameGuestSessionIdentity",
+        "RequestAccountDeletion", "RequestEmailVerification", "RequestMagicLink",
+        "RequestSessionJoin", "ResetPassword", "ResolveFriendCode", "RespondAsGuest",
+        "RespondToSessionInvitation", "RevokeSessionGuestLink", "RunDeletionSweep",
+        "SendFriendRequest", "SetPassword", "SetSessionReminder", "Slice2Authenticated",
+        "Slice2Onboarded", "Slice2SignIn", "Slice2SignOut", "StartSteamDeletion",
+        "StartSteamExternal", "UnbanAdminUser", "UnblockUser", "Unfriend",
+        "ValidateOnboardingProfile", "VerifyEmail", "VerifyEmailChange", "WithdrawSessionJoinRequest",
+    ];
 
     private readonly PartyUpApiFactory _factory = new();
 
@@ -80,7 +107,13 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         }
 
         Assert.DoesNotContain(ApiOperationIds.ExchangeGuestLink, operationIds);
-        Assert.Equal(ExpectedTotalOperationCount, operationIds.Count);
+
+        // S8 hardening: the exact shipped set, not merely its count — a swap (one operation added,
+        // a different one silently removed) leaves the count anchor green while this catches it.
+        string[] expectedOperationIds = [.. PreExistingOperationIds, .. NewPhase5OperationIds];
+        Assert.Equal(
+            expectedOperationIds.OrderBy(id => id, StringComparer.Ordinal).ToArray(),
+            operationIds.OrderBy(id => id, StringComparer.Ordinal).ToArray());
 
         // For the new operations: request/response schemas are non-empty, real named components —
         // never `object`/`unknown` placeholders. Specifically, the F1 discriminated union.

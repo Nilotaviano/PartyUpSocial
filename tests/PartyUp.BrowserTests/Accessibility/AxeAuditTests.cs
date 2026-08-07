@@ -111,12 +111,62 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
             // anyone. Read after the invite step so this navigation doesn't disturb it.
             string ownFriendCode = await PlaywrightFixture.GetOwnFriendCodeAsync(organizer.Page);
 
+            // S8 hardening: seed a real availability series so the `/calendar` scan below exercises
+            // the grid with a populated `myAvailability` layer (a busy cell, its ARIA name, in-grid
+            // block semantics) rather than the empty-grid DOM every prior run scanned — the session
+            // created above already populates the `sessions` layer for this same account.
+            await SeedWeeklyAvailabilityAsync(organizer.Page);
+
             _context = new AuditContext(organizer, sessionId, guestLinkUrl, ownFriendCode, onboardingFindings);
             return _context;
         }
         finally
         {
             SetupLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// No web UI authors a recurring series in Phase 5's write set (server-side only), so — exactly
+    /// like <c>AvailabilityCalendarFlowTests.SeedWeeklySeriesAsync</c> — this seeds one through the
+    /// same authenticated origin the SPA itself calls, from inside the page (shares the session
+    /// cookie; mints its own antiforgery token the way <c>web/src/api/client.ts</c> does), never a
+    /// second HTTP client or a second registration.
+    /// </summary>
+    private static async Task SeedWeeklyAvailabilityAsync(IPage page)
+    {
+        JsonElement result = await page.EvaluateAsync<JsonElement>(
+            """
+            async () => {
+                const now = new Date();
+                const pad = (n) => String(n).padStart(2, '0');
+                const dayOfWeek = ((now.getDay() + 6) % 7) + 1;
+                const effectiveFrom =
+                    `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+                const tokenResponse = await fetch('/api/v1/auth/antiforgery', { credentials: 'include' });
+                const { token } = await tokenResponse.json();
+                const response = await fetch('/api/v1/me/availability/series', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
+                    body: JSON.stringify({
+                        dayOfWeek,
+                        startTime: '10:00',
+                        durationMinutes: 60,
+                        effectiveFrom,
+                        effectiveUntil: null,
+                    }),
+                });
+                if (!response.ok) {
+                    throw new Error('Availability seed failed: ' + response.status);
+                }
+                return response.json();
+            }
+            """);
+
+        if (result.ValueKind == JsonValueKind.Undefined)
+        {
+            throw new InvalidOperationException("Availability series seed returned no data.");
         }
     }
 
