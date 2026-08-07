@@ -2,6 +2,7 @@ using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Availability;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Visibility;
 
 namespace PartyUp.Application.Availability;
 
@@ -50,6 +51,7 @@ public sealed class EditAvailabilityOccurrenceUseCase(IAvailabilityRepository av
         unitOfWork.ExecuteAsync(
             async ct =>
             {
+                AvailabilityVisibility.RequireWrite(ownerId, Viewer.Create(ownerId));
                 await availability.LockOwnerAsync(ownerId, ct);
 
                 IReadOnlyList<AvailabilitySeries> lockedSeries = await availability.LockSeriesAsync([seriesId], ct);
@@ -138,7 +140,12 @@ public sealed class EditAvailabilityOccurrenceUseCase(IAvailabilityRepository av
 /// <summary>
 /// Delete-one (§8): idempotent via the skip PK. On a date already edited via <c>onlyThis</c>, also
 /// removes that edit's materialized block — the skip write stays idempotent, but the block it produced
-/// is not otherwise reachable for cleanup.
+/// is not otherwise reachable for cleanup. <strong>Takes no series-row lock</strong> (round-1 finding
+/// F2a): this write mutates skips (an INSERT) and possibly a materialized block, never the series row
+/// itself, so <see cref="IAvailabilityRepository.FindSeriesAsync"/> — a plain read — is what §6.1 step 5
+/// re-validates against. This is what makes the owner's <c>users</c> row the <em>only</em> lock this
+/// write shares with a concurrent <c>thisAndFuture</c> split of the same series (P5-LK-01's
+/// <c>SplitAndDeleteOneOnTheSameDateSerializeOnTheOwnerLock_D143</c> discriminator).
 /// </summary>
 public sealed class DeleteAvailabilityOccurrenceUseCase(IAvailabilityRepository availability, IUnitOfWork unitOfWork)
 {
@@ -150,11 +157,11 @@ public sealed class DeleteAvailabilityOccurrenceUseCase(IAvailabilityRepository 
         unitOfWork.ExecuteAsync(
             async ct =>
             {
+                AvailabilityVisibility.RequireWrite(ownerId, Viewer.Create(ownerId));
                 await availability.LockOwnerAsync(ownerId, ct);
 
-                IReadOnlyList<AvailabilitySeries> lockedSeries = await availability.LockSeriesAsync([seriesId], ct);
-                AvailabilitySeries? series = lockedSeries.FirstOrDefault(s => s.Id == seriesId && s.OwnerId == ownerId);
-                if (series is null)
+                AvailabilitySeries? series = await availability.FindSeriesAsync(seriesId, ct);
+                if (series is null || series.OwnerId != ownerId)
                 {
                     throw new DomainException(DomainError.NotFound, "No such availability series.");
                 }

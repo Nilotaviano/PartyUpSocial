@@ -1,6 +1,7 @@
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Availability;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Visibility;
 
 namespace PartyUp.Application.Availability;
 
@@ -15,6 +16,7 @@ public sealed class CreateAvailabilityBlockUseCase(IAvailabilityRepository avail
         unitOfWork.ExecuteAsync(
             async ct =>
             {
+                AvailabilityVisibility.RequireWrite(ownerId, Viewer.Create(ownerId));
                 await availability.LockOwnerAsync(ownerId, ct);
 
                 AvailabilityBlock block = AvailabilityBlock.Create(ownerId, range);
@@ -36,6 +38,7 @@ public sealed class EditAvailabilityBlockUseCase(IAvailabilityRepository availab
         unitOfWork.ExecuteAsync(
             async ct =>
             {
+                AvailabilityVisibility.RequireWrite(ownerId, Viewer.Create(ownerId));
                 await availability.LockOwnerAsync(ownerId, ct);
 
                 IReadOnlyList<AvailabilityBlock> locked = await availability.LockBlocksAsync([blockId], ct);
@@ -67,6 +70,7 @@ public sealed class DeleteAvailabilityBlockUseCase(IAvailabilityRepository avail
         unitOfWork.ExecuteAsync(
             async ct =>
             {
+                AvailabilityVisibility.RequireWrite(ownerId, Viewer.Create(ownerId));
                 await availability.LockOwnerAsync(ownerId, ct);
 
                 IReadOnlyList<AvailabilityBlock> locked = await availability.LockBlocksAsync([blockId], ct);

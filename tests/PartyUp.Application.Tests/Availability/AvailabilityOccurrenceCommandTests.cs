@@ -97,6 +97,10 @@ public sealed class AvailabilityOccurrenceCommandTests
         Assert.Equal(beforeSplit, remainingSkip.OccurrenceDate);
         AvailabilityBlock remainingBlock = Assert.Single(repo.Blocks);
         Assert.Equal(beforeSplit, remainingBlock.SourceOccurrenceDate);
+
+        // F5: §6.1's step order (owner, series, blocks, skips) for a write that touches every table —
+        // asserted here rather than only on a zero-table create, which proves nothing about ordering.
+        Assert.Equal(["owner", "series", "blocks-by-series", "skips"], repo.LockCalls);
     }
 
     [Fact]

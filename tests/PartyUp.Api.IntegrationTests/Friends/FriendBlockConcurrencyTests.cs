@@ -186,7 +186,13 @@ public sealed class FriendBlockConcurrencyTests : IAsyncLifetime
             new FriendshipRepository(context),
             new BlockRepository(context),
             new NotificationRepository(context),
-            new CountingReminderScheduleWriter(counts));
+            new CountingReminderScheduleWriter(counts),
+            new PartyUp.Infrastructure.Deletion.DeletionScopeProvider(
+                context,
+                new SessionLockRepository(context),
+                new UsernameRegistryRepository(context),
+                new AvailabilityRepository(context)),
+            new AvailabilityRepository(context));
         var result = new DeletionExecutionResult(
             CanceledSessions: [],
             ExpiredPolls: [],

@@ -100,6 +100,13 @@ internal sealed class FakeAvailabilityRepository : IAvailabilityRepository
             [.. Series.Where(s => s.OwnerId == ownerId)]);
     }
 
+    public Task<AvailabilitySeries?> FindSeriesAsync(
+        AvailabilitySeriesId seriesId, CancellationToken cancellationToken)
+    {
+        LockCalls.Add("find-series");
+        return Task.FromResult(Series.FirstOrDefault(s => s.Id == seriesId));
+    }
+
     public Task<IReadOnlyList<AvailabilityBlock>> LockBlocksAsync(
         IReadOnlyCollection<AvailabilityBlockId> blockIds, CancellationToken cancellationToken)
     {

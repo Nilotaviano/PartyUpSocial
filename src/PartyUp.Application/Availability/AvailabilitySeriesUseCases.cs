@@ -2,6 +2,7 @@ using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Availability;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Visibility;
 
 namespace PartyUp.Application.Availability;
 
@@ -21,6 +22,7 @@ public sealed class CreateAvailabilitySeriesUseCase(IAvailabilityRepository avai
         unitOfWork.ExecuteAsync(
             async ct =>
             {
+                AvailabilityVisibility.RequireWrite(ownerId, Viewer.Create(ownerId));
                 await availability.LockOwnerAsync(ownerId, ct);
 
                 AvailabilitySeries series = AvailabilitySeries.Create(
@@ -43,6 +45,7 @@ public sealed class DeleteAvailabilitySeriesUseCase(IAvailabilityRepository avai
         unitOfWork.ExecuteAsync(
             async ct =>
             {
+                AvailabilityVisibility.RequireWrite(ownerId, Viewer.Create(ownerId));
                 await availability.LockOwnerAsync(ownerId, ct);
 
                 IReadOnlyList<AvailabilitySeries> lockedSeries = await availability.LockSeriesAsync([seriesId], ct);

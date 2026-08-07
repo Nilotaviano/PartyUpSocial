@@ -19,19 +19,18 @@ namespace PartyUp.Infrastructure.Friends;
 /// locks and deletes the subject's whole availability surface through
 /// <see cref="IDeletionScopeProvider.LoadAvailabilityForUpdateAsync"/> and
 /// <see cref="IAvailabilityRepository"/> — inside this same already-open transaction, so accounting for
-/// that scope stays honest rather than a claimed-but-silent purge. <paramref name="scopeProvider"/> and
-/// <paramref name="availability"/> default to <see langword="null"/> for callers constructed directly
-/// without the widened availability protocol (the same optional-trailing-parameter shape
-/// <c>ExecuteDeletionForUserUseCase</c> already uses for its own Phase 4 widening); production
-/// resolution always supplies both through DI.
+/// that scope stays honest rather than a claimed-but-silent purge. Both are <strong>required</strong>
+/// (round-1 finding F7): an optional default made a silent purge-skip reachable from any direct
+/// construction site that forgot to supply them, which is exactly the "accounting stays honest" failure
+/// mode this class exists to prevent. Production resolution supplies both through DI.
 /// </summary>
 public sealed class DeletionResultApplier(
     IFriendshipRepository friendships,
     IBlockRepository blocks,
     INotificationRepository notifications,
     IReminderScheduleWriter reminderSchedule,
-    IDeletionScopeProvider? scopeProvider = null,
-    IAvailabilityRepository? availability = null) : IDeletionResultApplier
+    IDeletionScopeProvider scopeProvider,
+    IAvailabilityRepository availability) : IDeletionResultApplier
 {
     public async Task ApplyAsync(
         DeletionExecutionResult result,
@@ -51,7 +50,7 @@ public sealed class DeletionResultApplier(
             await reminderSchedule.ApplyAsync(cancellation, cancellationToken);
         }
 
-        if (result.PurgedData.Contains(UserDataScope.Availability) && scopeProvider is not null && availability is not null)
+        if (result.PurgedData.Contains(UserDataScope.Availability))
         {
             await ApplyAvailabilityDeletionAsync(subject, cancellationToken);
         }
@@ -60,11 +59,11 @@ public sealed class DeletionResultApplier(
     private async Task ApplyAvailabilityDeletionAsync(UserId subject, CancellationToken cancellationToken)
     {
         AvailabilityDeletionScope scope =
-            await scopeProvider!.LoadAvailabilityForUpdateAsync(subject, cancellationToken);
+            await scopeProvider.LoadAvailabilityForUpdateAsync(subject, cancellationToken);
 
         foreach (AvailabilitySeries series in scope.Series)
         {
-            availability!.RemoveSkipsFrom(series.Id, series.EffectiveFrom);
+            availability.RemoveSkipsFrom(series.Id, series.EffectiveFrom);
             availability.RemoveMaterializedBlocksFrom(series.Id, series.EffectiveFrom);
             availability.RemoveSeries(series);
         }
@@ -75,7 +74,7 @@ public sealed class DeletionResultApplier(
             // standalone one-time blocks are left to remove here.
             if (!block.IsMaterializedFromSeries)
             {
-                availability!.RemoveBlock(block);
+                availability.RemoveBlock(block);
             }
         }
     }

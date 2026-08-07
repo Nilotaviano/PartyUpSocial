@@ -46,6 +46,12 @@ public sealed class AvailabilityRepository(AppDbContext context) : IAvailability
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<AvailabilitySeries?> FindSeriesAsync(
+        AvailabilitySeriesId seriesId, CancellationToken cancellationToken) =>
+        await context.AvailabilitySeries
+            .AsNoTracking()
+            .SingleOrDefaultAsync(series => series.Id == seriesId, cancellationToken);
+
     public async Task<IReadOnlyList<AvailabilitySeries>> LockOwnerSeriesAsync(
         UserId ownerId, CancellationToken cancellationToken) =>
         await context.AvailabilitySeries

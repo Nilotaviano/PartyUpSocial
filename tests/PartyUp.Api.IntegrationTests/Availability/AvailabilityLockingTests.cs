@@ -6,6 +6,7 @@ using PartyUp.Application.Availability;
 using PartyUp.Application.Profile;
 using PartyUp.Domain.Availability;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Persistence;
 
 namespace PartyUp.Api.IntegrationTests.Availability;
@@ -14,6 +15,11 @@ namespace PartyUp.Api.IntegrationTests.Availability;
 /// PHASE5_DESIGN.md P5-LK-01: the owner's <c>users</c> row is the serialization point for every
 /// availability write (A-075). Proved through the real S3 command surface, not raw SQL, mirroring
 /// <c>Sessions/SessionLockingTests.cs</c>'s precedent for the session-parent lock.
+///
+/// Round-1 verification (findings F1/F2) required every race here to be a <em>genuine, forced</em>
+/// interleaving rather than two un-awaited tasks racing on their own schedule: the "winner" side of
+/// each race runs the real use case inside a transaction this test opens and holds open itself — a
+/// real barrier — so the "loser" side is provably blocked on the shared row, not merely likely to be.
 /// </summary>
 [Trait("Category", "Integration")]
 public sealed class AvailabilityLockingTests : IAsyncLifetime, IDisposable
@@ -113,8 +119,12 @@ public sealed class AvailabilityLockingTests : IAsyncLifetime, IDisposable
     }
 
     /// <summary>
-    /// P5-LK-01: the owner's users row self-conflicts, so two concurrent <c>thisAndFuture</c> splits
-    /// of the same occurrence are strictly ordered. The loser's fresh read (after the winner commits)
+    /// P5-LK-01: the owner's <c>users</c> row self-conflicts (<c>FOR NO KEY UPDATE</c> against itself),
+    /// so two concurrent <c>thisAndFuture</c> splits of the same occurrence are strictly ordered.
+    /// Round-1 fix (F2c): the winner runs a real <see cref="EditAvailabilityOccurrenceUseCase"/> call
+    /// inside a transaction this test holds open — a genuine barrier — so the loser's attempt is
+    /// provably blocked on that exact row before it can even re-read the series, not merely likely to
+    /// lose a schedule race. The loser's forced-fresh read (only reachable after the winner commits)
     /// sees the already-truncated original and fails <c>EnsureOccurrenceDate</c> — exactly one
     /// successor ever results, never two, and never an orphaned pair.
     /// </summary>
@@ -128,36 +138,111 @@ public sealed class AvailabilityLockingTests : IAsyncLifetime, IDisposable
         WeeklyPattern patternA = WeeklyPattern.Create(IsoDayOfWeek.Tuesday, new LocalTime(20, 0), Duration15.FromMinutes(90));
         WeeklyPattern patternB = WeeklyPattern.Create(IsoDayOfWeek.Wednesday, new LocalTime(9, 0), Duration15.FromMinutes(45));
 
-        Task<OccurrenceEditOutcome?> first = RunSplitAsync(ownerId, seriesId, splitDate, patternA);
-        Task<OccurrenceEditOutcome?> second = RunSplitAsync(ownerId, seriesId, splitDate, patternB);
-        OccurrenceEditOutcome?[] results = await Task.WhenAll(first, second);
+        await using AsyncServiceScope winnerScope = _factory.Services.CreateAsyncScope();
+        AppDbContext winnerContext = winnerScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await using var winnerTransaction = await winnerContext.Database.BeginTransactionAsync();
+        var winnerUseCase = winnerScope.ServiceProvider.GetRequiredService<EditAvailabilityOccurrenceUseCase>();
 
-        Assert.Single(results, outcome => outcome is not null);
-        Assert.Single(results, outcome => outcome is null);
+        // Runs to completion against the ambient (still-open, uncommitted) transaction: the nested
+        // branch of IUnitOfWork.ExecuteAsync takes over, so the users/series row locks this call
+        // acquires stay held until we explicitly commit below.
+        await winnerUseCase.ExecuteAsync(
+            ownerId, AvailabilitySeriesId.From(seriesId), splitDate, OccurrenceEditScope.ThisAndFuture, null, patternA, default);
+
+        await using AsyncServiceScope loserScope = _factory.Services.CreateAsyncScope();
+        var loserUseCase = loserScope.ServiceProvider.GetRequiredService<EditAvailabilityOccurrenceUseCase>();
+        Task<OccurrenceEditOutcome?> loserTask = CatchNotFoundAsync(() => loserUseCase.ExecuteAsync(
+            ownerId, AvailabilitySeriesId.From(seriesId), splitDate, OccurrenceEditScope.ThisAndFuture, null, patternB, default));
+
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        Assert.False(
+            loserTask.IsCompleted,
+            "The second split must block on the winner's held users row (P5-LK-01) before it can even re-read the series.");
+
+        Instant winnerCommittedAt = SystemClock.Instance.GetCurrentInstant();
+        await winnerContext.SaveChangesAsync();
+        await winnerTransaction.CommitAsync();
+
+        OccurrenceEditOutcome? loserOutcome = await loserTask;
+        Instant loserObservedAt = SystemClock.Instance.GetCurrentInstant();
+        Assert.True(
+            winnerCommittedAt <= loserObservedAt,
+            "The loser must only be observed to complete after the winner's commit instant.");
+        Assert.Null(loserOutcome); // the loser's fresh read sees the already-truncated original.
 
         await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
         AppDbContext verify = verification.ServiceProvider.GetRequiredService<AppDbContext>();
         int seriesCount = await verify.AvailabilitySeries.AsNoTracking().CountAsync(s => s.OwnerId == ownerId);
-        Assert.Equal(2, seriesCount); // the (possibly truncated) original plus exactly one successor.
+        Assert.Equal(2, seriesCount); // the truncated original plus exactly one successor.
     }
 
     /// <summary>
     /// P5-LK-01: a <c>thisAndFuture</c> split racing a delete-one on the same date serializes on the
     /// owner lock — a row lock on <c>availability_occurrence_skips</c> could not achieve this, since
-    /// <c>FOR NO KEY UPDATE</c> never blocks an <c>INSERT</c>. Whichever wins, no skip survives
-    /// pointing into the split's dropped tail.
+    /// <c>FOR NO KEY UPDATE</c> never blocks an <c>INSERT</c>. Round-1 fix chain (F2a+F2b): delete-one
+    /// takes no series-row lock at all (<see cref="DeleteAvailabilityOccurrenceUseCase"/> reads the
+    /// series with the non-locking <c>FindSeriesAsync</c>, since it never mutates the series row) — so
+    /// the owner's <c>users</c> row is the <em>only</em> lock this pair shares, which is exactly what
+    /// this theory discriminates: with no shared series lock, the two orderings below still serialize
+    /// on users alone. Both orderings are forced with a real held transaction (the same barrier
+    /// idiom as the split-vs-split race above), and whichever wins, no skip survives pointing into
+    /// the split's dropped tail.
     /// </summary>
-    [Fact]
-    public async Task SplitAndDeleteOneOnTheSameDateSerializeOnTheOwnerLock_D143()
+    [Theory]
+    [InlineData(true)] // the split commits first; delete-one is the loser.
+    [InlineData(false)] // delete-one commits first; the split is the loser.
+    public async Task SplitAndDeleteOneOnTheSameDateSerializeOnTheOwnerLock_D143(bool splitWins)
     {
         UserId ownerId = await _factory.SeedUserAsync(email: $"lock-split-delete-{Guid.NewGuid():N}@example.test");
         Guid seriesId = await SeedSeriesAsync(ownerId);
         LocalDate splitDate = new(2026, 9, 15);
         WeeklyPattern replacement = WeeklyPattern.Create(IsoDayOfWeek.Tuesday, new LocalTime(20, 0), Duration15.FromMinutes(90));
 
-        Task<OccurrenceEditOutcome?> split = RunSplitAsync(ownerId, seriesId, splitDate, replacement);
-        Task<bool?> delete = RunDeleteOccurrenceAsync(ownerId, seriesId, splitDate);
-        await Task.WhenAll(split, delete);
+        await using AsyncServiceScope winnerScope = _factory.Services.CreateAsyncScope();
+        AppDbContext winnerContext = winnerScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await using var winnerTransaction = await winnerContext.Database.BeginTransactionAsync();
+        await using AsyncServiceScope loserScope = _factory.Services.CreateAsyncScope();
+
+        Task loserTask;
+        Task<OccurrenceEditOutcome?>? loserSplitTask = null;
+        Task<bool?>? loserDeleteTask = null;
+
+        if (splitWins)
+        {
+            var winnerUseCase = winnerScope.ServiceProvider.GetRequiredService<EditAvailabilityOccurrenceUseCase>();
+            await winnerUseCase.ExecuteAsync(
+                ownerId, AvailabilitySeriesId.From(seriesId), splitDate, OccurrenceEditScope.ThisAndFuture, null, replacement, default);
+
+            var loserUseCase = loserScope.ServiceProvider.GetRequiredService<DeleteAvailabilityOccurrenceUseCase>();
+            loserDeleteTask = CatchNotFoundAsync(() => loserUseCase.ExecuteAsync(
+                ownerId, AvailabilitySeriesId.From(seriesId), splitDate, default));
+            loserTask = loserDeleteTask;
+        }
+        else
+        {
+            var winnerUseCase = winnerScope.ServiceProvider.GetRequiredService<DeleteAvailabilityOccurrenceUseCase>();
+            await winnerUseCase.ExecuteAsync(ownerId, AvailabilitySeriesId.From(seriesId), splitDate, default);
+
+            var loserUseCase = loserScope.ServiceProvider.GetRequiredService<EditAvailabilityOccurrenceUseCase>();
+            loserSplitTask = CatchNotFoundAsync(() => loserUseCase.ExecuteAsync(
+                ownerId, AvailabilitySeriesId.From(seriesId), splitDate, OccurrenceEditScope.ThisAndFuture, null, replacement, default));
+            loserTask = loserSplitTask;
+        }
+
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        Assert.False(
+            loserTask.IsCompleted,
+            "The loser must block on the winner's held users row before its skip INSERT (or split re-read) can run.");
+
+        Instant winnerCommittedAt = SystemClock.Instance.GetCurrentInstant();
+        await winnerContext.SaveChangesAsync();
+        await winnerTransaction.CommitAsync();
+
+        await loserTask;
+        Instant loserObservedAt = SystemClock.Instance.GetCurrentInstant();
+        Assert.True(
+            winnerCommittedAt <= loserObservedAt,
+            "The loser's write must be observed only after the winner's commit instant.");
 
         await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
         AppDbContext verify = verification.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -165,53 +250,135 @@ public sealed class AvailabilityLockingTests : IAsyncLifetime, IDisposable
         int orphanedSkips = await verify.AvailabilityOccurrenceSkips.AsNoTracking()
             .CountAsync(s => s.SeriesId == typedSeriesId && s.OccurrenceDate == splitDate);
         Assert.Equal(0, orphanedSkips);
+
+        if (splitWins)
+        {
+            // The delete-one loser's forced-fresh (lockless) read finds the occurrence already
+            // outside the truncated original's range.
+            Assert.Null(await loserDeleteTask!);
+        }
+        else
+        {
+            // The split loser succeeds; its own RemoveSkipsFrom(splitDate) drops the skip the
+            // delete-one winner had just committed, so no orphan survives either way.
+            Assert.NotNull(await loserSplitTask!);
+        }
     }
 
     /// <summary>
-    /// A-081: the profile path's <c>FOR UPDATE</c> and an availability write's <c>FOR NO KEY UPDATE</c>
-    /// conflict on the same users row (the residual A-069 deadlock class), so a zone migration and a
-    /// concurrent block edit for the same owner serialize rather than corrupt each other.
+    /// A-081: the profile path's <c>FOR UPDATE</c> (<c>UserRepository.FindForUpdateAsync</c>) and an
+    /// availability write's <c>FOR NO KEY UPDATE</c> conflict on the same users row (the residual
+    /// A-069 deadlock class), so a real <see cref="ChangeTimeZoneUseCase"/> zone migration and a real
+    /// <see cref="EditAvailabilityBlockUseCase"/> edit for the same owner serialize rather than
+    /// corrupt each other. Round-1 fix (F1): both use cases are actually invoked — the prior version
+    /// only ever ran the block edit against a raw-SQL-simulated <c>FOR NO KEY UPDATE</c> holder and
+    /// never called <c>ChangeTimeZoneUseCase</c> at all. The theory forces each legal ordering once
+    /// with a real held transaction; the block's absolute instants read the same either way.
     /// </summary>
-    [Fact]
-    public async Task ZoneMigrationAndBlockEditSerializeOnTheOwnerRow_D061()
+    [Theory]
+    [InlineData(true)] // the zone migration commits first; the block edit is the loser.
+    [InlineData(false)] // the block edit commits first; the zone migration is the loser.
+    public async Task ZoneMigrationAndBlockEditSerializeOnTheOwnerRow_D061(bool zoneFirst)
     {
         UserId ownerId = await _factory.SeedUserAsync(email: $"lock-zone-{Guid.NewGuid():N}@example.test");
+        DateTimeZone oldZone = DateTimeZoneProviders.Tzdb["America/Fortaleza"];
+        DateTimeZone newZone = DateTimeZoneProviders.Tzdb["Europe/Lisbon"];
         Instant blockStart = Instant.FromUtc(2026, 9, 20, 10, 0);
+        Instant blockEnd = blockStart + Duration.FromMinutes(30);
         Guid blockId;
+        Guid seriesId;
 
         await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
         {
             AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
-            AvailabilityBlock block = AvailabilityBlock.Create(
-                ownerId, new TimeRange(blockStart, blockStart + Duration.FromMinutes(30)));
+            AvailabilityBlock block = AvailabilityBlock.Create(ownerId, new TimeRange(blockStart, blockEnd));
             blockId = block.Id.Value;
+            AvailabilitySeries series = AvailabilitySeries.Create(
+                ownerId,
+                WeeklyPattern.Create(IsoDayOfWeek.Tuesday, new LocalTime(19, 0), Duration15.FromMinutes(60)),
+                oldZone,
+                new LocalDate(2026, 9, 1));
+            seriesId = series.Id.Value;
             context.AvailabilityBlocks.Add(block);
+            context.AvailabilitySeries.Add(series);
             await context.SaveChangesAsync();
         }
 
-        await using AsyncServiceScope holderScope = _factory.Services.CreateAsyncScope();
-        AppDbContext holderContext = holderScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await using var holderTransaction = await holderContext.Database.BeginTransactionAsync();
-        await holderContext.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT 1 FROM users WHERE id = {ownerId.Value} FOR NO KEY UPDATE");
+        await using AsyncServiceScope winnerScope = _factory.Services.CreateAsyncScope();
+        AppDbContext winnerContext = winnerScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await using var winnerTransaction = await winnerContext.Database.BeginTransactionAsync();
+        await using AsyncServiceScope loserScope = _factory.Services.CreateAsyncScope();
 
-        await using AsyncServiceScope commandScope = _factory.Services.CreateAsyncScope();
-        var editUseCase = commandScope.ServiceProvider.GetRequiredService<EditAvailabilityBlockUseCase>();
         Instant newStart = blockStart + Duration.FromHours(3);
-        Task<AvailabilityBlock> commandTask = editUseCase.ExecuteAsync(
-            ownerId,
-            AvailabilityBlockId.From(blockId),
-            new TimeRange(newStart, newStart + Duration.FromMinutes(30)),
-            default);
+        Task loserTask;
+        Task<ProfileMutationResult>? loserZoneTask = null;
+        Task<AvailabilityBlock>? loserBlockTask = null;
+
+        if (zoneFirst)
+        {
+            var winnerUseCase = winnerScope.ServiceProvider.GetRequiredService<ChangeTimeZoneUseCase>();
+            ProfileMutationResult winnerResult = await winnerUseCase.ExecuteAsync(ownerId, newZone.Id, default);
+            Assert.True(winnerResult.Succeeded);
+
+            var loserUseCase = loserScope.ServiceProvider.GetRequiredService<EditAvailabilityBlockUseCase>();
+            loserBlockTask = loserUseCase.ExecuteAsync(
+                ownerId,
+                AvailabilityBlockId.From(blockId),
+                new TimeRange(newStart, newStart + Duration.FromMinutes(30)),
+                default);
+            loserTask = loserBlockTask;
+        }
+        else
+        {
+            var winnerUseCase = winnerScope.ServiceProvider.GetRequiredService<EditAvailabilityBlockUseCase>();
+            AvailabilityBlock winnerBlock = await winnerUseCase.ExecuteAsync(
+                ownerId,
+                AvailabilityBlockId.From(blockId),
+                new TimeRange(newStart, newStart + Duration.FromMinutes(30)),
+                default);
+            Assert.Equal(newStart, winnerBlock.Start);
+
+            var loserUseCase = loserScope.ServiceProvider.GetRequiredService<ChangeTimeZoneUseCase>();
+            loserZoneTask = loserUseCase.ExecuteAsync(ownerId, newZone.Id, default);
+            loserTask = loserZoneTask;
+        }
 
         await Task.Delay(TimeSpan.FromMilliseconds(500));
         Assert.False(
-            commandTask.IsCompleted,
-            "The block edit must block on the externally held users row (A-075's serialization point).");
+            loserTask.IsCompleted,
+            "The loser must block on the winner's held users row — A-081's FOR UPDATE/FOR NO KEY " +
+            "UPDATE mixed-mode conflict, executed here, not narrated.");
 
-        await holderTransaction.RollbackAsync();
-        AvailabilityBlock edited = await commandTask;
-        Assert.Equal(newStart, edited.Start);
+        await winnerContext.SaveChangesAsync();
+        await winnerTransaction.CommitAsync();
+
+        await loserTask;
+
+        await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
+        AppDbContext verify = verification.ServiceProvider.GetRequiredService<AppDbContext>();
+        AvailabilityBlockId typedBlockId = AvailabilityBlockId.From(blockId);
+        AvailabilitySeriesId typedSeriesId = AvailabilitySeriesId.From(seriesId);
+
+        AvailabilityBlock reloadedBlock = await verify.AvailabilityBlocks.AsNoTracking()
+            .SingleAsync(b => b.Id == typedBlockId);
+        Assert.Equal(newStart, reloadedBlock.Start); // untouched by the zone migration, either order.
+        Assert.Equal(newStart + Duration.FromMinutes(30), reloadedBlock.End);
+
+        AvailabilitySeries reloadedSeries = await verify.AvailabilitySeries.AsNoTracking()
+            .SingleAsync(s => s.Id == typedSeriesId);
+        Assert.Equal(newZone.Id, reloadedSeries.ZoneId);
+
+        User reloadedUser = await verify.DomainUsers.AsNoTracking().SingleAsync(u => u.Id == ownerId);
+        Assert.Equal(newZone.Id, reloadedUser.TimeZone!.Id);
+
+        if (zoneFirst)
+        {
+            Assert.Equal(newStart, (await loserBlockTask!).Start);
+        }
+        else
+        {
+            Assert.True((await loserZoneTask!).Succeeded);
+        }
     }
 
     private async Task<Guid> SeedSeriesAsync(UserId ownerId)
@@ -228,37 +395,25 @@ public sealed class AvailabilityLockingTests : IAsyncLifetime, IDisposable
         return series.Id.Value;
     }
 
-    private async Task<OccurrenceEditOutcome?> RunSplitAsync(
-        UserId ownerId, Guid seriesId, LocalDate splitDate, WeeklyPattern replacement)
+    private static async Task<OccurrenceEditOutcome?> CatchNotFoundAsync(Func<Task<OccurrenceEditOutcome>> action)
     {
-        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
-        var useCase = scope.ServiceProvider.GetRequiredService<EditAvailabilityOccurrenceUseCase>();
         try
         {
-            return await useCase.ExecuteAsync(
-                ownerId,
-                AvailabilitySeriesId.From(seriesId),
-                splitDate,
-                OccurrenceEditScope.ThisAndFuture,
-                null,
-                replacement,
-                default);
+            return await action();
         }
-        catch (PartyUp.Domain.Kernel.DomainException)
+        catch (DomainException)
         {
             return null;
         }
     }
 
-    private async Task<bool?> RunDeleteOccurrenceAsync(UserId ownerId, Guid seriesId, LocalDate occurrenceDate)
+    private static async Task<bool?> CatchNotFoundAsync(Func<Task<bool>> action)
     {
-        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
-        var useCase = scope.ServiceProvider.GetRequiredService<DeleteAvailabilityOccurrenceUseCase>();
         try
         {
-            return await useCase.ExecuteAsync(ownerId, AvailabilitySeriesId.From(seriesId), occurrenceDate, default);
+            return await action();
         }
-        catch (PartyUp.Domain.Kernel.DomainException)
+        catch (DomainException)
         {
             return null;
         }

@@ -20,6 +20,17 @@ public interface IAvailabilityRepository
     Task<IReadOnlyList<AvailabilitySeries>> LockSeriesAsync(
         IReadOnlyCollection<AvailabilitySeriesId> seriesIds, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// A plain, non-locking read of one series — for a write that only ever validates against the
+    /// series (existence, occurrence-date membership) without mutating the series row itself.
+    /// Delete-one is the only caller (round-1 finding F2a): it mutates skips and possibly a
+    /// materialized block, never the series, so locking the series row there would give it a lock
+    /// P5-LK-01 does not require and would blur the users row as the sole common lock between
+    /// delete-one and a <c>thisAndFuture</c> split. Safe under the owner-row serialization §6.1 step 2
+    /// already established — reads never need their own lock.
+    /// </summary>
+    Task<AvailabilitySeries?> FindSeriesAsync(AvailabilitySeriesId seriesId, CancellationToken cancellationToken);
+
     /// <summary>§6.1 step 3, derived form — A-081's zone migration and the deletion executor.</summary>
     Task<IReadOnlyList<AvailabilitySeries>> LockOwnerSeriesAsync(UserId ownerId, CancellationToken cancellationToken);
 
