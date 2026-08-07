@@ -1,8 +1,20 @@
+using PartyUp.Domain.Availability;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users.DeletionExecution;
 
 namespace PartyUp.Application.Abstractions;
+
+/// <summary>
+/// §11 step 5 / A-075's availability payload: every row <see cref="IDeletionResultApplier"/> deletes
+/// for a tombstoned owner. <see cref="Blocks"/> already carries every materialized block — a
+/// materialized block's <c>OwnerId</c> is always its source series' owner (§5.1) — so it needs no
+/// separate provenance-form fetch alongside <see cref="Series"/>.
+/// </summary>
+public sealed record AvailabilityDeletionScope(
+    IReadOnlyList<AvailabilitySeries> Series,
+    IReadOnlyList<AvailabilityBlock> Blocks,
+    IReadOnlyList<AvailabilityOccurrenceSkip> Skips);
 
 /// <summary>
 /// The deletion executor's scope port, widened for the §6.2 pre-lock/reload protocol: the caller must
@@ -36,6 +48,17 @@ public interface IDeletionScopeProvider
     /// </summary>
     Task<DeletionScope> LoadForUpdateAsync(UserId id, CancellationToken cancellationToken) =>
         LoadAsync(id, cancellationToken);
+
+    /// <summary>
+    /// §11 step 5 (A-075's lock-order tail): locks and loads the subject's complete availability write
+    /// surface — every series they own, every block they own (materialized or standalone), and those
+    /// series' skips — so <see cref="IDeletionResultApplier"/> can delete it inside the same transaction
+    /// the executor already holds its user and session locks in. Called after every other lock
+    /// <see cref="LoadForUpdateAsync"/> takes, so appending it here never inverts an existing pair. The
+    /// default returns nothing, for any caller that predates the widened availability protocol.
+    /// </summary>
+    Task<AvailabilityDeletionScope> LoadAvailabilityForUpdateAsync(UserId ownerId, CancellationToken cancellationToken) =>
+        Task.FromResult(new AvailabilityDeletionScope([], [], []));
 
     private async Task<IReadOnlyCollection<UserId>> DefaultDiscoverAffectedUserIdsAsync(
         UserId id,

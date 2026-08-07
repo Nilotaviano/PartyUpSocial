@@ -111,6 +111,34 @@ public sealed class RecurringJobRegistrationServiceRetryTests
             $"StopAsync took {stopwatch.ElapsedMilliseconds}ms; cancellation should not wait out the retry delay.");
     }
 
+    /// <summary>
+    /// PHASE5_DESIGN.md §7/§11: Phase 5 adds no Hangfire job and raises no notification event.
+    /// Asserted here, against the same real <see cref="RecurringJobRegistrationService"/> production
+    /// registration path the retry tests above drive — no host, no environment name, no Hangfire
+    /// storage — rather than from an integration test under the "Testing" host, which observes an
+    /// empty registration set by construction (<c>Program.cs</c>, <c>PartyUpApiFactory.cs</c>,
+    /// ARCHITECTURE.md:217) and so could never fail if a Phase 5 slice added a third job.
+    /// </summary>
+    [Fact]
+    public async Task RegistersExactlyTheTwoPhase4RecurringJobs_A066()
+    {
+        var manager = new RecordingRecurringJobManager();
+        ServiceProvider provider = new ServiceCollection()
+            .AddSingleton<IRecurringJobManager>(manager)
+            .BuildServiceProvider();
+        var service = new RecurringJobRegistrationService(
+            new FakeServiceScopeFactory(provider),
+            NullLogger<RecurringJobRegistrationService>.Instance);
+
+        await service.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => manager.RegisteredJobIds.Count >= 2, TimeSpan.FromSeconds(5));
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.Equal(
+            new HashSet<string> { "session-due-sweep", "session-reminder-due" },
+            manager.RegisteredJobIds);
+    }
+
     private static (RecurringJobRegistrationService Service, ThrowingRecurringJobManager Manager) CreateService(
         TimeSpan[]? retryDelays = null)
     {
@@ -149,6 +177,31 @@ public sealed class RecurringJobRegistrationServiceRetryTests
         {
             Interlocked.Increment(ref _attemptCount);
             throw new InvalidOperationException("Simulated Hangfire storage failure.");
+        }
+
+        public void Trigger(string recurringJobId) => throw new NotSupportedException();
+
+        public void RemoveIfExists(string recurringJobId) => throw new NotSupportedException();
+    }
+
+    /// <summary>
+    /// A recording sibling of <see cref="ThrowingRecurringJobManager"/>: captures every
+    /// <c>recurringJobId</c> passed to <see cref="AddOrUpdate"/> instead of throwing, so
+    /// <see cref="RegistersExactlyTheTwoPhase4RecurringJobs_A066"/> can assert the exact set the real
+    /// production registration path names.
+    /// </summary>
+    private sealed class RecordingRecurringJobManager : IRecurringJobManager
+    {
+        private readonly HashSet<string> _registeredJobIds = [];
+
+        public HashSet<string> RegisteredJobIds => _registeredJobIds;
+
+        public void AddOrUpdate(string recurringJobId, Job job, string cronExpression, RecurringJobOptions options)
+        {
+            lock (_registeredJobIds)
+            {
+                _registeredJobIds.Add(recurringJobId);
+            }
         }
 
         public void Trigger(string recurringJobId) => throw new NotSupportedException();

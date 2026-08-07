@@ -183,6 +183,67 @@ public sealed class AvailabilityMigrationTests : IAsyncLifetime
         Assert.Equal("pk_availability_occurrence_skips", duplicate.ConstraintName);
     }
 
+    /// <summary>
+    /// S2 round-1 finding C2: §4.2's DB-boundary rejections were asserted only by constraint
+    /// existence, not by a failing insert. These three cases are the ones the existing tests above
+    /// leave unexercised: a half-filled provenance pair, an inverted block range, and a sub-minute
+    /// (seconds-precision) off-grid instant.
+    /// </summary>
+    [Fact]
+    public async Task HalfFilledProvenanceInvertedRangeAndSubMinuteInstantAreRejected_D071_D143()
+    {
+        await using AppDbContext context = CreateContext();
+        await context.Database.MigrateAsync();
+        UserId ownerId = await SeedUserAsync(context);
+
+        // Half-filled provenance: source_series_id set, source_occurrence_date null.
+        Guid seriesId = Guid.CreateVersion7();
+        await InsertSeriesAsync(context, seriesId, ownerId, effectiveUntil: null);
+        PostgresException halfFilled = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(context, $"""
+            INSERT INTO availability_blocks (id, owner_id, start_time, end_time, source_series_id, source_occurrence_date)
+            VALUES ({Guid.CreateVersion7()}, {ownerId.Value}, {Base}, {Base + Duration.FromMinutes(30)}, {seriesId}, NULL)
+            """));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, halfFilled.SqlState);
+        Assert.Equal("ck_availability_blocks_provenance", halfFilled.ConstraintName);
+
+        // Half-filled the other way: source_occurrence_date set, source_series_id null.
+        PostgresException halfFilledOther = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(context, $"""
+            INSERT INTO availability_blocks (id, owner_id, start_time, end_time, source_series_id, source_occurrence_date)
+            VALUES ({Guid.CreateVersion7()}, {ownerId.Value}, {Base}, {Base + Duration.FromMinutes(30)}, NULL, {new LocalDate(2026, 9, 7)})
+            """));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, halfFilledOther.SqlState);
+        Assert.Equal("ck_availability_blocks_provenance", halfFilledOther.ConstraintName);
+
+        // Inverted block range: end_time <= start_time.
+        PostgresException invertedRange = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(context, $"""
+            INSERT INTO availability_blocks (id, owner_id, start_time, end_time)
+            VALUES ({Guid.CreateVersion7()}, {ownerId.Value}, {Base + Duration.FromMinutes(30)}, {Base})
+            """));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, invertedRange.SqlState);
+        Assert.Equal("ck_availability_blocks_range", invertedRange.ConstraintName);
+
+        // Sub-minute (seconds-precision) off-grid instant: on the 15-minute boundary but with a
+        // nonzero seconds component — a bad adapter that rounds to the wrong minute would pass a
+        // naive "minute % 15 == 0" check while still failing the DB's date_trunc('minute', …) test.
+        PostgresException subMinuteBlock = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(context, $"""
+            INSERT INTO availability_blocks (id, owner_id, start_time, end_time)
+            VALUES ({Guid.CreateVersion7()}, {ownerId.Value}, {Base + Duration.FromSeconds(30)}, {Base + Duration.FromMinutes(30)})
+            """));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, subMinuteBlock.SqlState);
+        Assert.Equal("ck_availability_blocks_grid", subMinuteBlock.ConstraintName);
+
+        // The series grid check is minute/second-based (LocalTime has no sub-second component here),
+        // so the sub-minute counterexample for availability_series is a nonzero-second start_time.
+        PostgresException subMinuteSeries = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(context, $"""
+            INSERT INTO availability_series
+                (id, owner_id, day_of_week, start_time, duration_minutes, zone_id, effective_from)
+            VALUES
+                ({Guid.CreateVersion7()}, {ownerId.Value}, 1, '09:00:30'::time, 60, 'UTC', {new LocalDate(2026, 9, 1)})
+            """));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, subMinuteSeries.SqlState);
+        Assert.Equal("ck_availability_series_grid", subMinuteSeries.ConstraintName);
+    }
+
     private static async Task InsertSeriesAsync(
         AppDbContext context, Guid seriesId, UserId ownerId, LocalDate? effectiveUntil) =>
         await ExecuteAsync(context, $"""

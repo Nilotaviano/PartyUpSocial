@@ -31,6 +31,16 @@ public interface IAvailabilityRepository
     Task<IReadOnlyList<AvailabilityBlock>> LockBlocksBySourceSeriesAsync(
         IReadOnlyCollection<AvailabilitySeriesId> seriesIds, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// §6.1 step 4a, owner-derived form — every block the owner holds, materialized or standalone.
+    /// <see cref="AvailabilityBlock.Materialize"/> always carries the source series' <c>OwnerId</c>
+    /// forward, so this single statement already covers a materialized block; it exists for the
+    /// deletion executor's total wipe (§11 step 5), the one write whose block set is neither a
+    /// supplied id list nor scoped to a locked series set. Used instead of, never alongside,
+    /// <see cref="LockBlocksAsync"/> or <see cref="LockBlocksBySourceSeriesAsync"/> in the same write.
+    /// </summary>
+    Task<IReadOnlyList<AvailabilityBlock>> LockBlocksByOwnerAsync(UserId ownerId, CancellationToken cancellationToken);
+
     /// <summary>§6.1 step 4b — A-075's addition to A-068's declared lock order.</summary>
     Task<IReadOnlyList<AvailabilityOccurrenceSkip>> LockSkipsAsync(
         IReadOnlyCollection<AvailabilitySeriesId> seriesIds, CancellationToken cancellationToken);

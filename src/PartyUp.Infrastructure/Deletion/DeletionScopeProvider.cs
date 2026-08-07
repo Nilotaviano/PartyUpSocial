@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PartyUp.Application.Abstractions;
+using PartyUp.Domain.Availability;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
@@ -16,11 +17,16 @@ namespace PartyUp.Infrastructure.Deletion;
 /// reloads friendships, blocks, and affected session parents (with their children) under the normal
 /// graph lock order. <see cref="LoadAsync"/> is preserved unchanged for callers that have not adopted
 /// the widened protocol (Phase 3's friend-graph race tests among them).
+/// <see cref="LoadAvailabilityForUpdateAsync"/> is the Phase 5 (A-075) tail: it runs after every lock
+/// above and is called directly by <see cref="PartyUp.Infrastructure.Friends.DeletionResultApplier"/>,
+/// which is where §11 step 5's availability deletion actually happens (A-075's lock-order tail is
+/// appended to an already-open transaction, never a new one).
 /// </summary>
 public sealed class DeletionScopeProvider(
     AppDbContext context,
     ISessionLockRepository sessionLocks,
-    IUsernameRegistryRepository usernames)
+    IUsernameRegistryRepository usernames,
+    IAvailabilityRepository availability)
     : IDeletionScopeProvider
 {
     public async Task<DeletionScope> LoadAsync(
@@ -169,6 +175,25 @@ public sealed class DeletionScopeProvider(
             .ToListAsync(cancellationToken);
 
         return baseline with { Sessions = sessions };
+    }
+
+    /// <summary>
+    /// A-075's availability tail: series (owner-derived), blocks (owner-derived — already every
+    /// materialized block too, §5.1), then those series' skips — one statement per table, in the
+    /// declared order, over rows the caller is about to delete.
+    /// </summary>
+    public async Task<AvailabilityDeletionScope> LoadAvailabilityForUpdateAsync(
+        UserId ownerId, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<AvailabilitySeries> series = await availability.LockOwnerSeriesAsync(ownerId, cancellationToken);
+        IReadOnlyList<AvailabilityBlock> blocks = await availability.LockBlocksByOwnerAsync(ownerId, cancellationToken);
+
+        List<AvailabilitySeriesId> seriesIds = [.. series.Select(s => s.Id)];
+        IReadOnlyList<AvailabilityOccurrenceSkip> skips = seriesIds.Count == 0
+            ? []
+            : await availability.LockSkipsAsync(seriesIds, cancellationToken);
+
+        return new AvailabilityDeletionScope(series, blocks, skips);
     }
 
     private static IQueryable<Session> LoadWithChildren(IQueryable<Session> query) =>
