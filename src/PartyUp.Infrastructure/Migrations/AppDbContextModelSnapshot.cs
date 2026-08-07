@@ -154,6 +154,136 @@ namespace PartyUp.Infrastructure.Migrations
                     b.ToTable("auth_user_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("PartyUp.Domain.Availability.AvailabilityBlock", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Instant>("End")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("end_time");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<LocalDate?>("SourceOccurrenceDate")
+                        .HasColumnType("date")
+                        .HasColumnName("source_occurrence_date");
+
+                    b.Property<Guid?>("SourceSeriesId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_series_id");
+
+                    b.Property<Instant>("Start")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("start_time");
+
+                    b.HasKey("Id")
+                        .HasName("pk_availability_blocks");
+
+                    b.HasIndex("SourceSeriesId", "SourceOccurrenceDate")
+                        .HasDatabaseName("ix_availability_blocks_source_series_occurrence");
+
+                    b.HasIndex("OwnerId", "Start", "End")
+                        .HasDatabaseName("ix_availability_blocks_owner_start_end");
+
+                    b.ToTable("availability_blocks", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_availability_blocks_grid", "date_trunc('minute', start_time) = start_time AND date_trunc('minute', end_time) = end_time AND extract(minute from start_time)::int % 15 = 0 AND extract(minute from end_time)::int % 15 = 0");
+
+                            t.HasCheckConstraint("ck_availability_blocks_provenance", "(source_series_id IS NULL) = (source_occurrence_date IS NULL)");
+
+                            t.HasCheckConstraint("ck_availability_blocks_range", "end_time > start_time");
+                        });
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Availability.AvailabilityOccurrenceSkip", b =>
+                {
+                    b.Property<Guid>("SeriesId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("series_id");
+
+                    b.Property<LocalDate>("OccurrenceDate")
+                        .HasColumnType("date")
+                        .HasColumnName("occurrence_date");
+
+                    b.Property<Instant>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("SeriesId", "OccurrenceDate")
+                        .HasName("pk_availability_occurrence_skips");
+
+                    b.ToTable("availability_occurrence_skips", (string)null);
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Availability.AvailabilitySeries", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<short>("DayOfWeek")
+                        .HasColumnType("smallint")
+                        .HasColumnName("day_of_week");
+
+                    b.Property<int>("Duration")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_minutes");
+
+                    b.Property<LocalDate>("EffectiveFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_from");
+
+                    b.Property<LocalDate?>("EffectiveUntil")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_until");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<LocalTime>("StartTime")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("start_time");
+
+                    b.Property<string>("ZoneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("zone_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_availability_series");
+
+                    b.HasIndex("OwnerId", "EffectiveFrom", "EffectiveUntil")
+                        .HasDatabaseName("ix_availability_series_owner_effective");
+
+                    b.ToTable("availability_series", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_availability_series_duration", "duration_minutes BETWEEN 15 AND 1440 AND duration_minutes % 15 = 0");
+
+                            t.HasCheckConstraint("ck_availability_series_effective_range", "effective_until IS NULL OR effective_until >= effective_from");
+
+                            t.HasCheckConstraint("ck_availability_series_grid", "extract(second from start_time) = 0 AND extract(minute from start_time)::int % 15 = 0");
+                        });
+                });
+
             modelBuilder.Entity("PartyUp.Domain.Friendships.Block", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1189,6 +1319,42 @@ namespace PartyUp.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_auth_user_tokens_auth_users_user_id");
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Availability.AvailabilityBlock", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_availability_blocks_users_owner_id");
+
+                    b.HasOne("PartyUp.Domain.Availability.AvailabilitySeries", null)
+                        .WithMany()
+                        .HasForeignKey("SourceSeriesId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_availability_blocks_availability_series_source_series_id");
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Availability.AvailabilityOccurrenceSkip", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Availability.AvailabilitySeries", null)
+                        .WithMany()
+                        .HasForeignKey("SeriesId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_availability_occurrence_skips_availability_series_series_id");
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Availability.AvailabilitySeries", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_availability_series_users_owner_id");
                 });
 
             modelBuilder.Entity("PartyUp.Domain.Friendships.Block", b =>

@@ -67,6 +67,8 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ISessionRepository, SessionRepository>();
         services.AddScoped<ISessionReadRepository, SessionReadRepository>();
+        services.AddScoped<IAvailabilityRepository, AvailabilityRepository>();
+        services.AddScoped<IAvailabilityReadRepository, AvailabilityReadRepository>();
         services.AddScoped<ISessionLockRepository, SessionLockRepository>();
         services.AddScoped<IBlockEffectsExecutor, BlockEffectsExecutor>();
         services.AddScoped<IBlockEffectScopeProvider, SessionBlockEffectScopeProvider>();

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using PartyUp.Domain.Availability;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Sessions;
@@ -49,6 +50,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<NotificationMute> NotificationMutes => Set<NotificationMute>();
 
     public DbSet<SessionReminderHandoff> SessionReminderHandoffs => Set<SessionReminderHandoff>();
+
+    public DbSet<AvailabilityBlock> AvailabilityBlocks => Set<AvailabilityBlock>();
+
+    public DbSet<AvailabilitySeries> AvailabilitySeries => Set<AvailabilitySeries>();
+
+    public DbSet<AvailabilityOccurrenceSkip> AvailabilityOccurrenceSkips => Set<AvailabilityOccurrenceSkip>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -104,5 +111,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.ApplyConfiguration(new GuestLinkConfiguration());
         builder.ApplyConfiguration(new NotificationMuteConfiguration());
         builder.ApplyConfiguration(new SessionReminderHandoffConfiguration());
+        builder.ApplyConfiguration(new AvailabilityBlockConfiguration());
+        builder.ApplyConfiguration(new AvailabilitySeriesConfiguration());
+        builder.ApplyConfiguration(new AvailabilityOccurrenceSkipConfiguration());
     }
 }
