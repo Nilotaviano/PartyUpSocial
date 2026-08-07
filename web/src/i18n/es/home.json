@@ -1,0 +1,36 @@
+{
+  "nav": {
+    "discover": "Descubrir"
+  },
+  "home": {
+    "heading": "Inicio",
+    "actionable": {
+      "heading": "Necesita tu atención",
+      "invitationsHeading": "Invitaciones",
+      "joinRequestsHeading": "Solicitudes para unirse",
+      "requestedBy": "Solicitado por {{name}}",
+      "empty": "Nada necesita tu atención en este momento.",
+      "seeAll": "Ver todas"
+    },
+    "polls": {
+      "heading": "Encuestas",
+      "empty": "Todavía no hay encuestas."
+    },
+    "upcoming": {
+      "heading": "Próximas",
+      "empty": "No hay sesiones próximas.",
+      "seeAll": "Ver todas"
+    },
+    "discoverable": {
+      "heading": "Descubrir sesiones",
+      "empty": "No hay sesiones para descubrir en este momento.",
+      "seeAll": "Ver todas"
+    }
+  },
+  "discover": {
+    "heading": "Descubrir",
+    "empty": "No hay sesiones para descubrir en este momento.",
+    "loadMore": "Cargar más",
+    "organizedBy": "Organizado por {{name}}"
+  }
+}

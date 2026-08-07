@@ -7,6 +7,7 @@ import enAvailability from './en/availability.json'
 import enCommon from './en/common.json'
 import enErrors from './en/errors.json'
 import enFriends from './en/friends.json'
+import enHome from './en/home.json'
 import enOnboarding from './en/onboarding.json'
 import enProfile from './en/profile.json'
 import enSessions from './en/sessions.json'
@@ -16,6 +17,7 @@ import esAvailability from './es/availability.json'
 import esCommon from './es/common.json'
 import esErrors from './es/errors.json'
 import esFriends from './es/friends.json'
+import esHome from './es/home.json'
 import esOnboarding from './es/onboarding.json'
 import esProfile from './es/profile.json'
 import esSessions from './es/sessions.json'
@@ -25,6 +27,7 @@ import ptBRAvailability from './pt-BR/availability.json'
 import ptBRCommon from './pt-BR/common.json'
 import ptBRErrors from './pt-BR/errors.json'
 import ptBRFriends from './pt-BR/friends.json'
+import ptBRHome from './pt-BR/home.json'
 import ptBROnboarding from './pt-BR/onboarding.json'
 import ptBRProfile from './pt-BR/profile.json'
 import ptBRSessions from './pt-BR/sessions.json'
@@ -42,6 +45,7 @@ export const resources = {
     friends: enFriends,
     sessions: enSessions,
     availability: enAvailability,
+    home: enHome,
   },
   'pt-BR': {
     common: ptBRCommon,
@@ -53,6 +57,7 @@ export const resources = {
     friends: ptBRFriends,
     sessions: ptBRSessions,
     availability: ptBRAvailability,
+    home: ptBRHome,
   },
   es: {
     common: esCommon,
@@ -64,6 +69,7 @@ export const resources = {
     friends: esFriends,
     sessions: esSessions,
     availability: esAvailability,
+    home: esHome,
   },
 }
 
@@ -84,6 +90,7 @@ void i18n
       'friends',
       'sessions',
       'availability',
+      'home',
     ],
     resources,
     interpolation: {

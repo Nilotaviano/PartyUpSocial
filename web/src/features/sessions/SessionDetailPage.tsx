@@ -308,7 +308,16 @@ export function SessionDetailPage() {
   const declined = data?.roster.filter((r) => r.status === 'declined') ?? []
   const pending = data?.roster.filter((r) => r.status === 'pending') ?? []
   const waitlisted = data?.roster.filter((r) => r.isWaitlisted) ?? []
-  const viewerEntry = data?.roster.find((r) => r.userId === session?.userId)
+  // A masked or guest roster entry's userId is absent on the wire (§5.1), so it
+  // must never coincidentally match an unresolved session.userId (both undefined) —
+  // both sides are required to be a real, matching id.
+  const viewerEntry = data?.roster.find(
+    (r) => Boolean(session?.userId) && r.userId === session?.userId,
+  )
+  // A-077 (d): a Removed participation keeps whatever inherited access the viewer
+  // still has, but the shipped join mutation refuses a request from it
+  // (DomainError.RemovalIsPermanent) — the request-to-join action is not offered.
+  const canRequestJoin = viewerEntry?.status !== 'removed'
   const inProgress = data ? isSessionInProgress(data) : false
 
   return (
@@ -402,24 +411,26 @@ export function SessionDetailPage() {
               </button>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                disabled={join.isPending}
-                type="button"
-                onClick={() => join.mutate()}
-              >
-                {t('join.request')}
-              </button>
-              <button
-                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                disabled={withdraw.isPending}
-                type="button"
-                onClick={() => withdraw.mutate()}
-              >
-                {t('join.withdraw')}
-              </button>
-            </div>
+            {canRequestJoin && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                  disabled={join.isPending}
+                  type="button"
+                  onClick={() => join.mutate()}
+                >
+                  {t('join.request')}
+                </button>
+                <button
+                  className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                  disabled={withdraw.isPending}
+                  type="button"
+                  onClick={() => withdraw.mutate()}
+                >
+                  {t('join.withdraw')}
+                </button>
+              </div>
+            )}
 
             <div className="mt-4">
               <label className="font-medium text-slate-900" htmlFor="reminder-select">

@@ -14,6 +14,7 @@ const namespaces = [
   'friends',
   'sessions',
   'availability',
+  'home',
 ] as const
 
 // Closed problem-code inventory (PHASE5_DESIGN.md §8/§10.2): the five new

@@ -58,6 +58,8 @@ public static class AuditedRoutes
         new AuditedRoute("sessions-new", "/sessions/new"),
         new AuditedRoute("calendar", "/calendar"),
         new AuditedRoute("calendar-agenda", "/calendar/agenda"),
+        new AuditedRoute("find-a-time", "/find-a-time"),
+        new AuditedRoute("discover", "/discover"),
         new AuditedRoute("sessions-upcoming", "/sessions/upcoming"),
         new AuditedRoute("sessions-history", "/sessions/history"),
         new AuditedRoute("session-detail", "/sessions/{sessionId}"),

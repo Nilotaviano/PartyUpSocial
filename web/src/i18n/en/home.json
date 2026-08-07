@@ -1,0 +1,36 @@
+{
+  "nav": {
+    "discover": "Discover"
+  },
+  "home": {
+    "heading": "Home",
+    "actionable": {
+      "heading": "Needs your attention",
+      "invitationsHeading": "Invitations",
+      "joinRequestsHeading": "Join requests",
+      "requestedBy": "Requested by {{name}}",
+      "empty": "Nothing needs your attention right now.",
+      "seeAll": "See all"
+    },
+    "polls": {
+      "heading": "Polls",
+      "empty": "No polls yet."
+    },
+    "upcoming": {
+      "heading": "Upcoming",
+      "empty": "No upcoming sessions.",
+      "seeAll": "See all"
+    },
+    "discoverable": {
+      "heading": "Discover sessions",
+      "empty": "No sessions to discover right now.",
+      "seeAll": "See all"
+    }
+  },
+  "discover": {
+    "heading": "Discover",
+    "empty": "No sessions to discover right now.",
+    "loadMore": "Load more",
+    "organizedBy": "Organized by {{name}}"
+  }
+}

@@ -209,6 +209,8 @@ describe('AppNavigationTests', () => {
     ['/sessions/new', 'screen-session-create'],
     ['/calendar', 'screen-calendar'],
     ['/calendar/agenda', 'screen-calendar'],
+    ['/find-a-time', 'screen-find-a-time'],
+    ['/discover', 'screen-discover'],
   ])(
     'AuthenticatedEntries_ReachFriendsAndBlockedRoutes_D127: %s',
     async (path, testId) => {
@@ -269,12 +271,12 @@ describe('AppNavigationTests', () => {
   })
 
   it.each([
-    ['en', 'Friends', 'Settings', 'Sessions', 'Calendar'],
-    ['pt-BR', 'Amigos', 'Configurações', 'Sessões', 'Calendário'],
-    ['es', 'Amistades', 'Configuración', 'Sesiones', 'Calendario'],
+    ['en', 'Friends', 'Settings', 'Sessions', 'Calendar', 'Discover'],
+    ['pt-BR', 'Amigos', 'Configurações', 'Sessões', 'Calendário', 'Descobrir'],
+    ['es', 'Amistades', 'Configuración', 'Sesiones', 'Calendario', 'Descubrir'],
   ])(
     'PersistentEntries_HaveLocalizedAccessibleLabelsAndCurrentState_D139: %s',
-    async (locale, friendsLabel, settingsLabel, sessionsLabel, calendarLabel) => {
+    async (locale, friendsLabel, settingsLabel, sessionsLabel, calendarLabel, discoverLabel) => {
       await i18n.changeLanguage(locale)
       setSession(session({ authenticated: true, state: 'active' }))
       renderRoute('/friends')
@@ -293,8 +295,20 @@ describe('AppNavigationTests', () => {
         'href',
         '/calendar',
       )
+      expect(screen.getByRole('link', { name: discoverLabel })).toHaveAttribute(
+        'href',
+        '/discover',
+      )
     },
   )
+
+  it('clicked Discover entry renders the guarded discover page_S7', async () => {
+    setSession(session({ authenticated: true, state: 'active' }))
+    renderRoute('/app')
+
+    fireEvent.click(screen.getByRole('link', { name: 'Discover' }))
+    expect(await screen.findByTestId('screen-discover')).toBeInTheDocument()
+  })
 })
 
 describe('Guest route reachability_S6', () => {

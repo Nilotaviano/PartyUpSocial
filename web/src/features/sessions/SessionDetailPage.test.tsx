@@ -25,8 +25,10 @@ vi.mock('../../api/client', () => ({
   },
 }))
 
+const mockedUseSession = vi.hoisted(() => vi.fn())
+
 vi.mock('../../auth/useSession', () => ({
-  useSession: () => ({ data: { userId: 'organizer-1' } }),
+  useSession: mockedUseSession,
 }))
 
 import '../../i18n'
@@ -92,6 +94,7 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  mockedUseSession.mockReturnValue({ data: { userId: 'organizer-1' } })
   api.get.mockImplementation((path: string) => {
     if (path === '/api/v1/sessions/{sessionId}')
       return Promise.resolve({ data: detail() })
@@ -273,5 +276,66 @@ describe('SessionDetailPage', () => {
     renderPage()
 
     expect(await screen.findByText(format(profileZone))).toBeInTheDocument()
+  })
+
+  it('offers no join action to a removed viewer with inherited access_D018', async () => {
+    mockedUseSession.mockReturnValue({ data: { userId: 'viewer-1' } })
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/sessions/{sessionId}') {
+        const data = detail()
+        data.roster.push({
+          participationId: 'p-removed',
+          userId: 'viewer-1',
+          guestIdentityId: null,
+          displayName: 'Removed Person',
+          status: 'removed',
+          isWaitlisted: false,
+          origin: 'invited',
+          reminderChoice: null,
+        } as unknown as (typeof data.roster)[number])
+        return Promise.resolve({ data })
+      }
+      if (path === '/api/v1/sessions/{sessionId}/join-requests')
+        return Promise.resolve({ data: { items: [], nextCursor: null } })
+      if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    renderPage()
+
+    expect(await screen.findByText('Raid night')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Request to join' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Withdraw request' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('renders a roster entry with no user id as anonymous_D076', async () => {
+    mockedUseSession.mockReturnValue({ data: { userId: undefined } })
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/sessions/{sessionId}') {
+        const data = detail()
+        // A blocked-pair-masked entry: `userId` is absent on the wire
+        // (JsonIgnore WhenWritingNull), not merely null (§5.1).
+        data.roster.push({
+          participationId: 'p-masked',
+          guestIdentityId: null,
+          displayName: null,
+          status: 'going',
+          isWaitlisted: false,
+          origin: 'invited',
+          reminderChoice: null,
+        } as unknown as (typeof data.roster)[number])
+        return Promise.resolve({ data })
+      }
+      if (path === '/api/v1/sessions/{sessionId}/join-requests')
+        return Promise.resolve({ data: { items: [], nextCursor: null } })
+      if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    renderPage()
+
+    expect(await screen.findAllByText('Anonymous User')).not.toHaveLength(0)
   })
 })

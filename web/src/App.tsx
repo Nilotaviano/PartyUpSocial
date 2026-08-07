@@ -15,11 +15,14 @@ import {
   VerifyEmail,
   Welcome,
 } from './features/auth/AuthScreens'
+import { FindATimePage } from './features/availability/FindATimePage'
 import { WeekGridPage } from './features/availability/WeekGridPage'
+import { DiscoverPage } from './features/discover/DiscoverPage'
 import { AddFriendPage } from './features/friends/AddFriendPage'
 import { FriendsPage } from './features/friends/FriendsPage'
 import { ProfilePage } from './features/friends/ProfilePage'
 import { SteamImportPage } from './features/friends/SteamImportPage'
+import { HomePage } from './features/home/HomePage'
 import { OnboardingWizard } from './features/onboarding/OnboardingWizard'
 import { PublicDeletionConfirmPage } from './features/deletion/PublicDeletionConfirmPage'
 import { PublicDeletionRequestPage } from './features/deletion/PublicDeletionRequestPage'
@@ -33,31 +36,8 @@ import { SessionEditPage } from './features/sessions/SessionEditPage'
 import { SessionInvitePage } from './features/sessions/SessionInvitePage'
 import { SessionListPage } from './features/sessions/SessionListPage'
 
-type PlaceholderProps = {
-  testId: string
-  translationKey: string
-}
-
-function Placeholder({ testId, translationKey }: PlaceholderProps) {
-  const { t } = useTranslation([
-    'common',
-    'auth',
-    'onboarding',
-    'profile',
-    'settings',
-    'errors',
-    'sessions',
-  ])
-
-  return (
-    <main data-testid={testId}>
-      <h1>{t(translationKey)}</h1>
-    </main>
-  )
-}
-
 function AuthenticatedShell() {
-  const { t } = useTranslation(['common', 'sessions', 'availability'])
+  const { t } = useTranslation(['common', 'sessions', 'availability', 'home'])
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">
@@ -109,6 +89,18 @@ function AuthenticatedShell() {
             to="/calendar"
           >
             {t('nav.calendar', { ns: 'availability' })}
+          </NavLink>
+          <NavLink
+            className={({ isActive }) =>
+              `inline-flex min-h-11 items-center rounded-md px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
+                isActive
+                  ? 'bg-indigo-100 font-semibold text-indigo-950'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`
+            }
+            to="/discover"
+          >
+            {t('nav.discover', { ns: 'home' })}
           </NavLink>
           <NavLink
             className={({ isActive }) =>
@@ -190,14 +182,11 @@ function App() {
 
         <Route element={<RequireOnboarded />}>
           <Route element={<AuthenticatedShell />}>
-            <Route
-              path="/app"
-              element={
-                <Placeholder testId="screen-app" translationKey="pages.app" />
-              }
-            />
+            <Route path="/app" element={<HomePage />} />
             <Route path="/calendar" element={<WeekGridPage />} />
             <Route path="/calendar/agenda" element={<WeekGridPage />} />
+            <Route path="/find-a-time" element={<FindATimePage />} />
+            <Route path="/discover" element={<DiscoverPage />} />
             <Route path="/friends" element={<FriendsPage />} />
             <Route path="/friends/import/steam" element={<SteamImportPage />} />
             <Route path="/u/:username" element={<ProfilePage />} />
