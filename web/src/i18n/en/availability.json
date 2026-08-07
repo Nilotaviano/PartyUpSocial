@@ -2,9 +2,37 @@
   "nav": {
     "calendar": "Calendar"
   },
+  "calendar": {
+    "heading": "Calendar",
+    "week": "Week",
+    "agenda": "Agenda",
+    "previousWeek": "Previous week",
+    "nextWeek": "Next week",
+    "agendaComingSoon": "Agenda view is coming soon."
+  },
+  "block": {
+    "editHeading": "Edit availability",
+    "start": "Start time",
+    "end": "End time",
+    "save": "Save",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "scopeHeading": "Which occurrences?",
+    "scopeOnlyThis": "Only this occurrence",
+    "scopeThisAndFuture": "This and future occurrences",
+    "confirm": "Confirm"
+  },
   "prefill": {
     "clamped": "The start time was moved to the earliest time allowed (15 minutes from now).",
     "overDuration": "This session runs {{minutes}} minutes past the recommended window."
+  },
+  "a11y": {
+    "gridLabel": "Weekly availability",
+    "busy": "Busy",
+    "selectionStarted": "Selection started at {{time}}.",
+    "selectionExtent": "Selected {{start}} to {{end}}.",
+    "selectionCommitted": "Availability created from {{start}} to {{end}}.",
+    "selectionCanceled": "Selection canceled."
   },
   "errors": {
     "codes": {

@@ -15,6 +15,7 @@ import {
   VerifyEmail,
   Welcome,
 } from './features/auth/AuthScreens'
+import { WeekGridPage } from './features/availability/WeekGridPage'
 import { AddFriendPage } from './features/friends/AddFriendPage'
 import { FriendsPage } from './features/friends/FriendsPage'
 import { ProfilePage } from './features/friends/ProfilePage'
@@ -56,7 +57,7 @@ function Placeholder({ testId, translationKey }: PlaceholderProps) {
 }
 
 function AuthenticatedShell() {
-  const { t } = useTranslation(['common', 'sessions'])
+  const { t } = useTranslation(['common', 'sessions', 'availability'])
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">
@@ -96,6 +97,18 @@ function AuthenticatedShell() {
             to="/sessions/upcoming"
           >
             {t('nav.sessions', { ns: 'sessions' })}
+          </NavLink>
+          <NavLink
+            className={({ isActive }) =>
+              `inline-flex min-h-11 items-center rounded-md px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
+                isActive
+                  ? 'bg-indigo-100 font-semibold text-indigo-950'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`
+            }
+            to="/calendar"
+          >
+            {t('nav.calendar', { ns: 'availability' })}
           </NavLink>
           <NavLink
             className={({ isActive }) =>
@@ -183,6 +196,8 @@ function App() {
                 <Placeholder testId="screen-app" translationKey="pages.app" />
               }
             />
+            <Route path="/calendar" element={<WeekGridPage />} />
+            <Route path="/calendar/agenda" element={<WeekGridPage />} />
             <Route path="/friends" element={<FriendsPage />} />
             <Route path="/friends/import/steam" element={<SteamImportPage />} />
             <Route path="/u/:username" element={<ProfilePage />} />

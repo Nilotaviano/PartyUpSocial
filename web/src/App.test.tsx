@@ -207,6 +207,8 @@ describe('AppNavigationTests', () => {
     ['/sessions/upcoming', 'screen-sessions-upcoming'],
     ['/sessions/history', 'screen-sessions-history'],
     ['/sessions/new', 'screen-session-create'],
+    ['/calendar', 'screen-calendar'],
+    ['/calendar/agenda', 'screen-calendar'],
   ])(
     'AuthenticatedEntries_ReachFriendsAndBlockedRoutes_D127: %s',
     async (path, testId) => {
@@ -254,13 +256,25 @@ describe('AppNavigationTests', () => {
     ).toBeInTheDocument()
   })
 
+  it('clicked Calendar entry renders the guarded week grid, not a second nav entry for agenda_S6', async () => {
+    setSession(session({ authenticated: true, state: 'active' }))
+    renderRoute('/app')
+
+    fireEvent.click(screen.getByRole('link', { name: 'Calendar' }))
+    expect(await screen.findByTestId('screen-calendar')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Agenda' }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Agenda' })).toBeInTheDocument()
+  })
+
   it.each([
-    ['en', 'Friends', 'Settings', 'Sessions'],
-    ['pt-BR', 'Amigos', 'Configurações', 'Sessões'],
-    ['es', 'Amistades', 'Configuración', 'Sesiones'],
+    ['en', 'Friends', 'Settings', 'Sessions', 'Calendar'],
+    ['pt-BR', 'Amigos', 'Configurações', 'Sessões', 'Calendário'],
+    ['es', 'Amistades', 'Configuración', 'Sesiones', 'Calendario'],
   ])(
     'PersistentEntries_HaveLocalizedAccessibleLabelsAndCurrentState_D139: %s',
-    async (locale, friendsLabel, settingsLabel, sessionsLabel) => {
+    async (locale, friendsLabel, settingsLabel, sessionsLabel, calendarLabel) => {
       await i18n.changeLanguage(locale)
       setSession(session({ authenticated: true, state: 'active' }))
       renderRoute('/friends')
@@ -274,6 +288,10 @@ describe('AppNavigationTests', () => {
       expect(screen.getByRole('link', { name: sessionsLabel })).toHaveAttribute(
         'href',
         '/sessions/upcoming',
+      )
+      expect(screen.getByRole('link', { name: calendarLabel })).toHaveAttribute(
+        'href',
+        '/calendar',
       )
     },
   )
