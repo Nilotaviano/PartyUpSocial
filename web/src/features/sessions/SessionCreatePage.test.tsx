@@ -30,12 +30,12 @@ vi.mock('react-router', async () => {
 import '../../i18n'
 import { SessionCreatePage } from './SessionCreatePage'
 
-function renderPage() {
+function renderPage(initialEntries: string[] = ['/sessions/new']) {
   return render(
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <MemoryRouter>
+      <MemoryRouter initialEntries={initialEntries}>
         <SessionCreatePage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -55,6 +55,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  vi.useRealTimers()
 })
 
 describe('SessionCreatePage', () => {
@@ -240,4 +241,71 @@ describe('SessionCreatePage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Discard' }))
     expect(navigate).toHaveBeenCalledWith('/sessions/upcoming')
   })
+
+  it('parses the prefill query and surfaces the clamp to fifteen minutes ahead_D102', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'))
+    const expectedStart = toLocalDatetimeString(new Date(Date.now() + 15 * 60_000))
+
+    renderPage([
+      '/sessions/new?startTime=2020-01-01T00%3A00%3A00.000Z&durationMinutes=90',
+    ])
+    vi.useRealTimers()
+
+    expect(await screen.findByLabelText('Duration')).toHaveValue(90)
+    expect(screen.getByLabelText('Start time')).toHaveValue(expectedStart)
+    expect(
+      screen.getByText(
+        'The start time was moved to the earliest time allowed (15 minutes from now).',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('does not surface a clamp message when the prefilled start is already far enough ahead_D102', async () => {
+    renderPage(['/sessions/new?startTime=2035-06-01T12%3A00%3A00.000Z&durationMinutes=60'])
+
+    expect(await screen.findByLabelText('Duration')).toHaveValue(60)
+    expect(
+      screen.queryByText(
+        'The start time was moved to the earliest time allowed (15 minutes from now).',
+      ),
+    ).not.toBeInTheDocument()
+  })
+
+  it('renders the over-duration warning without blocking submit_D109', async () => {
+    renderPage([
+      '/sessions/new?startTime=2035-06-01T12%3A00%3A00.000Z&durationMinutes=120&overDurationMinutes=30',
+    ])
+
+    expect(
+      await screen.findByText(
+        'This session runs 30 minutes past the recommended window.',
+      ),
+    ).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Title'), {
+      target: { value: 'Raid night' },
+    })
+    fireEvent.click(screen.getByLabelText('Private session'))
+    fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
+
+    expect(
+      screen.queryByText('There were problems with your submission'),
+    ).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/sessions',
+        expect.objectContaining({
+          body: expect.objectContaining({ durationMinutes: 120 }),
+        }),
+      ),
+    )
+  })
 })
+
+function toLocalDatetimeString(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}`
+}

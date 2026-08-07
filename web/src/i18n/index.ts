@@ -3,6 +3,7 @@ import { initReactI18next } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
 
 import enAuth from './en/auth.json'
+import enAvailability from './en/availability.json'
 import enCommon from './en/common.json'
 import enErrors from './en/errors.json'
 import enFriends from './en/friends.json'
@@ -11,6 +12,7 @@ import enProfile from './en/profile.json'
 import enSessions from './en/sessions.json'
 import enSettings from './en/settings.json'
 import esAuth from './es/auth.json'
+import esAvailability from './es/availability.json'
 import esCommon from './es/common.json'
 import esErrors from './es/errors.json'
 import esFriends from './es/friends.json'
@@ -19,6 +21,7 @@ import esProfile from './es/profile.json'
 import esSessions from './es/sessions.json'
 import esSettings from './es/settings.json'
 import ptBRAuth from './pt-BR/auth.json'
+import ptBRAvailability from './pt-BR/availability.json'
 import ptBRCommon from './pt-BR/common.json'
 import ptBRErrors from './pt-BR/errors.json'
 import ptBRFriends from './pt-BR/friends.json'
@@ -38,6 +41,7 @@ export const resources = {
     errors: enErrors,
     friends: enFriends,
     sessions: enSessions,
+    availability: enAvailability,
   },
   'pt-BR': {
     common: ptBRCommon,
@@ -48,6 +52,7 @@ export const resources = {
     errors: ptBRErrors,
     friends: ptBRFriends,
     sessions: ptBRSessions,
+    availability: ptBRAvailability,
   },
   es: {
     common: esCommon,
@@ -58,6 +63,7 @@ export const resources = {
     errors: esErrors,
     friends: esFriends,
     sessions: esSessions,
+    availability: esAvailability,
   },
 }
 
@@ -77,6 +83,7 @@ void i18n
       'errors',
       'friends',
       'sessions',
+      'availability',
     ],
     resources,
     interpolation: {

@@ -13,6 +13,18 @@ const namespaces = [
   'errors',
   'friends',
   'sessions',
+  'availability',
+] as const
+
+// Closed problem-code inventory (PHASE5_DESIGN.md §8/§10.2): the five new
+// availability codes. The four pre-existing codes it reuses (invalid_scope,
+// invalid_cursor, rate_limited, transient_conflict) stay in sessions.json.
+const availabilityProblemCodes = [
+  'availability_not_found',
+  'availability_validation',
+  'invalid_range',
+  'range_too_large',
+  'occurrence_not_found',
 ] as const
 
 // Closed problem-code inventory (PHASE4_DESIGN.md §8): 23 endpoint codes plus
@@ -134,6 +146,33 @@ describe('sessions problem-code coverage D-060/D-146', () => {
         }
       ).errors.codes
       for (const code of problemCodes) {
+        expect(typeof codes[code]).toBe('string')
+        expect(codes[code].length).toBeGreaterThan(0)
+      }
+    })
+  }
+})
+
+describe('availability problem-code coverage D-060 (PHASE5_DESIGN.md §8/§10.2)', () => {
+  it('errors.codes contains exactly the five new availability problem codes', () => {
+    const codes = Object.keys(
+      (
+        registeredResources.en.availability as {
+          errors: { codes: Record<string, string> }
+        }
+      ).errors.codes,
+    ).sort()
+    expect(codes).toEqual([...availabilityProblemCodes].sort())
+  })
+
+  for (const locale of locales) {
+    it(locale + ' has one message per new availability problem code', () => {
+      const codes = (
+        registeredResources[locale].availability as {
+          errors: { codes: Record<string, string> }
+        }
+      ).errors.codes
+      for (const code of availabilityProblemCodes) {
         expect(typeof codes[code]).toBe('string')
         expect(codes[code].length).toBeGreaterThan(0)
       }

@@ -1,5 +1,4 @@
 import type { QueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
 import type { components } from '../../api/schema'
 import { client, isApiError } from '../../api/client'
 
@@ -308,21 +307,6 @@ export async function invalidateSessionQueries(
   }
 
   await Promise.all(invalidations)
-}
-
-/**
- * Warns the browser before an unsaved close/reload while a create/edit
- * form is dirty (design §10.1 "close" discard duty).
- */
-export function useDirtyGuard(dirty: boolean) {
-  useEffect(() => {
-    if (!dirty) return
-    const handler = (event: BeforeUnloadEvent) => {
-      event.preventDefault()
-    }
-    window.addEventListener('beforeunload', handler)
-    return () => window.removeEventListener('beforeunload', handler)
-  }, [dirty])
 }
 
 export function isSessionInProgress(session: {

@@ -1,0 +1,18 @@
+{
+  "nav": {
+    "calendar": "Calendar"
+  },
+  "prefill": {
+    "clamped": "The start time was moved to the earliest time allowed (15 minutes from now).",
+    "overDuration": "This session runs {{minutes}} minutes past the recommended window."
+  },
+  "errors": {
+    "codes": {
+      "availability_not_found": "That availability entry could not be found.",
+      "availability_validation": "Check the highlighted fields and try again.",
+      "invalid_range": "That date range is not valid.",
+      "range_too_large": "Choose a shorter date range.",
+      "occurrence_not_found": "That occurrence could not be found."
+    }
+  }
+}

@@ -23,6 +23,12 @@ vi.mock('../../api/client', () => ({
   },
 }))
 
+const navigate = vi.hoisted(() => vi.fn())
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual<typeof import('react-router')>('react-router')
+  return { ...actual, useNavigate: () => navigate }
+})
+
 import { ApiError } from '../../api/client'
 import '../../i18n'
 import { SessionEditPage } from './SessionEditPage'
@@ -180,5 +186,33 @@ describe('SessionEditPage', () => {
 
     await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(2))
     expect(api.patch.mock.calls[1][1].body.ifMatch).toBe('v2')
+  })
+
+  it('warns before discarding dirty edit-form values_D152_D162', async () => {
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Title'), {
+      target: { value: 'Updated title' },
+    })
+
+    const cancelTrigger = screen.getByRole('button', { name: 'Cancel' })
+    cancelTrigger.focus()
+    fireEvent.click(cancelTrigger)
+
+    let dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('Discard unsaved changes?')
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus(),
+    )
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByLabelText('Title')).toHaveValue('Updated title')
+    expect(navigate).not.toHaveBeenCalled()
+
+    fireEvent.click(cancelTrigger)
+    dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Discard' }))
+    expect(navigate).toHaveBeenCalledWith('/sessions/session-1')
   })
 })

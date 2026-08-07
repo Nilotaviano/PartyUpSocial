@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { useDirtyGuard } from '../../components/useDirtyGuard'
 import { DiscardDialog } from './SessionCreatePage'
 import {
   editSessionWithConflictRetry,
@@ -11,7 +12,6 @@ import {
   invalidateSessionQueries,
   isSessionInProgress,
   sessionKeys,
-  useDirtyGuard,
   type ClearField,
   type EditSessionRequest,
   type SessionDetail,
@@ -58,6 +58,7 @@ export function SessionEditPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [discardOpen, setDiscardOpen] = useState(false)
   const [conflictNotice, setConflictNotice] = useState(false)
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
 
   const detail = useQuery({
     queryKey: sessionKeys.detail(sessionId),
@@ -70,7 +71,12 @@ export function SessionEditPage() {
     heading.current?.focus()
   }, [])
 
-  useDirtyGuard(dirty)
+  useDirtyGuard(dirty, {
+    onBlockedNavigation: (target) => {
+      setPendingNavigation(target)
+      setDiscardOpen(true)
+    },
+  })
 
   // Adjusting state during render (not in an effect) to seed the form the
   // first time the detail query resolves, per React's documented pattern
@@ -165,6 +171,7 @@ export function SessionEditPage() {
 
   function requestCancel() {
     if (dirty) {
+      setPendingNavigation(`/sessions/${sessionId}`)
       setDiscardOpen(true)
       return
     }
@@ -400,7 +407,13 @@ export function SessionEditPage() {
         onDiscard={() => {
           setDiscardOpen(false)
           setDirty(false)
-          navigate(`/sessions/${sessionId}`)
+          const target = pendingNavigation ?? `/sessions/${sessionId}`
+          setPendingNavigation(null)
+          if (target === 'back') {
+            window.history.back()
+          } else {
+            navigate(target)
+          }
         }}
         onOpenChange={setDiscardOpen}
       />

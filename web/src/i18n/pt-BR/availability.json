@@ -1,0 +1,18 @@
+{
+  "nav": {
+    "calendar": "Calendário"
+  },
+  "prefill": {
+    "clamped": "O horário de início foi movido para o horário mais próximo permitido (15 minutos a partir de agora).",
+    "overDuration": "Esta sessão ultrapassa a janela recomendada em {{minutes}} minutos."
+  },
+  "errors": {
+    "codes": {
+      "availability_not_found": "Esse registro de disponibilidade não foi encontrado.",
+      "availability_validation": "Verifique os campos destacados e tente novamente.",
+      "invalid_range": "Esse intervalo de datas não é válido.",
+      "range_too_large": "Escolha um intervalo de datas mais curto.",
+      "occurrence_not_found": "Essa ocorrência não foi encontrada."
+    }
+  }
+}

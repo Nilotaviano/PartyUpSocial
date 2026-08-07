@@ -1,16 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { Dialog } from '../../components/ui/dialog'
+import { useDirtyGuard } from '../../components/useDirtyGuard'
 import { friendKeys, getFriends } from '../friends/friendGraph'
-import {
-  createSession,
-  useDirtyGuard,
-  type CreateSessionRequest,
-} from './sessionQueries'
+import { createSession, type CreateSessionRequest } from './sessionQueries'
 
 type DiscardDialogProps = {
   open: boolean
@@ -114,17 +111,82 @@ const emptyForm = {
   guestLinkCount: '0',
 }
 
+// D-130's minimum lead, mirrored client-side (`RecommendationPrefill.MinimumLead`
+// server-side): a prefilled start is raised to at least now + 15 min, never
+// lowered — A-083's session-arm consumption half (design §10.1).
+const MINIMUM_LEAD_MS = 15 * 60_000
+
+function toDatetimeLocal(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}`
+}
+
+type Prefill = {
+  start: string
+  durationMinutes: string | null
+  startWasClamped: boolean
+  overDurationMinutes: number
+}
+
+/**
+ * Reads `/sessions/new?startTime&durationMinutes&overDurationMinutes`
+ * (A-083, §10.1). S6 owns reading this URL; S7 writes it from a
+ * recommendation. The clamp is re-applied here (not just trusted from the
+ * URL) because time may have passed between the link being minted and this
+ * page loading.
+ */
+function readPrefill(params: URLSearchParams): Prefill | null {
+  const startTimeParam = params.get('startTime')
+  if (!startTimeParam) return null
+
+  const requested = new Date(startTimeParam)
+  if (Number.isNaN(requested.getTime())) return null
+
+  const earliest = new Date(Date.now() + MINIMUM_LEAD_MS)
+  const startWasClamped = requested.getTime() < earliest.getTime()
+  const effectiveStart = startWasClamped ? earliest : requested
+
+  const durationParam = params.get('durationMinutes')
+  const durationValue = durationParam ? Number(durationParam) : NaN
+  const durationMinutes =
+    Number.isFinite(durationValue) && durationValue > 0 ? String(durationValue) : null
+
+  const overDurationParam = params.get('overDurationMinutes')
+  const overDurationValue = overDurationParam ? Number(overDurationParam) : NaN
+  const overDurationMinutes = Number.isFinite(overDurationValue) ? overDurationValue : 0
+
+  return {
+    start: toDatetimeLocal(effectiveStart),
+    durationMinutes,
+    startWasClamped,
+    overDurationMinutes,
+  }
+}
+
 export function SessionCreatePage() {
-  const { t } = useTranslation(['sessions', 'errors'])
+  const { t } = useTranslation(['sessions', 'errors', 'availability'])
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const heading = useRef<HTMLHeadingElement>(null)
   const summaryRef = useRef<HTMLDivElement>(null)
   const cancelTrigger = useRef<HTMLButtonElement>(null)
-  const [form, setForm] = useState(emptyForm)
+  const [searchParams] = useSearchParams()
+  const [prefill] = useState(() => readPrefill(searchParams))
+  const [form, setForm] = useState(() =>
+    prefill
+      ? {
+          ...emptyForm,
+          start: prefill.start,
+          durationMinutes: prefill.durationMinutes ?? emptyForm.durationMinutes,
+        }
+      : emptyForm,
+  )
   const [dirty, setDirty] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [discardOpen, setDiscardOpen] = useState(false)
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
 
   const friends = useQuery({
     queryKey: friendKeys.friends,
@@ -143,7 +205,12 @@ export function SessionCreatePage() {
     heading.current?.focus()
   }, [])
 
-  useDirtyGuard(dirty)
+  useDirtyGuard(dirty, {
+    onBlockedNavigation: (target) => {
+      setPendingNavigation(target)
+      setDiscardOpen(true)
+    },
+  })
 
   useEffect(() => {
     if (submit.error && summaryRef.current) {
@@ -227,6 +294,7 @@ export function SessionCreatePage() {
 
   function requestCancel() {
     if (dirty) {
+      setPendingNavigation('/sessions/upcoming')
       setDiscardOpen(true)
       return
     }
@@ -246,6 +314,21 @@ export function SessionCreatePage() {
         {t('create.heading')}
       </h1>
       <p className="text-sm text-slate-600">{t('create.defaults')}</p>
+
+      {prefill?.startWasClamped && (
+        <p aria-live="polite" role="status">
+          {t('prefill.clamped', { ns: 'availability' })}
+        </p>
+      )}
+
+      {prefill && prefill.overDurationMinutes > 0 && (
+        <p role="status">
+          {t('prefill.overDuration', {
+            ns: 'availability',
+            minutes: prefill.overDurationMinutes,
+          })}
+        </p>
+      )}
 
       {Object.keys(fieldErrors).length > 0 && (
         <div
@@ -576,7 +659,13 @@ export function SessionCreatePage() {
         onDiscard={() => {
           setDiscardOpen(false)
           setDirty(false)
-          navigate('/sessions/upcoming')
+          const target = pendingNavigation ?? '/sessions/upcoming'
+          setPendingNavigation(null)
+          if (target === 'back') {
+            window.history.back()
+          } else {
+            navigate(target)
+          }
         }}
         onOpenChange={setDiscardOpen}
       />
