@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using System.Threading;
 using Microsoft.Playwright;
 using Testcontainers.PostgreSql;
 
@@ -53,7 +54,50 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     /// </summary>
     public static string WebBaseUrl { get; } = IsBuiltTopology ? ApiBaseUrl : "http://localhost:5173";
 
+    /// <summary>
+    /// F3 (round-1 fix): everything a CI red needs to diagnose — trx logs (`--results-directory`,
+    /// `ci.yml`), the API child process's own stdout/stderr, axe findings
+    /// (<c>Accessibility/AxeAuditTests.cs</c>'s own directory), and Playwright traces — lands under
+    /// this one directory so `ci.yml`'s upload step has a single real path to point at.
+    /// </summary>
+    private static string ArtifactsDirectory =>
+        Path.Combine(AppContext.BaseDirectory, "test-results");
+
+    private static int _registrationCount;
+
+    /// <summary>
+    /// Round-1 fix, gate-driven (this ticket's own two-consecutive-clean-run requirement exposed
+    /// it; no F-numbered finding named it): <c>RateLimitPolicies.cs</c>'s "default" dimension
+    /// (300/IP/minute, a FIXED window covering every operation, `AutoReplenishment = true`) is
+    /// shared across the whole collection — every class's traffic comes from the same loopback IP
+    /// and counts against the same budget. Each registration (age gate → register → verify →
+    /// onboarding) is by far the densest traffic a single test action produces here, and this
+    /// suite runs five of them (`AxeAuditTests` one, `SessionGuestFlowTests` one,
+    /// `SessionRegisteredFlowTests` three) close enough together — timed by nothing but how fast
+    /// Playwright can drive the UI, with no artificial pacing anywhere in the unmodified flow-test
+    /// files — that two registrations' combined traffic can exceed 300 within whatever 60s window
+    /// they land in. Confirmed by direct evidence: a captured 429 on `/api/v1/guest/{id}/session`,
+    /// itself `retry:false` client-side, stranding an unmodified Phase 4 guest-flow test showing
+    /// neither its expected text nor a visible error. A per-navigation delay only changes *when*
+    /// one class's own requests happen, not how many a *different*, unmodified class fires once it
+    /// starts, so the fix lives at the one call site every registration in the whole suite already
+    /// shares: before the second and every later registration, wait out a full window with zero
+    /// requests. `FixedWindowRateLimiter`'s replenishment does not depend on a request landing
+    /// exactly on the boundary, so a quiet period at least as long as the window guarantees
+    /// whichever window is open has fully reset before the next registration's burst begins — a
+    /// barrier on the shared resource's state, not a wait tied to any one assertion.
+    /// </summary>
+    private static async Task SettleSharedRateLimitWindowBeforeRegistrationAsync()
+    {
+        if (Interlocked.Increment(ref _registrationCount) > 1)
+        {
+            await Task.Delay(65_000);
+        }
+    }
+
     private readonly string _repoRoot = FindRepoRoot();
+    private readonly List<IBrowserContext> _tracedContexts = [];
+    private readonly Lock _tracedContextsLock = new();
     private string _mailDropPath = string.Empty;
     private KillOnCloseJob? _job;
     private Process? _apiProcess;
@@ -107,7 +151,8 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
                 ["ASPNETCORE_ENVIRONMENT"] = "Development",
                 ["Database__MigrateOnStartup"] = "true",
                 ["Email__DropPath"] = _mailDropPath,
-            });
+            },
+            logName: "api");
         AssignToJob(_apiProcess);
 
         _webProcess = StartProcess(
@@ -120,10 +165,16 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
 
     /// <summary>
     /// A-082: starts a Testcontainers Postgres, then runs the API's own built output directly
-    /// (never <c>dotnet run</c>) against it. The <c>browser</c> CI job is responsible for the build
-    /// and for copying <c>web/dist</c> into <c>src/PartyUp.Api/wwwroot</c> before this runs — that
-    /// placement is what the ASP.NET Core Web SDK copies into the build output's own
-    /// <c>wwwroot</c>, which is what <see cref="BuiltApiOutputDirectory"/> is checked against below.
+    /// (never <c>dotnet run</c>) against it. The <c>browser</c> CI job builds the solution and then
+    /// copies <c>web/dist</c> straight into <c>src/PartyUp.Api/bin/Debug/net10.0/wwwroot</c> —
+    /// <c>dotnet build</c> (unlike <c>dotnet publish</c>) never copies a project's own
+    /// <c>wwwroot</c> into its output directory, so the job must place the built assets directly
+    /// in the bin output itself, after the build, not the source tree before it. That physical
+    /// directory is what <see cref="BuiltApiOutputDirectory"/> is checked against below, and it is
+    /// what the API actually serves: this method starts the API process with that directory as its
+    /// working directory, ASP.NET Core's default content root is the process's current directory,
+    /// and <c>Program.cs:357</c>'s <c>Path.Combine(ContentRootPath, "wwwroot")</c> — the check that
+    /// gates <c>UseStaticFiles</c>/<c>MapFallbackToFile</c> — resolves against that content root.
     /// This path runs only where Docker exists (CI; the Windows dev host has none).
     /// </summary>
     private async Task InitializeBuiltTopologyAsync()
@@ -137,9 +188,11 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         {
             throw new InvalidOperationException(
                 $"Built topology requires a populated '{wwwrootPath}'. The 'browser' CI job must run " +
-                "'npm run build' in web/ and copy web/dist into src/PartyUp.Api/wwwroot (mirroring " +
-                "deploy/Dockerfile:27) before its own 'dotnet build PartyUp.sln' — A-082's fixture " +
-                "never audits a 404 shell.");
+                "'dotnet build PartyUp.sln' and THEN copy web/dist straight into that build's own " +
+                "bin output (src/PartyUp.Api/bin/Debug/net10.0/wwwroot) — 'dotnet build' never " +
+                "copies a project's wwwroot the way 'dotnet publish' does, so copying into the " +
+                "source tree or copying before the build both leave this directory empty. A-082's " +
+                "fixture never audits a 404 shell.");
         }
 
         string dllPath = Path.Combine(outputDirectory, "PartyUp.Api.dll");
@@ -160,7 +213,8 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
                 ["Email__DropPath"] = _mailDropPath,
                 ["ConnectionStrings__Db"] = _postgresContainer.GetConnectionString(),
                 ["PublicBaseUrl"] = ApiBaseUrl,
-            });
+            },
+            logName: "api");
         AssignToJob(_apiProcess);
     }
 
@@ -170,6 +224,35 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
 
     public async Task DisposeAsync()
     {
+        // F3: export every still-live traced context's trace BEFORE closing the browser (closing
+        // kills the contexts, and a context AxeAuditTests' own `finally` already closed cannot
+        // export — best-effort per context so one already-closed context doesn't drop the rest).
+        if (IsBuiltTopology)
+        {
+            List<IBrowserContext> contexts;
+            lock (_tracedContextsLock)
+            {
+                contexts = [.. _tracedContexts];
+            }
+
+            Directory.CreateDirectory(ArtifactsDirectory);
+            int index = 0;
+            foreach (IBrowserContext context in contexts)
+            {
+                try
+                {
+                    await context.Tracing.StopAsync(new()
+                    {
+                        Path = Path.Combine(ArtifactsDirectory, $"trace-{index++}.zip"),
+                    });
+                }
+                catch
+                {
+                    // Best-effort: a context closed earlier by test code has nothing left to export.
+                }
+            }
+        }
+
         if (Browser is not null)
         {
             await Browser.CloseAsync();
@@ -194,14 +277,33 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     public async Task<IBrowserContext> NewContextAsync(string? timezoneId = null)
     {
         IBrowserContext context = await Browser.NewContextAsync(new() { TimezoneId = timezoneId });
-        // A full lane run (axe pass over every audited route plus every flow class, one shared
-        // fixture) can push individual waits past Playwright's 30s default under load, so every
-        // context minted here carries a longer budget centrally instead of per-test overrides.
-        // These are wait ceilings, not retries — A-082's zero-retry rule is untouched.
-        context.SetDefaultNavigationTimeout(60000);
-        context.SetDefaultTimeout(45000);
+        context.SetDefaultNavigationTimeout(NavigationTimeoutMs);
+        context.SetDefaultTimeout(ActionTimeoutMs);
+
+        if (IsBuiltTopology)
+        {
+            // F3: CI-only (the topology check keeps this cost off every local run) unconditional
+            // tracing, so a red CI run has a real trace to open rather than only a log line.
+            await context.Tracing.StartAsync(new() { Screenshots = true, Snapshots = true, Sources = true });
+            lock (_tracedContextsLock)
+            {
+                _tracedContexts.Add(context);
+            }
+        }
+
         return context;
     }
+
+    /// <summary>
+    /// Round-1 F7: F2's deterministic response-barrier fix (`SessionGuestFlowTests.cs`'s
+    /// `CreatePrivateSessionAsync`) removed the client-navigation race that made a 60s ceiling look
+    /// necessary, so this override states Playwright's own default explicitly at the one call site
+    /// every context goes through, rather than widening it. Two consecutive cold 46-test runs (this
+    /// ticket's gate, after this file's separate rate-limit-window fix below — a defect distinct
+    /// from F2, gate-driven rather than F-numbered) were green at this un-raised value.
+    /// </summary>
+    private const int NavigationTimeoutMs = 30000;
+    private const int ActionTimeoutMs = 30000;
 
     /// <summary>
     /// Drives a brand-new registered account through the real magic-link-style flow the
@@ -210,11 +312,24 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     /// seeded/short-circuited session. Returns a page already at <c>/app</c>, plus the username
     /// the caller needs for friend-graph and roster assertions.
     /// </summary>
+    /// <param name="onOnboardingStep">
+    /// Round-1 F5: invoked once per onboarding step (<c>username</c>, <c>display-name</c>,
+    /// <c>avatar</c>, <c>time-zone</c>, <c>link-platforms</c>, <c>friends</c>), with the page settled
+    /// on that step and before it advances — the only way to reach any onboarding step's rendered
+    /// page at all, since <c>OnboardingWizard.tsx</c> redirects every one of its routes to the
+    /// <c>friends</c> step once the account's onboarding is complete (`isActive` in that component),
+    /// and redirects a request past whatever step the draft has actually reached back to that step
+    /// otherwise. <see cref="Accessibility.AxeAuditTests"/> is this parameter's only caller; the
+    /// ordinary flow-test callers (unmodified) pass <see langword="null"/> and walk straight through.
+    /// </param>
     public async Task<RegisteredUser> RegisterAndOnboardAsync(
         IBrowserContext context,
         string emailLocalPart,
-        string displayName)
+        string displayName,
+        Func<string, IPage, Task>? onOnboardingStep = null)
     {
+        await SettleSharedRateLimitWindowBeforeRegistrationAsync();
+
         // A random suffix on both the email and the username: the dev Postgres this fixture
         // points at is not reset between runs, so a fixed email would hit RegisterWithPasswordUseCase's
         // "existing account" branch (a different, link-less email template) on any rerun.
@@ -269,19 +384,55 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         await page.GetByRole(AriaRole.Button, new() { Name = "Continue" }).ClickAsync();
 
         await page.WaitForURLAsync(url => url.Contains("/onboarding", StringComparison.Ordinal));
+        if (onOnboardingStep is not null)
+        {
+            await onOnboardingStep("username", page);
+        }
+
         await page.GetByLabel("Username").FillAsync(username);
         await page.GetByRole(AriaRole.Button, new() { Name = "Continue" }).ClickAsync();
 
         await page.GetByLabel("Display name").WaitForAsync();
+        if (onOnboardingStep is not null)
+        {
+            await onOnboardingStep("display-name", page);
+        }
+
         await page.GetByLabel("Display name").FillAsync(displayName);
         await page.GetByRole(AriaRole.Button, new() { Name = "Continue" }).ClickAsync();
 
         // Avatar step: default selection is fine, just continue.
+        await page.WaitForURLAsync(url => url.EndsWith("/onboarding/avatar", StringComparison.Ordinal));
+        if (onOnboardingStep is not null)
+        {
+            await onOnboardingStep("avatar", page);
+        }
+
         await page.GetByRole(AriaRole.Button, new() { Name = "Continue" }).ClickAsync();
+
         // Time-zone step: browser-detected default is fine.
+        await page.WaitForURLAsync(url => url.EndsWith("/onboarding/time-zone", StringComparison.Ordinal));
+        if (onOnboardingStep is not null)
+        {
+            await onOnboardingStep("time-zone", page);
+        }
+
         await page.GetByRole(AriaRole.Button, new() { Name = "Continue" }).ClickAsync();
+
         // Link-platforms step: optional, completes onboarding.
+        await page.WaitForURLAsync(url => url.EndsWith("/onboarding/link-platforms", StringComparison.Ordinal));
+        if (onOnboardingStep is not null)
+        {
+            await onOnboardingStep("link-platforms", page);
+        }
+
         await page.GetByRole(AriaRole.Button, new() { Name = "Continue" }).ClickAsync();
+
+        await page.WaitForURLAsync(url => url.EndsWith("/onboarding/friends", StringComparison.Ordinal));
+        if (onOnboardingStep is not null)
+        {
+            await onOnboardingStep("friends", page);
+        }
 
         await page.GetByRole(AriaRole.Button, new() { Name = "Finish setup" }).ClickAsync();
         await page.WaitForURLAsync(url => url.EndsWith("/app", StringComparison.Ordinal));
@@ -367,11 +518,18 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         throw new TimeoutException($"No dropped email contained a link with '{pathContains}' within the timeout.");
     }
 
+    /// <summary>
+    /// F3 (round-1 fix): when <paramref name="logName"/> is supplied, this process's stdout/stderr
+    /// are appended to <c>{logName}.stdout.log</c>/<c>{logName}.stderr.log</c> under
+    /// <see cref="ArtifactsDirectory"/> instead of being discarded — a CI red on the API side used
+    /// to leave nothing to diagnose beyond the Playwright-side assertion failure.
+    /// </summary>
     private static Process StartProcess(
         string fileName,
         string arguments,
         string workingDirectory,
-        IDictionary<string, string?> environment)
+        IDictionary<string, string?> environment,
+        string? logName = null)
     {
         var info = new ProcessStartInfo(fileName, arguments)
         {
@@ -386,9 +544,30 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
             info.Environment[pair.Key] = pair.Value;
         }
 
+        StreamWriter? stdout = null;
+        StreamWriter? stderr = null;
+        if (logName is not null)
+        {
+            Directory.CreateDirectory(ArtifactsDirectory);
+            stdout = new StreamWriter(Path.Combine(ArtifactsDirectory, $"{logName}.stdout.log")) { AutoFlush = true };
+            stderr = new StreamWriter(Path.Combine(ArtifactsDirectory, $"{logName}.stderr.log")) { AutoFlush = true };
+        }
+
         var process = new Process { StartInfo = info, EnableRaisingEvents = true };
-        process.OutputDataReceived += (_, _) => { };
-        process.ErrorDataReceived += (_, _) => { };
+        process.OutputDataReceived += (_, e) =>
+        {
+            if (e.Data is not null)
+            {
+                stdout?.WriteLine(e.Data);
+            }
+        };
+        process.ErrorDataReceived += (_, e) =>
+        {
+            if (e.Data is not null)
+            {
+                stderr?.WriteLine(e.Data);
+            }
+        };
         process.Start();
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();

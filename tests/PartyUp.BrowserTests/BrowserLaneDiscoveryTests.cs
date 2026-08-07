@@ -5,14 +5,12 @@ namespace PartyUp.BrowserTests;
 /// <summary>
 /// A-082's own two lane-shape assertions (PHASE5_DESIGN.md §11 "Browser lane (S1)"). Neither needs
 /// <see cref="PlaywrightFixture"/> or a running stack — both are pure reflection over this compiled
-/// assembly, which is why they carry no <c>[Trait("Category","Integration")]</c>: unlike every other
-/// class here, they are meant to run and prove something even when the lane is excluded from
-/// discovery (a solution-wide `dotnet test` still compiles and could run this assembly's own tests
-/// under `-p:PartyUpBrowserTests=true` without CLAUDE.md's `Category!=Integration` filter narrowing
-/// it further — see the second fact below for why that trait belongs on this class too, exactly
-/// like every other one here: the `browser` CI job's two steps both filter *on*
-/// `Category=Integration` (never against it), so a class lacking the trait would silently never run
-/// in CI at all.
+/// assembly. Like every other class here this one carries
+/// <c>[Trait("Category","Integration")]</c> too (round-1 F6 fixed a stale comment that used to claim
+/// the opposite): the `browser` CI job's two steps both filter *on* `Category=Integration` (never
+/// against it), so a class lacking the trait would silently never run in CI at all — see the second
+/// fact below for the assertion that makes that requirement structural rather than a convention
+/// someone has to remember.
 /// </summary>
 [Trait("Category", "Integration")]
 public sealed class BrowserLaneDiscoveryTests

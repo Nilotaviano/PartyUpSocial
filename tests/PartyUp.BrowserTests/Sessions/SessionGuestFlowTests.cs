@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
@@ -44,6 +45,22 @@ public sealed class SessionGuestFlowTests(PlaywrightFixture fixture)
     /// A private session needs no invited registered friend (D-099 only gates non-private
     /// creation), which keeps the guest-only scenarios below to a single registered account.
     /// </summary>
+    /// <remarks>
+    /// Round-1 F2: this used to click "Create session" and then <c>WaitForURLAsync</c> for the
+    /// client's own post-create redirect. <c>SessionCreatePage.tsx</c>'s <c>onSuccess</c> handler
+    /// <c>await</c>s <c>queryClient.invalidateQueries({queryKey:['sessions']})</c> <b>before</b>
+    /// calling <c>navigate()</c>, so that client-side redirect is gated on a background refetch
+    /// whose duration scales with whatever else is loading the API at the time — under a full
+    /// lane run (this class plus the axe pass plus the registered-flow class, one shared fixture)
+    /// that occasionally pushed well past even a 60s wait, which is what made
+    /// <c>SecondDeviceEditWins_D126</c> nondeterministic. A longer wait cannot fix a delay with no
+    /// fixed bound, so the barrier here is the POST's own response instead: the created session id
+    /// comes straight off <c>CreateSessionResponse.session.id</c>, and this method navigates the
+    /// page there itself rather than depending on the client ever getting around to it. This does
+    /// not weaken what the class asserts — no fact here targets the post-create redirect itself
+    /// (that path stays covered, unchanged, by <c>SessionRegisteredFlowTests.CreateSessionAsync</c>);
+    /// every fact below still exercises the same private-session-then-guest-link setup it did before.
+    /// </remarks>
     private static async Task<string> CreatePrivateSessionAsync(IPage organizerPage, string title, DateTime startUtc)
     {
         await organizerPage.GotoAsync(PlaywrightFixture.WebBaseUrl + "/sessions/new");
@@ -53,10 +70,17 @@ public sealed class SessionGuestFlowTests(PlaywrightFixture fixture)
         await organizerPage.Locator("#field-min").FillAsync("1");
         await organizerPage.Locator("#field-max").FillAsync("4");
         await organizerPage.GetByLabel("Private session").CheckAsync();
-        await organizerPage.GetByRole(AriaRole.Button, new() { Name = "Create session" }).ClickAsync();
-        await organizerPage.WaitForURLAsync(url =>
-            System.Text.RegularExpressions.Regex.IsMatch(url, @"/sessions/[0-9a-fA-F-]{36}$"));
-        return new Uri(organizerPage.Url).Segments[^1];
+
+        IResponse response = await organizerPage.RunAndWaitForResponseAsync(
+            () => organizerPage.GetByRole(AriaRole.Button, new() { Name = "Create session" }).ClickAsync(),
+            candidate => candidate.Url.Contains("/api/v1/sessions", StringComparison.Ordinal) &&
+                candidate.Request.Method == "POST");
+        Assert.Equal(201, response.Status);
+        JsonElement body = (await response.JsonAsync())!.Value;
+        string sessionId = body.GetProperty("session").GetProperty("id").GetString()!;
+
+        await organizerPage.GotoAsync(PlaywrightFixture.WebBaseUrl + "/sessions/" + sessionId);
+        return sessionId;
     }
 
     private static async Task<string> CreateGuestLinkAsync(IPage organizerPage, string sessionId)

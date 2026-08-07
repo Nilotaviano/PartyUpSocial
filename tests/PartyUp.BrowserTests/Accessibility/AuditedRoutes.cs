@@ -4,23 +4,27 @@ namespace PartyUp.BrowserTests.Accessibility;
 /// One entry per audited route. <paramref name="PathTemplate"/> carries `{sessionId}`,
 /// `{username}` or `{code}` placeholders where the route needs a live entity id;
 /// <see cref="Accessibility.AxeAuditTests"/> resolves them against a shared fixture context before
-/// navigating. A route needing a token this fixture cannot mint on demand (magic link, password
-/// reset, email verification/change, external-auth callback) or a mid-onboarding account state
-/// (the six `/onboarding/*` sub-steps, which <see cref="PlaywrightFixture.RegisterAndOnboardAsync"/>
-/// drives straight through rather than pausing on) is out of S1's seed — "reachable in the fixture"
-/// (PHASE5_DESIGN.md §9) excludes what the fixture has no way to reach.
+/// navigating. <paramref name="OnboardingStepKey"/> is set only for the seven `/onboarding*` routes
+/// (round-1 F5) — those pages cannot be reached by direct navigation at all (see
+/// <see cref="Accessibility.AxeAuditTests"/>'s remarks), so their finding is captured during the
+/// fixture's own registration walk instead of a fresh <c>GotoAsync</c>. A route needing a token this
+/// fixture cannot mint on demand (magic link, password reset, email verification/change,
+/// external-auth callback) stays out of S1's seed — "reachable in the fixture" (PHASE5_DESIGN.md §9)
+/// excludes only what the fixture genuinely has no way to reach.
 /// </summary>
 public sealed record AuditedRoute(
     string Name,
     string PathTemplate,
-    bool RequiresGuestLink = false);
+    bool RequiresGuestLink = false,
+    string? OnboardingStepKey = null);
 
 /// <summary>
 /// Checked-in route inventory for the S1 axe lane (A-082, PHASE5_DESIGN.md §9, §11 "Browser lane
-/// (S1)"). Seeded with every Phase 4 route reachable in <see cref="PlaywrightFixture"/> — registered
-/// and guest surfaces alike. Each UI slice from S6 onward appends its own new routes here (design
-/// §12 serialization: `AuditedRoutes.cs` is S1 → S6 → S7); no Phase 5 route may carry an
-/// <see cref="AxeExclusions"/> entry (P5-AXE-02).
+/// (S1)"). Seeded with every Phase 4 route reachable in <see cref="PlaywrightFixture"/> — registered,
+/// onboarding and guest surfaces alike. Each UI slice from S6 onward appends its own new routes here
+/// (design §12 serialization: `AuditedRoutes.cs` is S1 → S6 → S7); no Phase 5 route may carry an
+/// <see cref="AxeExclusions"/> entry (P5-AXE-02) — enforced against the frozen S1 allowlist in
+/// `AxeExclusionListTests`, not against this list, because this list itself grows every later slice.
 /// </summary>
 public static class AuditedRoutes
 {
@@ -31,7 +35,18 @@ public static class AuditedRoutes
         new AuditedRoute("login", "/login"),
         new AuditedRoute("register", "/register"),
         new AuditedRoute("account-deletion", "/account-deletion"),
+        new AuditedRoute("account-deletion-confirm", "/account-deletion/confirm"),
         new AuditedRoute("guest-invalid", "/guest/invalid"),
+        // The bare index route redirects immediately to whichever step a fresh draft allows —
+        // "username" for the account this fixture walks — so it renders the identical DOM the
+        // "username" capture already covers; both entries key the same captured finding.
+        new AuditedRoute("onboarding", "/onboarding", OnboardingStepKey: "username"),
+        new AuditedRoute("onboarding-username", "/onboarding/username", OnboardingStepKey: "username"),
+        new AuditedRoute("onboarding-display-name", "/onboarding/display-name", OnboardingStepKey: "display-name"),
+        new AuditedRoute("onboarding-avatar", "/onboarding/avatar", OnboardingStepKey: "avatar"),
+        new AuditedRoute("onboarding-time-zone", "/onboarding/time-zone", OnboardingStepKey: "time-zone"),
+        new AuditedRoute("onboarding-link-platforms", "/onboarding/link-platforms", OnboardingStepKey: "link-platforms"),
+        new AuditedRoute("onboarding-friends", "/onboarding/friends", OnboardingStepKey: "friends"),
         new AuditedRoute("app", "/app"),
         new AuditedRoute("friends", "/friends"),
         new AuditedRoute("friends-import-steam", "/friends/import/steam"),

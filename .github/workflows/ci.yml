@@ -66,29 +66,39 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      # This job's own SPA build, copied into the API's wwwroot (mirroring deploy/Dockerfile:27's
-      # placement) BEFORE the job's own dotnet build, so the Web SDK's default wwwroot content
-      # globbing picks the built assets up into src/PartyUp.Api/bin/Debug/net10.0/wwwroot.
+      # This job's own SPA build. `dotnet build` (unlike `dotnet publish`) does NOT copy a
+      # project's wwwroot into its output directory, so the copy below runs AFTER the build,
+      # straight into the build's own bin output — that is the physical directory
+      # `PlaywrightFixture`'s built topology checks and the directory it sets as the API child
+      # process's working directory (ASP.NET Core's default content root is the process's current
+      # directory), which is what makes `Program.cs:357`'s `Path.Combine(ContentRootPath,
+      # "wwwroot")` resolve to exactly what was copied here.
       - run: npm ci
         working-directory: web
       - run: npm run build
         working-directory: web
-      - run: |
-          mkdir -p src/PartyUp.Api/wwwroot
-          cp -r web/dist/. src/PartyUp.Api/wwwroot/
 
       - run: dotnet restore PartyUp.sln
       - run: dotnet build PartyUp.sln --no-restore -warnaserror
 
+      - run: |
+          mkdir -p src/PartyUp.Api/bin/Debug/net10.0/wwwroot
+          cp -r web/dist/. src/PartyUp.Api/bin/Debug/net10.0/wwwroot/
+
       - name: Install pinned Playwright browsers (Chromium + WebKit)
         run: pwsh tests/PartyUp.BrowserTests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium webkit
 
+      # F3 (round-1 fix): both steps log to trx inside the same `test-results` directory
+      # `PlaywrightFixture.ArtifactsDirectory` also writes API stdout/stderr and Playwright traces
+      # into, so the upload step below has one real directory covering every diagnostic a CI red
+      # produces, not a path nothing is ever written to.
       - name: Chromium flows + axe
         env:
           PARTYUP_BROWSER_TOPOLOGY: built
         run: >
           dotnet test tests/PartyUp.BrowserTests --no-build -p:PartyUpBrowserTests=true
           --filter "Category=Integration&Browser!=WebKit"
+          --logger trx --results-directory tests/PartyUp.BrowserTests/bin/Debug/net10.0/test-results
 
       - name: WebKit pointer lane
         env:
@@ -96,6 +106,7 @@ jobs:
         run: >
           dotnet test tests/PartyUp.BrowserTests --no-build -p:PartyUpBrowserTests=true
           --filter "Browser=WebKit"
+          --logger trx --results-directory tests/PartyUp.BrowserTests/bin/Debug/net10.0/test-results
 
       - name: Upload axe/trace artifacts on failure
         if: failure()
@@ -105,4 +116,4 @@ jobs:
           path: |
             tests/PartyUp.BrowserTests/bin/Debug/net10.0/axe-results/**
             tests/PartyUp.BrowserTests/bin/Debug/net10.0/test-results/**
-          if-no-files-found: ignore
+          if-no-files-found: warn
