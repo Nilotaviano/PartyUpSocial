@@ -70,10 +70,12 @@ public static class CalendarEndpoints
             friend => friend.Counterpart.Id, friend => friend.Counterpart.DisplayName);
         var ordinals = new MaskedParticipantAssigner(names);
 
+        // round-1 fix (F3): one shared assigner for the whole response — a friend-availability owner
+        // who is also a visible session's organizer gets one ordinal, not two.
         var response = new CalendarViewResponse(
             MyAvailabilityLayerResponse.From(view.MyAvailability, includeRange: false),
             [.. view.FriendAvailability.Select(entry => FriendAvailabilityEntryResponse.From(entry, ordinals))],
-            [.. view.Sessions.Select(SessionSummaryResponse.From)],
+            [.. view.Sessions.Select(s => SessionSummaryResponse.From(s, ordinals))],
             []);
         return Results.Ok(response);
     }

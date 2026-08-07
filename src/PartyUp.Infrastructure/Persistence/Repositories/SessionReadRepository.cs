@@ -158,7 +158,11 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
         List<Session> sessions = await HydrateSessionsInOrderAsync(ids, cancellationToken);
         List<SessionSummary> summaries = await BuildSummariesAsync(sessions, viewerId, cancellationToken);
 
-        return ToSummaryPage(summaries, pageSize);
+        // round-1 fix (F5): mints its own page's cursor at the named Discover scope directly — this
+        // is Discover's only caller, so no endpoint-side rebind step is needed the way
+        // Upcoming/History/JoinRequests require one (their one shared repository helper cannot know
+        // which of several possible callers is asking).
+        return ToSummaryPage(summaries, pageSize, SessionListScope.Discover);
     }
 
     /// <summary>
@@ -560,10 +564,11 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
         return ViewerRelation.Inherited;
     }
 
-    private static SessionPage<SessionSummary> ToSummaryPage(List<SessionSummary> summaries, int pageSize)
+    private static SessionPage<SessionSummary> ToSummaryPage(
+        List<SessionSummary> summaries, int pageSize, SessionListScope scope = SessionListScope.Unbound)
     {
         string? nextCursor = summaries.Count == pageSize && summaries.Count > 0
-            ? new SessionListCursor(summaries[^1].StartTime, summaries[^1].Id.Value).Encode()
+            ? new SessionListCursor(summaries[^1].StartTime, summaries[^1].Id.Value, scope).Encode()
             : null;
 
         return new SessionPage<SessionSummary>(summaries, nextCursor);

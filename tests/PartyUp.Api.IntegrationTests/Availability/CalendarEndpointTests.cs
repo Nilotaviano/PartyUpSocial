@@ -67,6 +67,106 @@ public sealed class CalendarEndpointTests : IAsyncLifetime, IDisposable
         }
     }
 
+    /// <summary>
+    /// round-1 fix (F3): <c>MaskedParticipant.ordinal</c> is per-person-stable within one response, not
+    /// hardcoded 0 for every single-person context. <c>friendA</c> appears twice in this one <c>/calendar</c>
+    /// response — once as a friend-availability owner, once as a visible session's organizer — and must
+    /// carry the same ordinal both times; <c>friendB</c>, a different person, must carry a different one.
+    /// </summary>
+    [Fact]
+    public async Task MaskedParticipantOrdinalsArePerPersonStableWithinOneResponseAndDistinctAcrossPeople_F3()
+    {
+        UserId viewerId = await _factory.SeedUserAsync(email: $"cal-ord-viewer-{Guid.NewGuid():N}@example.test");
+        UserId friendAId = await _factory.SeedUserAsync(email: $"cal-ord-a-{Guid.NewGuid():N}@example.test");
+        UserId friendBId = await _factory.SeedUserAsync(email: $"cal-ord-b-{Guid.NewGuid():N}@example.test");
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, viewerId, friendAId);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, viewerId, friendBId);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, friendAId, friendBId);
+
+        using SessionHttpSession friendASession = await SessionEndpointTestSupport.SignInAsync(_factory, friendAId);
+        using SessionHttpSession friendBSession = await SessionEndpointTestSupport.SignInAsync(_factory, friendBId);
+
+        Instant blockStart = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await friendASession.SendUnsafeAsync(
+                HttpMethod.Post,
+                "/api/v1/me/availability/blocks",
+                JsonContent.Create(new
+                {
+                    startTime = Iso(blockStart),
+                    endTime = Iso(blockStart + Duration.FromHours(2)),
+                }))).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await friendBSession.SendUnsafeAsync(
+                HttpMethod.Post,
+                "/api/v1/me/availability/blocks",
+                JsonContent.Create(new
+                {
+                    startTime = Iso(blockStart),
+                    endTime = Iso(blockStart + Duration.FromHours(2)),
+                }))).StatusCode);
+
+        // friendA organizes a session inviting friendB (D-099); friendB organizes a second session
+        // inviting friendA — the viewer sees both through the "any" access-kind calendar layer as a
+        // friend of each organizer.
+        Guid sessionByAId = await CreateVisibleSessionAsync(friendASession, "Ordinal fixture A", friendBId);
+        Guid sessionByBId = await CreateVisibleSessionAsync(friendBSession, "Ordinal fixture B", friendAId);
+
+        using SessionHttpSession viewerSession = await SessionEndpointTestSupport.SignInAsync(_factory, viewerId);
+        Instant from = _factory.Clock.GetCurrentInstant();
+        Instant to = from + Duration.FromDays(7);
+        HttpResponseMessage calendar = await viewerSession.GetAsync(
+            $"/api/v1/calendar?from={Uri.EscapeDataString(Iso(from))}&to={Uri.EscapeDataString(Iso(to))}");
+        using JsonDocument body = await SessionEndpointTestSupport.SuccessJsonAsync(calendar);
+
+        JsonElement friendAvailability = body.RootElement.GetProperty("friendAvailability");
+        JsonElement sessions = body.RootElement.GetProperty("sessions");
+
+        // Both friendA and friendB share the shipped default display name ("Test Player" —
+        // PartyUpApiFactory.SeedUserAsync), so a masked response's ordinal is the ONLY correlation
+        // signal available — exactly the property this test proves. friendAvailability therefore
+        // carries exactly two owner entries with two distinct ordinals (distinct-people half of F3);
+        // each session's organizer ordinal must equal exactly one of those two pre-existing ordinals
+        // (same-person-same-ordinal-across-response-sections half), and the two organizers' ordinals
+        // must differ from each other.
+        int[] friendOwnerOrdinals = [.. friendAvailability.EnumerateArray()
+            .Select(entry => entry.GetProperty("owner").GetProperty("ordinal").GetInt32())];
+        Assert.Equal(2, friendOwnerOrdinals.Length);
+        Assert.Equal(2, friendOwnerOrdinals.Distinct().Count());
+
+        JsonElement sessionByA = sessions.EnumerateArray()
+            .Single(s => s.GetProperty("id").GetGuid() == sessionByAId);
+        JsonElement sessionByB = sessions.EnumerateArray()
+            .Single(s => s.GetProperty("id").GetGuid() == sessionByBId);
+        int organizerAOrdinal = sessionByA.GetProperty("organizer").GetProperty("ordinal").GetInt32();
+        int organizerBOrdinal = sessionByB.GetProperty("organizer").GetProperty("ordinal").GetInt32();
+
+        Assert.Contains(organizerAOrdinal, friendOwnerOrdinals);
+        Assert.Contains(organizerBOrdinal, friendOwnerOrdinals);
+        Assert.NotEqual(organizerAOrdinal, organizerBOrdinal);
+    }
+
+    private async Task<Guid> CreateVisibleSessionAsync(SessionHttpSession organizerSession, string title, UserId inviteeId)
+    {
+        Instant start = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
+        HttpResponseMessage created = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title,
+                startTime = Iso(start),
+                isPrivate = false,
+                minAttendance = 1,
+                inviteeUserIds = new[] { inviteeId.Value },
+            }));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        return (await SessionEndpointTestSupport.SuccessJsonAsync(created))
+            .RootElement.GetProperty("session").GetProperty("id").GetGuid();
+    }
+
     [Fact]
     public async Task PollLayerIsDeclaredAndEmpty_D111()
     {

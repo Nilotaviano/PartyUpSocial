@@ -4,11 +4,43 @@ namespace PartyUp.Api.IntegrationTests.Availability;
 
 /// <summary>
 /// PHASE5_DESIGN.md P5-HTTP-01/A-071: operation ids stay globally unique with the Phase 5 surface
-/// added, and every new problem code's documented status is present on the routes §8 assigns it to.
+/// added, the new-operation set is closed (round-1 fix F9 — the prior version only asserted
+/// <c>Contains</c> on seven ids with no schema check), and every new problem code's documented status
+/// is present on the routes §8 assigns it to.
 /// </summary>
 [Trait("Category", "Integration")]
 public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
 {
+    /// <summary>§8's twelve new operations — the closed set this slice may add.</summary>
+    private static readonly string[] NewPhase5OperationIds =
+    [
+        ApiOperationIds.GetMyAvailability,
+        ApiOperationIds.CreateAvailabilityBlock,
+        ApiOperationIds.EditAvailabilityBlock,
+        ApiOperationIds.DeleteAvailabilityBlock,
+        ApiOperationIds.CreateAvailabilitySeries,
+        ApiOperationIds.DeleteAvailabilitySeries,
+        ApiOperationIds.EditAvailabilityOccurrence,
+        ApiOperationIds.DeleteAvailabilityOccurrence,
+        ApiOperationIds.FindOverlapWindows,
+        ApiOperationIds.GetHomeSuggestions,
+        ApiOperationIds.GetCalendarView,
+        ApiOperationIds.GetActionableInbox,
+    ];
+
+    /// <summary>
+    /// Every non-Phase-5 operation id in the shipped document uses a raw <c>.WithName("…")</c> string
+    /// literal rather than an <c>ApiOperationIds</c> constant (the pre-Phase-4 surface predates that
+    /// convention), so the closed-set proof anchors on the document's own total count rather than
+    /// re-deriving the pre-existing ids from a constants class that does not enumerate them. Captured
+    /// against this test factory's own <c>Testing</c>-environment host (which additionally maps the
+    /// four <c>/api/v1/_slice2/*</c> sign-in helper routes <c>Program.cs</c> only registers under that
+    /// environment name): 101 total operation ids, of which exactly the 12 above are new. A deliberate
+    /// future change to either count must update this constant explicitly — it is not meant to
+    /// silently absorb drift.
+    /// </summary>
+    private const int ExpectedTotalOperationCount = 101;
+
     private readonly PartyUpApiFactory _factory = new();
 
     public Task InitializeAsync() => _factory.StartAsync();
@@ -36,13 +68,62 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         }
 
         Assert.Equal(operationIds.Count, operationIds.Distinct(StringComparer.Ordinal).Count());
-        Assert.Contains(ApiOperationIds.GetMyAvailability, operationIds);
-        Assert.Contains(ApiOperationIds.CreateAvailabilityBlock, operationIds);
-        Assert.Contains(ApiOperationIds.EditAvailabilityOccurrence, operationIds);
-        Assert.Contains(ApiOperationIds.GetCalendarView, operationIds);
-        Assert.Contains(ApiOperationIds.GetActionableInbox, operationIds);
-        Assert.Contains(ApiOperationIds.FindOverlapWindows, operationIds);
-        Assert.Contains(ApiOperationIds.GetHomeSuggestions, operationIds);
+
+        // F9: the closed set — every one of the 12 new operations appears exactly once, A-064's
+        // transport exception is absent (it sits outside /api/v1 and outside this document by
+        // design), and the document's total operation count is exactly the captured anchor — an
+        // operation silently added or removed anywhere in the document fails this, not just a
+        // `Contains` check on the Phase 5 subset.
+        foreach (string newId in NewPhase5OperationIds)
+        {
+            Assert.Single(operationIds, id => id == newId);
+        }
+
+        Assert.DoesNotContain(ApiOperationIds.ExchangeGuestLink, operationIds);
+        Assert.Equal(ExpectedTotalOperationCount, operationIds.Count);
+
+        // For the new operations: request/response schemas are non-empty, real named components —
+        // never `object`/`unknown` placeholders. Specifically, the F1 discriminated union.
+        JsonElement schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+        string[] expectedSchemas =
+        [
+            "AvailabilityBlockView",
+            "AvailabilitySeriesView",
+            "MaskedParticipant",
+            "MyAvailabilityLayerResponse",
+            "OverlapSearchResponse",
+            "HomeSuggestionsResponse",
+            "CalendarViewResponse",
+            "ActionableInboxResponse",
+            "CreateAvailabilityBlockRequest",
+            "CreateAvailabilitySeriesRequest",
+            "EditOccurrenceRequest",
+            "EditOccurrenceResponse",
+            "EditOccurrenceResponseOnlyThis",
+            "EditOccurrenceResponseThisAndFuture",
+        ];
+        foreach (string schemaName in expectedSchemas)
+        {
+            Assert.True(schemas.TryGetProperty(schemaName, out JsonElement schema), $"Missing schema {schemaName}");
+            Assert.True(
+                schema.EnumerateObject().Any(),
+                $"Schema {schemaName} must not be an empty/untyped placeholder.");
+        }
+
+        // The union itself: a discriminator on "scope" mapping to the two named derived schemas —
+        // not `Produces<object>()`'s prior untyped shape.
+        JsonElement editOccurrenceResponse = schemas.GetProperty("EditOccurrenceResponse");
+        Assert.True(editOccurrenceResponse.TryGetProperty("discriminator", out JsonElement discriminator));
+        Assert.Equal("scope", discriminator.GetProperty("propertyName").GetString());
+        JsonElement mapping = discriminator.GetProperty("mapping");
+        Assert.True(mapping.TryGetProperty("onlyThis", out _));
+        Assert.True(mapping.TryGetProperty("thisAndFuture", out _));
+
+        JsonElement onlyThisSchema = schemas.GetProperty("EditOccurrenceResponseOnlyThis");
+        Assert.True(onlyThisSchema.GetProperty("properties").TryGetProperty("block", out _));
+        JsonElement thisAndFutureSchema = schemas.GetProperty("EditOccurrenceResponseThisAndFuture");
+        Assert.True(thisAndFutureSchema.GetProperty("properties").TryGetProperty("original", out _));
+        Assert.True(thisAndFutureSchema.GetProperty("properties").TryGetProperty("successor", out _));
 
         // §8's closed problem-code inventory: five new codes, each with its documented status present
         // on the operations that can emit it.
@@ -56,6 +137,10 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
             paths, "/api/v1/me/availability/series/{seriesId}/occurrences/{occurrenceDate}", "patch", 400);
         AssertStatusDocumented(paths, "/api/v1/availability/overlaps", "get", 400); // invalid_range / range_too_large
         AssertStatusDocumented(paths, "/api/v1/calendar", "get", 400);
+
+        // F8: the idempotent-204 delete routes no longer document an unreachable 404.
+        AssertStatusNotDocumented(paths, "/api/v1/me/availability/blocks/{blockId}", "delete", 404);
+        AssertStatusNotDocumented(paths, "/api/v1/me/availability/series/{seriesId}", "delete", 404);
     }
 
     private static void AssertStatusDocumented(JsonElement paths, string path, string method, int status)
@@ -64,6 +149,14 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         Assert.True(
             responses.TryGetProperty(status.ToString(System.Globalization.CultureInfo.InvariantCulture), out _),
             $"{method.ToUpperInvariant()} {path} must document status {status}.");
+    }
+
+    private static void AssertStatusNotDocumented(JsonElement paths, string path, string method, int status)
+    {
+        JsonElement responses = paths.GetProperty(path).GetProperty(method).GetProperty("responses");
+        Assert.False(
+            responses.TryGetProperty(status.ToString(System.Globalization.CultureInfo.InvariantCulture), out _),
+            $"{method.ToUpperInvariant()} {path} must not document unreachable status {status}.");
     }
 
     private async Task<JsonDocument> FetchDocumentAsync()

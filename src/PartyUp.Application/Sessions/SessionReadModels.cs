@@ -132,8 +132,12 @@ public sealed record GuestTerminalView(SessionId SessionId, GuestLinkView Notice
 /// <summary>
 /// The list a <see cref="SessionListCursor"/> was issued for (A-072). A cursor decoded for
 /// presentation to any list other than the one that issued it is rejected — <c>Unbound</c> is the
-/// zero value used only for the cursor's transient internal (pre-rebind) representation and is
-/// never a value a client-presented cursor may declare itself as.
+/// zero value used only for a freshly-minted cursor's transient internal (pre-rebind) representation
+/// and is never a value a client-presented cursor may declare itself as. PHASE5_DESIGN.md A-077 (f)
+/// (round-1 fix F5): <c>Discover</c> is a named scope like every other list — <c>ListDiscoverAsync</c>
+/// mints its page's cursor with this scope directly (<c>SessionReadRepository.cs</c>), so a discover
+/// cursor is a client-presented value exactly like an upcoming/history/join-requests one, never left
+/// at <c>Unbound</c> as a scope-check sentinel.
 /// </summary>
 public enum SessionListScope
 {
@@ -141,6 +145,7 @@ public enum SessionListScope
     Upcoming = 1,
     History = 2,
     JoinRequests = 3,
+    Discover = 4,
 }
 
 /// <summary>The A-072 keyset cursor: the list's sort-key instant, the tie-breaking id, and the

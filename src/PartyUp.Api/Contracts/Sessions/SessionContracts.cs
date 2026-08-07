@@ -326,7 +326,11 @@ public sealed record SessionSummaryResponse(
     MaskedParticipant Organizer,
     string ViewerRelation)
 {
-    public static SessionSummaryResponse From(SessionSummary summary) =>
+    // round-1 fix (F3): the organizer's MaskedParticipant now comes from a per-response
+    // MaskedParticipantAssigner shared across every summary/entry a response composes, instead of a
+    // hardcoded ordinal 0 — two distinct organizers in one page (or in one calendar response, or one
+    // that is also a friend-availability owner) get distinct-but-stable ordinals.
+    public static SessionSummaryResponse From(SessionSummary summary, MaskedParticipantAssigner ordinals) =>
         new(
             summary.Id.Value,
             summary.ViewerRelation == Application.Sessions.ViewerRelation.Inherited
@@ -341,7 +345,7 @@ public sealed record SessionSummaryResponse(
             summary.IsPrivate,
             summary.MaxCapacity,
             summary.ActiveOccupancy,
-            MaskedParticipantAssigner.ForOne(summary.OrganizerDisplayName),
+            ordinals.For(summary.OrganizerId, summary.OrganizerDisplayName),
             SessionWireFormat.ViewerRelation(summary.ViewerRelation));
 }
 
@@ -382,13 +386,13 @@ public sealed record JoinRequestViewResponse(
             SessionWireFormat.Format(request.CreatedAt),
             null);
 
-    public static JoinRequestViewResponse From(JoinRequestSummary summary) =>
+    public static JoinRequestViewResponse From(JoinRequestSummary summary, MaskedParticipantAssigner ordinals) =>
         new(
             summary.Id.Value,
             summary.RequesterId.Value,
             SessionWireFormat.JoinRequestStatus(summary.Status),
             SessionWireFormat.Format(summary.CreatedAt),
-            MaskedParticipantAssigner.ForOne(summary.RequesterDisplayName));
+            ordinals.For(summary.RequesterId, summary.RequesterDisplayName));
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -424,15 +428,20 @@ public sealed record ActionableInboxResponse(
     bool HasMoreInvitations,
     bool HasMoreJoinRequests)
 {
-    public static ActionableInboxResponse From(ActionableInbox inbox) =>
+    // round-1 fix (F3): one shared assigner for the whole inbox response — an invitee organizer who
+    // also happens to be a join-request requester (or appears on two rows) keeps one ordinal.
+    // ActionableJoinRequest (SessionReadModels.cs) carries no requester user id, only a resolved
+    // display name, so its ordinal goes through MaskedParticipantAssigner.ForDisplayNameOnly — the
+    // documented, disclosed exception (see that method's doc comment).
+    public static ActionableInboxResponse From(ActionableInbox inbox, MaskedParticipantAssigner ordinals) =>
         new(
             [.. inbox.Invitations.Select(invitation => new ActionableInvitationResponse(
-                SessionSummaryResponse.From(invitation.Session),
+                SessionSummaryResponse.From(invitation.Session, ordinals),
                 SessionWireFormat.Format(invitation.InvitedAt)))],
             [.. inbox.JoinRequests.Select(request => new ActionableJoinRequestResponse(
                 request.Id.Value,
-                SessionSummaryResponse.From(request.Session),
-                MaskedParticipantAssigner.ForOne(request.RequesterDisplayName),
+                SessionSummaryResponse.From(request.Session, ordinals),
+                ordinals.ForDisplayNameOnly(request.RequesterDisplayName),
                 SessionWireFormat.Format(request.RequestedAt)))],
             inbox.HasMoreInvitations,
             inbox.HasMoreJoinRequests);

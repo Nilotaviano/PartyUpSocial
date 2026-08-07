@@ -165,6 +165,80 @@ public sealed class AvailabilityEndpointTests : IAsyncLifetime, IDisposable
             unknownScope, HttpStatusCode.BadRequest, "availability_validation");
     }
 
+    /// <summary>
+    /// round-1 fix (F7): the request union is closed PER ARM, not just on <c>scope</c> — a
+    /// <c>thisAndFuture</c>-only field on an <c>onlyThis</c> body (and vice versa) is a validation
+    /// error, never silently ignored.
+    /// </summary>
+    [Fact]
+    public async Task EditOccurrenceRequestRejectsCrossArmFields_F7()
+    {
+        UserId ownerId = await _factory.SeedUserAsync(email: $"avail-crossarm-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession session = await SessionEndpointTestSupport.SignInAsync(_factory, ownerId);
+
+        LocalDate effectiveFrom = AnchorDate();
+        (Guid seriesId, string occurrenceDate) = await CreateSeriesAsync(session, effectiveFrom);
+        Instant replacementStart = effectiveFrom.AtStartOfDayInZone(DateTimeZone.Utc).ToInstant()
+            + Duration.FromHours(20);
+
+        // onlyThis + thisAndFuture-only fields (dayOfWeek, durationMinutes).
+        HttpResponseMessage onlyThisWithDayOfWeek = await session.SendUnsafeAsync(
+            HttpMethod.Patch,
+            $"/api/v1/me/availability/series/{seriesId:D}/occurrences/{occurrenceDate}",
+            JsonContent.Create(new
+            {
+                scope = "onlyThis",
+                startTime = Iso(replacementStart),
+                endTime = Iso(replacementStart + Duration.FromHours(1)),
+                dayOfWeek = 3,
+            }));
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            onlyThisWithDayOfWeek, HttpStatusCode.BadRequest, "availability_validation");
+
+        HttpResponseMessage onlyThisWithDurationMinutes = await session.SendUnsafeAsync(
+            HttpMethod.Patch,
+            $"/api/v1/me/availability/series/{seriesId:D}/occurrences/{occurrenceDate}",
+            JsonContent.Create(new
+            {
+                scope = "onlyThis",
+                startTime = Iso(replacementStart),
+                endTime = Iso(replacementStart + Duration.FromHours(1)),
+                durationMinutes = 60,
+            }));
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            onlyThisWithDurationMinutes, HttpStatusCode.BadRequest, "availability_validation");
+
+        // thisAndFuture + onlyThis-only field (endTime).
+        HttpResponseMessage thisAndFutureWithEndTime = await session.SendUnsafeAsync(
+            HttpMethod.Patch,
+            $"/api/v1/me/availability/series/{seriesId:D}/occurrences/{occurrenceDate}",
+            JsonContent.Create(new
+            {
+                scope = "thisAndFuture",
+                dayOfWeek = (int)effectiveFrom.DayOfWeek,
+                startTime = "19:00",
+                durationMinutes = 60,
+                endTime = Iso(replacementStart + Duration.FromHours(1)),
+            }));
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            thisAndFutureWithEndTime, HttpStatusCode.BadRequest, "availability_validation");
+
+        // thisAndFuture + an Instant-formatted startTime (onlyThis's shape, not thisAndFuture's
+        // "HH:mm" LocalTime) — already rejected because it fails LocalTime parsing, proven here.
+        HttpResponseMessage thisAndFutureWithInstantStartTime = await session.SendUnsafeAsync(
+            HttpMethod.Patch,
+            $"/api/v1/me/availability/series/{seriesId:D}/occurrences/{occurrenceDate}",
+            JsonContent.Create(new
+            {
+                scope = "thisAndFuture",
+                dayOfWeek = (int)effectiveFrom.DayOfWeek,
+                startTime = Iso(replacementStart),
+                durationMinutes = 60,
+            }));
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            thisAndFutureWithInstantStartTime, HttpStatusCode.BadRequest, "availability_validation");
+    }
+
     [Fact]
     public async Task OnlyThisReturnsTheMaterializedBlockAndThisAndFutureReturnsBothSeries_D143()
     {

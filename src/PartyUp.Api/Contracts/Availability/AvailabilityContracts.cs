@@ -81,30 +81,67 @@ public static class AvailabilityWireFormat
 public sealed record MaskedParticipant(int Ordinal, string? DisplayName);
 
 /// <summary>
-/// Assigns 0-based ordinals to <see cref="UserId"/>s within one response, stable for the lifetime of
-/// this instance only (one instance per HTTP response, PHASE5_DESIGN.md §8.1).
+/// Assigns 0-based ordinals to distinct people within one response, stable for the lifetime of this
+/// instance only (one instance per HTTP response composition, PHASE5_DESIGN.md §8.1) — a person seen
+/// twice in one response (a friend-availability owner who is also a visible session's organizer, a
+/// requester appearing on two join-request rows, …) carries the same ordinal both times; a different
+/// person always gets the next one. round-1 fix (F3): the prior <c>ForOne</c> hardcoded ordinal 0 for
+/// every single-person context, so two distinct organizers in one page both read as person 0 — a
+/// client correlating an inherited row's absent <c>organizerId</c> against a friend-layer owner could
+/// conclude they were the same person. Every allocation now goes through one shared counter.
 /// </summary>
-public sealed class MaskedParticipantAssigner(IReadOnlyDictionary<UserId, DisplayName?> displayNames)
+public sealed class MaskedParticipantAssigner(IReadOnlyDictionary<UserId, DisplayName?>? knownDisplayNames = null)
 {
-    private readonly Dictionary<UserId, int> _ordinals = [];
+    private readonly IReadOnlyDictionary<UserId, DisplayName?> _knownDisplayNames =
+        knownDisplayNames ?? new Dictionary<UserId, DisplayName?>();
+    private readonly Dictionary<UserId, int> _ordinalsByUserId = [];
+    private readonly Dictionary<string, int> _ordinalsByDisplayName = [];
+    private int _nextOrdinal;
 
-    public MaskedParticipant For(UserId id)
+    /// <summary>Looks the display name up in the dictionary this assigner was built with (the friend-set
+    /// contexts: overlap windows, considered friends, calendar friend-availability owners).</summary>
+    public MaskedParticipant For(UserId id) =>
+        For(id, _knownDisplayNames.TryGetValue(id, out DisplayName? name) ? name : null);
+
+    /// <summary>A caller-resolved display name (session organizer, join-request requester) that is not
+    /// necessarily in the friend-set dictionary — an unattached Discover/calendar organizer is a
+    /// stranger to the viewer, never a friend, and would resolve to nothing from that dictionary.</summary>
+    public MaskedParticipant For(UserId id, DisplayName? displayName)
     {
-        if (!_ordinals.TryGetValue(id, out int ordinal))
+        if (!_ordinalsByUserId.TryGetValue(id, out int ordinal))
         {
-            ordinal = _ordinals.Count;
-            _ordinals[id] = ordinal;
+            ordinal = _nextOrdinal++;
+            _ordinalsByUserId[id] = ordinal;
         }
 
-        string? displayName = displayNames.TryGetValue(id, out DisplayName? name) ? name?.Value : null;
-        return new MaskedParticipant(ordinal, displayName);
+        return new MaskedParticipant(ordinal, displayName?.Value);
     }
 
-    public IReadOnlyList<MaskedParticipant> For(IEnumerable<UserId> ids) => [.. ids.Select(For)];
+    public IReadOnlyList<MaskedParticipant> For(IEnumerable<UserId> ids) => [.. ids.Select(id => For(id))];
 
-    /// <summary>A single-person context (e.g. an organizer or a join-request requester): ordinal 0,
-    /// since nothing else in that response correlates against it (PHASE5_DESIGN.md §8.1).</summary>
-    public static MaskedParticipant ForOne(DisplayName? displayName) => new(0, displayName?.Value);
+    /// <summary>
+    /// The one Phase 5 read model with no user id to correlate on at all —
+    /// <c>ActionableJoinRequest</c> (<c>SessionReadModels.cs</c>, outside this slice's write set beyond
+    /// F5) carries only a resolved display name. Keys the ordinal on that name instead: the best
+    /// identity signal that record exposes, not a true identity correlation — two different people
+    /// sharing a display name would collide. A null name never reuses another null name's ordinal,
+    /// since two different anonymous people are not "the same person" either.
+    /// </summary>
+    public MaskedParticipant ForDisplayNameOnly(DisplayName? displayName)
+    {
+        if (displayName is not { } name)
+        {
+            return new MaskedParticipant(_nextOrdinal++, null);
+        }
+
+        if (!_ordinalsByDisplayName.TryGetValue(name.Value, out int ordinal))
+        {
+            ordinal = _nextOrdinal++;
+            _ordinalsByDisplayName[name.Value] = ordinal;
+        }
+
+        return new MaskedParticipant(ordinal, name.Value);
+    }
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -228,6 +265,32 @@ public sealed record AvailabilitySeriesView(
             series.ZoneId,
             AvailabilityWireFormat.Format(series.EffectiveFrom),
             series.EffectiveUntil is { } until ? AvailabilityWireFormat.Format(until) : null);
+}
+
+/// <summary>
+/// PHASE5_DESIGN.md §8.1: the closed discriminated response for <c>PATCH
+/// …/occurrences/{occurrenceDate}</c>, wire-discriminated on <c>scope</c>. round-1 fix (F1): this
+/// replaced an untyped <c>Produces&lt;object&gt;()</c> + anonymous-object pair, which left
+/// <c>EditOccurrenceRequest</c>'s response side with no schema at all and a generated
+/// <c>unknown</c> client type. <c>OnlyThis</c> carries only <c>block</c>; <c>ThisAndFuture</c> carries
+/// <c>original</c> (nullable — <c>null</c> exactly when the split emptied the source series) and
+/// <c>successor</c>; the two arms never share a payload shape (§8.1's table).
+/// </summary>
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "scope")]
+[JsonDerivedType(typeof(OnlyThis), "onlyThis")]
+[JsonDerivedType(typeof(ThisAndFuture), "thisAndFuture")]
+public abstract record EditOccurrenceResponse
+{
+    private EditOccurrenceResponse()
+    {
+    }
+
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+    public sealed record OnlyThis(AvailabilityBlockView Block) : EditOccurrenceResponse;
+
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+    public sealed record ThisAndFuture(AvailabilitySeriesView? Original, AvailabilitySeriesView Successor)
+        : EditOccurrenceResponse;
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

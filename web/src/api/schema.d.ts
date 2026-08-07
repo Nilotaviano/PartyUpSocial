@@ -1605,6 +1605,18 @@ export interface components {
             /** Format: int32 */
             durationMinutes: null | number | string;
         };
+        EditOccurrenceResponse: components["schemas"]["EditOccurrenceResponseOnlyThis"] | components["schemas"]["EditOccurrenceResponseThisAndFuture"];
+        EditOccurrenceResponseOnlyThis: {
+            /** @enum {string} */
+            scope?: "onlyThis";
+            block: components["schemas"]["AvailabilityBlockView"];
+        };
+        EditOccurrenceResponseThisAndFuture: {
+            /** @enum {string} */
+            scope?: "thisAndFuture";
+            original: null | components["schemas"]["AvailabilitySeriesView"];
+            successor: components["schemas"]["AvailabilitySeriesView"];
+        };
         EditSessionRequest: {
             title: null | string;
             startTime: null | string;
@@ -3847,15 +3859,6 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
-                };
-            };
         };
     };
     EditAvailabilityBlock: {
@@ -3962,15 +3965,6 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["PartyUpProblem"];
-                };
-            };
         };
     };
     DeleteAvailabilityOccurrence: {
@@ -4031,7 +4025,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EditOccurrenceResponse"];
                 };
             };
             /** @description Bad Request */

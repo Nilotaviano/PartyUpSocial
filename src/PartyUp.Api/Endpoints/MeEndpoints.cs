@@ -95,10 +95,13 @@ public static class MeEndpoints
             .ProducesPartyUpProblem(StatusCodes.Status400BadRequest)
             .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
 
+        // round-1 fix (F8): DeleteAvailabilityBlock/DeleteAvailabilitySeries never emit 404 — a
+        // missing or non-owner target is the shipped idempotent 204 no-op (§5.2/§8) — so the
+        // previously-declared 404 was unreachable by design; removed from both declarations, and the
+        // §8-row deviation is recorded in TRACEABILITY.md's S5 section.
         availability.MapDelete("/blocks/{blockId:guid}", DeleteAvailabilityBlockAsync)
             .WithName(ApiOperationIds.DeleteAvailabilityBlock)
-            .Produces(StatusCodes.Status204NoContent)
-            .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
+            .Produces(StatusCodes.Status204NoContent);
 
         availability.MapPost("/series", CreateAvailabilitySeriesAsync)
             .WithName(ApiOperationIds.CreateAvailabilitySeries)
@@ -107,12 +110,11 @@ public static class MeEndpoints
 
         availability.MapDelete("/series/{seriesId:guid}", DeleteAvailabilitySeriesAsync)
             .WithName(ApiOperationIds.DeleteAvailabilitySeries)
-            .Produces(StatusCodes.Status204NoContent)
-            .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
+            .Produces(StatusCodes.Status204NoContent);
 
         availability.MapPatch("/series/{seriesId:guid}/occurrences/{occurrenceDate}", EditAvailabilityOccurrenceAsync)
             .WithName(ApiOperationIds.EditAvailabilityOccurrence)
-            .Produces<object>()
+            .Produces<EditOccurrenceResponse>()
             .ProducesPartyUpProblem(StatusCodes.Status400BadRequest)
             .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
 
@@ -532,6 +534,13 @@ public static class MeEndpoints
         switch (request.Scope)
         {
             case "onlyThis":
+                // round-1 fix (F7): the union is closed per-arm — thisAndFuture-only fields on an
+                // onlyThis body are rejected, not silently ignored.
+                if (request.DayOfWeek is not null || request.DurationMinutes is not null)
+                {
+                    return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "availability_validation");
+                }
+
                 scope = OccurrenceEditScope.OnlyThis;
                 if (!TryParseInstantRange(request.StartTime, request.EndTime, out TimeRange range))
                 {
@@ -541,6 +550,12 @@ public static class MeEndpoints
                 onlyThisRange = range;
                 break;
             case "thisAndFuture":
+                // round-1 fix (F7): onlyThis-only field on a thisAndFuture body is rejected.
+                if (request.EndTime is not null)
+                {
+                    return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "availability_validation");
+                }
+
                 scope = OccurrenceEditScope.ThisAndFuture;
                 if (request.DayOfWeek is not { } dayOfWeekValue ||
                     dayOfWeekValue is < 1 or > 7 ||
@@ -589,15 +604,15 @@ public static class MeEndpoints
         }
 
         // §8.1: the closed discriminated response — onlyThis carries only {scope, block};
-        // thisAndFuture carries {scope, original (nullable), successor}.
-        return outcome.Scope == OccurrenceEditScope.OnlyThis
-            ? Results.Ok(new { scope = "onlyThis", block = AvailabilityBlockView.From(outcome.Block!) })
-            : Results.Ok(new
-            {
-                scope = "thisAndFuture",
-                original = outcome.Original is { } original ? AvailabilitySeriesView.From(original) : null,
-                successor = AvailabilitySeriesView.From(outcome.Successor!),
-            });
+        // thisAndFuture carries {scope, original (nullable), successor}. round-1 fix (F1): a real
+        // typed union (EditOccurrenceResponse) replaces the prior untyped anonymous objects, so the
+        // OpenAPI document and the generated client both carry a real schema instead of `unknown`.
+        EditOccurrenceResponse response = outcome.Scope == OccurrenceEditScope.OnlyThis
+            ? new EditOccurrenceResponse.OnlyThis(AvailabilityBlockView.From(outcome.Block!))
+            : new EditOccurrenceResponse.ThisAndFuture(
+                outcome.Original is { } original ? AvailabilitySeriesView.From(original) : null,
+                AvailabilitySeriesView.From(outcome.Successor!));
+        return Results.Ok(response);
     }
 
     private static async Task<IResult> DeleteAvailabilityOccurrenceAsync(
@@ -645,7 +660,7 @@ public static class MeEndpoints
         }
 
         ActionableInbox inbox = await useCase.ExecuteAsync(actorId.Value, cancellationToken);
-        return Results.Ok(ActionableInboxResponse.From(inbox));
+        return Results.Ok(ActionableInboxResponse.From(inbox, new MaskedParticipantAssigner()));
     }
 
     /// <summary>Both endpoints are Instant strings — used by GET /me/availability and block create/edit.</summary>
