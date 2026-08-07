@@ -46,20 +46,14 @@ public sealed class SessionGuestFlowTests(PlaywrightFixture fixture)
     /// creation), which keeps the guest-only scenarios below to a single registered account.
     /// </summary>
     /// <remarks>
-    /// Round-1 F2: this used to click "Create session" and then <c>WaitForURLAsync</c> for the
-    /// client's own post-create redirect. <c>SessionCreatePage.tsx</c>'s <c>onSuccess</c> handler
-    /// <c>await</c>s <c>queryClient.invalidateQueries({queryKey:['sessions']})</c> <b>before</b>
-    /// calling <c>navigate()</c>, so that client-side redirect is gated on a background refetch
-    /// whose duration scales with whatever else is loading the API at the time — under a full
-    /// lane run (this class plus the axe pass plus the registered-flow class, one shared fixture)
-    /// that occasionally pushed well past even a 60s wait, which is what made
-    /// <c>SecondDeviceEditWins_D126</c> nondeterministic. A longer wait cannot fix a delay with no
-    /// fixed bound, so the barrier here is the POST's own response instead: the created session id
-    /// comes straight off <c>CreateSessionResponse.session.id</c>, and this method navigates the
-    /// page there itself rather than depending on the client ever getting around to it. This does
-    /// not weaken what the class asserts — no fact here targets the post-create redirect itself
-    /// (that path stays covered, unchanged, by <c>SessionRegisteredFlowTests.CreateSessionAsync</c>);
-    /// every fact below still exercises the same private-session-then-guest-link setup it did before.
+    /// Setup helper, so the barrier is the create POST's own response, never the client's
+    /// post-create redirect: <c>SessionCreatePage.tsx</c>'s <c>onSuccess</c> <c>await</c>s
+    /// <c>queryClient.invalidateQueries({queryKey:['sessions']})</c> before <c>navigate()</c>, so
+    /// waiting on that URL means waiting on a background refetch with no fixed bound under a full
+    /// shared-fixture lane run — and a 4xx surfaces as a silent timeout instead of a loud assert.
+    /// The created session id comes straight off <c>CreateSessionResponse.session.id</c> and this
+    /// method navigates there itself. No fact in this class targets the post-create redirect;
+    /// that UI path stays covered by <c>SessionRegisteredFlowTests.CreateSessionAsync</c>.
     /// </remarks>
     private static async Task<string> CreatePrivateSessionAsync(IPage organizerPage, string title, DateTime startUtc)
     {
