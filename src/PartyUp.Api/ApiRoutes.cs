@@ -75,4 +75,18 @@ public static class ApiOperationIds
     public const string ClaimGuestSessionLink = "ClaimGuestSessionLink";
     public const string RenameGuestSessionIdentity = "RenameGuestSessionIdentity";
     public const string RespondAsGuest = "RespondAsGuest";
+
+    // PHASE5_DESIGN.md §8: availability, calendar, Home and Discover HTTP surface, relative to /api/v1.
+    public const string GetMyAvailability = "GetMyAvailability";
+    public const string CreateAvailabilityBlock = "CreateAvailabilityBlock";
+    public const string EditAvailabilityBlock = "EditAvailabilityBlock";
+    public const string DeleteAvailabilityBlock = "DeleteAvailabilityBlock";
+    public const string CreateAvailabilitySeries = "CreateAvailabilitySeries";
+    public const string DeleteAvailabilitySeries = "DeleteAvailabilitySeries";
+    public const string EditAvailabilityOccurrence = "EditAvailabilityOccurrence";
+    public const string DeleteAvailabilityOccurrence = "DeleteAvailabilityOccurrence";
+    public const string FindOverlapWindows = "FindOverlapWindows";
+    public const string GetHomeSuggestions = "GetHomeSuggestions";
+    public const string GetCalendarView = "GetCalendarView";
+    public const string GetActionableInbox = "GetActionableInbox";
 }

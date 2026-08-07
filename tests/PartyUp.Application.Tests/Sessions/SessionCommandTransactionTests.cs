@@ -470,6 +470,98 @@ internal sealed class FakeSessionReadRepository(FakeSessionRepository store) : I
     public Task<GuestSessionView?> FindGuestViewAsync(GuestLinkId guestLinkId, CancellationToken cancellationToken) =>
         Task.FromResult<GuestSessionView?>(null);
 
+    /// <summary>
+    /// PHASE5_DESIGN.md §5.1: correct enough to keep this pre-S4 fake compiling against the interface
+    /// this file does not otherwise exercise — Discover's real fragment/exclusion-set semantics are
+    /// proven by <c>DiscoverReadTests</c> against the real repository, not here.
+    /// </summary>
+    public Task<SessionPage<SessionSummary>> ListDiscoverAsync(
+        UserId viewerId, SessionListCursor? cursor, int pageSize, CancellationToken cancellationToken)
+    {
+        List<Session> visible = [.. store.All
+            .Where(s => s.Status is not (SessionStatus.Completed or SessionStatus.Expired or SessionStatus.Canceled))
+            .Where(s => s.OrganizerId != viewerId)
+            .Where(s => s.Participations.All(p => p.UserId != viewerId))
+            .Where(s => s.JoinRequests.All(r => r.RequesterId != viewerId || r.Status != JoinRequestStatus.Pending))
+            .Where(s => IsVisible(viewerId, s))
+            .OrderBy(s => s.StartTime)
+            .ThenBy(s => s.Id.Value)];
+
+        return Task.FromResult(Page(visible, pageSize, s => new SessionSummary(
+            s.Id, s.OrganizerId, s.Title, s.StartTime, s.Duration, s.Platform, s.Game,
+            s.Status, s.IsPrivate, s.MaxCapacity, s.ActiveOccupancy)));
+    }
+
+    public Task<IReadOnlyList<SessionSummary>> ListCalendarSessionsAsync(
+        UserId viewerId, TimeRange range, CancellationToken cancellationToken)
+    {
+        List<SessionSummary> summaries = [.. store.All
+            .Where(s => s.Status is not (SessionStatus.Expired or SessionStatus.Canceled))
+            .Where(s => s.StartTime < range.End && s.StartTime + s.Duration.Value > range.Start)
+            .Where(s => IsVisible(viewerId, s))
+            .OrderBy(s => s.StartTime)
+            .ThenBy(s => s.Id.Value)
+            .Select(s => new SessionSummary(
+                s.Id, s.OrganizerId, s.Title, s.StartTime, s.Duration, s.Platform, s.Game,
+                s.Status, s.IsPrivate, s.MaxCapacity, s.ActiveOccupancy))];
+
+        return Task.FromResult<IReadOnlyList<SessionSummary>>(summaries);
+    }
+
+    public Task<ActionableInbox> ListActionableAsync(
+        UserId viewerId, Instant now, int cap, CancellationToken cancellationToken)
+    {
+        List<ActionableInvitation> invitations = [.. store.All
+            .Where(s => s.Status is SessionStatus.Unconfirmed or SessionStatus.Confirmed)
+            .Where(s => s.StartTime > now)
+            .SelectMany(s => s.Participations
+                .Where(p => p.UserId == viewerId && p.Status == ParticipationStatus.Pending
+                    && p.Origin == ParticipationOrigin.Invited)
+                .Select(p => (Session: s, Participation: p)))
+            .OrderBy(x => x.Session.StartTime)
+            .ThenBy(x => x.Session.Id.Value)
+            .Take(cap + 1)
+            .Select(x => new ActionableInvitation(
+                new SessionSummary(
+                    x.Session.Id, x.Session.OrganizerId, x.Session.Title, x.Session.StartTime, x.Session.Duration,
+                    x.Session.Platform, x.Session.Game, x.Session.Status, x.Session.IsPrivate, x.Session.MaxCapacity,
+                    x.Session.ActiveOccupancy),
+                x.Participation.CreatedAt))];
+
+        bool hasMoreInvitations = invitations.Count > cap;
+        if (hasMoreInvitations)
+        {
+            invitations.RemoveAt(invitations.Count - 1);
+        }
+
+        List<ActionableJoinRequest> joinRequests = [.. store.All
+            .Where(s => s.OrganizerId == viewerId)
+            .Where(s => s.Status is SessionStatus.Unconfirmed or SessionStatus.Confirmed)
+            .Where(s => s.StartTime > now)
+            .SelectMany(s => s.JoinRequests
+                .Where(r => r.Status == JoinRequestStatus.Pending)
+                .Select(r => (Session: s, Request: r)))
+            .OrderBy(x => x.Session.StartTime)
+            .ThenBy(x => x.Session.Id.Value)
+            .Take(cap + 1)
+            .Select(x => new ActionableJoinRequest(
+                x.Request.Id,
+                new SessionSummary(
+                    x.Session.Id, x.Session.OrganizerId, x.Session.Title, x.Session.StartTime, x.Session.Duration,
+                    x.Session.Platform, x.Session.Game, x.Session.Status, x.Session.IsPrivate, x.Session.MaxCapacity,
+                    x.Session.ActiveOccupancy),
+                null,
+                x.Request.CreatedAt))];
+
+        bool hasMoreJoinRequests = joinRequests.Count > cap;
+        if (hasMoreJoinRequests)
+        {
+            joinRequests.RemoveAt(joinRequests.Count - 1);
+        }
+
+        return Task.FromResult(new ActionableInbox(invitations, joinRequests, hasMoreInvitations, hasMoreJoinRequests));
+    }
+
     private bool IsVisible(UserId viewerId, Session session)
     {
         Viewer viewer = Viewer.Create(viewerId, AcceptedFriendsOf(viewerId), BlockedOf(viewerId));

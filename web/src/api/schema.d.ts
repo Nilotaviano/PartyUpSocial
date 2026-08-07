@@ -564,6 +564,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/actionable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetActionableInbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -660,6 +676,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetCalendarView"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/onboarding/state": {
         parameters: {
             query?: never;
@@ -738,6 +770,102 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["ChangePlatformHandle"];
+        trace?: never;
+    };
+    "/api/v1/me/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetMyAvailability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/availability/blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CreateAvailabilityBlock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/availability/blocks/{blockId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["DeleteAvailabilityBlock"];
+        options?: never;
+        head?: never;
+        patch: operations["EditAvailabilityBlock"];
+        trace?: never;
+    };
+    "/api/v1/me/availability/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CreateAvailabilitySeries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/availability/series/{seriesId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["DeleteAvailabilitySeries"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/availability/series/{seriesId}/occurrences/{occurrenceDate}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["DeleteAvailabilityOccurrence"];
+        options?: never;
+        head?: never;
+        patch: operations["EditAvailabilityOccurrence"];
         trace?: never;
     };
     "/api/v1/friend-share": {
@@ -1220,12 +1348,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/availability/overlaps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["FindOverlapWindows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/availability/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetHomeSuggestions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         AccountDeletionResponse: {
             graceEndsAt: string;
+        };
+        ActionableInboxResponse: {
+            invitations: components["schemas"]["ActionableInvitationResponse"][];
+            joinRequests: components["schemas"]["ActionableJoinRequestResponse"][];
+            hasMoreInvitations: boolean;
+            hasMoreJoinRequests: boolean;
+        };
+        ActionableInvitationResponse: {
+            session: components["schemas"]["SessionSummaryResponse"];
+            invitedAt: string;
+        };
+        ActionableJoinRequestResponse: {
+            /** Format: uuid */
+            joinRequestId: string;
+            session: components["schemas"]["SessionSummaryResponse"];
+            requester: components["schemas"]["MaskedParticipant"];
+            requestedAt: string;
         };
         AdminMutationResponse: {
             status: string;
@@ -1261,6 +1438,38 @@ export interface components {
         AuthMethodsResponse: {
             methods: components["schemas"]["AuthMethodResponse"][];
         };
+        AvailabilityBlockSourceView: {
+            /** Format: uuid */
+            seriesId: string;
+            occurrenceDate: string;
+        };
+        AvailabilityBlockView: {
+            /** Format: uuid */
+            blockId: string;
+            startTime: string;
+            endTime: string;
+            source: null | components["schemas"]["AvailabilityBlockSourceView"];
+        };
+        AvailabilityOccurrenceOriginView: {
+            kind: string;
+            /** Format: uuid */
+            blockId: null | string;
+            /** Format: uuid */
+            seriesId: null | string;
+            occurrenceDate: null | string;
+        };
+        AvailabilitySeriesView: {
+            /** Format: uuid */
+            seriesId: string;
+            /** Format: int32 */
+            dayOfWeek: number | string;
+            startTime: string;
+            /** Format: int32 */
+            durationMinutes: number | string;
+            zoneId: string;
+            effectiveFrom: string;
+            effectiveUntil: null | string;
+        };
         AvatarDraft: {
             kind: string;
             emoji: null | string;
@@ -1284,6 +1493,13 @@ export interface components {
             blockId: string;
             username: string;
             createdAt: string;
+        };
+        CalendarPollOptionView: Record<string, never>;
+        CalendarViewResponse: {
+            myAvailability: components["schemas"]["MyAvailabilityLayerResponse"];
+            friendAvailability: components["schemas"]["FriendAvailabilityEntryResponse"][];
+            sessions: components["schemas"]["SessionSummaryResponse"][];
+            pollOptions: components["schemas"]["CalendarPollOptionView"][];
         };
         ChangeDisplayNameRequest: {
             displayName: string;
@@ -1321,6 +1537,19 @@ export interface components {
         ConsumeMagicLinkRequest: {
             token: string;
             ageGateAttested: null | boolean;
+        };
+        CreateAvailabilityBlockRequest: {
+            startTime: null | string;
+            endTime: null | string;
+        };
+        CreateAvailabilitySeriesRequest: {
+            /** Format: int32 */
+            dayOfWeek: null | number | string;
+            startTime: null | string;
+            /** Format: int32 */
+            durationMinutes: null | number | string;
+            effectiveFrom: null | string;
+            effectiveUntil: null | string;
         };
         CreateSessionGuestLinksRequest: {
             /** Format: int32 */
@@ -1363,6 +1592,19 @@ export interface components {
             /** Format: int32 */
             tokensPurged: number | string;
         };
+        EditAvailabilityBlockRequest: {
+            startTime: null | string;
+            endTime: null | string;
+        };
+        EditOccurrenceRequest: {
+            scope: null | string;
+            startTime: null | string;
+            endTime: null | string;
+            /** Format: int32 */
+            dayOfWeek: null | number | string;
+            /** Format: int32 */
+            durationMinutes: null | number | string;
+        };
         EditSessionRequest: {
             title: null | string;
             startTime: null | string;
@@ -1392,6 +1634,10 @@ export interface components {
         };
         ExternalIntentResponse: {
             intent: string;
+        };
+        FriendAvailabilityEntryResponse: {
+            owner: components["schemas"]["MaskedParticipant"];
+            ranges: components["schemas"]["TimeRangeView"][];
         };
         FriendCodeResolutionResponse: {
             profile: components["schemas"]["ProfileViewResponse"];
@@ -1472,6 +1718,10 @@ export interface components {
             displayName: null | string;
             response: null | string;
         };
+        HomeSuggestionsResponse: {
+            suggestions: components["schemas"]["OverlapWindowView"][];
+            hasMore: boolean;
+        };
         InviteSessionUsersRequest: {
             userIds: string[];
         };
@@ -1482,6 +1732,7 @@ export interface components {
             requesterId: string;
             status: string;
             createdAt: string;
+            requester: null | components["schemas"]["MaskedParticipant"];
         };
         LinkPlatformRequest: {
             platform: string;
@@ -1495,6 +1746,21 @@ export interface components {
             email: string;
             locale: null | string;
             continuation?: null | string;
+        };
+        MaskedParticipant: {
+            /** Format: int32 */
+            ordinal: number | string;
+            displayName: null | string;
+        };
+        MyAvailabilityLayerResponse: {
+            occurrences: components["schemas"]["MyAvailabilityOccurrenceView"][];
+            merged: components["schemas"]["TimeRangeView"][];
+            range: null | components["schemas"]["TimeRangeView"];
+        };
+        MyAvailabilityOccurrenceView: {
+            startTime: string;
+            endTime: string;
+            origin: components["schemas"]["AvailabilityOccurrenceOriginView"];
         };
         MyProfileResponse: {
             username: null | string;
@@ -1519,6 +1785,18 @@ export interface components {
             completedSteps: string[];
             nextStep: string;
             isComplete: boolean;
+        };
+        OverlapSearchResponse: {
+            windows: components["schemas"]["OverlapWindowView"][];
+            range: components["schemas"]["TimeRangeView"];
+            selectionSource: string;
+            consideredFriends: null | components["schemas"]["MaskedParticipant"][];
+        };
+        OverlapWindowView: {
+            start: string;
+            end: string;
+            available: components["schemas"]["MaskedParticipant"][];
+            maybe: components["schemas"]["MaskedParticipant"][];
         };
         ParticipationViewResponse: {
             /** Format: uuid */
@@ -1704,7 +1982,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
-            organizerId: string;
+            organizerId: null | string;
             title: string;
             startTime: string;
             /** Format: int32 */
@@ -1717,6 +1995,8 @@ export interface components {
             maxCapacity: null | number | string;
             /** Format: int32 */
             activeOccupancy: number | string;
+            organizer: components["schemas"]["MaskedParticipant"];
+            viewerRelation: string;
         };
         SetPasswordRequest: {
             newPassword: string;
@@ -1795,6 +2075,10 @@ export interface components {
         };
         TargetUsernameRequest: {
             targetUsername: null | string;
+        };
+        TimeRangeView: {
+            start: string;
+            end: string;
         };
         TokenRequest: {
             token: string;
@@ -2986,6 +3270,26 @@ export interface operations {
             };
         };
     };
+    GetActionableInbox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionableInboxResponse"];
+                };
+            };
+        };
+    };
     ListAdminUsers: {
         parameters: {
             query?: {
@@ -3204,6 +3508,38 @@ export interface operations {
             };
         };
     };
+    GetCalendarView: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarViewResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
     GetOnboardingState: {
         parameters: {
             query?: never;
@@ -3418,6 +3754,302 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetMyAvailability: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyAvailabilityLayerResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    CreateAvailabilityBlock: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAvailabilityBlockRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvailabilityBlockView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    DeleteAvailabilityBlock: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                blockId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    EditAvailabilityBlock: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                blockId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditAvailabilityBlockRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvailabilityBlockView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    CreateAvailabilitySeries: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAvailabilitySeriesRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvailabilitySeriesView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    DeleteAvailabilitySeries: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    DeleteAvailabilityOccurrence: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                seriesId: string;
+                occurrenceDate: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    EditAvailabilityOccurrence: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                seriesId: string;
+                occurrenceDate: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditOccurrenceRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
                 };
             };
         };
@@ -6641,6 +7273,59 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    FindOverlapWindows: {
+        parameters: {
+            query?: {
+                friendIds?: string;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverlapSearchResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    GetHomeSuggestions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeSuggestionsResponse"];
                 };
             };
         };

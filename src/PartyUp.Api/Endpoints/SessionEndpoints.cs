@@ -245,6 +245,7 @@ public static class SessionEndpoints
         string? cursor,
         ICurrentUserAccessor currentUser,
         SessionReadUseCases useCase,
+        ListDiscoverableSessionsUseCase discover,
         HttpContext context,
         CancellationToken cancellationToken)
     {
@@ -254,9 +255,30 @@ public static class SessionEndpoints
             return Problem(context, StatusCodes.Status401Unauthorized, "unauthorized");
         }
 
-        if (scope is not ("upcoming" or "history"))
+        if (scope is not ("upcoming" or "history" or "discover"))
         {
             return Problem(context, StatusCodes.Status400BadRequest, "invalid_scope");
+        }
+
+        if (scope == "discover")
+        {
+            // PHASE5_DESIGN.md A-077 (f): scope="discover", sortKey start_time ascending then id,
+            // page 20. SessionListScope's named members live in SessionReadModels.cs, outside S5's
+            // write set (§12), so discover reuses SessionListScope.Unbound(0) — the exact scope value
+            // the repository already mints every list's cursor with before RebindNextCursor below
+            // rebinds it to a non-zero, list-specific scope for every OTHER surface. Since discover is
+            // the only surface that never rebinds, an upcoming/history/join-requests cursor (always
+            // non-zero once it reaches a client) can never satisfy this Unbound check, and a discover
+            // cursor can never satisfy those lists' non-zero expectedScope checks either — the A-072
+            // cross-list rejection holds in both directions without a new enum member.
+            if (!TryDecodeCursor(cursor, SessionListScope.Unbound, out SessionListCursor? discoverCursor))
+            {
+                return Problem(context, StatusCodes.Status400BadRequest, "invalid_cursor");
+            }
+
+            SessionPage<SessionSummary> discoverPage = await discover.ExecuteAsync(
+                actorId.Value, discoverCursor, PageSize, cancellationToken);
+            return Results.Ok(SessionPageResponse.From(discoverPage, SessionSummaryResponse.From));
         }
 
         SessionListScope listScope = scope == "upcoming" ? SessionListScope.Upcoming : SessionListScope.History;

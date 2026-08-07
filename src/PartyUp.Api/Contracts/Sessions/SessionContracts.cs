@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using NodaTime;
 using NodaTime.Text;
+using PartyUp.Api.Contracts.Availability;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
@@ -96,6 +97,17 @@ public static class SessionWireFormat
         ReminderOffset.Hours12 => "Hours12",
         ReminderOffset.Hours24 => "Hours24",
         _ => throw new ArgumentOutOfRangeException(nameof(choice)),
+    };
+
+    /// <summary>PHASE5_DESIGN.md §5.1's precedence-ordered viewer relation, camelCase on the wire.</summary>
+    public static string ViewerRelation(Application.Sessions.ViewerRelation relation) => relation switch
+    {
+        Application.Sessions.ViewerRelation.Organizer => "organizer",
+        Application.Sessions.ViewerRelation.Invitee => "invitee",
+        Application.Sessions.ViewerRelation.Participant => "participant",
+        Application.Sessions.ViewerRelation.Requester => "requester",
+        Application.Sessions.ViewerRelation.Inherited => "inherited",
+        _ => throw new ArgumentOutOfRangeException(nameof(relation)),
     };
 
     /// <summary>Returns <c>false</c> for an unrecognized token so the caller can reject with 400.</summary>
@@ -233,7 +245,10 @@ public sealed record CreateSessionResponse(
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record RosterEntryResponse(
     Guid ParticipationId,
-    Guid? UserId,
+    // PHASE5_DESIGN.md §5.1 (D-076): a masked entry's UserId is null, and this attribute is what makes
+    // the property ABSENT rather than present-as-null — the same rule also makes a guest row's
+    // always-null userId absent, since its identity is already carried by guestIdentityId.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? UserId,
     Guid? GuestIdentityId,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DisplayName,
     string Status,
@@ -244,7 +259,9 @@ public sealed record RosterEntryResponse(
     public static RosterEntryResponse From(RosterEntry entry) =>
         new(
             entry.ParticipationId.Value,
-            entry.Participant.UserId?.Value,
+            // PHASE5_DESIGN.md §5.1 (D-076): a blocked-pair-masked entry drops its userId on the wire,
+            // distinct from a tombstoned entry (null displayName, userId still present).
+            entry.MaskedForViewer ? null : entry.Participant.UserId?.Value,
             entry.Participant.GuestIdentityId?.Value,
             entry.DisplayName?.Value,
             SessionWireFormat.ParticipationStatus(entry.Status),
@@ -293,7 +310,10 @@ public sealed record SessionDetailResponse(
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record SessionSummaryResponse(
     Guid Id,
-    Guid OrganizerId,
+    // PHASE5_DESIGN.md §5.1/§8.1: present iff viewerRelation != "inherited" — an unattached viewer
+    // (every Discover row, and the calendar layer's inherited rows) gets the organizer as a
+    // MaskedParticipant and no id.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? OrganizerId,
     string Title,
     string StartTime,
     int DurationMinutes,
@@ -302,12 +322,16 @@ public sealed record SessionSummaryResponse(
     string Status,
     bool IsPrivate,
     int? MaxCapacity,
-    int ActiveOccupancy)
+    int ActiveOccupancy,
+    MaskedParticipant Organizer,
+    string ViewerRelation)
 {
     public static SessionSummaryResponse From(SessionSummary summary) =>
         new(
             summary.Id.Value,
-            summary.OrganizerId.Value,
+            summary.ViewerRelation == Application.Sessions.ViewerRelation.Inherited
+                ? null
+                : summary.OrganizerId.Value,
             summary.Title.Value,
             SessionWireFormat.Format(summary.StartTime),
             summary.Duration.TotalMinutes,
@@ -316,7 +340,9 @@ public sealed record SessionSummaryResponse(
             SessionWireFormat.Status(summary.Status),
             summary.IsPrivate,
             summary.MaxCapacity,
-            summary.ActiveOccupancy);
+            summary.ActiveOccupancy,
+            MaskedParticipantAssigner.ForOne(summary.OrganizerDisplayName),
+            SessionWireFormat.ViewerRelation(summary.ViewerRelation));
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -339,21 +365,30 @@ public sealed record ParticipationViewResponse(
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record JoinRequestViewResponse(Guid Id, Guid RequesterId, string Status, string CreatedAt)
+public sealed record JoinRequestViewResponse(
+    Guid Id,
+    Guid RequesterId,
+    string Status,
+    string CreatedAt,
+    // PHASE5_DESIGN.md §5.1: populated on the summary overload only — the create overload's sole
+    // recipient is the requester naming themselves and has no resolved display name to offer.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] MaskedParticipant? Requester)
 {
     public static JoinRequestViewResponse From(JoinRequest request) =>
         new(
             request.Id.Value,
             request.RequesterId.Value,
             SessionWireFormat.JoinRequestStatus(request.Status),
-            SessionWireFormat.Format(request.CreatedAt));
+            SessionWireFormat.Format(request.CreatedAt),
+            null);
 
     public static JoinRequestViewResponse From(JoinRequestSummary summary) =>
         new(
             summary.Id.Value,
             summary.RequesterId.Value,
             SessionWireFormat.JoinRequestStatus(summary.Status),
-            SessionWireFormat.Format(summary.CreatedAt));
+            SessionWireFormat.Format(summary.CreatedAt),
+            MaskedParticipantAssigner.ForOne(summary.RequesterDisplayName));
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -368,4 +403,37 @@ public static class SessionPageResponse
 {
     public static SessionPageResponse<TOut> From<TIn, TOut>(SessionPage<TIn> page, Func<TIn, TOut> map) =>
         new(page.Items.Select(map).ToArray(), page.NextCursor);
+}
+
+// ---- PHASE5_DESIGN.md §5.1/§8.1: D-103 region 1, GET /me/actionable -------------------------------
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record ActionableInvitationResponse(SessionSummaryResponse Session, string InvitedAt);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record ActionableJoinRequestResponse(
+    Guid JoinRequestId,
+    SessionSummaryResponse Session,
+    MaskedParticipant Requester,
+    string RequestedAt);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record ActionableInboxResponse(
+    IReadOnlyList<ActionableInvitationResponse> Invitations,
+    IReadOnlyList<ActionableJoinRequestResponse> JoinRequests,
+    bool HasMoreInvitations,
+    bool HasMoreJoinRequests)
+{
+    public static ActionableInboxResponse From(ActionableInbox inbox) =>
+        new(
+            [.. inbox.Invitations.Select(invitation => new ActionableInvitationResponse(
+                SessionSummaryResponse.From(invitation.Session),
+                SessionWireFormat.Format(invitation.InvitedAt)))],
+            [.. inbox.JoinRequests.Select(request => new ActionableJoinRequestResponse(
+                request.Id.Value,
+                SessionSummaryResponse.From(request.Session),
+                MaskedParticipantAssigner.ForOne(request.RequesterDisplayName),
+                SessionWireFormat.Format(request.RequestedAt)))],
+            inbox.HasMoreInvitations,
+            inbox.HasMoreJoinRequests);
 }

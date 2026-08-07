@@ -1,11 +1,18 @@
 using System.Text.Json;
+using NodaTime;
 using NodaTime.Text;
 using PartyUp.Api.Auth;
+using PartyUp.Api.Contracts.Availability;
+using PartyUp.Api.Contracts.Sessions;
+using PartyUp.Api.ErrorHandling;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Accounts;
+using PartyUp.Application.Availability;
 using PartyUp.Application.Deletion;
 using PartyUp.Application.Onboarding;
 using PartyUp.Application.Profile;
+using PartyUp.Application.Sessions;
+using PartyUp.Domain.Availability;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Users;
 
@@ -66,6 +73,60 @@ public static class MeEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
+
+        // PHASE5_DESIGN.md §8: /me/availability/** and /me/actionable are mapped here — MeEndpoints is
+        // the shipped owner of every /me/** route (§12 S5 row).
+        RouteGroupBuilder availability = api.MapGroup("/me/availability")
+            .RequireAuthorization(AuthorizationPolicies.RequireOnboarded);
+
+        availability.MapGet(string.Empty, GetMyAvailabilityAsync)
+            .WithName(ApiOperationIds.GetMyAvailability)
+            .Produces<MyAvailabilityLayerResponse>()
+            .ProducesPartyUpProblem(StatusCodes.Status400BadRequest);
+
+        availability.MapPost("/blocks", CreateAvailabilityBlockAsync)
+            .WithName(ApiOperationIds.CreateAvailabilityBlock)
+            .Produces<AvailabilityBlockView>(StatusCodes.Status201Created)
+            .ProducesPartyUpProblem(StatusCodes.Status400BadRequest);
+
+        availability.MapPatch("/blocks/{blockId:guid}", EditAvailabilityBlockAsync)
+            .WithName(ApiOperationIds.EditAvailabilityBlock)
+            .Produces<AvailabilityBlockView>()
+            .ProducesPartyUpProblem(StatusCodes.Status400BadRequest)
+            .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
+
+        availability.MapDelete("/blocks/{blockId:guid}", DeleteAvailabilityBlockAsync)
+            .WithName(ApiOperationIds.DeleteAvailabilityBlock)
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
+
+        availability.MapPost("/series", CreateAvailabilitySeriesAsync)
+            .WithName(ApiOperationIds.CreateAvailabilitySeries)
+            .Produces<AvailabilitySeriesView>(StatusCodes.Status201Created)
+            .ProducesPartyUpProblem(StatusCodes.Status400BadRequest);
+
+        availability.MapDelete("/series/{seriesId:guid}", DeleteAvailabilitySeriesAsync)
+            .WithName(ApiOperationIds.DeleteAvailabilitySeries)
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
+
+        availability.MapPatch("/series/{seriesId:guid}/occurrences/{occurrenceDate}", EditAvailabilityOccurrenceAsync)
+            .WithName(ApiOperationIds.EditAvailabilityOccurrence)
+            .Produces<object>()
+            .ProducesPartyUpProblem(StatusCodes.Status400BadRequest)
+            .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
+
+        availability.MapDelete(
+                "/series/{seriesId:guid}/occurrences/{occurrenceDate}", DeleteAvailabilityOccurrenceAsync)
+            .WithName(ApiOperationIds.DeleteAvailabilityOccurrence)
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
+
+        api.MapGet("/me/actionable", GetActionableInboxAsync)
+            .WithName(ApiOperationIds.GetActionableInbox)
+            .RequireAuthorization(AuthorizationPolicies.RequireOnboarded)
+            .Produces<ActionableInboxResponse>();
+
         return api;
     }
 
@@ -244,6 +305,377 @@ public static class MeEndpoints
                 InstantPattern.ExtendedIso.Format(result.GraceEndsAt!.Value)))
             : Problem(context, StatusCodes.Status409Conflict, result.Code!);
     }
+
+    // ---- PHASE5_DESIGN.md §8: availability, calendar-adjacent /me routes -----------------------
+
+    private static async Task<IResult> GetMyAvailabilityAsync(
+        string? from,
+        string? to,
+        ICurrentUserAccessor currentUser,
+        ReadMyAvailabilityUseCase useCase,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        if (!TryParseInstantRange(from, to, out TimeRange range))
+        {
+            return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "invalid_range");
+        }
+
+        MyAvailabilityLayer layer;
+        try
+        {
+            layer = await useCase.ExecuteAsync(actorId.Value, range, cancellationToken);
+        }
+        catch (DomainException ex) when (ex.Error == DomainError.RangeTooLarge)
+        {
+            return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "range_too_large");
+        }
+
+        return Results.Ok(MyAvailabilityLayerResponse.From(layer, includeRange: true));
+    }
+
+    private static async Task<IResult> CreateAvailabilityBlockAsync(
+        CreateAvailabilityBlockRequest request,
+        ICurrentUserAccessor currentUser,
+        CreateAvailabilityBlockUseCase useCase,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        if (!TryParseInstantRange(request.StartTime, request.EndTime, out TimeRange range))
+        {
+            return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "availability_validation");
+        }
+
+        AvailabilityBlock block;
+        try
+        {
+            block = await useCase.ExecuteAsync(actorId.Value, range, cancellationToken);
+        }
+        catch (DomainException ex) when (ex.Error == DomainError.ValidationFailed)
+        {
+            return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "availability_validation");
+        }
+
+        return Results.Created(
+            $"{ApiRoutes.V1}/me/availability/blocks/{block.Id.Value:D}",
+            AvailabilityBlockView.From(block));
+    }
+
+    private static async Task<IResult> EditAvailabilityBlockAsync(
+        Guid blockId,
+        EditAvailabilityBlockRequest request,
+        ICurrentUserAccessor currentUser,
+        EditAvailabilityBlockUseCase useCase,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        if (!TryParseInstantRange(request.StartTime, request.EndTime, out TimeRange range))
+        {
+            return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "availability_validation");
+        }
+
+        AvailabilityBlock block;
+        try
+        {
+            block = await useCase.ExecuteAsync(
+                actorId.Value, AvailabilityBlockId.From(blockId), range, cancellationToken);
+        }
+        catch (DomainException ex) when (ex.Error == DomainError.NotFound)
+        {
+            return AvailabilityProblem(context, StatusCodes.Status404NotFound, "availability_not_found");
+        }
+        catch (DomainException ex) when (ex.Error == DomainError.ValidationFailed)
+        {
+            return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "availability_validation");
+        }
+
+        return Results.Ok(AvailabilityBlockView.From(block));
+    }
+
+    private static async Task<IResult> DeleteAvailabilityBlockAsync(
+        Guid blockId,
+        ICurrentUserAccessor currentUser,
+        DeleteAvailabilityBlockUseCase useCase,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        // Idempotent (§8): a missing or non-owner target is a no-op, never an error.
+        await useCase.ExecuteAsync(actorId.Value, AvailabilityBlockId.From(blockId), cancellationToken);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> CreateAvailabilitySeriesAsync(
+        CreateAvailabilitySeriesRequest request,
+        ICurrentUserAccessor currentUser,
+        IUserRepository users,
+        CreateAvailabilitySeriesUseCase useCase,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        User? user = await users.FindAsync(actorId.Value, cancellationToken);
+        if (user?.TimeZone is not { } zone)
+        {
+            return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "availability_validation");
+        }
+
+        if (request.DayOfWeek is not { } dayOfWeekValue ||
+            dayOfWeekValue is < 1 or > 7 ||
+            !AvailabilityWireFormat.TryParseTime(request.StartTime, out LocalTime startTime) ||
+            request.DurationMinutes is not { } durationMinutes ||
+            !AvailabilityWireFormat.TryParseDate(request.EffectiveFrom, out LocalDate effectiveFrom))
+        {
+            return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "availability_validation");
+        }
+
+        LocalDate? effectiveUntil = null;
+        if (request.EffectiveUntil is not null)
+        {
+            if (!AvailabilityWireFormat.TryParseDate(request.EffectiveUntil, out LocalDate until))
+            {
+                return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "availability_validation");
+            }
+
+            effectiveUntil = until;
+        }
+
+        AvailabilitySeries series;
+        try
+        {
+            WeeklyPattern pattern = WeeklyPattern.Create(
+                (IsoDayOfWeek)dayOfWeekValue, startTime, Duration15.FromMinutes(durationMinutes));
+            series = await useCase.ExecuteAsync(
+                actorId.Value, pattern, zone, effectiveFrom, effectiveUntil, cancellationToken);
+        }
+        catch (DomainException ex) when (ex.Error == DomainError.ValidationFailed)
+        {
+            return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "availability_validation");
+        }
+
+        return Results.Created(
+            $"{ApiRoutes.V1}/me/availability/series/{series.Id.Value:D}",
+            AvailabilitySeriesView.From(series));
+    }
+
+    private static async Task<IResult> DeleteAvailabilitySeriesAsync(
+        Guid seriesId,
+        ICurrentUserAccessor currentUser,
+        DeleteAvailabilitySeriesUseCase useCase,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        // Idempotent, cascades to skips and materialized blocks (§12-21).
+        await useCase.ExecuteAsync(actorId.Value, AvailabilitySeriesId.From(seriesId), cancellationToken);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> EditAvailabilityOccurrenceAsync(
+        Guid seriesId,
+        string occurrenceDate,
+        EditOccurrenceRequest request,
+        ICurrentUserAccessor currentUser,
+        EditAvailabilityOccurrenceUseCase useCase,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        // A date that fails to parse takes the same 404 as a date outside [EffectiveFrom,
+        // EffectiveUntil) or off the series weekday — indistinguishability is the visibility-safe
+        // default (§8).
+        if (!AvailabilityWireFormat.TryParseDate(occurrenceDate, out LocalDate date))
+        {
+            return AvailabilityProblem(context, StatusCodes.Status404NotFound, "occurrence_not_found");
+        }
+
+        OccurrenceEditScope scope;
+        TimeRange? onlyThisRange = null;
+        WeeklyPattern? thisAndFuturePattern = null;
+
+        switch (request.Scope)
+        {
+            case "onlyThis":
+                scope = OccurrenceEditScope.OnlyThis;
+                if (!TryParseInstantRange(request.StartTime, request.EndTime, out TimeRange range))
+                {
+                    return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "availability_validation");
+                }
+
+                onlyThisRange = range;
+                break;
+            case "thisAndFuture":
+                scope = OccurrenceEditScope.ThisAndFuture;
+                if (request.DayOfWeek is not { } dayOfWeekValue ||
+                    dayOfWeekValue is < 1 or > 7 ||
+                    !AvailabilityWireFormat.TryParseTime(request.StartTime, out LocalTime startTime) ||
+                    request.DurationMinutes is not { } durationMinutes)
+                {
+                    return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "availability_validation");
+                }
+
+                try
+                {
+                    thisAndFuturePattern = WeeklyPattern.Create(
+                        (IsoDayOfWeek)dayOfWeekValue, startTime, Duration15.FromMinutes(durationMinutes));
+                }
+                catch (DomainException)
+                {
+                    return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "availability_validation");
+                }
+
+                break;
+            default:
+                return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "availability_validation");
+        }
+
+        OccurrenceEditOutcome outcome;
+        try
+        {
+            outcome = await useCase.ExecuteAsync(
+                actorId.Value,
+                AvailabilitySeriesId.From(seriesId),
+                date,
+                scope,
+                onlyThisRange,
+                thisAndFuturePattern,
+                cancellationToken);
+        }
+        catch (DomainException ex) when (ex.Error == DomainError.NotFound)
+        {
+            // §8: series missing/not owned, occurrence outside range, and off-weekday all collapse
+            // to the same occurrence_not_found 404 — no new DomainError member is added.
+            return AvailabilityProblem(context, StatusCodes.Status404NotFound, "occurrence_not_found");
+        }
+        catch (DomainException ex) when (ex.Error == DomainError.ValidationFailed)
+        {
+            return AvailabilityProblem(context, StatusCodes.Status400BadRequest, "availability_validation");
+        }
+
+        // §8.1: the closed discriminated response — onlyThis carries only {scope, block};
+        // thisAndFuture carries {scope, original (nullable), successor}.
+        return outcome.Scope == OccurrenceEditScope.OnlyThis
+            ? Results.Ok(new { scope = "onlyThis", block = AvailabilityBlockView.From(outcome.Block!) })
+            : Results.Ok(new
+            {
+                scope = "thisAndFuture",
+                original = outcome.Original is { } original ? AvailabilitySeriesView.From(original) : null,
+                successor = AvailabilitySeriesView.From(outcome.Successor!),
+            });
+    }
+
+    private static async Task<IResult> DeleteAvailabilityOccurrenceAsync(
+        Guid seriesId,
+        string occurrenceDate,
+        ICurrentUserAccessor currentUser,
+        DeleteAvailabilityOccurrenceUseCase useCase,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        if (!AvailabilityWireFormat.TryParseDate(occurrenceDate, out LocalDate date))
+        {
+            return AvailabilityProblem(context, StatusCodes.Status404NotFound, "occurrence_not_found");
+        }
+
+        try
+        {
+            // Idempotent via the skip PK (§8); on a date already edited via onlyThis, also removes
+            // that edit's materialized block.
+            await useCase.ExecuteAsync(actorId.Value, AvailabilitySeriesId.From(seriesId), date, cancellationToken);
+        }
+        catch (DomainException ex) when (ex.Error == DomainError.NotFound)
+        {
+            return AvailabilityProblem(context, StatusCodes.Status404NotFound, "occurrence_not_found");
+        }
+
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> GetActionableInboxAsync(
+        ICurrentUserAccessor currentUser,
+        GetActionableInboxUseCase useCase,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        ActionableInbox inbox = await useCase.ExecuteAsync(actorId.Value, cancellationToken);
+        return Results.Ok(ActionableInboxResponse.From(inbox));
+    }
+
+    /// <summary>Both endpoints are Instant strings — used by GET /me/availability and block create/edit.</summary>
+    private static bool TryParseInstantRange(string? startTime, string? endTime, out TimeRange range)
+    {
+        range = default;
+        if (!AvailabilityWireFormat.TryParseInstant(startTime, out Instant start) ||
+            !AvailabilityWireFormat.TryParseInstant(endTime, out Instant end))
+        {
+            return false;
+        }
+
+        try
+        {
+            range = new TimeRange(start, end);
+            return true;
+        }
+        catch (DomainException)
+        {
+            return false;
+        }
+    }
+
+    private static IResult AvailabilityProblem(HttpContext context, int status, string code) =>
+        PartyUpProblemResults.Create(context, status, code);
+
+    private static async Task<UserId?> ActorIdAsync(
+        ICurrentUserAccessor currentUser,
+        CancellationToken cancellationToken) =>
+        (await currentUser.GetAsync(cancellationToken))?.Id;
 
     private static IResult ProfileMutationProblem(
         HttpContext context,

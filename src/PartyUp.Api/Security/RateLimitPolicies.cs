@@ -229,6 +229,45 @@ public static class RateLimitPolicies
                 ApiOperationIds.ClaimGuestSessionLink,
                 ApiOperationIds.RenameGuestSessionIdentity,
                 ApiOperationIds.RespondAsGuest)),
+        // PHASE5_DESIGN.md A-079: five new User-partitioned dimensions, assigned exhaustively so §8
+        // has no unassigned route.
+        new(
+            "availability-write",
+            60,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.User,
+            Operations(
+                ApiOperationIds.CreateAvailabilityBlock,
+                ApiOperationIds.EditAvailabilityBlock,
+                ApiOperationIds.DeleteAvailabilityBlock,
+                ApiOperationIds.CreateAvailabilitySeries,
+                ApiOperationIds.DeleteAvailabilitySeries,
+                ApiOperationIds.EditAvailabilityOccurrence,
+                ApiOperationIds.DeleteAvailabilityOccurrence)),
+        new(
+            "overlap-search",
+            30,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.User,
+            Operations(ApiOperationIds.FindOverlapWindows, ApiOperationIds.GetHomeSuggestions)),
+        new(
+            "calendar-read",
+            120,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.User,
+            Operations(ApiOperationIds.GetCalendarView, ApiOperationIds.GetMyAvailability)),
+        new(
+            "home-read",
+            120,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.User,
+            Operations(ApiOperationIds.GetActionableInbox)),
+        new(
+            "session-list-read",
+            120,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.User,
+            Operations(ApiOperationIds.ListSessions)),
         new(
             "default",
             300,
