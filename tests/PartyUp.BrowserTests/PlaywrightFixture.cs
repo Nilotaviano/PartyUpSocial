@@ -3,31 +3,62 @@ using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
+using Testcontainers.PostgreSql;
 
 namespace PartyUp.BrowserTests;
 
 /// <summary>
 /// Orchestrates a real, black-box PartyUp stack for Playwright (PHASE4_DESIGN.md §12 S6 row,
-/// ARCHITECTURE.md:73 "Browser E2E lane"). Unlike <c>PartyUp.Api.IntegrationTests</c> (in-process
-/// <c>WebApplicationFactory</c> + Testcontainers), a browser needs a real listening HTTP server it
-/// can navigate to, so this fixture spawns the same two processes a developer runs locally:
+/// PHASE5_DESIGN.md §9/A-082, ARCHITECTURE.md:73 "Browser E2E lane"). Unlike
+/// <c>PartyUp.Api.IntegrationTests</c> (in-process <c>WebApplicationFactory</c> + Testcontainers), a
+/// browser needs a real listening HTTP server it can navigate to. Two topologies, selected by the
+/// <c>PARTYUP_BROWSER_TOPOLOGY</c> environment variable (documented at
+/// <c>ARCHITECTURE.md:73</c>/`PHASE4_REFORECAST.md:66`'s canonical command):
+/// <list type="bullet">
+/// <item><b>local</b> (default — the Windows dev host has no Docker): spawns
 /// <c>dotnet run --project src/PartyUp.Api</c> (Kestrel on the fixed dev port 5000, exactly the port
 /// <c>web/vite.config.ts</c>'s proxy targets) and <c>npm run dev</c> (Vite on 5173, matching
 /// <c>PublicBaseUrl</c> in <c>appsettings.json</c> so magic-link/verification emails point back at
-/// it). Both point at the local dev Postgres already used for the WSL full-suite gate
-/// (Host=localhost;Port=5432 — reachable from the Windows host per the documented local-dev setup);
-/// <c>Database:MigrateOnStartup</c> is forced on so the schema is current without a manual EF step.
+/// it), both against the local dev Postgres already used for the WSL full-suite gate
+/// (Host=localhost;Port=5432 — reachable from the Windows host per the documented local-dev setup).</item>
+/// <item><b>built</b> (<c>PARTYUP_BROWSER_TOPOLOGY=built</c>, set by the CI <c>browser</c> job only):
+/// the API serves its own <c>wwwroot</c> against a Testcontainers Postgres — no <c>dotnet run</c>, no
+/// Vite dev server, matching the single-container prod topology (`ARCHITECTURE.md:12`). The job
+/// prepares the built solution and a populated <c>wwwroot</c> (mirroring `deploy/Dockerfile:27`'s
+/// placement) and starts neither process — this fixture starts the API from the built output and
+/// fails the run outright if that <c>wwwroot</c> is empty, rather than auditing a 404 shell.</item>
+/// </list>
+/// <c>Database:MigrateOnStartup</c> is forced on in both topologies so the schema is current without
+/// a manual EF step.
 /// </summary>
 public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
 {
-    public const string WebBaseUrl = "http://localhost:5173";
     private const string ApiBaseUrl = "http://localhost:5000";
+
+    /// <summary>
+    /// A-082's selector. Anything other than the literal <c>"built"</c> (unset included) is the
+    /// local topology — the property is opt-in the same way <c>PartyUpBrowserTests</c> is, so a
+    /// plain developer run never accidentally reaches for Docker.
+    /// </summary>
+    private static bool IsBuiltTopology => string.Equals(
+        Environment.GetEnvironmentVariable("PARTYUP_BROWSER_TOPOLOGY"),
+        "built",
+        StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// In the built topology the API serves the SPA itself (prod's single-container shape), so
+    /// there is no separate Vite origin — this stays a static property (not an instance member) so
+    /// every existing flow-test call site (<c>PlaywrightFixture.WebBaseUrl</c>) keeps working
+    /// unchanged across both topologies.
+    /// </summary>
+    public static string WebBaseUrl { get; } = IsBuiltTopology ? ApiBaseUrl : "http://localhost:5173";
 
     private readonly string _repoRoot = FindRepoRoot();
     private string _mailDropPath = string.Empty;
     private KillOnCloseJob? _job;
     private Process? _apiProcess;
     private Process? _webProcess;
+    private PostgreSqlContainer? _postgresContainer;
     private IPlaywright? _playwright;
 
     public IBrowser Browser { get; private set; } = null!;
@@ -46,6 +77,27 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
             _job = new KillOnCloseJob();
         }
 
+        if (IsBuiltTopology)
+        {
+            await InitializeBuiltTopologyAsync();
+        }
+        else
+        {
+            InitializeLocalTopology();
+        }
+
+        await WaitForHttpReadyAsync(ApiBaseUrl + "/health/live", TimeSpan.FromMinutes(3));
+        if (!IsBuiltTopology)
+        {
+            await WaitForHttpReadyAsync(WebBaseUrl + "/", TimeSpan.FromMinutes(2));
+        }
+
+        _playwright = await Playwright.CreateAsync();
+        Browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+    }
+
+    private void InitializeLocalTopology()
+    {
         _apiProcess = StartProcess(
             "dotnet",
             "run --no-launch-profile --project src/PartyUp.Api --urls " + ApiBaseUrl,
@@ -64,13 +116,57 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
             Path.Combine(_repoRoot, "web"),
             new Dictionary<string, string?>());
         AssignToJob(_webProcess);
-
-        await WaitForHttpReadyAsync(ApiBaseUrl + "/health/live", TimeSpan.FromMinutes(3));
-        await WaitForHttpReadyAsync(WebBaseUrl + "/", TimeSpan.FromMinutes(2));
-
-        _playwright = await Playwright.CreateAsync();
-        Browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
     }
+
+    /// <summary>
+    /// A-082: starts a Testcontainers Postgres, then runs the API's own built output directly
+    /// (never <c>dotnet run</c>) against it. The <c>browser</c> CI job is responsible for the build
+    /// and for copying <c>web/dist</c> into <c>src/PartyUp.Api/wwwroot</c> before this runs — that
+    /// placement is what the ASP.NET Core Web SDK copies into the build output's own
+    /// <c>wwwroot</c>, which is what <see cref="BuiltApiOutputDirectory"/> is checked against below.
+    /// This path runs only where Docker exists (CI; the Windows dev host has none).
+    /// </summary>
+    private async Task InitializeBuiltTopologyAsync()
+    {
+        _postgresContainer = new PostgreSqlBuilder("postgres:17-alpine").Build();
+        await _postgresContainer.StartAsync();
+
+        string outputDirectory = BuiltApiOutputDirectory;
+        string wwwrootPath = Path.Combine(outputDirectory, "wwwroot");
+        if (!Directory.Exists(wwwrootPath) || !Directory.EnumerateFileSystemEntries(wwwrootPath).Any())
+        {
+            throw new InvalidOperationException(
+                $"Built topology requires a populated '{wwwrootPath}'. The 'browser' CI job must run " +
+                "'npm run build' in web/ and copy web/dist into src/PartyUp.Api/wwwroot (mirroring " +
+                "deploy/Dockerfile:27) before its own 'dotnet build PartyUp.sln' — A-082's fixture " +
+                "never audits a 404 shell.");
+        }
+
+        string dllPath = Path.Combine(outputDirectory, "PartyUp.Api.dll");
+        if (!File.Exists(dllPath))
+        {
+            throw new InvalidOperationException(
+                $"Built topology requires '{dllPath}'. Run 'dotnet build PartyUp.sln' before this fixture.");
+        }
+
+        _apiProcess = StartProcess(
+            "dotnet",
+            $"exec \"{dllPath}\" --urls {ApiBaseUrl}",
+            outputDirectory,
+            new Dictionary<string, string?>
+            {
+                ["ASPNETCORE_ENVIRONMENT"] = "Development",
+                ["Database__MigrateOnStartup"] = "true",
+                ["Email__DropPath"] = _mailDropPath,
+                ["ConnectionStrings__Db"] = _postgresContainer.GetConnectionString(),
+                ["PublicBaseUrl"] = ApiBaseUrl,
+            });
+        AssignToJob(_apiProcess);
+    }
+
+    /// <summary>The directory the CI <c>browser</c> job's own <c>dotnet build</c> writes to.</summary>
+    private string BuiltApiOutputDirectory =>
+        Path.Combine(_repoRoot, "src", "PartyUp.Api", "bin", "Debug", "net10.0");
 
     public async Task DisposeAsync()
     {
@@ -82,6 +178,11 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         _playwright?.Dispose();
         KillProcessTree(_webProcess);
         KillProcessTree(_apiProcess);
+        if (_postgresContainer is not null)
+        {
+            await _postgresContainer.DisposeAsync();
+        }
+
         Dispose();
     }
 
@@ -90,8 +191,17 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     // DisposeAsync as well is harmless.
     public void Dispose() => _job?.Dispose();
 
-    public Task<IBrowserContext> NewContextAsync(string? timezoneId = null) =>
-        Browser.NewContextAsync(new() { TimezoneId = timezoneId });
+    public async Task<IBrowserContext> NewContextAsync(string? timezoneId = null)
+    {
+        IBrowserContext context = await Browser.NewContextAsync(new() { TimezoneId = timezoneId });
+        // A full lane run (axe pass over every audited route plus every flow class, one shared
+        // fixture) can push individual waits past Playwright's 30s default under load, so every
+        // context minted here carries a longer budget centrally instead of per-test overrides.
+        // These are wait ceilings, not retries — A-082's zero-retry rule is untouched.
+        context.SetDefaultNavigationTimeout(60000);
+        context.SetDefaultTimeout(45000);
+        return context;
+    }
 
     /// <summary>
     /// Drives a brand-new registered account through the real magic-link-style flow the

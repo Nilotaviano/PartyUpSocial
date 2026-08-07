@@ -43,3 +43,66 @@ jobs:
       # tsc -b && vite build — covers the typecheck gate and the production build in one step.
       - run: npm run build
       - run: npm test
+
+  # A-082 (PHASE5_DESIGN.md §9, §12 S1 row): the dedicated CI browser + axe lane. `needs: dotnet`
+  # only orders the jobs — a GitHub Actions job shares no filesystem or build output with another,
+  # so this job builds and assembles the built topology itself rather than reusing the `dotnet` or
+  # `web` job's output. Neither this job's steps nor any other job start the API process:
+  # `PlaywrightFixture`'s built topology does that, against the `wwwroot` and built solution this
+  # job hands it, and fails outright if that `wwwroot` is empty.
+  browser:
+    needs: dotnet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # This job's own SPA build, copied into the API's wwwroot (mirroring deploy/Dockerfile:27's
+      # placement) BEFORE the job's own dotnet build, so the Web SDK's default wwwroot content
+      # globbing picks the built assets up into src/PartyUp.Api/bin/Debug/net10.0/wwwroot.
+      - run: npm ci
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+      - run: |
+          mkdir -p src/PartyUp.Api/wwwroot
+          cp -r web/dist/. src/PartyUp.Api/wwwroot/
+
+      - run: dotnet restore PartyUp.sln
+      - run: dotnet build PartyUp.sln --no-restore -warnaserror
+
+      - name: Install pinned Playwright browsers (Chromium + WebKit)
+        run: pwsh tests/PartyUp.BrowserTests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium webkit
+
+      - name: Chromium flows + axe
+        env:
+          PARTYUP_BROWSER_TOPOLOGY: built
+        run: >
+          dotnet test tests/PartyUp.BrowserTests --no-build -p:PartyUpBrowserTests=true
+          --filter "Category=Integration&Browser!=WebKit"
+
+      - name: WebKit pointer lane
+        env:
+          PARTYUP_BROWSER_TOPOLOGY: built
+        run: >
+          dotnet test tests/PartyUp.BrowserTests --no-build -p:PartyUpBrowserTests=true
+          --filter "Browser=WebKit"
+
+      - name: Upload axe/trace artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-lane-artifacts
+          path: |
+            tests/PartyUp.BrowserTests/bin/Debug/net10.0/axe-results/**
+            tests/PartyUp.BrowserTests/bin/Debug/net10.0/test-results/**
+          if-no-files-found: ignore

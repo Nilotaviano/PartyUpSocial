@@ -2,11 +2,14 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
-    <!-- The fixture boots `dotnet run` + `npm run dev` on fixed local ports and drives a real
-         Chromium — a Windows-host-only lane this phase (ARCHITECTURE.md:73 defers the CI browser
-         lane to Phase 5). Linux (WSL full suite, CI) still compiles the project but must not
-         discover/run it: neither environment has Playwright browsers or a Vite dev server. -->
-    <IsTestProject Condition="'$(OS)' != 'Windows_NT'">false</IsTestProject>
+    <!-- A-082: explicitly-defaulted opt-in, not an OS condition. An undefined MSBuild property
+         expands to the empty string, which is not `false`, so the default clause below only fires
+         when nothing set the property — every `dotnet test` on every OS (Windows dev host, WSL full
+         suite, CI's solution-wide `dotnet` job) discovers zero tests here unless the caller passes
+         `-p:PartyUpBrowserTests=true` (CLAUDE.md's canonical local command; CI's dedicated `browser`
+         job, `.github/workflows/ci.yml`). This must stay textually before `IsTestProject` below. -->
+    <PartyUpBrowserTests Condition="'$(PartyUpBrowserTests)' == ''">false</PartyUpBrowserTests>
+    <IsTestProject>$(PartyUpBrowserTests)</IsTestProject>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,8 +21,10 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Deque.AxeCore.Playwright" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.Playwright" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
