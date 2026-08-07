@@ -133,7 +133,7 @@ Transactional in-app rows already exist at each owning mutation. This phase adds
 ## Phase 8 — Compliance, localization, hardening
 
 - Translation pass: pt-BR + es for UI, **notifications, and emails**; locale formatting audit (D-060, D-146).
-- WCAG 2.2 AA audit across all screens; remediation (D-139). Calendar and poll grid get dedicated SR/keyboard sweeps.
+- WCAG 2.2 AA audit across all screens; remediation (D-139). Calendar and poll grid get dedicated SR/keyboard sweeps — including the real-device touch + NVDA checkpoint on the shipped week grid, re-deferred here from Phase 5 by explicit owner decision (2026-08-07, `P5-TOUCH-01`; the automated WebKit pointer lane is the interim evidence).
 - **Cross-browser matrix pass:** current + previous Chrome, Edge, Firefox, Safari, incl. mobile variants (D-138).
 - Legal documents as a real work item, started during Phase 7: privacy policy, ToS, community standards — three locales, LGPD-aware (§8.6); footer/store-listing surfacing for Phase 2's functional public deletion-request route (D-072); compliance re-verification of the shipped platform unlink + data-revocation flow.
 - **Deletion completeness verification:** end-to-end test that grace expiry produces every D-092 effect and backups age out per retention policy.
@@ -177,6 +177,7 @@ OIDC/token auth layer for native clients, FCM/APNs channel, store age-signal API
 | 3 | 2 wk |
 | 4 | 4–6 wk |
 | 5 | 5–6 wk |
+| 5.1 | 1–2 wk |
 | 6 | 3–4 wk |
 | 7 | 2 wk |
 | 8 | 4–5 wk |

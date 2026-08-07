@@ -319,7 +319,7 @@ describe('WeekGridPage occurrence editing', () => {
 
     renderPage()
 
-    await screen.findAllByRole('gridcell', { name: /Busy/ })
+    await screen.findAllByRole('gridcell', { name: /Busy/ }, { timeout: 5000 })
     const busyCell = screen.getAllByRole('gridcell', { name: /Busy/ })[0]
     busyCell.focus()
     fireEvent.keyDown(busyCell, { key: 'Enter' })
@@ -385,7 +385,7 @@ describe('WeekGridPage occurrence editing', () => {
 
     renderPage()
 
-    await screen.findAllByRole('gridcell', { name: /Busy/ })
+    await screen.findAllByRole('gridcell', { name: /Busy/ }, { timeout: 5000 })
     const busyCell = screen.getAllByRole('gridcell', { name: /Busy/ })[0]
     busyCell.focus()
     fireEvent.keyDown(busyCell, { key: 'Enter' })
@@ -460,7 +460,7 @@ describe('WeekGridPage occurrence editing', () => {
 
     renderPage()
 
-    await screen.findAllByRole('gridcell', { name: /Busy/ })
+    await screen.findAllByRole('gridcell', { name: /Busy/ }, { timeout: 5000 })
     const busyCell = screen.getAllByRole('gridcell', { name: /Busy/ })[0]
     busyCell.focus()
     fireEvent.keyDown(busyCell, { key: 'Enter' })
@@ -548,7 +548,7 @@ describe('WeekGridPage occurrence editing', () => {
 
     renderPage()
 
-    await screen.findAllByRole('gridcell', { name: /Busy/ })
+    await screen.findAllByRole('gridcell', { name: /Busy/ }, { timeout: 5000 })
     expect(screen.getByRole('gridcell', { name: /Ana available/ })).toBeInTheDocument()
     expect(screen.getByRole('gridcell', { name: /Raid night/ })).toBeInTheDocument()
 

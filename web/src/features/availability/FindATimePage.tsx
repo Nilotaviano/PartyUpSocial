@@ -168,24 +168,24 @@ export function FindATimePage() {
           the checkboxes above. An omitted selection ("allFriends") is
           resolved server-side, and `consideredFriends` is the only source of
           "whose calendars produced these windows" — the client never derives
-          that set itself. No second "All accepted friends" label here — the
-          summary text above this section already names the same default; an
-          empty list (no accepted friends yet) renders nothing at all rather
-          than a label over a blank list.
+          that set itself. An empty list (no accepted friends yet) renders
+          nothing at all rather than a heading over a blank list.
         */}
         {overlaps.data?.selectionSource === 'allFriends' &&
           overlaps.data.consideredFriends &&
           overlaps.data.consideredFriends.length > 0 && (
-            <ul
-              className="mt-3 space-y-1 text-sm text-slate-600"
-              data-testid="find-a-time-considered-friends"
-            >
-              {overlaps.data.consideredFriends.map((friend) => (
-                <li key={friend.ordinal}>
-                  {friend.displayName ?? t('detail.anonymous', { ns: 'sessions' })}
-                </li>
-              ))}
-            </ul>
+            <div className="mt-3" data-testid="find-a-time-considered-friends">
+              <h3 className="text-sm font-medium text-slate-700">
+                {t('findATime.consideredHeading')}
+              </h3>
+              <ul className="mt-1 space-y-1 text-sm text-slate-600">
+                {overlaps.data.consideredFriends.map((friend) => (
+                  <li key={friend.ordinal}>
+                    {friend.displayName ?? t('detail.anonymous', { ns: 'sessions' })}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
       </section>
 

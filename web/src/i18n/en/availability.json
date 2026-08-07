@@ -44,6 +44,7 @@
     "subheading": "See when your friends are free.",
     "friendsLabel": "Friends",
     "friendsAllDefault": "All accepted friends",
+    "consideredHeading": "Based on these friends' calendars",
     "friendsSelected": "{{count}} selected",
     "rangeLabel": "Date range",
     "rangeDefault": "Next 7 days",

@@ -44,6 +44,7 @@
     "subheading": "Veja quando seus amigos estão livres.",
     "friendsLabel": "Amigos",
     "friendsAllDefault": "Todos os amigos aceitos",
+    "consideredHeading": "Com base nas agendas destes amigos",
     "friendsSelected": "{{count}} selecionados",
     "rangeLabel": "Período",
     "rangeDefault": "Próximos 7 dias",

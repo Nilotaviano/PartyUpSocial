@@ -44,6 +44,7 @@
     "subheading": "Mira cuándo están libres tus amistades.",
     "friendsLabel": "Amistades",
     "friendsAllDefault": "Todas las amistades aceptadas",
+    "consideredHeading": "Basado en los calendarios de estas amistades",
     "friendsSelected": "{{count}} seleccionadas",
     "rangeLabel": "Rango de fechas",
     "rangeDefault": "Próximos 7 días",
