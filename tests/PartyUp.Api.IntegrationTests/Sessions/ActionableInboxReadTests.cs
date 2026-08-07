@@ -100,16 +100,35 @@ public sealed class ActionableInboxReadTests : IAsyncLifetime, IDisposable
 
         UserId viewerId = await _factory.SeedUserAsync(email: "inbox-past-viewer@example.test");
         UserId organizerId = await _factory.SeedUserAsync(email: "inbox-past-organizer@example.test");
+        UserId expiredOrganizerId = await _factory.SeedUserAsync(email: "inbox-past-expired-organizer@example.test");
+        UserId pastStartOrganizerId = await _factory.SeedUserAsync(email: "inbox-past-start-organizer@example.test");
         Instant now = _factory.Clock.GetCurrentInstant();
 
         SessionId canceledSession = await CreateSessionAsync(context, organizerId, now + Duration.FromHours(2), [viewerId]);
         await CancelAsync(context, canceledSession);
+
+        // Expired: materialized status set directly at the database boundary (A-067 — the predicate
+        // reads the column only, never re-derives it), per the same idiom
+        // SessionVisibilitySqlCharacterizationTests uses for Completed.
+        SessionId expiredSession = await CreateSessionAsync(context, expiredOrganizerId, now + Duration.FromHours(2), [viewerId]);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE sessions SET status = 3 WHERE id = {expiredSession.Value}");
+
+        // start_time > now: a session created with a valid future start, then moved into the past at
+        // the database boundary (Session.Create forbids constructing one directly) — proves the
+        // future-only filter is actually exercised, not just "yesterday's invitation never existed".
+        SessionId pastStartSession = await CreateSessionAsync(
+            context, pastStartOrganizerId, now + Duration.FromHours(2), [viewerId]);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE sessions SET start_time = {now - Duration.FromHours(1)} WHERE id = {pastStartSession.Value}");
 
         SessionId futureSession = await CreateSessionAsync(context, organizerId, now + Duration.FromHours(2), [viewerId]);
 
         ActionableInbox inbox = await reads.ListActionableAsync(viewerId, now, 50, default);
 
         Assert.DoesNotContain(inbox.Invitations, i => i.Session.Id == canceledSession);
+        Assert.DoesNotContain(inbox.Invitations, i => i.Session.Id == expiredSession);
+        Assert.DoesNotContain(inbox.Invitations, i => i.Session.Id == pastStartSession);
         Assert.Contains(inbox.Invitations, i => i.Session.Id == futureSession);
     }
 
@@ -122,16 +141,25 @@ public sealed class ActionableInboxReadTests : IAsyncLifetime, IDisposable
 
         UserId viewerId = await _factory.SeedUserAsync(email: "inbox-invisible-viewer@example.test");
         UserId organizerId = await _factory.SeedUserAsync(email: "inbox-invisible-organizer@example.test");
+        UserId organizerTwoId = await _factory.SeedUserAsync(email: "inbox-invisible-organizer-2@example.test");
         Instant now = _factory.Clock.GetCurrentInstant();
 
         // A block between the viewer and organizer removes even an active invitation from the inbox —
-        // the A-077 fragment applies here too, so a session the viewer cannot see never appears.
+        // the A-077 fragment applies here too, so a session the viewer cannot see never appears. Viewer
+        // is the blocker here.
         SessionId invitedThenBlocked = await CreateSessionAsync(context, organizerId, now + Duration.FromHours(2), [viewerId]);
         await BlockAsync(context, viewerId, organizerId);
+
+        // Mirror direction: the organizer is the blocker — a test whose green survives deleting one
+        // arm of SessionVisibilitySql's block predicate would not close this.
+        SessionId invitedThenBlockedByOrganizer = await CreateSessionAsync(
+            context, organizerTwoId, now + Duration.FromHours(2), [viewerId]);
+        await BlockAsync(context, organizerTwoId, viewerId);
 
         ActionableInbox inbox = await reads.ListActionableAsync(viewerId, now, 50, default);
 
         Assert.DoesNotContain(inbox.Invitations, i => i.Session.Id == invitedThenBlocked);
+        Assert.DoesNotContain(inbox.Invitations, i => i.Session.Id == invitedThenBlockedByOrganizer);
     }
 
     private async Task<SessionId> CreateSessionAsync(

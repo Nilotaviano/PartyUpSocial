@@ -110,11 +110,13 @@ public sealed class AvailabilityWindowPadTests : IAsyncLifetime
     /// <summary>
     /// PHASE5_DESIGN.md S2 verification carry C3: §4.2 pad case (d) was proven tautologically in S2
     /// (the same method, <c>ReadOwnersWindowAsync</c>, called twice). Now that <c>/calendar</c>,
-    /// <c>/me/availability</c> and the overlap search exist as S4 use cases, this proves the trailing
-    /// boundary series appears identically through all three: <see cref="ReadMyAvailabilityUseCase"/>,
-    /// <see cref="GetCalendarViewUseCase"/>'s <c>myAvailability</c> layer, and
-    /// <see cref="FindOverlapWindowsUseCase"/>'s read — the same one-read composition (§5.1), not
-    /// three independent implementations that could silently diverge.
+    /// <c>/me/availability</c> and the overlap search exist as S4 use cases, this proves both boundary
+    /// series — trailing (UTC-12) and leading (UTC+14) — appear identically through all three:
+    /// <see cref="ReadMyAvailabilityUseCase"/>, <see cref="GetCalendarViewUseCase"/>'s
+    /// <c>myAvailability</c> layer, and <see cref="FindOverlapWindowsUseCase"/>'s read — the same
+    /// one-read composition (§5.1), not three independent implementations that could silently diverge.
+    /// Round-1 verification F4: the leading series is the other boundary case §4.2 names and was
+    /// missing from this three-surface proof.
     /// </summary>
     [Fact]
     public async Task BoundarySeriesAppearIdenticallyThroughMyAvailabilityCalendarAndOverlapReads_C3()
@@ -126,11 +128,11 @@ public sealed class AvailabilityWindowPadTests : IAsyncLifetime
         await MakeAcceptedFriendsAsync(context, viewerId, ownerId);
 
         DateTimeZone utcMinus12 = DateTimeZoneProviders.Tzdb["Etc/GMT+12"];
+        DateTimeZone utcPlus14 = DateTimeZoneProviders.Tzdb["Etc/GMT-14"];
         LocalDate d = new(2026, 10, 5);
 
-        // The same (a) trailing boundary series AvailabilityWindowPadTests proves at the repository
-        // level — live in UTC until d+2 11:45, admitted only by the A-076 pad for a window starting
-        // d+2 06:00.
+        // (a) trailing boundary series — live in UTC until d+2 11:45, admitted only by the A-076 pad
+        // for a window starting d+2 06:00.
         AvailabilitySeries trailing = AvailabilitySeries.Create(
             ownerId,
             WeeklyPattern.Create(d.DayOfWeek, new LocalTime(23, 45), Duration15.FromMinutes(24 * 60)),
@@ -138,12 +140,23 @@ public sealed class AvailabilityWindowPadTests : IAsyncLifetime
             d,
             d.PlusDays(1));
 
-        context.AvailabilitySeries.Add(trailing);
+        // (b) leading boundary series — live from d-1 10:00 UTC even though `effective_from` is d,
+        // after a window ending d-1 12:00; admitted only by the A-076 pad's leading side.
+        AvailabilitySeries leading = AvailabilitySeries.Create(
+            ownerId,
+            WeeklyPattern.Create(d.DayOfWeek, new LocalTime(0, 0), Duration15.FromMinutes(15)),
+            utcPlus14,
+            d);
+
+        context.AvailabilitySeries.AddRange(trailing, leading);
         await context.SaveChangesAsync();
 
         TimeRange trailingWindow = new(
             d.PlusDays(2).AtMidnight().InZoneStrictly(DateTimeZone.Utc).ToInstant() + Duration.FromHours(6),
             d.PlusDays(3).AtMidnight().InZoneStrictly(DateTimeZone.Utc).ToInstant());
+        TimeRange leadingWindow = new(
+            d.PlusDays(-3).AtMidnight().InZoneStrictly(DateTimeZone.Utc).ToInstant(),
+            d.PlusDays(-1).AtMidnight().InZoneStrictly(DateTimeZone.Utc).ToInstant() + Duration.FromHours(12));
 
         await using AppDbContext readContext = CreateContext();
         var availabilityReads = new AvailabilityReadRepository(readContext);
@@ -151,23 +164,42 @@ public sealed class AvailabilityWindowPadTests : IAsyncLifetime
         var sessionReads = new SessionReadRepository(readContext);
 
         ReadMyAvailabilityUseCase myAvailability = new(availabilityReads, DateTimeZoneProviders.Tzdb);
-        MyAvailabilityLayer myLayer = await myAvailability.ExecuteAsync(ownerId, trailingWindow, default);
-        Assert.Contains(myLayer.Occurrences, occurrence =>
-            occurrence.Origin is AvailabilityOccurrenceOrigin.FromSeriesOccurrence fromSeries
-            && fromSeries.SeriesId == trailing.Id);
-
         GetCalendarViewUseCase calendarView = new(
             myAvailability, friendships, availabilityReads, sessionReads, DateTimeZoneProviders.Tzdb);
-        CalendarView calendar = await calendarView.ExecuteAsync(ownerId, trailingWindow, default);
-        Assert.Contains(calendar.MyAvailability.Occurrences, occurrence =>
+
+        // (a) trailing, through all three surfaces.
+        MyAvailabilityLayer myLayerTrailing = await myAvailability.ExecuteAsync(ownerId, trailingWindow, default);
+        Assert.Contains(myLayerTrailing.Occurrences, occurrence =>
             occurrence.Origin is AvailabilityOccurrenceOrigin.FromSeriesOccurrence fromSeries
             && fromSeries.SeriesId == trailing.Id);
 
-        FindOverlapWindowsUseCase overlapSearch = new(
+        CalendarView calendarTrailing = await calendarView.ExecuteAsync(ownerId, trailingWindow, default);
+        Assert.Contains(calendarTrailing.MyAvailability.Occurrences, occurrence =>
+            occurrence.Origin is AvailabilityOccurrenceOrigin.FromSeriesOccurrence fromSeries
+            && fromSeries.SeriesId == trailing.Id);
+
+        FindOverlapWindowsUseCase overlapSearchTrailing = new(
             friendships, availabilityReads, DateTimeZoneProviders.Tzdb, new FixedInstantClock(trailingWindow.Start));
-        OverlapSearchResult overlap = await overlapSearch.ExecuteAsync(
+        OverlapSearchResult overlapTrailing = await overlapSearchTrailing.ExecuteAsync(
             viewerId, [ownerId], trailingWindow, default);
-        Assert.NotEmpty(overlap.Windows);
+        Assert.NotEmpty(overlapTrailing.Windows);
+
+        // (b) leading, through all three surfaces.
+        MyAvailabilityLayer myLayerLeading = await myAvailability.ExecuteAsync(ownerId, leadingWindow, default);
+        Assert.Contains(myLayerLeading.Occurrences, occurrence =>
+            occurrence.Origin is AvailabilityOccurrenceOrigin.FromSeriesOccurrence fromSeries
+            && fromSeries.SeriesId == leading.Id);
+
+        CalendarView calendarLeading = await calendarView.ExecuteAsync(ownerId, leadingWindow, default);
+        Assert.Contains(calendarLeading.MyAvailability.Occurrences, occurrence =>
+            occurrence.Origin is AvailabilityOccurrenceOrigin.FromSeriesOccurrence fromSeries
+            && fromSeries.SeriesId == leading.Id);
+
+        FindOverlapWindowsUseCase overlapSearchLeading = new(
+            friendships, availabilityReads, DateTimeZoneProviders.Tzdb, new FixedInstantClock(leadingWindow.Start));
+        OverlapSearchResult overlapLeading = await overlapSearchLeading.ExecuteAsync(
+            viewerId, [ownerId], leadingWindow, default);
+        Assert.NotEmpty(overlapLeading.Windows);
     }
 
     private static async Task MakeAcceptedFriendsAsync(AppDbContext context, UserId a, UserId b)

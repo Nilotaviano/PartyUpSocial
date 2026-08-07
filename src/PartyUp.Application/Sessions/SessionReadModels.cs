@@ -6,11 +6,6 @@ using PartyUp.Domain.Sessions;
 namespace PartyUp.Application.Sessions;
 
 /// <summary>
-/// The read shapes <c>ISessionReadRepository</c> returns (PHASE4_DESIGN.md §5.1). Every read is
-/// rendered through visibility plus identity masking before it reaches an endpoint; that masking is
-/// an Application/API concern layered on top of these DTOs, not performed by the repository itself.
-/// </summary>
-/// <summary>
 /// PHASE5_DESIGN.md §5.1: the viewer's relation to a session, evaluated in exactly this precedence
 /// order (first match wins, so the value is total and single-valued) over the shipped participation
 /// and join-request enums. <c>Invitee</c> is not cosmetic — it is what lets D-103's first Home region
@@ -27,6 +22,15 @@ public enum ViewerRelation
     Inherited,
 }
 
+/// <summary>
+/// The read shapes <c>ISessionReadRepository</c> returns (PHASE4_DESIGN.md §5.1). Every read is
+/// rendered through visibility plus identity masking before it reaches an endpoint; that masking is
+/// an Application/API concern layered on top of these DTOs, not performed by the repository itself.
+/// One session as a list/summary read renders it, extended by PHASE5_DESIGN.md §5.1: its
+/// <c>OrganizerDisplayName</c> is null for a tombstoned organizer (D-092), and its
+/// <c>ViewerRelation</c> is the precedence value the enum above states. Both default to the
+/// pre-Phase-5 value so existing positional-constructor call sites keep compiling.
+/// </summary>
 public sealed record SessionSummary(
     SessionId Id,
     UserId OrganizerId,

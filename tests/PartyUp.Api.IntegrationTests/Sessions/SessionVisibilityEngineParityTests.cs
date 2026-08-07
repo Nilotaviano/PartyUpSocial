@@ -42,10 +42,22 @@ public sealed class SessionVisibilityEngineParityTests : IAsyncLifetime, IDispos
         UserId strangerId = await _factory.SeedUserAsync(email: "parity-stranger@example.test");
         UserId strangerTwoId = await _factory.SeedUserAsync(email: "parity-stranger-two@example.test");
         UserId blockedFriendId = await _factory.SeedUserAsync(email: "parity-blocked-friend@example.test");
+        UserId blockedByFriendId = await _factory.SeedUserAsync(email: "parity-blocked-by-friend@example.test");
+        UserId blockedExtenderId = await _factory.SeedUserAsync(email: "parity-blocked-extender@example.test");
+        UserId extenderBlockingViewerId = await _factory.SeedUserAsync(email: "parity-extender-blocking-viewer@example.test");
 
         await LinkFriendsAsync(context, viewerId, friendId);
         await LinkFriendsAsync(context, viewerId, blockedFriendId);
         await BlockAsync(context, viewerId, blockedFriendId);
+        // Rule 4 mirror: the organizer is the blocker, viewer the blocked party.
+        await LinkFriendsAsync(context, viewerId, blockedByFriendId);
+        await BlockAsync(context, blockedByFriendId, viewerId);
+        // Extender sub-clause, both directions: the friend who would otherwise extend access is
+        // blocked with the viewer, so their path is not counted (rule 4 inside rule 2's extender path).
+        await LinkFriendsAsync(context, viewerId, blockedExtenderId);
+        await BlockAsync(context, viewerId, blockedExtenderId);
+        await LinkFriendsAsync(context, viewerId, extenderBlockingViewerId);
+        await BlockAsync(context, extenderBlockingViewerId, viewerId);
 
         List<SessionId> sessionIds =
         [
@@ -54,9 +66,12 @@ public sealed class SessionVisibilityEngineParityTests : IAsyncLifetime, IDispos
             await CreateSessionAsync(context, friendId, isPrivate: false, invitees: [strangerId]), // inherited via organizer friend
             await CreateSessionAsync(context, strangerId, isPrivate: false, invitees: [friendId]), // inherited via extending participant friend
             await CreateSessionAsync(context, friendId, isPrivate: true, invitees: []), // private: rule 3 blocks the inherited path
-            await CreateSessionAsync(context, blockedFriendId, isPrivate: false, invitees: [strangerId]), // rule 4: organizer blocked despite being a friend
+            await CreateSessionAsync(context, blockedFriendId, isPrivate: false, invitees: [strangerId]), // rule 4: organizer blocked despite being a friend (viewer is blocker)
+            await CreateSessionAsync(context, blockedByFriendId, isPrivate: false, invitees: [strangerId]), // rule 4 mirror: organizer is the blocker
             await CreateSessionAsync(context, strangerId, isPrivate: false, invitees: [strangerTwoId]), // unrelated
             await CreateSessionAsync(context, strangerId, isPrivate: true, invitees: [viewerId]), // invited, still Pending (no RSVP) — direct access via rule 1
+            await CreateSessionAsync(context, strangerId, isPrivate: false, invitees: [blockedExtenderId], rsvpGoing: blockedExtenderId), // extender blocked by viewer — path not counted
+            await CreateSessionAsync(context, strangerId, isPrivate: false, invitees: [extenderBlockingViewerId], rsvpGoing: extenderBlockingViewerId), // extender mirror: extender is the blocker
         ];
 
         Viewer viewer = await BuildViewerAsync(context, viewerId);

@@ -41,9 +41,13 @@ public sealed class SessionVisibilitySqlCharacterizationTests : IAsyncLifetime, 
         UserId strangerId = await _factory.SeedUserAsync(email: "characterization-stranger@example.test");
         UserId strangerTwoId = await _factory.SeedUserAsync(email: "characterization-stranger-two@example.test");
         UserId blockedId = await _factory.SeedUserAsync(email: "characterization-blocked@example.test");
+        UserId blockedByOrganizerId = await _factory.SeedUserAsync(email: "characterization-blocked-by-organizer@example.test");
 
         await LinkFriendsAsync(context, viewerId, friendId);
         await BlockAsync(context, viewerId, blockedId);
+        // Rule 4 mirror: the organizer is the blocker, viewer the blocked party — a test whose green
+        // survives deleting one arm of SessionVisibilitySql's block predicate would not close this.
+        await BlockAsync(context, blockedByOrganizerId, viewerId);
 
         // Visible: viewer is organizer.
         SessionId organizerSessionId = await CreateSessionAsync(context, viewerId, isPrivate: true, invitees: []);
@@ -53,8 +57,10 @@ public sealed class SessionVisibilitySqlCharacterizationTests : IAsyncLifetime, 
         SessionId inheritedSessionId = await CreateSessionAsync(context, friendId, isPrivate: false, invitees: [strangerId]);
         // Not visible: private, viewer is only a friend of the organizer (rule 3).
         SessionId privateInheritedId = await CreateSessionAsync(context, friendId, isPrivate: true, invitees: []);
-        // Not visible: organizer is blocked with viewer, even though public (rule 4).
+        // Not visible: organizer is blocked with viewer, even though public (rule 4). Viewer is the blocker.
         SessionId blockedOrganizerId = await CreateSessionAsync(context, blockedId, isPrivate: false, invitees: [strangerId]);
+        // Not visible: rule 4 mirror — organizer is the blocker.
+        SessionId blockedByOrganizerSessionId = await CreateSessionAsync(context, blockedByOrganizerId, isPrivate: false, invitees: [strangerId]);
         // Not visible: unrelated public session with no friend path at all.
         SessionId unrelatedId = await CreateSessionAsync(context, strangerId, isPrivate: false, invitees: [strangerTwoId]);
 
@@ -64,6 +70,7 @@ public sealed class SessionVisibilitySqlCharacterizationTests : IAsyncLifetime, 
         Assert.Equal(expectedUpcoming, fullPage.Items.Select(item => item.Id.Value).ToHashSet());
         Assert.DoesNotContain(privateInheritedId.Value, fullPage.Items.Select(item => item.Id.Value));
         Assert.DoesNotContain(blockedOrganizerId.Value, fullPage.Items.Select(item => item.Id.Value));
+        Assert.DoesNotContain(blockedByOrganizerSessionId.Value, fullPage.Items.Select(item => item.Id.Value));
         Assert.DoesNotContain(unrelatedId.Value, fullPage.Items.Select(item => item.Id.Value));
 
         // Cursor branch, one row at a time, must reproduce the same set in the same order as the

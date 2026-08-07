@@ -20,12 +20,22 @@ public sealed class AvailabilityLoadShapeTests
     private static readonly LocalDate Monday = new(2026, 9, 7);
     private static readonly DateTimeZone Utc = DateTimeZoneProviders.Tzdb["Etc/UTC"];
 
+    /// <summary>
+    /// Round-1 verification F3: a fixture where every friend shares identical instants is structurally
+    /// unfailable — it collapses to a handful of windows regardless of friend count, so the 4096
+    /// ceiling is never a live constraint. This one staggers each friend's 20 blocks into 20
+    /// widely-spaced day groups (4 days apart, so groups never overlap each other) and staggers the
+    /// starts *within* a group across a 64-friend cycle (still a 15-minute-grid offset), which is
+    /// enough distinct boundary instants to produce a four-figure window count without adversarially
+    /// exploding past the ceiling.
+    /// </summary>
     [Fact]
     public async Task OneHundredFiftyFriendsOverNinetyTwoDaysStaysWithinFourThousandWindowsAndTwoPortCalls_A079()
     {
         const int FriendCount = 150;
         const int SeriesPerFriend = 3;
         const int BlocksPerFriend = 20;
+        const int StaggerCycle = 64; // distinct starts per day group; 64 * 15 min = 16 h, inside the group's own day.
 
         Instant windowStart = Monday.PlusDays(-14).AtMidnight().InZoneStrictly(Utc).ToInstant();
         TimeRange window = new(windowStart, windowStart + Duration.FromDays(92));
@@ -33,10 +43,9 @@ public sealed class AvailabilityLoadShapeTests
         FakeFriendshipReads friendships = new();
         FakeAvailabilityReads reads = new();
 
-        // The documented worst-case counts, drawn from a shared daily/weekly menu (A-079 bounds cost
-        // by range and cadence, not by an adversarial per-friend timetable) — every friend's series
-        // and blocks land on the same instants as every other friend's, so the sweep's distinct
-        // boundary count stays flat as the friend count grows to 150.
+        // The documented worst-case counts. Series stay identical across friends (D-108's Home
+        // suggestion floor is a Domain concern, not this budget's) — the staggering that makes the
+        // ceiling live lives entirely in the one-time blocks below.
         IsoDayOfWeek[] seriesDays = [IsoDayOfWeek.Monday, IsoDayOfWeek.Wednesday, IsoDayOfWeek.Friday];
 
         for (int f = 0; f < FriendCount; f++)
@@ -57,8 +66,17 @@ public sealed class AvailabilityLoadShapeTests
             List<AvailabilityBlock> blocks = [];
             for (int b = 0; b < BlocksPerFriend; b++)
             {
-                Instant start = windowStart + Duration.FromDays(b * 4) + Duration.FromHours(10);
-                blocks.Add(AvailabilityBlock.Create(friend, new TimeRange(start, start + Duration.FromMinutes(90))));
+                // Each block index is its own day group, 4 days apart (20 groups span 80 days, inside
+                // the 92-day window with margin) so groups never share a boundary instant with each
+                // other. Within a group, the start is staggered by (f mod 64) * 15 minutes and the end
+                // is shared by every friend in the group — the same shared-end ladder shape that makes
+                // a nested set of windows realizable, just replayed across 20 independent groups.
+                int dayGroup = b * 4;
+                int staggerMinutes = (f % StaggerCycle) * 15;
+                Instant groupDayStart = windowStart + Duration.FromDays(dayGroup);
+                Instant start = groupDayStart + Duration.FromMinutes(staggerMinutes);
+                Instant end = groupDayStart + Duration.FromHours(22);
+                blocks.Add(AvailabilityBlock.Create(friend, new TimeRange(start, end)));
             }
 
             reads.Owners.Add(new AvailabilityOwnerData(friend, Utc, blocks, series, []));
@@ -67,6 +85,11 @@ public sealed class AvailabilityLoadShapeTests
         FindOverlapWindowsUseCase useCase = new(friendships, reads, DateTimeZoneProviders.Tzdb, new FixedClock(windowStart));
         OverlapSearchResult result = await useCase.ExecuteAsync(UserId.New(), friendIds: null, range: window, default);
 
+        // Floor proves the fixture is dense enough that the ceiling is a live constraint, not a
+        // structurally-unfailable formality (round-1 F3); ceiling is A-079's actual budget.
+        Assert.True(
+            result.Windows.Count >= 1000,
+            $"Fixture too sparse to exercise the ceiling: expected >= 1000 windows, got {result.Windows.Count}.");
         Assert.True(result.Windows.Count <= 4096, $"Expected at most 4096 windows, got {result.Windows.Count}.");
         Assert.Equal(1, reads.ReadCalls);
         Assert.Equal(1, friendships.ListAcceptedCalls);

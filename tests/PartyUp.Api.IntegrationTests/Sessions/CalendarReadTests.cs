@@ -58,6 +58,15 @@ public sealed class CalendarReadTests : IAsyncLifetime, IDisposable
             context, viewerId, now + Duration.FromHours(2), Duration15.FromMinutes(30));
         await CancelAsync(context, canceled);
 
+        // Expired: excluded, same as Canceled — materialized status set directly at the database
+        // boundary (A-067, the same idiom SessionVisibilitySqlCharacterizationTests uses for Completed).
+        // Created before the Completed fixture below so its `now + 2h` lead is still valid — completing
+        // that fixture advances the shared factory clock past this session's own start window.
+        SessionId expired = await CreateSessionAsync(
+            context, viewerId, now + Duration.FromHours(2), Duration15.FromMinutes(30));
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE sessions SET status = 3 WHERE id = {expired.Value}");
+
         // Completed: included (D-056) — confirm, then complete.
         SessionId completed = await CreateSessionAsync(
             context, viewerId, now + Duration.FromHours(2), Duration15.FromMinutes(30));
@@ -71,6 +80,7 @@ public sealed class CalendarReadTests : IAsyncLifetime, IDisposable
         Assert.DoesNotContain(afterRange.Value, present);
         Assert.DoesNotContain(canceled.Value, present);
         Assert.Contains(completed.Value, present);
+        Assert.DoesNotContain(expired.Value, present);
     }
 
     [Fact]

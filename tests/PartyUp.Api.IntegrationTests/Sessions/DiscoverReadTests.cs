@@ -111,7 +111,7 @@ public sealed class DiscoverReadTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
-    public async Task PrivateBlockedLapsedAndAlreadyAttachedReturnNothing_D047_D065()
+    public async Task BlockedInEitherDirectionExcludesAndAWithdrawnRequestDoesNot_D047_D065()
     {
         await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
         AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -120,13 +120,21 @@ public sealed class DiscoverReadTests : IAsyncLifetime, IDisposable
         UserId viewerId = await _factory.SeedUserAsync(email: "disc-neg-viewer@example.test");
         UserId blockedOrganizerId = await _factory.SeedUserAsync(email: "disc-neg-blocked-org@example.test");
         UserId lapsedOrganizerId = await _factory.SeedUserAsync(email: "disc-neg-lapsed-org@example.test");
-        UserId requesterFriendId = await _factory.SeedUserAsync(email: "disc-neg-friend@example.test");
 
         await MakeAcceptedFriendsAsync(context, viewerId, blockedOrganizerId);
         await BlockAsync(context, viewerId, blockedOrganizerId);
 
-        // rule 4: organizer blocked despite being (formerly) a friend.
+        // rule 4: organizer blocked despite being (formerly) a friend. Viewer is the blocker here.
         SessionId blockedOrganizerSession = await CreateSessionAsync(context, blockedOrganizerId, isPrivate: false, invitees: []);
+
+        // rule 4, mirror direction: the ORGANIZER is the blocker, viewer the blocked party — a test
+        // whose green survives deleting one arm of SessionVisibilitySql's block predicate (both
+        // `b.blocker_id = viewer` and `b.blocker_id = organizer` sub-clauses) would not close this.
+        UserId blockedByOrganizerId = await _factory.SeedUserAsync(email: "disc-neg-blocked-by-org@example.test");
+        await MakeAcceptedFriendsAsync(context, viewerId, blockedByOrganizerId);
+        await BlockAsync(context, blockedByOrganizerId, viewerId);
+        SessionId blockedByOrganizerSession = await CreateSessionAsync(
+            context, blockedByOrganizerId, isPrivate: false, invitees: []);
 
         // withdrawn join request: no longer Pending, so it grants nothing.
         await MakeAcceptedFriendsAsync(context, viewerId, lapsedOrganizerId);
@@ -140,15 +148,100 @@ public sealed class DiscoverReadTests : IAsyncLifetime, IDisposable
         SessionId canceledSession = await CreateSessionAsync(context, canceledOrganizerId, isPrivate: false, invitees: []);
         await CancelAsync(context, canceledSession);
 
+        // The extender sub-clause has the same two-direction shape as the organizer one — a
+        // stranger-organized session whose only inherited path is through a friend the viewer blocks
+        // (or who blocks the viewer) admits nothing, in either direction.
+        UserId strangerOrganizerOneId = await _factory.SeedUserAsync(email: "disc-neg-stranger-org-1@example.test");
+        UserId blockedExtenderId = await _factory.SeedUserAsync(email: "disc-neg-blocked-extender@example.test");
+        await MakeAcceptedFriendsAsync(context, viewerId, blockedExtenderId);
+        await BlockAsync(context, viewerId, blockedExtenderId);
+        SessionId blockedExtenderSession = await CreateSessionAsync(
+            context, strangerOrganizerOneId, isPrivate: false, invitees: [blockedExtenderId]);
+        await RsvpGoingAsync(context, blockedExtenderSession, blockedExtenderId);
+
+        UserId strangerOrganizerTwoId = await _factory.SeedUserAsync(email: "disc-neg-stranger-org-2@example.test");
+        UserId extenderBlockingViewerId = await _factory.SeedUserAsync(email: "disc-neg-extender-blocking-viewer@example.test");
+        await MakeAcceptedFriendsAsync(context, viewerId, extenderBlockingViewerId);
+        await BlockAsync(context, extenderBlockingViewerId, viewerId);
+        SessionId extenderBlockingViewerSession = await CreateSessionAsync(
+            context, strangerOrganizerTwoId, isPrivate: false, invitees: [extenderBlockingViewerId]);
+        await RsvpGoingAsync(context, extenderBlockingViewerSession, extenderBlockingViewerId);
+
         SessionPage<SessionSummary> page = await reads.ListDiscoverAsync(viewerId, null, 20, default);
         HashSet<Guid> admitted = [.. page.Items.Select(s => s.Id.Value)];
 
         Assert.DoesNotContain(blockedOrganizerSession.Value, admitted);
+        // Rule 4 mirror: it excludes regardless of who initiated the block.
+        Assert.DoesNotContain(blockedByOrganizerSession.Value, admitted);
         // The withdrawn request no longer blocks Discover — the friendship with the organizer still
         // admits it, so this proves the exclusion is Pending-scoped, not "ever requested".
         Assert.Contains(withdrawnRequestSession.Value, admitted);
         Assert.DoesNotContain(canceledSession.Value, admitted);
-        Assert.DoesNotContain(requesterFriendId.Value, admitted); // never a session id — sanity guard against a malformed fixture.
+        Assert.DoesNotContain(blockedExtenderSession.Value, admitted);
+        Assert.DoesNotContain(extenderBlockingViewerSession.Value, admitted);
+    }
+
+    [Fact]
+    public async Task PagesByStartTimeThenId_D149_A072()
+    {
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var reads = scope.ServiceProvider.GetRequiredService<ISessionReadRepository>();
+
+        UserId viewerId = await _factory.SeedUserAsync(email: "disc-order-viewer@example.test");
+        UserId organizerId = await _factory.SeedUserAsync(email: "disc-order-organizer@example.test");
+        await MakeAcceptedFriendsAsync(context, viewerId, organizerId);
+
+        Instant earliest = _factory.Clock.GetCurrentInstant() + Duration.FromHours(3);
+        Instant middle = earliest + Duration.FromHours(1);
+        Instant latest = earliest + Duration.FromHours(2);
+
+        // Three distinct start times, created out of order.
+        SessionId latestSession = await CreateSessionWithStartAsync(context, organizerId, latest);
+        SessionId earliestSession = await CreateSessionWithStartAsync(context, organizerId, earliest);
+        SessionId middleSession = await CreateSessionWithStartAsync(context, organizerId, middle);
+
+        // Two sessions sharing one start time — the id tiebreak's only proof.
+        SessionId tieA = await CreateSessionWithStartAsync(context, organizerId, middle);
+        SessionId tieB = await CreateSessionWithStartAsync(context, organizerId, middle);
+
+        SessionPage<SessionSummary> page = await reads.ListDiscoverAsync(viewerId, null, 20, default);
+        List<Guid> observed = [.. page.Items.Select(s => s.Id.Value)];
+
+        int earliestIndex = observed.IndexOf(earliestSession.Value);
+        int middleIndex = observed.IndexOf(middleSession.Value);
+        int latestIndex = observed.IndexOf(latestSession.Value);
+        Assert.True(earliestIndex < middleIndex, "start_time ascending: earliest must precede middle.");
+        Assert.True(middleIndex < latestIndex, "start_time ascending: middle must precede latest.");
+
+        // Among the tied-start-time trio (middle, tieA, tieB), the observed order matches Postgres's
+        // own uuid byte-ordering (A-068's big-endian comparer), not insertion order or a Guid.CompareTo
+        // ordering (little-endian, which does not match).
+        List<Guid> tied = [middleSession.Value, tieA.Value, tieB.Value];
+        List<Guid> expectedTieOrder = [.. tied.OrderBy(id => id, PostgresGuidComparer.Instance)];
+        List<Guid> observedTieOrder = [.. observed.Where(tied.Contains)];
+        Assert.Equal(expectedTieOrder, observedTieOrder);
+    }
+
+    private async Task<SessionId> CreateSessionWithStartAsync(AppDbContext context, UserId organizerId, Instant startTime)
+    {
+        UserId filler = await _factory.SeedUserAsync(email: $"disc-order-filler-{Guid.NewGuid():N}@example.test");
+        SessionDetails details = new(
+            SessionTitle.Create("Discover ordering fixture"),
+            startTime,
+            Duration15.FromMinutes(60),
+            Platform.NotApplicable,
+            null,
+            SessionNotes.Empty,
+            minAttendance: 1,
+            maxCapacity: null,
+            isPrivate: false);
+
+        Session session = Session.Create(organizerId, details, [filler], _factory.Clock);
+        _ = session.DequeueEvents();
+        context.Sessions.Add(session);
+        await context.SaveChangesAsync();
+        return session.Id;
     }
 
     [Fact]
@@ -274,4 +367,18 @@ public sealed class DiscoverReadTests : IAsyncLifetime, IDisposable
         context.Friendships.Add(friendship);
         await context.SaveChangesAsync();
     }
+}
+
+/// <summary>
+/// ARCHITECTURE.md A-068: Postgres's own <c>uuid</c> byte ordering — big-endian
+/// <c>ToByteArray</c>/<c>SequenceCompareTo</c> — which <c>Guid.CompareTo</c> (little-endian) does not
+/// reproduce. Used only to assert the Discover cursor's <c>id</c> tiebreak against what the database
+/// actually orders by, never as a lock order (this file issues no lock).
+/// </summary>
+file sealed class PostgresGuidComparer : IComparer<Guid>
+{
+    internal static readonly PostgresGuidComparer Instance = new();
+
+    public int Compare(Guid x, Guid y) =>
+        x.ToByteArray(bigEndian: true).AsSpan().SequenceCompareTo(y.ToByteArray(bigEndian: true));
 }
