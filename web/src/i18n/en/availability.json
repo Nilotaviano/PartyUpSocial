@@ -35,6 +35,27 @@
     "clamped": "The start time was moved to the earliest time allowed (15 minutes from now).",
     "overDuration": "This session runs {{minutes}} minutes past the recommended window."
   },
+  "validation": {
+    "endBeforeStart": "End time must be after the start time.",
+    "offGrid": "Choose a time in 15-minute increments."
+  },
+  "findATime": {
+    "heading": "Find a time",
+    "subheading": "See when your friends are free.",
+    "friendsLabel": "Friends",
+    "friendsAllDefault": "All accepted friends",
+    "friendsSelected": "{{count}} selected",
+    "rangeLabel": "Date range",
+    "rangeDefault": "Next 7 days",
+    "resultsHeading": "Suggested windows",
+    "available": "{{count}} available",
+    "maybe": "{{count}} maybe",
+    "overDurationWarning": "This session runs {{minutes}} minutes past this window.",
+    "empty": "No overlapping windows in this range.",
+    "suggestionsHeading": "Top 5 suggestions",
+    "seeAll": "See all",
+    "scheduleCta": "Schedule this time"
+  },
   "a11y": {
     "gridLabel": "Weekly availability",
     "agendaLabel": "Agenda",

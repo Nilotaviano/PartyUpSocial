@@ -7,6 +7,20 @@ export type BlockEditorValue = {
   end: string
 }
 
+// Both fields are `datetime-local` strings ("YYYY-MM-DDTHH:mm", always
+// zero-padded by the native control and by `datetimeLocalValue` in
+// `WeekGridPage.tsx`) — chronological order is lexicographic order for that
+// exact shape, so no `Date` parsing is needed to compare them.
+function minutesOf(value: string): number {
+  const time = value.split('T')[1]
+  const minutes = time?.split(':')[1]
+  return minutes ? Number(minutes) : 0
+}
+
+function isOffGrid(value: string): boolean {
+  return minutesOf(value) % 15 !== 0
+}
+
 type BlockEditorDialogProps = {
   open: boolean
   initialStart: string
@@ -35,6 +49,9 @@ export function BlockEditorDialog({
   const startRef = useRef<HTMLInputElement>(null)
   const [start, setStart] = useState(initialStart)
   const [end, setEnd] = useState(initialEnd)
+  const [validationError, setValidationError] = useState<'endBeforeStart' | 'offGrid' | null>(
+    null,
+  )
   // Re-seeds the form from the newly-selected occurrence each time the
   // dialog freshly opens — adjusting state during render (not in an
   // effect, and not a ref — refs may not be read during render), the
@@ -44,6 +61,7 @@ export function BlockEditorDialog({
   if (open && !seededOpen) {
     setStart(initialStart)
     setEnd(initialEnd)
+    setValidationError(null)
     setSeededOpen(true)
   } else if (!open && seededOpen) {
     setSeededOpen(false)
@@ -71,9 +89,24 @@ export function BlockEditorDialog({
             className="mt-4 space-y-4"
             onSubmit={(event) => {
               event.preventDefault()
+              // Local-only (F3): the server remains the authoritative
+              // validator (`availability_validation`, §8) — this just saves
+              // a doomed round trip and shows the reason before it happens.
+              if (isOffGrid(start) || isOffGrid(end)) {
+                setValidationError('offGrid')
+                return
+              }
+              if (end <= start) {
+                setValidationError('endBeforeStart')
+                return
+              }
+              setValidationError(null)
               onSave({ start, end })
             }}
           >
+            {validationError && (
+              <p role="alert">{t(`validation.${validationError}`)}</p>
+            )}
             <div>
               <label className="block font-medium text-slate-900" htmlFor="block-start">
                 {t('block.start')}

@@ -141,23 +141,38 @@ describe('WeekGrid keyboard flow', () => {
       { id: 'block-a', start: localDate(9, 0), end: localDate(9, 30) },
       { id: 'block-b', start: localDate(9, 15), end: localDate(9, 45) },
     ]
-    const merged: GridRange[] = [{ start: localDate(9, 0), end: localDate(9, 45) }]
+    // Round 1's F5 finding: the true union of these two occurrences IS
+    // 9:00–9:45, so a fixture using that union can't discriminate the
+    // client trusting `merged` verbatim (A-076) from a client silently
+    // re-deriving the same merge itself — both would paint identically.
+    // `merged` is deliberately short of block-b's own tail here (an
+    // internal detail the client is never supposed to reconstruct, e.g. a
+    // trailing occurrence the merge engine coalesced differently); the
+    // assertions below check the painted band follows this exact —
+    // "wrong-looking" — value, not what re-deriving from `occurrences`
+    // would produce.
+    const merged: GridRange[] = [{ start: localDate(9, 0), end: localDate(9, 30) }]
     const { onEditOccurrence } = renderGrid({ occurrences, merged })
 
-    // One continuous painted band from `merged` — no seam at 9:15 where the
-    // two occurrences actually split (D-101 visual half, A-076).
-    for (const label of ['9:00', '9:15', '9:30']) {
+    // Busy through 9:00–9:30 (`merged`), free at 9:30 even though block-b
+    // (9:15–9:45) still legitimately covers that slot as an occurrence — a
+    // client re-deriving the union from `occurrences` would paint 9:30 busy
+    // too and fail this.
+    for (const label of ['9:00', '9:15']) {
       expect(screen.getByRole('gridcell', { name: `${label} – Busy` })).toHaveAttribute(
         'data-state',
         'busy',
       )
     }
+    const nineThirty = screen.getAllByRole('gridcell', { name: '9:30' })[0]
+    expect(nineThirty).toHaveAttribute('data-state', 'free')
 
-    // Both occurrences stay separately addressable for edit.
+    // Both occurrences stay separately addressable for edit, including the
+    // one `merged` doesn't fully paint.
     fireEvent.keyDown(screen.getByRole('gridcell', { name: '9:00 – Busy' }), { key: 'Enter' })
     expect(onEditOccurrence).toHaveBeenCalledWith('block-a')
 
-    fireEvent.keyDown(screen.getByRole('gridcell', { name: '9:30 – Busy' }), { key: 'Enter' })
+    fireEvent.keyDown(nineThirty, { key: 'Enter' })
     expect(onEditOccurrence).toHaveBeenCalledWith('block-b')
   })
 
@@ -415,6 +430,56 @@ describe('WeekGridPage occurrence editing', () => {
     // field that legitimately isn't there.
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('rejects an end time at or before the start time locally, without a server round trip_F3', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve({ data: profileResponse() })
+      if (path === '/api/v1/calendar') {
+        return Promise.resolve({
+          data: {
+            myAvailability: {
+              occurrences: [
+                {
+                  startTime: '2026-08-10T13:00:00.000Z',
+                  endTime: '2026-08-10T13:30:00.000Z',
+                  origin: { kind: 'block', blockId: 'block-1', seriesId: null, occurrenceDate: null },
+                },
+              ],
+              merged: [{ start: '2026-08-10T13:00:00.000Z', end: '2026-08-10T13:30:00.000Z' }],
+              range: { start: '2026-08-10T13:00:00.000Z', end: '2026-08-10T13:30:00.000Z' },
+            },
+            friendAvailability: [],
+            sessions: [],
+            pollOptions: [],
+          },
+        })
+      }
+      throw new Error(`Unexpected GET ${path}`)
+    })
+
+    renderPage()
+
+    await screen.findAllByRole('gridcell', { name: /Busy/ })
+    const busyCell = screen.getAllByRole('gridcell', { name: /Busy/ })[0]
+    busyCell.focus()
+    fireEvent.keyDown(busyCell, { key: 'Enter' })
+
+    // A one-time block (kind: 'block') opens the editor directly — no
+    // scope dialog detour, matching handleEditOccurrence in WeekGridPage.tsx.
+    const editDialog = await screen.findByRole('dialog')
+    expect(editDialog).toHaveTextContent('Edit availability')
+
+    fireEvent.change(screen.getByLabelText('End time'), {
+      target: { value: '2026-08-10T13:00' }, // equal to the prefilled start — rejected locally
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(
+      await screen.findByText('End time must be after the start time.'),
+    ).toBeInTheDocument()
+    expect(api.patch).not.toHaveBeenCalled()
+    expect(editDialog).toBeVisible()
   })
 
   it.each([

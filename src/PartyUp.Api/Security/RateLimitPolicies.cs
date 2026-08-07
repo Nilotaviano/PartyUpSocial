@@ -71,6 +71,9 @@ public static class RateLimitPolicies
 {
     private const string EmailPartitionItem = "PartyUp.RateLimit.NormalizedEmail";
 
+    private static int _registerIpPermitLimit = 5;
+    private static IReadOnlyList<RateLimitDimension>? _cachedDimensions;
+
     /// <summary>
     /// register-ip's permit count (5/hour/IP in production, unconditionally). Overridable via
     /// <c>RateLimits:RegisterPerIpPerHour</c> — <c>Program.cs</c> reads that key once at startup and
@@ -80,11 +83,24 @@ public static class RateLimitPolicies
     /// API process it spawns for the browser test lane — never in-process, never a second dimension.
     /// A settable static (not a constructor parameter) because <see cref="Dimensions"/> is a plain
     /// static list every existing caller (this class, its tests) already reads with no DI container
-    /// in between.
+    /// in between. The setter invalidates <see cref="_cachedDimensions"/> (round-1 F4: <see cref="Dimensions"/>
+    /// is read inside per-request rate-limiting middleware — it must stay a build-once list, rebuilt
+    /// only on an actual change here, not 26 records and 26 <see cref="HashSet{T}"/>s allocated on
+    /// every request).
     /// </summary>
-    public static int RegisterIpPermitLimit { get; set; } = 5;
+    public static int RegisterIpPermitLimit
+    {
+        get => _registerIpPermitLimit;
+        set
+        {
+            _registerIpPermitLimit = value;
+            _cachedDimensions = null;
+        }
+    }
 
-    public static IReadOnlyList<RateLimitDimension> Dimensions =>
+    public static IReadOnlyList<RateLimitDimension> Dimensions => _cachedDimensions ??= BuildDimensions();
+
+    private static IReadOnlyList<RateLimitDimension> BuildDimensions() =>
     [
         new(
             "auth-ip",

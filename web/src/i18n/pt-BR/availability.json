@@ -35,6 +35,27 @@
     "clamped": "O horário de início foi movido para o horário mais próximo permitido (15 minutos a partir de agora).",
     "overDuration": "Esta sessão ultrapassa a janela recomendada em {{minutes}} minutos."
   },
+  "validation": {
+    "endBeforeStart": "O horário de término deve ser depois do horário de início.",
+    "offGrid": "Escolha um horário em incrementos de 15 minutos."
+  },
+  "findATime": {
+    "heading": "Encontrar um horário",
+    "subheading": "Veja quando seus amigos estão livres.",
+    "friendsLabel": "Amigos",
+    "friendsAllDefault": "Todos os amigos aceitos",
+    "friendsSelected": "{{count}} selecionados",
+    "rangeLabel": "Período",
+    "rangeDefault": "Próximos 7 dias",
+    "resultsHeading": "Horários sugeridos",
+    "available": "{{count}} disponíveis",
+    "maybe": "{{count}} talvez",
+    "overDurationWarning": "Esta sessão ultrapassa esta janela em {{minutes}} minutos.",
+    "empty": "Nenhum horário em comum neste período.",
+    "suggestionsHeading": "5 principais sugestões",
+    "seeAll": "Ver todos",
+    "scheduleCta": "Agendar este horário"
+  },
   "a11y": {
     "gridLabel": "Disponibilidade semanal",
     "agendaLabel": "Agenda",

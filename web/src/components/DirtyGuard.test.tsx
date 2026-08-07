@@ -79,12 +79,15 @@ describe('useDirtyGuard warns on navigating away or closing a dirty form_D152_D1
     const onBlockedNavigation = vi.fn()
     const pushStateSpy = vi.spyOn(window.history, 'pushState')
     renderHook(() => useDirtyGuard(true, { onBlockedNavigation }))
-    pushStateSpy.mockClear()
+
+    // The mount itself pushes the one clean→dirty sentinel — counted here,
+    // not cleared away, so the assertion below is honest about the total.
+    expect(pushStateSpy).toHaveBeenCalledTimes(1)
 
     window.dispatchEvent(new PopStateEvent('popstate'))
 
     expect(onBlockedNavigation).toHaveBeenCalledWith('back')
-    expect(pushStateSpy).toHaveBeenCalled()
+    expect(pushStateSpy).toHaveBeenCalledTimes(2)
   })
 
   it('stops intercepting once the hook unmounts', () => {
@@ -96,5 +99,56 @@ describe('useDirtyGuard warns on navigating away or closing a dirty form_D152_D1
 
     expect(event.defaultPrevented).toBe(false)
     expect(onBlockedNavigation).not.toHaveBeenCalled()
+  })
+
+  // Round 1's F1 finding: `onBlockedNavigation` is a fresh inline arrow on
+  // every render on both real call sites (SessionCreatePage.tsx,
+  // SessionEditPage.tsx), which is what a naive `[dirty, onBlockedNavigation]`
+  // dependency array turns into a `pushState` per keystroke. Mirrors that
+  // exactly — a new callback identity every rerender while dirty stays
+  // true throughout — rather than a stable `vi.fn()` across rerenders,
+  // which cannot discriminate this bug (a stable reference never changes,
+  // so a dependency-array effect built on it never re-fires either way).
+  it('pushes exactly one history sentinel across many rerenders with a fresh callback identity each time_D152_D162', () => {
+    const pushStateSpy = vi.spyOn(window.history, 'pushState')
+    const calls: string[] = []
+    const { rerender } = renderHook(
+      ({ dirty }: { dirty: boolean }) =>
+        useDirtyGuard(dirty, {
+          // A genuinely new function on every render — the exact shape
+          // `SessionCreatePage.tsx`/`SessionEditPage.tsx` pass from their
+          // own render bodies, never memoized.
+          onBlockedNavigation: (target: string) => {
+            calls.push(target)
+          },
+        }),
+      { initialProps: { dirty: true } },
+    )
+
+    for (let i = 0; i < 24; i++) {
+      rerender({ dirty: true })
+    }
+
+    expect(pushStateSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('reconciles the sentinel on a dirty-to-clean transition without pushing a new one', () => {
+    const pushStateSpy = vi.spyOn(window.history, 'pushState')
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState')
+    const { rerender } = renderHook(({ dirty }: { dirty: boolean }) => useDirtyGuard(dirty), {
+      initialProps: { dirty: true },
+    })
+    expect(pushStateSpy).toHaveBeenCalledTimes(1)
+
+    rerender({ dirty: false })
+
+    expect(pushStateSpy).toHaveBeenCalledTimes(1)
+    expect(replaceStateSpy).toHaveBeenCalledTimes(1)
+
+    // Clean now: a beforeunload/click is no longer intercepted, confirming
+    // the listeners this effect installed were actually torn down, not
+    // just left dangling alongside the reconciled sentinel.
+    const event = dispatchBeforeUnload()
+    expect(event.defaultPrevented).toBe(false)
   })
 })
