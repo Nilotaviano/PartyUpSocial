@@ -110,6 +110,10 @@ Phase 5 shipped end-to-end across eight slices (S1-S8), documented in `PHASE5_DE
 - **Closeout (S8):** a real-browser Discover→detail→join-request proof; blocked-pair-masking and ordinal-assignment carries closed; `P5-AXE-02` discharged in full (zero findings, zero exclusions); `P5-TOUCH-01`'s human real-device/NVDA checkpoint re-deferred to Phase 8 by explicit owner decision, 2026-08-07 — the automated WebKit lane stands as Phase 5's interim evidence; every `TRACEABILITY.md` row closed to a named test, none reading `Client | 5`.
 - Prefill session (D-102 session arm) — shipped in Phase 5 (A-083, unconditional); see the Phase 6 row below for the poll arm (§1.4 decision 1 of `PHASE5_DESIGN.md`, a relocation not a reduction, D-163).
 
+## Phase 5.1 — Visual identity and styling pass (planned)
+
+A full-site styling pass with a distinctive visual identity — explicitly not the default utility-class look the app shipped Phases 0–5 with. Scope: typography, color system, spacing rhythm, and component polish across every shipped surface (auth/onboarding, sessions, friends, calendar/week grid, Home, Find-a-time, Discover, guest pages), plus a dark-mode decision. Constraints are binding, not aspirational: WCAG 2.2 AA holds with the axe lane green and the zero-exclusions rule intact on every route, all three locale layouts survive, and no functional or contract change ships under a styling commit. Owner decision 2026-08-07; next session runs it as its own program.
+
 ## Phase 6 — Polls
 
 - Poll creation (full details + 2..12 options, deadlines), voting grid (options × Available/Maybe/Unavailable — **second a11y hotspot; explicit keyboard/SR task**), suggestions, option deletion, deadline close, organizer selection, expiry, finalization → session with capacity allocation (whole §7.3/8.1 poll block), sweeper jobs for deadline/expiry.

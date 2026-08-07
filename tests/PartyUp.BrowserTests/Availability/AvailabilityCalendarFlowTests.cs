@@ -91,6 +91,39 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         }
     }
 
+    /// <summary>
+    /// Geometry, not semantics: the functional and axe suites passed while the shipped grid
+    /// rendered as one vertical column of cells (its rows carried no layout CSS), so at least one
+    /// browser assertion must pin the two-dimensional shape itself — cells of one row share a top
+    /// edge with distinct lefts, cells of one column share a left edge with distinct tops.
+    /// </summary>
+    [Fact]
+    public async Task GridCellsLayOutInRowsAndColumns_D132()
+    {
+        RegisteredUser organizer = await GetOrganizerAsync();
+        IPage page = organizer.Page;
+
+        await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/calendar");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        ILocator grid = page.GetByRole(AriaRole.Grid);
+        ILocator firstRowCells = grid.Locator("[role=row]").Nth(1).Locator("[role=gridcell]");
+        ILocator secondRowCells = grid.Locator("[role=row]").Nth(2).Locator("[role=gridcell]");
+        Assert.True(await firstRowCells.CountAsync() >= 2, "expected at least two day cells per row");
+
+        LocatorBoundingBoxResult? a = await firstRowCells.Nth(0).BoundingBoxAsync();
+        LocatorBoundingBoxResult? b = await firstRowCells.Nth(1).BoundingBoxAsync();
+        LocatorBoundingBoxResult? below = await secondRowCells.Nth(0).BoundingBoxAsync();
+        Assert.NotNull(a);
+        Assert.NotNull(b);
+        Assert.NotNull(below);
+
+        Assert.True(Math.Abs(a!.Y - b!.Y) < 1, $"same-row cells must share a top edge (got {a.Y} vs {b.Y})");
+        Assert.True(b.X > a.X + 1, $"same-row cells must occupy distinct columns (got {a.X} vs {b.X})");
+        Assert.True(Math.Abs(a.X - below!.X) < 1, $"same-column cells must share a left edge (got {a.X} vs {below.X})");
+        Assert.True(below.Y > a.Y + 1, $"same-column cells must occupy distinct rows (got {a.Y} vs {below.Y})");
+    }
+
     [Fact]
     public async Task KeyboardOnlyCreateEditDelete_D132()
     {
