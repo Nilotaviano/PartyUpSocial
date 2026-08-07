@@ -95,6 +95,12 @@ public static class DependencyInjection
         services.AddScoped<DeleteAvailabilitySeriesUseCase>();
         services.AddScoped<EditAvailabilityOccurrenceUseCase>();
         services.AddScoped<DeleteAvailabilityOccurrenceUseCase>();
+        services.AddScoped<ReadMyAvailabilityUseCase>();
+        services.AddScoped<FindOverlapWindowsUseCase>();
+        services.AddScoped<GetHomeSuggestionsUseCase>();
+        services.AddScoped<GetCalendarViewUseCase>();
+        services.AddScoped<ListDiscoverableSessionsUseCase>();
+        services.AddScoped<GetActionableInboxUseCase>();
         services.AddScoped<SessionDueCandidateStore>();
         services.AddScoped<SessionDueSweepJob>();
         services.AddScoped<SessionReminderDueJob>();

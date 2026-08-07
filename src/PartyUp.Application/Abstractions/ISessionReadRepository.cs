@@ -1,3 +1,4 @@
+using NodaTime;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Kernel;
 
@@ -39,4 +40,48 @@ public interface ISessionReadRepository
         CancellationToken cancellationToken);
 
     Task<GuestSessionView?> FindGuestViewAsync(GuestLinkId guestLinkId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// PHASE5_DESIGN.md A-077 (c)/(f): the Discover surface — <c>SessionVisibilitySql</c>'s
+    /// <c>inheritedOnly</c> access-kind plus the already-attached exclusion set (organizer, any
+    /// participation row whatever its status, or a Pending join request), never time-derived, ordered
+    /// <c>start_time</c> ascending then <c>id</c> ascending. Cursor scope validation is S5's — this
+    /// port takes only the ordering and page size (§5.1). The default throws rather than composing:
+    /// there is no correct generic implementation over the other members, and the default exists only
+    /// so a fake predating S4 (<c>tests/PartyUp.Application.Tests/Sessions/SessionCommandTransactionTests.cs</c>,
+    /// outside this slice's write set) keeps compiling without exercising Discover.
+    /// </summary>
+    Task<SessionPage<SessionSummary>> ListDiscoverAsync(
+        UserId viewerId,
+        SessionListCursor? cursor,
+        int pageSize,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("ListDiscoverAsync has no default composition (PHASE5_DESIGN.md §5.1).");
+
+    /// <summary>
+    /// PHASE5_DESIGN.md A-080: the calendar <c>sessions</c> layer — <c>SessionVisibilitySql</c> at
+    /// access-kind <c>any</c> plus the intersection predicate
+    /// <c>start_time &lt; to AND start_time + duration &gt; from</c>. <c>Canceled</c>/<c>Expired</c>
+    /// are excluded; <c>Completed</c> is included (D-056). Unpaginated (A-079). See
+    /// <see cref="ListDiscoverAsync"/> for why the default throws.
+    /// </summary>
+    Task<IReadOnlyList<SessionSummary>> ListCalendarSessionsAsync(
+        UserId viewerId,
+        TimeRange range,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("ListCalendarSessionsAsync has no default composition (PHASE5_DESIGN.md A-080).");
+
+    /// <summary>
+    /// PHASE5_DESIGN.md §5.1/P5-HOME-01: D-103's Home region 1. Both lists are scoped to
+    /// <paramref name="now"/>-future sessions with materialized status ∈ {Unconfirmed, Confirmed},
+    /// through the A-077 fragment at access-kind <c>any</c>, ordered by start ascending and capped at
+    /// <paramref name="cap"/> each with a <c>hasMore</c> flag. See <see cref="ListDiscoverAsync"/> for
+    /// why the default throws.
+    /// </summary>
+    Task<ActionableInbox> ListActionableAsync(
+        UserId viewerId,
+        Instant now,
+        int cap,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("ListActionableAsync has no default composition (PHASE5_DESIGN.md §5.1).");
 }

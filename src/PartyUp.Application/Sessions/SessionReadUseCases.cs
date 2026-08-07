@@ -37,7 +37,36 @@ public sealed class SessionReadUseCases(
             return null;
         }
 
-        return await reads.FindDetailAsync(sessionId, cancellationToken);
+        SessionDetail? detail = await reads.FindDetailAsync(sessionId, cancellationToken);
+        return detail is null ? null : MaskBlockedPairRoster(detail, viewer);
+    }
+
+    /// <summary>
+    /// PHASE5_DESIGN.md §5.1 (D-076, closing the live prod leak this slice fixes): rule 4 tests only
+    /// the (viewer, organizer) pair, so a third-party session's roster can legitimately still carry a
+    /// participant the viewer is blocked with (A-077 (e)). <c>viewer.BlockedCounterpartIds</c> is
+    /// already every counterpart on this session blocked with the viewer in either direction
+    /// (<see cref="BuildViewerAsync"/>'s <c>IBlockRepository.FindPairsAmongAsync</c> call — no new
+    /// port member). This sets <see cref="RosterEntry.MaskedForViewer"/> and nulls
+    /// <see cref="RosterEntry.DisplayName"/> — the wire shape's "displayName omitted and userId
+    /// omitted" (§5.1) needs both signals available to it, and <see cref="RosterEntry.MaskedForViewer"/>
+    /// is what keeps this distinct from the tombstone null-name rule (D-092, which nulls the name for
+    /// every viewer and never sets the flag). The underlying <see cref="ParticipantRef"/> stays real —
+    /// occupancy, ordering and the deletion executor all still see the true participant.
+    /// </summary>
+    private static SessionDetail MaskBlockedPairRoster(SessionDetail detail, Viewer viewer)
+    {
+        if (viewer.BlockedCounterpartIds.Count == 0)
+        {
+            return detail;
+        }
+
+        List<RosterEntry> roster = [.. detail.Roster.Select(entry =>
+            entry.Participant.UserId is { } userId && viewer.BlockedCounterpartIds.Contains(userId)
+                ? entry with { MaskedForViewer = true, DisplayName = null }
+                : entry)];
+
+        return detail with { Roster = roster };
     }
 
     public Task<SessionPage<SessionSummary>> ListUpcomingSessionsAsync(

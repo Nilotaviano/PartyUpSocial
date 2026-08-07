@@ -10,6 +10,23 @@ namespace PartyUp.Application.Sessions;
 /// rendered through visibility plus identity masking before it reaches an endpoint; that masking is
 /// an Application/API concern layered on top of these DTOs, not performed by the repository itself.
 /// </summary>
+/// <summary>
+/// PHASE5_DESIGN.md §5.1: the viewer's relation to a session, evaluated in exactly this precedence
+/// order (first match wins, so the value is total and single-valued) over the shipped participation
+/// and join-request enums. <c>Invitee</c> is not cosmetic — it is what lets D-103's first Home region
+/// distinguish a Pending invitation awaiting a response from a <c>Going</c> RSVP. <c>Inherited</c>
+/// covers every unattached viewer, including a <c>Removed</c> participation with an unblocked
+/// inherited path (A-077 (d)).
+/// </summary>
+public enum ViewerRelation
+{
+    Organizer,
+    Invitee,
+    Participant,
+    Requester,
+    Inherited,
+}
+
 public sealed record SessionSummary(
     SessionId Id,
     UserId OrganizerId,
@@ -21,9 +38,18 @@ public sealed record SessionSummary(
     SessionStatus Status,
     bool IsPrivate,
     int? MaxCapacity,
-    int ActiveOccupancy);
+    int ActiveOccupancy,
+    DisplayName? OrganizerDisplayName = null,
+    ViewerRelation ViewerRelation = ViewerRelation.Inherited);
 
-/// <summary>One roster row as a detail/roster read renders it — never the bearer token or link id.</summary>
+/// <summary>
+/// One roster row as a detail/roster read renders it — never the bearer token or link id.
+/// <see cref="MaskedForViewer"/> is the §5.1 blocked-pair signal (D-076): set to <c>true</c> only by
+/// the use case applying rule 2 (<c>SessionReadUseCases</c>), never by the repository. It is a
+/// distinct signal from <see cref="DisplayName"/> being null for a tombstoned owner (D-092) — both
+/// render as the shipped Anonymous User string client-side, but only a masked entry also drops its
+/// <see cref="ParticipantRef"/>'s id on the wire (S5).
+/// </summary>
 public sealed record RosterEntry(
     ParticipationId ParticipationId,
     ParticipantRef Participant,
@@ -31,7 +57,8 @@ public sealed record RosterEntry(
     ParticipationStatus Status,
     bool IsWaitlisted,
     ParticipationOrigin Origin,
-    ReminderOffset? ReminderChoice);
+    ReminderOffset? ReminderChoice,
+    bool MaskedForViewer = false);
 
 /// <summary>
 /// The full session read (§8: <c>SessionDetail</c>). <see cref="ConcurrencyToken"/> is the raw
@@ -59,7 +86,28 @@ public sealed record JoinRequestSummary(
     JoinRequestId Id,
     UserId RequesterId,
     JoinRequestStatus Status,
-    Instant CreatedAt);
+    Instant CreatedAt,
+    DisplayName? RequesterDisplayName = null);
+
+/// <summary>
+/// PHASE5_DESIGN.md §5.1: the D-103 Home region 1 read model. Both lists are scoped to future,
+/// non-<c>Canceled</c>/non-<c>Expired</c> sessions (§12-14, materialized status only), ordered by
+/// session start ascending, and capped at 50 each with a display-bound <c>HasMore</c> flag — never a
+/// second cursor contract (§8's "See all" links to the shipped list surfaces instead).
+/// </summary>
+public sealed record ActionableInvitation(SessionSummary Session, Instant InvitedAt);
+
+public sealed record ActionableJoinRequest(
+    JoinRequestId Id,
+    SessionSummary Session,
+    DisplayName? RequesterDisplayName,
+    Instant RequestedAt);
+
+public sealed record ActionableInbox(
+    IReadOnlyList<ActionableInvitation> Invitations,
+    IReadOnlyList<ActionableJoinRequest> JoinRequests,
+    bool HasMoreInvitations,
+    bool HasMoreJoinRequests);
 
 /// <summary>What a claimed or unclaimed guest bearer currently sees through their link (§5.1, §8.1).</summary>
 public sealed record GuestSessionView(
