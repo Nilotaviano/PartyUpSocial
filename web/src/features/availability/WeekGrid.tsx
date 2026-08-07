@@ -388,13 +388,13 @@ export function WeekGrid({
         role="grid"
         onMouseUp={handleMouseUp}
       >
-        <div role="row">
-          <div aria-colindex={1} className="min-h-11 min-w-11" role="columnheader" />
+        <div className="flex" role="row">
+          <div aria-colindex={1} className="min-h-11 w-16 shrink-0" role="columnheader" />
           {dayIndexes.map((day) => (
             <div
               key={day}
               aria-colindex={day + 2}
-              className="min-h-11 min-w-11 text-center text-sm font-medium"
+              className="min-h-11 min-w-11 flex-1 text-center text-sm font-medium"
               role="columnheader"
             >
               {dayLabels[day]}
@@ -402,11 +402,11 @@ export function WeekGrid({
           ))}
         </div>
         {slotIndexes.map((slot) => (
-          <div key={slot} role="row">
+          <div key={slot} className="flex" role="row">
             <div
               aria-colindex={1}
               aria-rowindex={slot + 2}
-              className="min-h-11 min-w-11 pr-2 text-right text-xs text-slate-500"
+              className="min-h-11 w-16 shrink-0 pr-2 text-right text-xs text-slate-500"
               role="rowheader"
             >
               {slot % 4 === 0
@@ -455,7 +455,7 @@ export function WeekGrid({
                   aria-colindex={day + 2}
                   aria-label={labelParts.join(' – ')}
                   aria-rowindex={slot + 2}
-                  className="min-h-11 min-w-11 border border-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                  className="min-h-11 min-w-11 flex-1 border border-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                   data-state={state}
                   role="gridcell"
                   tabIndex={isFocused ? 0 : -1}
