@@ -81,9 +81,13 @@ public sealed class PollReadRepository(AppDbContext context) : IPollReadReposito
 
     /// <summary>
     /// §4.1: non-private, still <c>Polling</c>, rule-2 inherited access only (D-118 entry point) --
-    /// the already-attached exclusion set mirrors <c>ListDiscoverAsync</c>'s own (organizer, any
-    /// participant row, or a pending join request), so a poll the viewer is already involved with is
-    /// never double-listed across both bands.
+    /// the already-attached exclusion set is organizer, an <em>Active</em> participant row, or a
+    /// pending join request. Round-1 divergence from <c>ListDiscoverAsync</c>'s own exclusion
+    /// (session: any participation row regardless of status): a poll participant permanently
+    /// <c>Removed</c> (§12-24) is not "already attached" in the sense rule 1 means it -- rule 1 has
+    /// already failed them -- and <c>VisibilityEngine.Resolve</c> would grant them rule-2 access
+    /// through a clean extender exactly like any other non-attached viewer, so the SQL exclusion must
+    /// not blanket-exclude a Removed row the way it excludes an Active one.
     /// </summary>
     public async Task<SessionPage<PollSummary>> ListDiscoverableAsync(
         UserId viewerId,
@@ -101,7 +105,7 @@ public sealed class PollReadRepository(AppDbContext context) : IPollReadReposito
                 SELECT id FROM polls p
                 WHERE status = {1}
                   AND p.organizer_id <> {0}
-                  AND NOT EXISTS (SELECT 1 FROM poll_participants pp WHERE pp.poll_id = p.id AND pp.user_id = {0})
+                  AND NOT EXISTS (SELECT 1 FROM poll_participants pp WHERE pp.poll_id = p.id AND pp.user_id = {0} AND pp.status = 0)
                   AND NOT EXISTS (SELECT 1 FROM join_requests jr WHERE jr.poll_id = p.id AND jr.requester_user_id = {0} AND jr.status = {2})
                   AND (deadline, id) > ({3}, {4})
                   AND {{predicate}}
@@ -113,7 +117,7 @@ public sealed class PollReadRepository(AppDbContext context) : IPollReadReposito
                 SELECT id FROM polls p
                 WHERE status = {1}
                   AND p.organizer_id <> {0}
-                  AND NOT EXISTS (SELECT 1 FROM poll_participants pp WHERE pp.poll_id = p.id AND pp.user_id = {0})
+                  AND NOT EXISTS (SELECT 1 FROM poll_participants pp WHERE pp.poll_id = p.id AND pp.user_id = {0} AND pp.status = 0)
                   AND NOT EXISTS (SELECT 1 FROM join_requests jr WHERE jr.poll_id = p.id AND jr.requester_user_id = {0} AND jr.status = {2})
                   AND {{predicate}}
                 ORDER BY deadline, id

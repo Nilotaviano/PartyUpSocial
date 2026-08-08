@@ -11,9 +11,11 @@ public static class PollVisibilitySql
     public enum AccessKind
     {
         /// <summary>
-        /// §7 rule 1: the organizer, or a registered participant row still <c>Active</c>
-        /// (<c>PollVisibility.KeepsDirectAccess</c> -- a poll participant has no Pending state).
-        /// Minus rule 4's blocked pair.
+        /// §7 rule 1: the organizer, a pending join requester (<c>VisibilityEngine.cs:32</c>'s
+        /// <c>HasPendingRequestFrom</c> arm -- round-1 fix: the poll SQL originally omitted this,
+        /// unlike <see cref="SessionVisibilitySql"/>'s own rule-1 fragment), or a registered
+        /// participant row still <c>Active</c> (<c>PollVisibility.KeepsDirectAccess</c> -- a poll
+        /// participant has no Pending state). Minus rule 4's blocked pair.
         /// </summary>
         DirectAccess,
 
@@ -37,6 +39,10 @@ public static class PollVisibilitySql
                 )
                 AND (
                     p.organizer_id = {0}
+                    OR EXISTS (
+                        SELECT 1 FROM join_requests jr
+                        WHERE jr.poll_id = p.id AND jr.requester_user_id = {0} AND jr.status = 0
+                    )
                     OR EXISTS (
                         SELECT 1 FROM poll_participants pp
                         WHERE pp.poll_id = p.id AND pp.user_id = {0} AND pp.status = 0

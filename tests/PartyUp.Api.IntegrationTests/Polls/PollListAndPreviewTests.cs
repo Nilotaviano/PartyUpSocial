@@ -1,11 +1,15 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
 using PartyUp.Api.IntegrationTests.Sessions;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Polls;
+using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Jobs;
+using PartyUp.Infrastructure.Persistence;
 
 namespace PartyUp.Api.IntegrationTests.Polls;
 
@@ -85,6 +89,136 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
         Assert.DoesNotContain(finalizedPollId, ids);
     }
 
+    /// <summary>round-1 note 5: Expired is a terminal status like Canceled/Finalized -- excluded from involved.</summary>
+    [Fact]
+    public async Task Involved_ExcludesAnExpiredPoll()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"pl-inv-exp-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        Guid pollId = await CreatePollAsync(organizerSession, []);
+
+        _factory.Clock.Advance(Duration.FromHours(25) + Duration.FromHours(48) + Duration.FromMinutes(1));
+        await RunPollDueSweepAsync();
+
+        using JsonDocument list = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync("/api/v1/polls?band=involved"));
+        Assert.DoesNotContain(
+            list.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == pollId);
+    }
+
+    /// <summary>
+    /// round-1 note 1: §7 rule 1's pending-JoinRequest arm (<c>VisibilityEngine.cs:32</c>) was missing
+    /// from the poll SQL -- a discoverer who requests to join a poll must move from discoverable to
+    /// involved, not vanish from both bands, and must move back on withdrawal.
+    /// </summary>
+    [Fact]
+    public async Task PendingJoinRequest_MovesThePollFromDiscoverableToInvolved_AndBackOnWithdraw()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"pl-pending-org-{Guid.NewGuid():N}@example.test");
+        UserId invitedFriendId = await _factory.SeedUserAsync(email: $"pl-pending-invited-{Guid.NewGuid():N}@example.test");
+        UserId requesterId = await _factory.SeedUserAsync(email: $"pl-pending-req-{Guid.NewGuid():N}@example.test");
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, invitedFriendId);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, requesterId);
+
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        Guid pollId = await CreateNonPrivatePollAsync(organizerSession, invitedFriendId);
+
+        using SessionHttpSession requesterSession = await SessionEndpointTestSupport.SignInAsync(_factory, requesterId);
+
+        using JsonDocument beforeDiscoverable = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await requesterSession.GetAsync("/api/v1/polls?band=discoverable"));
+        Assert.Contains(
+            beforeDiscoverable.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == pollId);
+
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await requesterSession.SendUnsafeAsync(HttpMethod.Post, $"/api/v1/polls/{pollId:D}/join-requests")).StatusCode);
+
+        using JsonDocument afterRequestInvolved = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await requesterSession.GetAsync("/api/v1/polls?band=involved"));
+        Assert.Contains(
+            afterRequestInvolved.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == pollId);
+
+        using JsonDocument afterRequestDiscoverable = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await requesterSession.GetAsync("/api/v1/polls?band=discoverable"));
+        Assert.DoesNotContain(
+            afterRequestDiscoverable.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == pollId);
+
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await requesterSession.SendUnsafeAsync(HttpMethod.Delete, $"/api/v1/polls/{pollId:D}/join-requests/mine")).StatusCode);
+
+        using JsonDocument afterWithdrawInvolved = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await requesterSession.GetAsync("/api/v1/polls?band=involved"));
+        Assert.DoesNotContain(
+            afterWithdrawInvolved.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == pollId);
+
+        using JsonDocument afterWithdrawDiscoverable = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await requesterSession.GetAsync("/api/v1/polls?band=discoverable"));
+        Assert.Contains(
+            afterWithdrawDiscoverable.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == pollId);
+    }
+
+    /// <summary>
+    /// round-1 note 1: a permanently <c>Removed</c> participant (§12-24, block-then-unblock) fails
+    /// rule 1 but is re-admitted by rule 2 through a still-Active, non-all-Unavailable extender --
+    /// mirrors <c>VisibilityEngine.Resolve</c>'s answer exactly: discoverable, never involved.
+    /// </summary>
+    [Fact]
+    public async Task RemovedParticipant_WithACleanExtender_IsDiscoverableNotInvolved()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"pl-removed-org-{Guid.NewGuid():N}@example.test");
+        UserId removedVoterId = await _factory.SeedUserAsync(email: $"pl-removed-voter-{Guid.NewGuid():N}@example.test");
+        UserId extenderId = await _factory.SeedUserAsync(email: $"pl-removed-extender-{Guid.NewGuid():N}@example.test");
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, removedVoterId);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, extenderId);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, removedVoterId, extenderId);
+
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        Guid pollId = await CreatePollAsync(organizerSession, [removedVoterId, extenderId]);
+
+        string removedVoterUsername = $"removedpoll{Guid.NewGuid():N}"[..20];
+        await using (AsyncServiceScope claimScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = claimScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            User removedVoterUser = await context.DomainUsers.SingleAsync(u => u.Id == removedVoterId);
+            Username username = Username.Create(removedVoterUsername);
+            removedVoterUser.ChangeUsername(username, _factory.Clock);
+            context.UsernameRegistry.Add(UsernameRegistryEntry.ClaimNew(username, removedVoterId));
+            await context.SaveChangesAsync();
+        }
+
+        HttpResponseMessage blockCreated = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post, "/api/v1/blocks", JsonContent.Create(new { targetUsername = removedVoterUsername }));
+        Assert.Equal(HttpStatusCode.Created, blockCreated.StatusCode);
+        using JsonDocument blockBody = await SessionEndpointTestSupport.SuccessJsonAsync(blockCreated);
+        Guid blockId = blockBody.RootElement.GetProperty("blockId").GetGuid();
+
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await organizerSession.SendUnsafeAsync(HttpMethod.Delete, $"/api/v1/blocks/{blockId:D}")).StatusCode);
+
+        using SessionHttpSession removedVoterSession = await SessionEndpointTestSupport.SignInAsync(_factory, removedVoterId);
+
+        using JsonDocument involved = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await removedVoterSession.GetAsync("/api/v1/polls?band=involved"));
+        Assert.DoesNotContain(
+            involved.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == pollId);
+
+        using JsonDocument discoverable = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await removedVoterSession.GetAsync("/api/v1/polls?band=discoverable"));
+        Assert.Contains(
+            discoverable.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == pollId);
+    }
+
     // ---- discoverable band --------------------------------------------------------------------------
 
     [Fact]
@@ -140,21 +274,109 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
         using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
         Guid pollId = await CreateNonPrivatePollAsync(organizerSession, invitedFriendId);
         _factory.Clock.Advance(Duration.FromHours(25));
-
-        // The materialized status column only flips on a write path or the due-sweep job -- a plain
-        // list read never re-derives it (ARCHITECTURE's materialized-status invariant), so the sweep
-        // runs here the same way PollSweepTests does.
-        await using (Microsoft.Extensions.DependencyInjection.AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
-        {
-            var job = scope.ServiceProvider.GetRequiredService<PollDueSweepJob>();
-            await job.ExecuteAsync(default);
-        }
+        await RunPollDueSweepAsync();
 
         using SessionHttpSession discovererSession = await SessionEndpointTestSupport.SignInAsync(_factory, discovererId);
         using JsonDocument discovererList = await SessionEndpointTestSupport.SuccessJsonAsync(
             await discovererSession.GetAsync("/api/v1/polls?band=discoverable"));
         Assert.DoesNotContain(
             discovererList.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == pollId);
+    }
+
+    /// <summary>round-1 note 5: rule 4 (blocked pair) beats rule 2 -- a blocked viewer sees the poll in neither band.</summary>
+    [Fact]
+    public async Task Discoverable_ExcludesAPollWhoseOrganizerBlockedTheViewer()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"pl-disc-blocked-org-{Guid.NewGuid():N}@example.test");
+        UserId invitedFriendId = await _factory.SeedUserAsync(email: $"pl-disc-blocked-invited-{Guid.NewGuid():N}@example.test");
+        UserId viewerId = await _factory.SeedUserAsync(email: $"pl-disc-blocked-viewer-{Guid.NewGuid():N}@example.test");
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, invitedFriendId);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, viewerId);
+
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        Guid pollId = await CreateNonPrivatePollAsync(organizerSession, invitedFriendId);
+
+        string viewerUsername = $"discblocked{Guid.NewGuid():N}"[..20];
+        await using (AsyncServiceScope claimScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = claimScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            User viewerUser = await context.DomainUsers.SingleAsync(u => u.Id == viewerId);
+            Username username = Username.Create(viewerUsername);
+            viewerUser.ChangeUsername(username, _factory.Clock);
+            context.UsernameRegistry.Add(UsernameRegistryEntry.ClaimNew(username, viewerId));
+            await context.SaveChangesAsync();
+        }
+
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await organizerSession.SendUnsafeAsync(
+                HttpMethod.Post, "/api/v1/blocks", JsonContent.Create(new { targetUsername = viewerUsername }))).StatusCode);
+
+        using SessionHttpSession viewerSession = await SessionEndpointTestSupport.SignInAsync(_factory, viewerId);
+
+        using JsonDocument involved = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await viewerSession.GetAsync("/api/v1/polls?band=involved"));
+        Assert.DoesNotContain(
+            involved.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == pollId);
+
+        using JsonDocument discoverable = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await viewerSession.GetAsync("/api/v1/polls?band=discoverable"));
+        Assert.DoesNotContain(
+            discoverable.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == pollId);
+    }
+
+    /// <summary>
+    /// round-1 note 5 / §12-17: the only extender voting Unavailable on every option does not extend
+    /// access -- a friend-of-extender-only viewer cannot discover the poll -- but revising a single
+    /// vote off all-Unavailable restores discoverability.
+    /// </summary>
+    [Fact]
+    public async Task Discoverable_ExcludesWhileTheOnlyExtenderVotedUnavailableThroughout_ReincludedOnRevision()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"pl-disc-unavail-org-{Guid.NewGuid():N}@example.test");
+        UserId extenderId = await _factory.SeedUserAsync(email: $"pl-disc-unavail-ext-{Guid.NewGuid():N}@example.test");
+        UserId viewerId = await _factory.SeedUserAsync(email: $"pl-disc-unavail-viewer-{Guid.NewGuid():N}@example.test");
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, extenderId);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, extenderId, viewerId);
+
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        (Guid pollId, Guid firstOptionId) = await CreatePollWithFirstOptionAsync(organizerSession, [extenderId]);
+        using JsonDocument detail = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}"));
+        Guid secondOptionId = detail.RootElement.GetProperty("options")[1].GetProperty("id").GetGuid();
+
+        using SessionHttpSession extenderSession = await SessionEndpointTestSupport.SignInAsync(_factory, extenderId);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await extenderSession.SendUnsafeAsync(
+                HttpMethod.Put, $"/api/v1/polls/{pollId:D}/options/{firstOptionId:D}/vote", JsonContent.Create(new { choice = "unavailable" })))
+                .StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await extenderSession.SendUnsafeAsync(
+                HttpMethod.Put, $"/api/v1/polls/{pollId:D}/options/{secondOptionId:D}/vote", JsonContent.Create(new { choice = "unavailable" })))
+                .StatusCode);
+
+        using SessionHttpSession viewerSession = await SessionEndpointTestSupport.SignInAsync(_factory, viewerId);
+        using JsonDocument beforeRevision = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await viewerSession.GetAsync("/api/v1/polls?band=discoverable"));
+        Assert.DoesNotContain(
+            beforeRevision.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == pollId);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await extenderSession.SendUnsafeAsync(
+                HttpMethod.Put, $"/api/v1/polls/{pollId:D}/options/{firstOptionId:D}/vote", JsonContent.Create(new { choice = "available" })))
+                .StatusCode);
+
+        using JsonDocument afterRevision = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await viewerSession.GetAsync("/api/v1/polls?band=discoverable"));
+        Assert.Contains(
+            afterRevision.RootElement.GetProperty("items").EnumerateArray(),
             item => item.GetProperty("id").GetGuid() == pollId);
     }
 
@@ -194,6 +416,56 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
             "invalid_cursor");
 
         Assert.True(involvedPage.RootElement.TryGetProperty("nextCursor", out _));
+    }
+
+    /// <summary>round-1 note 4: a cursor minted for an entirely different list feature (session Discover) is rejected too.</summary>
+    [Fact]
+    public async Task CrossFeatureCursor_SessionDiscoverCursorIsRejectedOnThePollRoute()
+    {
+        UserId viewerId = await _factory.SeedUserAsync(email: $"pl-cursor-xfeature-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession session = await SessionEndpointTestSupport.SignInAsync(_factory, viewerId);
+
+        string sessionDiscoverCursor = new PartyUp.Application.Sessions.SessionListCursor(
+            _factory.Clock.GetCurrentInstant(), Guid.NewGuid(), PartyUp.Application.Sessions.SessionListScope.Discover).Encode();
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await session.GetAsync($"/api/v1/polls?band=involved&cursor={Uri.EscapeDataString(sessionDiscoverCursor)}"),
+            HttpStatusCode.BadRequest,
+            "invalid_cursor");
+    }
+
+    /// <summary>round-1 note 4: a full page-boundary walk -- no duplicate and no skipped poll across the cursor seam.</summary>
+    [Fact]
+    public async Task Involved_TwentyOnePolls_PagesAcrossTheBoundaryWithNoDuplicateOrSkip()
+    {
+        const int totalPolls = 21;
+        const int pageSize = 20;
+
+        UserId organizerId = await _factory.SeedUserAsync(email: $"pl-cursor-walk-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+
+        HashSet<Guid> created = [];
+        for (int i = 0; i < totalPolls; i++)
+        {
+            created.Add(await CreatePollAsync(organizerSession, []));
+            _factory.Clock.Advance(Duration.FromMinutes(1)); // distinct deadlines -> deterministic (deadline, id) order
+        }
+
+        using JsonDocument firstPage = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync("/api/v1/polls?band=involved"));
+        Guid[] firstPageIds = [.. firstPage.RootElement.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid())];
+        Assert.Equal(pageSize, firstPageIds.Length);
+        string? nextCursor = firstPage.RootElement.GetProperty("nextCursor").GetString();
+        Assert.NotNull(nextCursor);
+
+        using JsonDocument secondPage = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/polls?band=involved&cursor={Uri.EscapeDataString(nextCursor!)}"));
+        Guid[] secondPageIds = [.. secondPage.RootElement.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid())];
+        Assert.Single(secondPageIds); // totalPolls (21) - pageSize (20) == 1
+        Assert.Null(secondPage.RootElement.GetProperty("nextCursor").GetString());
+
+        Assert.Empty(firstPageIds.Intersect(secondPageIds)); // no duplicate across the seam
+        Assert.Equal(created.OrderBy(id => id), firstPageIds.Concat(secondPageIds).OrderBy(id => id)); // no skip
     }
 
     // ---- finalization preview ---------------------------------------------------------------------
@@ -244,36 +516,131 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
             "poll_not_found");
     }
 
+    /// <summary>round-1 note 2: a terminal poll (Canceled/Expired/Finalized) short-circuits to poll_invalid_transition, never a hollow 200.</summary>
+    [Fact]
+    public async Task Preview_ACanceledZeroOptionPoll_IsPollInvalidTransition()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"pl-preview-term-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        Guid pollId = await CreatePollAsync(organizerSession, []);
+
+        using JsonDocument detail = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}"));
+        foreach (JsonElement option in detail.RootElement.GetProperty("options").EnumerateArray())
+        {
+            Assert.Equal(
+                HttpStatusCode.NoContent,
+                (await organizerSession.SendUnsafeAsync(
+                    HttpMethod.Delete, $"/api/v1/polls/{pollId:D}/options/{option.GetProperty("id").GetGuid():D}")).StatusCode);
+        }
+
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await organizerSession.SendUnsafeAsync(HttpMethod.Post, $"/api/v1/polls/{pollId:D}/cancel")).StatusCode);
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}/finalization-preview"),
+            HttpStatusCode.Conflict,
+            "poll_invalid_transition");
+    }
+
     /// <summary>
-    /// The preview guarantee (design §5): calling preview then finalizing the same option, against
-    /// unchanged inputs, must yield the identical roster/waitlist split -- because both routes call
-    /// the same <c>Poll.Finalize</c> allocation.
+    /// round-1 note 6: preview never persists. A poll due-but-unswept (deadline passed, no write path
+    /// has applied the due transition yet) still previews 200 -- but the materialized status column
+    /// stays exactly what it was, and no notification row or session row is created by the call.
     /// </summary>
     [Fact]
-    public async Task Preview_MatchesTheFinalizedSessionRoster_ForTheSameOption()
+    public async Task Preview_IsSideEffectFree_OnADueButUnsweptPoll()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"pl-preview-sideeffect-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        (Guid pollId, _) = await CreatePollWithFirstOptionAsync(organizerSession);
+        _factory.Clock.Advance(Duration.FromHours(25));
+
+        PollStatus statusBefore;
+        int notificationCountBefore;
+        int sessionCountBefore;
+        await using (AsyncServiceScope beforeScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = beforeScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            statusBefore = (await context.Polls.AsNoTracking().SingleAsync(p => p.Id == PollId.From(pollId))).Status;
+            notificationCountBefore = await context.Notifications.CountAsync();
+            sessionCountBefore = await context.Sessions.CountAsync();
+        }
+
+        Assert.Equal(PollStatus.Polling, statusBefore); // due but not yet swept by any write path
+
+        HttpResponseMessage preview = await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}/finalization-preview");
+        Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
+
+        await using (AsyncServiceScope afterScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = afterScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            PollStatus statusAfter = (await context.Polls.AsNoTracking().SingleAsync(p => p.Id == PollId.From(pollId))).Status;
+            int notificationCountAfter = await context.Notifications.CountAsync();
+            int sessionCountAfter = await context.Sessions.CountAsync();
+
+            Assert.Equal(statusBefore, statusAfter); // preview never persists the inline due-Close it simulates
+            Assert.Equal(notificationCountBefore, notificationCountAfter);
+            Assert.Equal(sessionCountBefore, sessionCountAfter);
+        }
+    }
+
+    /// <summary>
+    /// The preview guarantee (design §5): calling preview then finalizing the same option, against
+    /// unchanged inputs, must yield the identical roster/waitlist split IN ALLOCATION ORDER (D-119) --
+    /// because both routes call the same <c>Poll.Finalize</c> allocation, over unchanged aggregate
+    /// state, the natural (never re-sorted) order out of each response must already agree. Capacity 3
+    /// against organizer + 2 Available + 2 Maybe puts the D-119 waitlist split in play: the two Maybe
+    /// voters overflow.
+    /// </summary>
+    [Fact]
+    public async Task Preview_MatchesTheFinalizedSessionRoster_InAllocationOrder_WithAWaitlistSplit()
     {
         UserId organizerId = await _factory.SeedUserAsync(email: $"pl-preview-eq-org-{Guid.NewGuid():N}@example.test");
-        UserId availableId = await _factory.SeedUserAsync(email: $"pl-preview-eq-avail-{Guid.NewGuid():N}@example.test");
-        UserId maybeId = await _factory.SeedUserAsync(email: $"pl-preview-eq-maybe-{Guid.NewGuid():N}@example.test");
-        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, availableId);
-        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, maybeId);
+        UserId avail1Id = await _factory.SeedUserAsync(email: $"pl-preview-eq-avail1-{Guid.NewGuid():N}@example.test");
+        UserId avail2Id = await _factory.SeedUserAsync(email: $"pl-preview-eq-avail2-{Guid.NewGuid():N}@example.test");
+        UserId maybe1Id = await _factory.SeedUserAsync(email: $"pl-preview-eq-maybe1-{Guid.NewGuid():N}@example.test");
+        UserId maybe2Id = await _factory.SeedUserAsync(email: $"pl-preview-eq-maybe2-{Guid.NewGuid():N}@example.test");
+        foreach (UserId inviteeId in new[] { avail1Id, avail2Id, maybe1Id, maybe2Id })
+        {
+            await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, inviteeId);
+        }
 
         using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
-        (Guid pollId, Guid optionId) = await CreatePollWithFirstOptionAsync(organizerSession, [availableId, maybeId]);
+        HttpResponseMessage created = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/polls",
+            JsonContent.Create(new
+            {
+                title = "Waitlist-split preview fixture",
+                optionStartTimes = new[]
+                {
+                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
+                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
+                },
+                isPrivate = false,
+                minAttendance = 1,
+                maxCapacity = 3,
+                inviteeUserIds = new[] { avail1Id.Value, avail2Id.Value, maybe1Id.Value, maybe2Id.Value },
+            }));
+        using JsonDocument createdBody = await SessionEndpointTestSupport.SuccessJsonAsync(created);
+        Guid pollId = createdBody.RootElement.GetProperty("poll").GetProperty("id").GetGuid();
+        Guid optionId = createdBody.RootElement.GetProperty("poll").GetProperty("options")[0].GetProperty("id").GetGuid();
 
-        using SessionHttpSession availableSession = await SessionEndpointTestSupport.SignInAsync(_factory, availableId);
-        Assert.Equal(
-            HttpStatusCode.OK,
-            (await availableSession.SendUnsafeAsync(
-                HttpMethod.Put, $"/api/v1/polls/{pollId:D}/options/{optionId:D}/vote", JsonContent.Create(new { choice = "available" })))
-                .StatusCode);
+        async Task VoteAsync(UserId voterId, string choice)
+        {
+            using SessionHttpSession voterSession = await SessionEndpointTestSupport.SignInAsync(_factory, voterId);
+            Assert.Equal(
+                HttpStatusCode.OK,
+                (await voterSession.SendUnsafeAsync(
+                    HttpMethod.Put, $"/api/v1/polls/{pollId:D}/options/{optionId:D}/vote", JsonContent.Create(new { choice }))).StatusCode);
+        }
 
-        using SessionHttpSession maybeSession = await SessionEndpointTestSupport.SignInAsync(_factory, maybeId);
-        Assert.Equal(
-            HttpStatusCode.OK,
-            (await maybeSession.SendUnsafeAsync(
-                HttpMethod.Put, $"/api/v1/polls/{pollId:D}/options/{optionId:D}/vote", JsonContent.Create(new { choice = "maybe" })))
-                .StatusCode);
+        await VoteAsync(avail1Id, "available");
+        await VoteAsync(avail2Id, "available");
+        await VoteAsync(maybe1Id, "maybe");
+        await VoteAsync(maybe2Id, "maybe");
 
         _factory.Clock.Advance(Duration.FromHours(25));
 
@@ -284,8 +651,15 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
         var previewRoster = previewOption.GetProperty("roster").EnumerateArray()
             .Where(r => r.TryGetProperty("userId", out _))
             .Select(r => (UserId: r.GetProperty("userId").GetGuid(), Status: r.GetProperty("status").GetString(), IsWaitlisted: r.GetProperty("isWaitlisted").GetBoolean()))
-            .OrderBy(r => r.UserId)
-            .ToArray();
+            .ToArray(); // natural (API) order -- never re-sorted
+
+        // D-119: organizer, then Available voters, then Maybe voters -- capacity 3 waitlists both Maybes.
+        Assert.Equal(5, previewRoster.Length);
+        Assert.Equal((organizerId.Value, "going", false), previewRoster[0]);
+        Assert.Contains(previewRoster[1..3], r => r.UserId == avail1Id.Value && r.Status == "going" && !r.IsWaitlisted);
+        Assert.Contains(previewRoster[1..3], r => r.UserId == avail2Id.Value && r.Status == "going" && !r.IsWaitlisted);
+        Assert.Contains(previewRoster[3..5], r => r.UserId == maybe1Id.Value && r.Status == "maybe" && r.IsWaitlisted);
+        Assert.Contains(previewRoster[3..5], r => r.UserId == maybe2Id.Value && r.Status == "maybe" && r.IsWaitlisted);
 
         HttpResponseMessage finalize = await organizerSession.SendUnsafeAsync(
             HttpMethod.Post, $"/api/v1/polls/{pollId:D}/finalize", JsonContent.Create(new { optionId }));
@@ -298,14 +672,34 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
         var finalizedRoster = sessionBody.RootElement.GetProperty("roster").EnumerateArray()
             .Where(r => r.TryGetProperty("userId", out _))
             .Select(r => (UserId: r.GetProperty("userId").GetGuid(), Status: r.GetProperty("status").GetString(), IsWaitlisted: r.GetProperty("isWaitlisted").GetBoolean()))
-            .OrderBy(r => r.UserId)
             .ToArray();
 
-        Assert.Equal(3, previewRoster.Length); // organizer + available + maybe
-        Assert.Equal(previewRoster, finalizedRoster);
+        // Content equality, not sequence equality: GET /sessions/{id}'s roster comes back through a
+        // second DB round trip (SessionReadRepository.ToDetailAsync over an EF collection navigation
+        // with no ORDER BY) -- that route makes no ordering promise and none is asserted on it
+        // elsewhere in the suite. The allocation-order claim this test actually verifies is checked
+        // directly above, against the preview response's own array (which -- unlike the session
+        // detail read -- is emitted straight from the in-memory AllocateRoster/FromPollFinalization
+        // list Poll.Finalize built, with no intervening query). The preview-equals-finalize property
+        // (design §5) is a same-inputs-same-outputs claim over the roster/waitlist split itself, not
+        // over an unrelated endpoint's incidental wire order.
+        Assert.Equal(previewRoster.OrderBy(r => r.UserId), finalizedRoster.OrderBy(r => r.UserId));
     }
 
     // ---- fixture helpers ----------------------------------------------------------------------------
+
+    /// <summary>
+    /// The materialized status column only flips on a write path or the due-sweep job -- a plain list
+    /// read never re-derives it (ARCHITECTURE's materialized-status invariant) -- so tests that need a
+    /// due poll to actually read as Closed/Expired run the sweep directly, the same way
+    /// <c>PollSweepTests</c> does.
+    /// </summary>
+    private async Task RunPollDueSweepAsync()
+    {
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        var job = scope.ServiceProvider.GetRequiredService<PollDueSweepJob>();
+        await job.ExecuteAsync(default);
+    }
 
     private async Task<Guid> CreatePollAsync(SessionHttpSession organizerSession, IReadOnlyList<UserId> inviteeIds)
     {

@@ -43,6 +43,16 @@ public sealed class PollFinalizationPreviewUseCase(
             return PollFinalizationPreviewResult.Failed("poll_not_found");
         }
 
+        // Round-1 fix: a terminal poll (Finalized/Expired/Canceled) has no live options loop to fall
+        // through and no window to gate on -- without this check, a zero-option poll that was then
+        // Canceled fell through every guard below to an empty-but-"successful" 200. Checked ahead of
+        // the window gate, mirroring Poll.Finalize's own RequireStatus ordering (ApplyDueTransitions,
+        // then status, then the window).
+        if (poll.IsTerminal)
+        {
+            return PollFinalizationPreviewResult.Failed("poll_invalid_transition");
+        }
+
         // Mirrors FinalizePollUseCase's own pre-check split (Poll.Finalize's unconditional window
         // guard is evaluated a second time below, per simulated option, but these two outcomes are
         // reported once here so a poll with zero options still fails honestly rather than looping
