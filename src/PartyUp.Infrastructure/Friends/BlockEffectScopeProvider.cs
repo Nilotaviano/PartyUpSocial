@@ -15,7 +15,7 @@ namespace PartyUp.Infrastructure.Friends;
 /// poll parents — in that order, each in its own A-068/P3-LK-01-ordered statement — so a concurrent
 /// pair of blocks sharing parents cannot take them in opposite orders, then loads them with the
 /// children <see cref="Domain.Friendships.BlockEffects.Apply"/> needs to reapply eligibility under
-/// lock. The domain decides the actual gate (terminal/past-window, §116); this provider only feeds
+/// lock. The domain decides the actual gate (terminal/past-window, BlockEffects.cs:116); this provider only feeds
 /// candidates.
 /// </summary>
 public sealed class BlockEffectScopeProvider(

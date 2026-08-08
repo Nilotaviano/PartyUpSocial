@@ -246,6 +246,70 @@ public sealed class DeletionSweepTests : IAsyncLifetime, IDisposable
     }
 
     /// <summary>
+    /// ticket-P6-S3-fix1 F7: resolves <see cref="ExecuteDeletionForUserUseCase"/> straight from the
+    /// real DI container (not <c>Phase3DeletionTestSupport.CreateUseCase</c>'s manual per-argument
+    /// <c>GetRequiredService</c> wiring) so a future deregistration of the optional
+    /// <see cref="IPollNotificationMaterializer"/> parameter fails this test instead of silently
+    /// resolving the use case with a null poll materializer -- the D-170 row landing proves it arrived.
+    /// </summary>
+    [Fact]
+    public async Task Execute_ResolvedFromTheRealContainer_StillMaterializesThePollExpiredRow_D170()
+    {
+        UserId subjectId = await _factory.SeedUserAsync(
+            pendingDeletion: true,
+            email: $"delete-poll-container-owner-{Guid.NewGuid():N}@example.test");
+        UserId inviteeId = await _factory.SeedUserAsync(
+            email: $"delete-poll-container-invitee-{Guid.NewGuid():N}@example.test");
+
+        PollId pollId;
+        await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await PollTestHelpers.SeedAcceptedFriendshipAsync(context, subjectId, inviteeId, _factory.Clock);
+            await context.SaveChangesAsync();
+
+            Instant now = _factory.Clock.GetCurrentInstant();
+            CreatePollResult created = await PollTestHelpers.BuildCreateUseCase(seedScope).ExecuteAsync(
+                new CreatePollCommand(
+                    subjectId,
+                    "Deletion container-resolved poll",
+                    DurationMinutes: 60,
+                    Platform: null,
+                    Game: null,
+                    Notes: null,
+                    MinAttendance: 1,
+                    MaxCapacity: null,
+                    IsPrivate: false,
+                    OptionStartTimes: [now + Duration.FromDays(2), now + Duration.FromDays(3)],
+                    DeadlineChoice: PollDeadlineChoice.Hours24,
+                    InviteeUserIds: [inviteeId],
+                    GuestLinkCount: null),
+                default);
+            Assert.True(created.Succeeded, created.Code);
+            pollId = created.Poll!.Id;
+        }
+
+        _factory.Clock.Advance(User.DeletionGracePeriod);
+
+        await using (AsyncServiceScope runScope = _factory.Services.CreateAsyncScope())
+        {
+            var useCase = runScope.ServiceProvider.GetRequiredService<ExecuteDeletionForUserUseCase>();
+            Assert.True(await useCase.ExecuteAsync(subjectId, default));
+        }
+
+        await using AsyncServiceScope readScope = _factory.Services.CreateAsyncScope();
+        AppDbContext readContext = readScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Poll afterRun = await readContext.Polls.AsNoTracking().SingleAsync(p => p.Id == pollId);
+        Assert.Equal(PollStatus.Expired, afterRun.Status);
+
+        Notification invited = await readContext.Notifications.AsNoTracking().SingleAsync(n =>
+            n.PollId == pollId &&
+            n.Type == NotificationType.PollExpired &&
+            n.RecipientUserId == inviteeId);
+        Assert.Equal(pollId, invited.PollId);
+    }
+
+    /// <summary>
     /// §11 step 3: the subject's row on somebody else's poll becomes <c>Removed</c> and their pending
     /// join request on a third poll lapses -- the poll analogues of the shipped session removal/lapse
     /// proof.
@@ -352,7 +416,7 @@ public sealed class DeletionSweepTests : IAsyncLifetime, IDisposable
     /// unit-level skip.
     /// </summary>
     [Fact]
-    public async Task Execute_RemovedVotersVotesAreExcludedFromLaterFinalizationMapping_D092_S63()
+    public async Task Execute_RemovedVotersVotesAreExcludedFromLaterFinalizationMapping_D092()
     {
         UserId subjectId = await _factory.SeedUserAsync(
             pendingDeletion: true,

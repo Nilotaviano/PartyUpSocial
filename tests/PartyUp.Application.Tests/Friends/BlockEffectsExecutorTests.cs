@@ -103,28 +103,32 @@ public sealed class BlockEffectsExecutorTests
     /// (<c>BlockEffectsExecutor.cs:60-63</c>) always discards the poll's dequeued events rather than
     /// forwarding them to any materializer — pre-finalization poll roster changes produce zero
     /// materialized poll notifications, whether or not an <see cref="IPollNotificationMaterializer"/>
-    /// exists on this port at all (it does not; only sessions have one here).
+    /// exists on this port at all (it does not; only sessions have one here). The poll is seeded past
+    /// its Deadline (but inside the 48h selection window) so <see cref="Poll.RemoveParticipant"/>'s own
+    /// <c>ApplyDueTransitions</c> closes it and raises <c>PollClosed</c> mid-executor — a real, non-empty
+    /// event to drain, so the pin fails if the drain line is deleted.
     /// </summary>
     [Fact]
     public async Task Execute_DrainsPollEventsWithoutMaterializingAnyPollNotification_D077()
     {
-        IClock clock = FriendTestData.Clock();
+        TestClock creationClock = FriendTestData.Clock();
+        TestClock executionClock = new(creationClock.GetCurrentInstant() + Duration.FromHours(24) + Duration.FromMinutes(1));
         User blocker = FriendTestData.Active("poll-drain-blocker", "Poll Drain Blocker");
         User blocked = FriendTestData.Active("poll-drain-blocked", "Poll Drain Blocked");
-        Poll poll = BlockExecutorTestData.Poll(blocker.Id, blocked.Id, clock);
-        Block block = Block.Create(blocker.Id, blocked.Id, blocked.Username!.Value, clock);
+        Poll poll = BlockExecutorTestData.Poll(blocker.Id, blocked.Id, creationClock);
+        Block block = Block.Create(blocker.Id, blocked.Id, blocked.Username!.Value, executionClock);
         var executor = new BlockEffectsExecutor(
             new RecordingBlockEffectScopeProvider(new BlockEffectScope([], [poll])),
             new BlockTestFriendshipRepository([]),
             new RecordingReminderScheduleWriter(),
-            clock);
+            executionClock);
 
         await executor.ExecuteAsync(block, [], default);
 
         Assert.True(poll.FindParticipant(ParticipantRef.ForUser(blocked.Id))!.IsRemoved);
+        Assert.Equal(PollStatus.Closed, poll.Status);
         Assert.Empty(poll.DequeueEvents());
     }
-
 }
 
 internal sealed class RecordingBlockEffectScopeProvider(BlockEffectScope scope)

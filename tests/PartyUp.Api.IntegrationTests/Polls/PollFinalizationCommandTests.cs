@@ -161,6 +161,14 @@ public sealed class PollFinalizationCommandTests : IAsyncLifetime, IDisposable
         NotificationMute reloaded = await readContext.NotificationMutes.AsNoTracking().SingleAsync(m => m.Id == muteId);
         Assert.Null(reloaded.PollId);
         Assert.Equal(result.Session!.Id, reloaded.SessionId);
+
+        // §9/D-090: the mute must still suppress the PollClosed the same Finalize call raises via
+        // ApplyDueTransitions -- proving the write-time mute lookup sees the pre-re-parent PollId.
+        List<Notification> pollClosed = await readContext.Notifications.AsNoTracking()
+            .Where(n => n.PollId == pollId && n.Type == NotificationType.PollClosed)
+            .ToListAsync();
+        Assert.DoesNotContain(pollClosed, n => n.RecipientUserId == inviteeId);
+        Assert.Contains(pollClosed, n => n.RecipientUserId == organizerId);
     }
 
     /// <summary>§5.4/A-015: the re-parented guest link keeps its stored token digest byte-for-byte.</summary>
@@ -217,7 +225,7 @@ public sealed class PollFinalizationCommandTests : IAsyncLifetime, IDisposable
 
     /// <summary>§9: a future session's Going participant gets a durable reminder handoff planned.</summary>
     [Fact]
-    public async Task Finalize_PlansAReminderHandoffForAFutureSession_S9()
+    public async Task Finalize_PlansAReminderHandoffForAFutureSession_D082()
     {
         (PollId pollId, UserId organizerId, UserId inviteeId, PollOptionId optionId) =
             await SeedPollAsync(startOffset: Duration.FromDays(4));
@@ -246,7 +254,7 @@ public sealed class PollFinalizationCommandTests : IAsyncLifetime, IDisposable
 
     /// <summary>§9/D-153: a completed (already-ended) session is terminal, so no reminder handoff is ever written.</summary>
     [Fact]
-    public async Task Finalize_WritesNoReminderHandoffForAnAlreadyEndedSession_S9()
+    public async Task Finalize_WritesNoReminderHandoffForAnAlreadyEndedSession_D153()
     {
         UserId organizerId = await _factory.SeedUserAsync(email: $"poll-fin-past-org-{Guid.NewGuid():N}@example.test");
         UserId inviteeId = await _factory.SeedUserAsync(email: $"poll-fin-past-invitee-{Guid.NewGuid():N}@example.test");
@@ -298,6 +306,42 @@ public sealed class PollFinalizationCommandTests : IAsyncLifetime, IDisposable
             .Where(h => h.SessionId == result.Session!.Id)
             .CountAsync();
         Assert.Equal(0, handoffCount);
+
+        int optionSelectedCount = await readContext.Notifications.AsNoTracking()
+            .Where(n => n.PollId == pollId && n.Type == NotificationType.PollOptionSelected)
+            .CountAsync();
+        Assert.Equal(2, optionSelectedCount);
+    }
+
+    /// <summary>§6.4/D-153: a started-but-not-ended option (now ∈ [start, end)) settles as Confirmed
+    /// with the session already in progress by clock evaluation, not settled Completed/Expired.</summary>
+    [Fact]
+    public async Task Finalize_SelectsAStartedOptionAsInProgress_D153()
+    {
+        (PollId pollId, UserId organizerId, UserId inviteeId, PollOptionId optionId) =
+            await SeedPollAsync(startOffset: Duration.FromHours(5) + Duration.FromMinutes(50));
+
+        await using (AsyncServiceScope voteScope = _factory.Services.CreateAsyncScope())
+        {
+            Assert.True((await PollTestHelpers.BuildVoteUseCases(voteScope)
+                .VoteAsync(pollId, inviteeId, optionId, VoteChoice.Available, default)).Succeeded);
+        }
+
+        _factory.Clock.Advance(Duration.FromHours(6) + Duration.FromMinutes(1));
+
+        await using AsyncServiceScope finalizeScope = _factory.Services.CreateAsyncScope();
+        FinalizePollResult result = await PollTestHelpers.BuildFinalizeUseCase(finalizeScope)
+            .FinalizeAsync(pollId, organizerId, optionId, default);
+        Assert.True(result.Succeeded, result.Code);
+        Assert.Equal(SessionStatus.Confirmed, result.Session!.Status);
+        Assert.True(result.Session!.IsInProgress(_factory.Clock));
+
+        await using AsyncServiceScope readScope = _factory.Services.CreateAsyncScope();
+        AppDbContext readContext = readScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        int optionSelectedCount = await readContext.Notifications.AsNoTracking()
+            .Where(n => n.PollId == pollId && n.Type == NotificationType.PollOptionSelected)
+            .CountAsync();
+        Assert.Equal(2, optionSelectedCount);
     }
 
     [Fact]

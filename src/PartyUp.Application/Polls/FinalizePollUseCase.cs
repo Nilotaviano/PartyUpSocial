@@ -74,6 +74,13 @@ public sealed class FinalizePollUseCase(
                 Session session = result.Session;
                 sessions.Add(session);
 
+                // Materialize before re-parenting the mutes: the materializer's own mute lookup
+                // queries NotificationMutes by PollId on this same scoped context, and EF's identity
+                // resolution would hand back the tracked (already re-parented) instances if the
+                // AttachToSession loop ran first -- silently losing the poll-keyed mute mid-batch.
+                IReadOnlyList<IDomainEvent> events = poll.DequeueEvents();
+                await materializer.MaterializeAsync(poll, events, ct);
+
                 // §12-15: the poll's mutes carry onto the session finalization created -- a
                 // re-parent of the already-tracked row, not a delete-and-recreate, mirroring the
                 // guest link/identity re-parent Poll.Finalize already performed on the aggregate.
@@ -81,9 +88,6 @@ public sealed class FinalizePollUseCase(
                 {
                     mute.AttachToSession(session.Id);
                 }
-
-                IReadOnlyList<IDomainEvent> events = poll.DequeueEvents();
-                await materializer.MaterializeAsync(poll, events, ct);
 
                 HashSet<UserId> reminderRecipients = [];
                 foreach (Participation participation in session.Participations)
