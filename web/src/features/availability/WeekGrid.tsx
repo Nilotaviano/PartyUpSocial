@@ -383,7 +383,7 @@ export function WeekGrid({
         aria-colcount={8}
         aria-label={t('a11y.gridLabel')}
         aria-rowcount={slots + 1}
-        className={`max-h-[70vh] overflow-y-auto ${isTouchDragging ? 'touch-none' : ''}`}
+        className={`max-h-[70vh] overflow-x-auto overflow-y-auto [-webkit-overflow-scrolling:touch] ${isTouchDragging ? 'touch-none' : ''}`}
         data-touch-dragging={isTouchDragging}
         role="grid"
         onMouseUp={handleMouseUp}

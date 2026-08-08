@@ -45,9 +45,11 @@ export function ThemeToggle() {
         (OPTIONS.indexOf(preference) + delta + OPTIONS.length) % OPTIONS.length
       ]
     choose(next)
-    event.currentTarget.parentElement
-      ?.querySelectorAll<HTMLButtonElement>('[role=radio]')
-      [OPTIONS.indexOf(next)]?.focus()
+    const radios =
+      event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+        '[role=radio]',
+      )
+    radios?.[OPTIONS.indexOf(next)]?.focus()
   }
 
   return (

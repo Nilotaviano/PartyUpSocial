@@ -241,8 +241,10 @@ export function SessionInvitePage() {
                 key={link.guestLinkId}
                 className="flex items-center justify-between gap-2 rounded-card border-2 border-ink bg-card p-3"
               >
-                <span className="truncate font-mono text-ink">{link.url}</span>
-                <span className="flex gap-2">
+                <span className="min-w-0 flex-1 truncate font-mono text-ink">
+                  {link.url}
+                </span>
+                <span className="flex flex-none gap-2">
                   <Button
                     aria-label={t('a11y.copyLink')}
                     type="button"

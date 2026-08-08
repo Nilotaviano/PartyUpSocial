@@ -48,72 +48,74 @@ function AuthenticatedShell() {
         >
           <NavLink
             aria-label={t('navigation.home')}
-            className="mr-auto inline-flex min-h-11 items-center rounded-control font-display font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className="mr-auto inline-flex min-h-11 flex-none items-center rounded-control font-display font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             end
             to="/app"
           >
             {t('app.name')}
           </NavLink>
-          <NavLink
-            className={({ isActive }) =>
-              `inline-flex min-h-11 items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-                isActive
-                  ? 'bg-primary font-semibold text-primary-ink'
-                  : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
-              }`
-            }
-            to="/friends"
-          >
-            {t('navigation.friends')}
-          </NavLink>
-          <NavLink
-            className={({ isActive }) =>
-              `inline-flex min-h-11 items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-                isActive
-                  ? 'bg-primary font-semibold text-primary-ink'
-                  : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
-              }`
-            }
-            to="/sessions/upcoming"
-          >
-            {t('nav.sessions', { ns: 'sessions' })}
-          </NavLink>
-          <NavLink
-            className={({ isActive }) =>
-              `inline-flex min-h-11 items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-                isActive
-                  ? 'bg-primary font-semibold text-primary-ink'
-                  : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
-              }`
-            }
-            to="/calendar"
-          >
-            {t('nav.calendar', { ns: 'availability' })}
-          </NavLink>
-          <NavLink
-            className={({ isActive }) =>
-              `inline-flex min-h-11 items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-                isActive
-                  ? 'bg-primary font-semibold text-primary-ink'
-                  : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
-              }`
-            }
-            to="/discover"
-          >
-            {t('nav.discover', { ns: 'home' })}
-          </NavLink>
-          <NavLink
-            className={({ isActive }) =>
-              `inline-flex min-h-11 items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-                isActive
-                  ? 'bg-primary font-semibold text-primary-ink'
-                  : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
-              }`
-            }
-            to="/settings/account"
-          >
-            {t('navigation.settings')}
-          </NavLink>
+          <div className="flex min-w-0 items-center gap-2 overflow-x-auto [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]">
+            <NavLink
+              className={({ isActive }) =>
+                `inline-flex min-h-11 flex-none items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+                  isActive
+                    ? 'bg-primary font-semibold text-primary-ink'
+                    : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
+                }`
+              }
+              to="/friends"
+            >
+              {t('navigation.friends')}
+            </NavLink>
+            <NavLink
+              className={({ isActive }) =>
+                `inline-flex min-h-11 flex-none items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+                  isActive
+                    ? 'bg-primary font-semibold text-primary-ink'
+                    : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
+                }`
+              }
+              to="/sessions/upcoming"
+            >
+              {t('nav.sessions', { ns: 'sessions' })}
+            </NavLink>
+            <NavLink
+              className={({ isActive }) =>
+                `inline-flex min-h-11 flex-none items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+                  isActive
+                    ? 'bg-primary font-semibold text-primary-ink'
+                    : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
+                }`
+              }
+              to="/calendar"
+            >
+              {t('nav.calendar', { ns: 'availability' })}
+            </NavLink>
+            <NavLink
+              className={({ isActive }) =>
+                `inline-flex min-h-11 flex-none items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+                  isActive
+                    ? 'bg-primary font-semibold text-primary-ink'
+                    : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
+                }`
+              }
+              to="/discover"
+            >
+              {t('nav.discover', { ns: 'home' })}
+            </NavLink>
+            <NavLink
+              className={({ isActive }) =>
+                `inline-flex min-h-11 flex-none items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+                  isActive
+                    ? 'bg-primary font-semibold text-primary-ink'
+                    : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
+                }`
+              }
+              to="/settings/account"
+            >
+              {t('navigation.settings')}
+            </NavLink>
+          </div>
         </nav>
       </header>
       <Outlet />
