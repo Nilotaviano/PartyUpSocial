@@ -2,6 +2,7 @@ using NodaTime;
 using PartyUp.Api.Security;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
 
 namespace PartyUp.Api.Endpoints;
@@ -25,7 +26,9 @@ public static class GuestExchangeEndpoints
         string token,
         IGuestLinkResolver resolver,
         ISessionRepository sessions,
+        IPollRepository polls,
         GuestLinkCredentialProtector protector,
+        PollGuestLinkCredentialProtector pollProtector,
         IClock clock,
         HttpContext context,
         CancellationToken cancellationToken)
@@ -33,12 +36,12 @@ public static class GuestExchangeEndpoints
         context.Response.Headers.CacheControl = "no-store";
         context.Response.Headers["Referrer-Policy"] = "no-referrer";
 
-        ClearStaleGuestCookies(context, protector, clock);
+        ClearStaleGuestCookies(context, protector, pollProtector, clock);
 
         ResolvedGuestLink? resolved = await resolver.ResolveAsync(token, cancellationToken);
         if (resolved is null)
         {
-            return Results.Redirect("/guest/invalid");
+            return await ExchangePollBranchAsync(token, resolver, polls, pollProtector, clock, context, cancellationToken);
         }
 
         Session? session = await sessions.FindAsync(resolved.SessionId, cancellationToken);
@@ -72,12 +75,68 @@ public static class GuestExchangeEndpoints
     }
 
     /// <summary>
+    /// The poll-owned branch (PHASE6_DESIGN.md §4, ticket-P6-S4b), tried only once the session branch
+    /// above has already missed: a link finalization already re-parented (row's <c>PollId</c> null,
+    /// <c>SessionId</c> set) never reaches here — it matched <see cref="IGuestLinkResolver.ResolveAsync"/>
+    /// instead, which is exactly what makes a re-exchanged token mint a session credential with no
+    /// extra branching. Redirects to the SAME <c>/guest/{linkId}</c> SPA route the session branch does.
+    /// </summary>
+    private static async Task<IResult> ExchangePollBranchAsync(
+        string token,
+        IGuestLinkResolver resolver,
+        IPollRepository polls,
+        PollGuestLinkCredentialProtector pollProtector,
+        IClock clock,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        ResolvedPollGuestLink? resolved = await resolver.ResolvePollAsync(token, cancellationToken);
+        if (resolved is null)
+        {
+            return Results.Redirect("/guest/invalid");
+        }
+
+        Poll? poll = await polls.FindAsync(resolved.PollId, cancellationToken);
+        if (poll is null)
+        {
+            return Results.Redirect("/guest/invalid");
+        }
+
+        GuestLinkView view;
+        try
+        {
+            view = poll.ResolveGuestLink(resolved.GuestLinkId, clock);
+        }
+        catch (DomainException)
+        {
+            return Results.Redirect("/guest/invalid");
+        }
+
+        Instant now = clock.GetCurrentInstant();
+        bool isLive = view == GuestLinkView.LiveView;
+        GuestCredentialMode mode = isLive ? GuestCredentialMode.Active : GuestCredentialMode.Terminal;
+        // Lifetime clamp (ticket-P6-S4b): active-mode expiry is the poll's own selection window
+        // close — the poll is terminal from that instant on, so no separate 400-day ceiling applies
+        // the way it does for a session's much-longer-lived link.
+        Instant expiresAt = isLive
+            ? poll.SelectionWindowEndsAt
+            : now + PollGuestLinkCredentialProtector.TerminalLifetime;
+
+        var credential = new PollGuestLinkCredential(resolved.GuestLinkId, resolved.PollId, mode, now, expiresAt);
+        GuestPollEndpoints.SetPollGuestCookie(context, pollProtector, credential, expiresAt - now);
+
+        string guestLinkIdN = resolved.GuestLinkId.Value.ToString("N");
+        return Results.Redirect($"/guest/{guestLinkIdN}");
+    }
+
+    /// <summary>
     /// §9.1's stale-cookie bound: every <c>pu.g.*</c> cookie on the request whose payload is expired
     /// or whose 10-minute terminal window has closed is cleared via <c>Set-Cookie … Max-Age=0</c>.
     /// </summary>
     private static void ClearStaleGuestCookies(
         HttpContext context,
         GuestLinkCredentialProtector protector,
+        PollGuestLinkCredentialProtector pollProtector,
         IClock clock)
     {
         foreach (string name in context.Request.Cookies.Keys)
@@ -88,8 +147,7 @@ public static class GuestExchangeEndpoints
             }
 
             string? value = context.Request.Cookies[name];
-            GuestLinkCredential? credential = value is null ? null : protector.Unprotect(value);
-            if (credential is null || credential.IsExpired(clock))
+            if (value is null || IsStale(value, protector, pollProtector, clock))
             {
                 context.Response.Cookies.Append(name, string.Empty, new CookieOptions
                 {
@@ -102,6 +160,27 @@ public static class GuestExchangeEndpoints
                 });
             }
         }
+    }
+
+    /// <summary>
+    /// A cookie is stale when neither purpose can decrypt it (garbage/forged/wrong-purpose-for-a-
+    /// deleted-link) or the one that does decrypt it reports itself expired — tried session-purpose
+    /// first, then poll-purpose, since a genuine cookie only ever decrypts under one of the two.
+    /// </summary>
+    private static bool IsStale(
+        string value,
+        GuestLinkCredentialProtector protector,
+        PollGuestLinkCredentialProtector pollProtector,
+        IClock clock)
+    {
+        GuestLinkCredential? sessionCredential = protector.Unprotect(value);
+        if (sessionCredential is not null)
+        {
+            return sessionCredential.IsExpired(clock);
+        }
+
+        PollGuestLinkCredential? pollCredential = pollProtector.Unprotect(value);
+        return pollCredential is null || pollCredential.IsExpired(clock);
     }
 
     /// <summary>

@@ -1,0 +1,90 @@
+using System.Text.Json.Serialization;
+using PartyUp.Api.Contracts.Sessions;
+using PartyUp.Application.Polls;
+using PartyUp.Domain.Sessions;
+
+namespace PartyUp.Api.Contracts.Polls;
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record ClaimGuestPollRequest(string? DisplayName);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record RenameGuestPollIdentityRequest(string? DisplayName);
+
+/// <summary>
+/// The poll guest bearer's own flat response (PHASE6_DESIGN.md §4, ticket-P6-S4b), parallel to
+/// <see cref="GuestSessionResponse"/> but participant-identical rather than roster-less (D-030/D-114):
+/// the live shape carries the same masked per-voter grid the registered <c>PollDetailResponse</c>
+/// does, flattened onto this record instead of nested, matching the shipped guest-session convention.
+/// The <c>finalized</c> state is this arm's own addition — <see cref="GuestSessionResponse"/> has no
+/// analogue because a session-owned link is never re-parented — carrying no live poll fields, only the
+/// created session id and the re-exchange path the bearer's already-known raw token completes (the
+/// server never stores that token itself, A-015, so it cannot fill in the placeholder).
+/// </summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record GuestPollResponse(
+    string State,
+    Guid PollId,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? SessionId,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ReExchangeUrl,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Title,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? DurationMinutes,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Platform,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] GameResponse? Game,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Notes,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Deadline,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SelectionWindowEndsAt,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Status,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? GuestIdentityId,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DisplayName,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<PollOptionResponse>? Options,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<PollRosterEntryResponse>? Roster)
+{
+    public const string LiveState = "live";
+    public const string FinalizedState = "finalized";
+
+    /// <summary>
+    /// A-015: the server never stores the raw bearer token, so it cannot fill this in — the SPA
+    /// substitutes the token it already holds from the original <c>/g/{token}</c> visit that landed
+    /// it here.
+    /// </summary>
+    public const string FinalizedReExchangeUrlTemplate = "/g/{token}";
+
+    public static GuestPollResponse Live(GuestPollDetail guestDetail)
+    {
+        PollDetail detail = guestDetail.Detail;
+        return new GuestPollResponse(
+            LiveState,
+            detail.Id.Value,
+            null,
+            null,
+            detail.Title.Value,
+            detail.Duration.TotalMinutes,
+            SessionWireFormat.Platform(detail.Platform),
+            detail.Game is { } game ? GameResponse.From(game) : null,
+            detail.Notes.Value,
+            SessionWireFormat.Format(detail.Deadline),
+            SessionWireFormat.Format(detail.SelectionWindowEndsAt),
+            PollWireFormat.Status(detail.Status),
+            guestDetail.OwnGuestIdentityId?.Value,
+            guestDetail.OwnDisplayName?.Value,
+            detail.Options.Select(PollOptionResponse.From).ToArray(),
+            detail.Roster.Select(PollRosterEntryResponse.From).ToArray());
+    }
+
+    public static GuestPollResponse Terminal(Guid pollId, GuestLinkView notice) =>
+        new(NoticeState(notice), pollId, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+
+    public static GuestPollResponse Finalized(Guid pollId, Guid sessionId) =>
+        new(FinalizedState, pollId, sessionId, FinalizedReExchangeUrlTemplate,
+            null, null, null, null, null, null, null, null, null, null, null, null);
+
+    private static string NoticeState(GuestLinkView notice) => notice switch
+    {
+        GuestLinkView.CanceledNotice => "canceled",
+        GuestLinkView.RevokedNotice => "revoked",
+        GuestLinkView.EndedNotice => "ended",
+        GuestLinkView.PollExpiredNotice => "pollExpired",
+        _ => throw new ArgumentOutOfRangeException(nameof(notice)),
+    };
+}

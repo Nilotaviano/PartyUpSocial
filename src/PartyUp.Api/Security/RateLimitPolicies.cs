@@ -257,7 +257,13 @@ public static class RateLimitPolicies
             Operations(
                 ApiOperationIds.ClaimGuestSessionLink,
                 ApiOperationIds.RenameGuestSessionIdentity,
-                ApiOperationIds.RespondAsGuest)),
+                ApiOperationIds.RespondAsGuest,
+                // PHASE6_DESIGN.md §4.2 (ticket-P6-S4b): poll guest ops join this existing dimension
+                // rather than a new one — GetGuestPollView is unassigned (default dimension), a GET.
+                ApiOperationIds.ClaimGuestPollLink,
+                ApiOperationIds.VoteOnPollAsGuest,
+                ApiOperationIds.SuggestPollOptionAsGuest,
+                ApiOperationIds.RenameGuestPollIdentity)),
         // PHASE5_DESIGN.md A-079: five new User-partitioned dimensions, assigned exhaustively so §8
         // has no unassigned route.
         new(

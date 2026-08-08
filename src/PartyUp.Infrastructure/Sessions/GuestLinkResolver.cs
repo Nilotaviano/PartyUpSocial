@@ -41,4 +41,38 @@ public sealed class GuestLinkResolver(AppDbContext context) : IGuestLinkResolver
             ? null
             : new ResolvedGuestLink(match.Id, match.SessionId!.Value);
     }
+
+    /// <summary>
+    /// The poll-owned analogue (ticket-P6-S4b): a link finalization already re-parented (its row's
+    /// <c>PollId</c> now null, <c>SessionId</c> set) never matches here, so a re-exchanged token
+    /// naturally falls through to <see cref="ResolveAsync"/> instead — no branching on poll status
+    /// needed at the call site.
+    /// </summary>
+    public async Task<ResolvedPollGuestLink?> ResolvePollAsync(string token, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return null;
+        }
+
+        string tokenHash;
+        try
+        {
+            tokenHash = GuestLink.HashToken(token);
+        }
+        catch (DomainException)
+        {
+            return null;
+        }
+
+        var match = await context.GuestLinks
+            .AsNoTracking()
+            .Where(link => link.TokenHash == tokenHash && link.PollId != null)
+            .Select(link => new { link.Id, link.PollId })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return match is null
+            ? null
+            : new ResolvedPollGuestLink(match.Id, match.PollId!.Value);
+    }
 }

@@ -72,6 +72,15 @@ public sealed class PartyUpOpenApiTransformer :
         // zero-option finalize precondition need (PHASE6_DESIGN.md §4).
         "poll_selection_window_closed",
         "poll_zero_options",
+
+        // PHASE6_DESIGN.md §4 (ticket-P6-S4b): the poll guest arm's own codes — GuestPollUseCases
+        // (Application layer, already shipped) already produces the first two; the guest HTTP
+        // surface is what makes them reachable. poll_guest_link_not_found/poll_guest_link_inactive
+        // are both fail-closed 404s (§12-24's hidden-equals-missing rule); guest_link_not_claimed is
+        // the explicit vote-before-claim 409 (D-017).
+        "poll_guest_link_not_found",
+        "poll_guest_link_inactive",
+        "guest_link_not_claimed",
     ];
 
     private static readonly HashSet<string> FriendOperationIds =

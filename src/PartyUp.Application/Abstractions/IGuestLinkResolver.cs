@@ -10,7 +10,19 @@ namespace PartyUp.Application.Abstractions;
 public interface IGuestLinkResolver
 {
     Task<ResolvedGuestLink?> ResolveAsync(string token, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The poll-owned analogue (PHASE6_DESIGN.md §4, ticket-P6-S4b): a poll-owned link's token
+    /// exchange, resolved alongside <see cref="ResolveAsync"/> rather than folded into it — after
+    /// finalization a link's row flips from poll-owned to session-owned with its token preserved
+    /// (D-048), so trying <see cref="ResolveAsync"/> first and this second is what makes a
+    /// re-exchanged token land on the session branch automatically post-handover.
+    /// </summary>
+    Task<ResolvedPollGuestLink?> ResolvePollAsync(string token, CancellationToken cancellationToken);
 }
 
 /// <summary>The minimal fact the A-064 exchange route needs: which link, and which session it names.</summary>
 public sealed record ResolvedGuestLink(GuestLinkId GuestLinkId, SessionId SessionId);
+
+/// <summary>The poll-owned analogue of <see cref="ResolvedGuestLink"/>.</summary>
+public sealed record ResolvedPollGuestLink(GuestLinkId GuestLinkId, PollId PollId);

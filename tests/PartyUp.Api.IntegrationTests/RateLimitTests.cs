@@ -87,7 +87,17 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
                 "RejectSessionWaitlistParticipant",
             ],
             ["guest-link-exchange"] = ["ExchangeGuestLink"],
-            ["guest-write"] = ["ClaimGuestSessionLink", "RenameGuestSessionIdentity", "RespondAsGuest"],
+            ["guest-write"] =
+            [
+                "ClaimGuestSessionLink",
+                "RenameGuestSessionIdentity",
+                "RespondAsGuest",
+                // PHASE6_DESIGN.md §4.2 (ticket-P6-S4b): poll guest ops join this dimension.
+                "ClaimGuestPollLink",
+                "VoteOnPollAsGuest",
+                "SuggestPollOptionAsGuest",
+                "RenameGuestPollIdentity",
+            ],
             // PHASE5_DESIGN.md A-079 (round-2 fix, disclosed extension — Phase 4 S4 precedent for
             // mechanical RateLimitTests/AntiforgeryTests inventory extensions): five new
             // User-partitioned dimensions, assigned exhaustively so §8 has no unassigned route.

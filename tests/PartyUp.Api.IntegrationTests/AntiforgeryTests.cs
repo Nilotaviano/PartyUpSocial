@@ -233,6 +233,16 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 Onboarded(() => null),
             ["POST /api/v1/polls/{pollId:guid}/join-requests/{requestId:guid}/reject"] =
                 Onboarded(() => null),
+            // PHASE6_DESIGN.md §4 (ticket-P6-S4b): the poll guest arm — the shipped guest session
+            // routes' Public() pattern (no authorization, no onboarding).
+            ["POST /api/v1/guest/{guestLinkId:guid}/poll/claim"] = Public(() =>
+                JsonContent.Create(new { displayName = "Probe Guest" })),
+            ["PUT /api/v1/guest/{guestLinkId:guid}/poll/options/{optionId:guid}/vote"] = Public(() =>
+                JsonContent.Create(new { choice = "available" })),
+            ["POST /api/v1/guest/{guestLinkId:guid}/poll/options"] = Public(() =>
+                JsonContent.Create(new { startTime = "2027-01-01T00:00:00Z" })),
+            ["PUT /api/v1/guest/{guestLinkId:guid}/poll/display-name"] = Public(() =>
+                JsonContent.Create(new { displayName = "Probe Guest" })),
         };
 
     private readonly PartyUpApiFactory _factory = new();

@@ -7,6 +7,7 @@ using Microsoft.Net.Http.Headers;
 using NodaTime;
 using PartyUp.Api.Security;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
 using PartyUp.Infrastructure.Persistence;
 
@@ -183,6 +184,117 @@ public sealed class GuestExchangeTests : IAsyncLifetime, IDisposable
             client, session.GuestLinks[0].Id.Value, CookieHeader(cookie));
 
         Assert.Equal("live", view.RootElement.GetProperty("state").GetString());
+    }
+
+    // ---- ticket-P6-S4b: the /g/{token} poll-owned branch ---------------------------------------
+
+    /// <summary>
+    /// The poll branch (PHASE6_DESIGN.md §4): a poll-owned token mints a poll-purpose credential and
+    /// redirects to the SAME tokenless <c>/guest/{linkId}</c> route the session branch uses — never a
+    /// distinguishable path shape a bearer or observer could use to tell polls and sessions apart.
+    /// </summary>
+    [Fact]
+    public async Task PollOwnedToken_SetsAPollPurposeCookieAndRedirectsToTheSameTokenlessRoute_D125()
+    {
+        (PollId pollId, GuestLinkId linkId, string token) = await SeedPollWithGuestLinkAsync();
+        using HttpClient client = CreateExchangeClient();
+
+        HttpResponseMessage response = await client.GetAsync($"/g/{token}");
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        string? location = response.Headers.Location?.ToString();
+        Assert.NotNull(location);
+        Assert.Equal($"/guest/{linkId.Value:N}", location);
+        Assert.DoesNotContain(token, location, StringComparison.Ordinal);
+
+        SetCookieHeaderValue cookie = SetCookiesOf(response).Single(c => c.Name.Value!.StartsWith("pu.g.", StringComparison.Ordinal));
+        Assert.Equal($"pu.g.{linkId.Value:N}", cookie.Name.Value);
+        Assert.True(cookie.HttpOnly);
+        Assert.StartsWith("/api/v1/guest/", cookie.Path.Value);
+
+        using JsonDocument view = await FetchGuestPollAsync(client, linkId.Value, CookieHeader(cookie));
+        Assert.Equal("live", view.RootElement.GetProperty("state").GetString());
+        Assert.Equal(pollId.Value, view.RootElement.GetProperty("pollId").GetGuid());
+        Assert.DoesNotContain(token, await FetchGuestPollBodyAsync(client, linkId.Value, CookieHeader(cookie)), StringComparison.Ordinal);
+    }
+
+    /// <summary>A session-purpose credential cannot decrypt on a poll route, and vice versa (PHASE6_DESIGN.md §4).</summary>
+    [Fact]
+    public async Task CrossPurposeCredential_IsRejectedOnTheOtherArmsRoute_StructurallyFailClosed()
+    {
+        (Session session, string sessionToken) = await SeedSessionWithGuestLinkAsync();
+        (PollId _, GuestLinkId pollLinkId, string pollToken) = await SeedPollWithGuestLinkAsync();
+        using HttpClient client = CreateExchangeClient();
+
+        HttpResponseMessage sessionExchange = await client.GetAsync($"/g/{sessionToken}");
+        SetCookieHeaderValue sessionCookie = SetCookiesOf(sessionExchange)
+            .Single(c => c.Name.Value!.StartsWith("pu.g.", StringComparison.Ordinal));
+
+        HttpResponseMessage pollExchange = await client.GetAsync($"/g/{pollToken}");
+        SetCookieHeaderValue pollCookie = SetCookiesOf(pollExchange)
+            .Single(c => c.Name.Value!.StartsWith("pu.g.", StringComparison.Ordinal));
+
+        Guid sessionGuestLinkId = session.GuestLinks[0].Id.Value;
+
+        // The session-typed cookie on the poll route.
+        var pollRouteRequest = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/guest/{sessionGuestLinkId:N}/poll");
+        pollRouteRequest.Headers.Add(HeaderNames.Cookie, CookieHeader(sessionCookie));
+        HttpResponseMessage crossOne = await client.SendAsync(pollRouteRequest);
+        Assert.Equal(HttpStatusCode.NotFound, crossOne.StatusCode);
+        Assert.Contains("poll_not_found", await crossOne.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+
+        // The poll-typed cookie on the session route.
+        var sessionRouteRequest = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/guest/{pollLinkId.Value:N}/session");
+        sessionRouteRequest.Headers.Add(HeaderNames.Cookie, CookieHeader(pollCookie));
+        HttpResponseMessage crossTwo = await client.SendAsync(sessionRouteRequest);
+        Assert.Equal(HttpStatusCode.NotFound, crossTwo.StatusCode);
+        Assert.Contains("session_not_found", await crossTwo.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    private async Task<(PollId PollId, GuestLinkId LinkId, string Token)> SeedPollWithGuestLinkAsync()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"guest-poll-exchange-{Guid.NewGuid():N}@example.test");
+        Instant baseTime = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
+        Poll poll = Poll.Create(
+            organizerId,
+            new PollDetails(
+                SessionTitle.Create("Poll exchange test"),
+                Duration15.FromMinutes(60),
+                Platform.NotApplicable,
+                null,
+                SessionNotes.Empty,
+                minAttendance: 1,
+                maxCapacity: null,
+                isPrivate: true),
+            PollDeadlineChoice.Hours24,
+            [baseTime, baseTime + Duration.FromHours(1)],
+            [],
+            _factory.Clock);
+        (GuestLink link, string token) = poll.CreateGuestLink(_factory.Clock);
+        _ = poll.DequeueEvents();
+
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        context.Polls.Add(poll);
+        await context.SaveChangesAsync();
+        return (poll.Id, link.Id, token);
+    }
+
+    private static async Task<JsonDocument> FetchGuestPollAsync(HttpClient client, Guid guestLinkId, string cookieHeader)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/guest/{guestLinkId:N}/poll");
+        request.Headers.Add(HeaderNames.Cookie, cookieHeader);
+        HttpResponseMessage response = await client.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        return JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+    }
+
+    private static async Task<string> FetchGuestPollBodyAsync(HttpClient client, Guid guestLinkId, string cookieHeader)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/guest/{guestLinkId:N}/poll");
+        request.Headers.Add(HeaderNames.Cookie, cookieHeader);
+        HttpResponseMessage response = await client.SendAsync(request);
+        return await response.Content.ReadAsStringAsync();
     }
 
     // ---- helpers -------------------------------------------------------------------------------

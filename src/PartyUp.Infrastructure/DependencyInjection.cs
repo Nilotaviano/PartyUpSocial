@@ -83,6 +83,7 @@ public static class DependencyInjection
         services.AddScoped<GuestPollUseCases>();
         services.AddScoped<PollJoinRequestUseCases>();
         services.AddScoped<PollReadUseCases>();
+        services.AddScoped<GuestPollReadUseCases>();
         services.AddScoped<CancelPollUseCase>();
         services.AddScoped<FinalizePollUseCase>();
         services.AddScoped<PollTransitionUseCase>();

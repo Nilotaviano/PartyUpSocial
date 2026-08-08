@@ -111,4 +111,12 @@ public static class ApiOperationIds
     // the routes these ids name.
     public const string ListPolls = "ListPolls";
     public const string GetPollFinalizationPreview = "GetPollFinalizationPreview";
+
+    // PHASE6_DESIGN.md §4: the poll guest arm, relative to /api/v1 (ticket-P6-S4b) — parallel nested
+    // resources on the shipped /guest/{guestLinkId} group, joining the shipped guest-write dimension.
+    public const string GetGuestPollView = "GetGuestPollView";
+    public const string ClaimGuestPollLink = "ClaimGuestPollLink";
+    public const string VoteOnPollAsGuest = "VoteOnPollAsGuest";
+    public const string SuggestPollOptionAsGuest = "SuggestPollOptionAsGuest";
+    public const string RenameGuestPollIdentity = "RenameGuestPollIdentity";
 }

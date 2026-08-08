@@ -133,6 +133,29 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
             {
                 ["put"] = ApiOperationIds.RespondAsGuest,
             },
+            // PHASE6_DESIGN.md §4 (ticket-P6-S4b): the poll guest arm shares this same
+            // /api/v1/guest/{guestLinkId} prefix, so this inventory's blanket path filter below
+            // picks these up too — kept exhaustive rather than narrowing the filter.
+            ["/api/v1/guest/{guestLinkId}/poll"] = new()
+            {
+                ["get"] = ApiOperationIds.GetGuestPollView,
+            },
+            ["/api/v1/guest/{guestLinkId}/poll/claim"] = new()
+            {
+                ["post"] = ApiOperationIds.ClaimGuestPollLink,
+            },
+            ["/api/v1/guest/{guestLinkId}/poll/options/{optionId}/vote"] = new()
+            {
+                ["put"] = ApiOperationIds.VoteOnPollAsGuest,
+            },
+            ["/api/v1/guest/{guestLinkId}/poll/options"] = new()
+            {
+                ["post"] = ApiOperationIds.SuggestPollOptionAsGuest,
+            },
+            ["/api/v1/guest/{guestLinkId}/poll/display-name"] = new()
+            {
+                ["put"] = ApiOperationIds.RenameGuestPollIdentity,
+            },
         };
 
         // Exact path set: no extras, nothing missing (this is the S4 session/guest surface only —
