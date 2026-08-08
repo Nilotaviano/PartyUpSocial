@@ -127,20 +127,57 @@ export function Welcome() {
   const { t } = useTranslation(['common', 'auth'])
   return (
     <main
-      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
+      className="mx-auto flex min-h-[80vh] max-w-3xl flex-col justify-center gap-8 p-4 sm:p-8"
       data-testid="screen-welcome"
     >
-      <h1 className="text-h1 font-display font-bold text-ink">
-        {t('pages.welcome')}
-      </h1>
-      <p className="text-ink-soft">{t('app.tagline')}</p>
-      <div className="flex flex-wrap gap-3">
-        <Link className={`${linkButtonBase} bg-primary text-primary-ink`} to="/login">
-          {t('pages.login', { ns: 'auth' })}
-        </Link>
-        <Link className={`${linkButtonBase} bg-card text-ink`} to="/register">
-          {t('pages.register', { ns: 'auth' })}
-        </Link>
+      <div className="grid items-center gap-10 sm:grid-cols-[3fr_2fr]">
+        <div className="space-y-6">
+          <span className="inline-flex items-center rounded-full border-2 border-ink bg-accent px-3 py-1 font-display text-xs font-bold uppercase tracking-widest text-accent-ink dark:border-accent-ink">
+            {t('pages.welcome')}
+          </span>
+          <h1 className="max-w-[16ch] font-display text-4xl leading-[1.05] font-extrabold text-ink sm:text-5xl">
+            {t('app.tagline')}
+          </h1>
+          <div className="flex flex-wrap gap-3">
+            <Link className={`${linkButtonBase} bg-primary text-primary-ink`} to="/login">
+              {t('pages.login', { ns: 'auth' })}
+            </Link>
+            <Link className={`${linkButtonBase} bg-card text-ink`} to="/register">
+              {t('pages.register', { ns: 'auth' })}
+            </Link>
+          </div>
+        </div>
+        {/* Decorative miniature of the product's own week grid — the one
+            surface that explains PartyUp without words. Colors are grid
+            tokens; the ringed column is the selection band idiom. */}
+        <div
+          aria-hidden="true"
+          className="hidden rotate-2 rounded-card border-2 border-ink bg-card p-4 shadow-offset-card sm:block"
+        >
+          <div className="mb-3 flex items-center gap-2">
+            <span className="h-2.5 w-10 rounded-full bg-ink/20" />
+            <span className="h-2.5 w-6 rounded-full bg-ink/10" />
+          </div>
+          <div className="grid grid-cols-5 gap-1">
+            {[
+              'bg-page', 'bg-free', 'bg-page', 'bg-busy', 'bg-page',
+              'bg-busy', 'bg-free', 'bg-free', 'bg-page', 'bg-busy',
+              'bg-page', 'bg-free', 'bg-free', 'bg-free', 'bg-page',
+              'bg-free', 'bg-free', 'bg-page', 'bg-busy', 'bg-free',
+              'bg-page', 'bg-busy', 'bg-page', 'bg-page', 'bg-page',
+            ].map((fill, index) => (
+              <span
+                key={index}
+                className={`h-7 rounded-[0.3rem] border border-ink/15 ${fill} ${
+                  index === 6 || index === 11 ? 'ring-2 ring-ink ring-inset' : ''
+                }`}
+              />
+            ))}
+          </div>
+          <div className="mt-3 inline-flex items-center rounded-full border-2 border-ink bg-accent px-2.5 py-0.5 font-display text-xs font-bold text-accent-ink dark:border-accent-ink">
+            21:00 — 23:00
+          </div>
+        </div>
       </div>
     </main>
   )
