@@ -5,6 +5,13 @@ import QRCode from 'react-qr-code'
 import { client, isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 
+// PHASE5_1_DESIGN.md §1/§3: QR modules always render --color-qr-ink on a
+// --color-qr chip in both themes (scannability; the pair is theme-invariant
+// and never overridden under [data-theme=dark]) — hardcoded here since
+// react-qr-code needs literal hex, not CSS var references.
+const QR_CHIP_COLOR = '#FFFDF5' // --color-qr
+const QR_MODULE_COLOR = '#1B2408' // --color-qr-ink
+
 async function getFriendShare() {
   const { data } = await client.GET('/api/v1/friend-share')
   if (!data) throw new Error('Friend-share response was empty.')
@@ -31,15 +38,15 @@ export function ShareCard() {
   return (
     <section
       aria-labelledby="friend-share-heading"
-      className="rounded-2xl border border-indigo-200 bg-indigo-50 p-5 shadow-sm"
+      className="rounded-card border-2 border-ink bg-card p-5 shadow-offset-card"
     >
       <h2
         id="friend-share-heading"
-        className="text-xl font-semibold text-slate-950"
+        className="font-display text-h2 font-semibold text-ink"
       >
         {t('sections.share')}
       </h2>
-      {share.isPending && <p>{t('status.loading')}</p>}
+      {share.isPending && <p className="text-ink-soft">{t('status.loading')}</p>}
       {share.error && (
         <p role="alert">
           {t(isApiError(share.error) ? share.error.code : 'generic', {
@@ -50,18 +57,24 @@ export function ShareCard() {
       )}
       {share.data && (
         <div className="mt-4 grid gap-5 sm:grid-cols-[auto_1fr] sm:items-center">
-          <div aria-hidden="true" className="w-fit rounded-xl bg-white p-3">
-            <QRCode aria-hidden="true" size={152} value={share.data.addUrl} />
+          <div aria-hidden="true" className="w-fit rounded-card bg-qr p-6">
+            <QRCode
+              aria-hidden="true"
+              bgColor={QR_CHIP_COLOR}
+              fgColor={QR_MODULE_COLOR}
+              size={152}
+              value={share.data.addUrl}
+            />
           </div>
           <div className="min-w-0 space-y-4">
-            <p className="text-sm text-slate-600">{t('qr.description')}</p>
+            <p className="text-ink-soft">{t('qr.description')}</p>
             <div>
-              <p className="text-sm text-slate-600">{t('labels.friendCode')}</p>
-              <p className="select-all font-mono text-2xl font-bold tracking-widest text-slate-950">
+              <p className="text-ink-soft">{t('labels.friendCode')}</p>
+              <p className="select-all font-mono text-h1 font-bold tracking-widest text-ink">
                 {share.data.friendCode}
               </p>
               <Button
-                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                variant="neutral"
                 onClick={() =>
                   void copy(share.data.friendCode, t('labels.friendCode'))
                 }
@@ -70,17 +83,17 @@ export function ShareCard() {
               </Button>
             </div>
             <div>
-              <p className="text-sm text-slate-600">
+              <p className="text-ink-soft">
                 {t('share.addLinkDescription')}
               </p>
               <a
-                className="inline-flex min-h-11 items-center break-all text-indigo-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="inline-flex min-h-11 items-center break-all text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                 href={share.data.addUrl}
               >
                 {share.data.addUrl}
               </a>
               <Button
-                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                variant="neutral"
                 onClick={() =>
                   void copy(share.data.addUrl, t('actions.copyAddLink'))
                 }
@@ -89,17 +102,17 @@ export function ShareCard() {
               </Button>
             </div>
             <div>
-              <p className="text-sm text-slate-600">
+              <p className="text-ink-soft">
                 {t('share.profileLinkDescription')}
               </p>
               <a
-                className="inline-flex min-h-11 items-center break-all text-indigo-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="inline-flex min-h-11 items-center break-all text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                 href={share.data.profileUrl}
               >
                 {share.data.profileUrl}
               </a>
               <Button
-                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                variant="neutral"
                 onClick={() =>
                   void copy(share.data.profileUrl, t('actions.copyProfileLink'))
                 }
@@ -110,7 +123,7 @@ export function ShareCard() {
           </div>
         </div>
       )}
-      <p aria-live="polite" className="mt-3 text-sm text-emerald-700">
+      <p aria-live="polite" className="mt-3 text-ink">
         {announcement}
       </p>
     </section>

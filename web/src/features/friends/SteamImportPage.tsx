@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { client, isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { AvatarDisc } from './AvatarDisc'
 import {
   invalidateFriendGraph,
   runFriendGraphAction,
@@ -129,14 +130,14 @@ export function SteamImportPage() {
       <h1
         ref={heading}
         tabIndex={-1}
-        className="text-3xl font-bold tracking-tight text-slate-950 focus:outline-none"
+        className="font-display text-display font-bold text-ink focus:outline-none"
       >
         {t('pages.importSteam')}
       </h1>
       <Button
         aria-busy={importer.isPending}
-        className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
         disabled={importer.isPending}
+        variant="primary"
         onClick={() => importer.mutate()}
       >
         {result?.state === 'upstream_failure'
@@ -152,7 +153,7 @@ export function SteamImportPage() {
           })}
         </p>
       )}
-      <p aria-live="polite" className="text-sm text-emerald-700">
+      <p aria-live="polite" className="text-ink">
         {status}
       </p>
 
@@ -160,14 +161,14 @@ export function SteamImportPage() {
         <section aria-labelledby="steam-result-heading" className="space-y-4">
           <h2
             id="steam-result-heading"
-            className="text-xl font-semibold text-slate-950"
+            className="font-display text-h2 font-semibold text-ink"
           >
             {t(titleKey)}
           </h2>
-          {bodyKey && <p className="text-slate-700">{t(bodyKey)}</p>}
+          {bodyKey && <p className="text-ink-soft">{t(bodyKey)}</p>}
           {result.state === 'private_profile' && (
             <a
-              className="inline-flex min-h-11 items-center text-indigo-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              className="inline-flex min-h-11 items-center text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               href="https://steamcommunity.com/my/edit/settings"
               rel="noreferrer"
               target="_blank"
@@ -180,11 +181,11 @@ export function SteamImportPage() {
             <ul className="grid gap-3 sm:grid-cols-2">
               {view.matches.map((match, index) => (
                 <li key={`${match.username}:${index}`}>
-                  <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <h3 className="font-mono font-semibold text-slate-950">
+                  <article className="rounded-card border-2 border-ink bg-card p-4 shadow-offset-card">
+                    <h3 className="font-mono font-semibold text-ink">
                       @{match.username}
                     </h3>
-                    <p className="mt-1 text-sm text-slate-600">
+                    <p className="mt-1 text-ink-soft">
                       {t('steam.matchDescription', {
                         username: match.username,
                       })}
@@ -194,8 +195,8 @@ export function SteamImportPage() {
                         <Button
                           aria-busy={graphAction.isPending}
                           aria-label={`${t('actions.sendRequest')} @${match.username}`}
-                          className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
                           disabled={graphAction.isPending}
+                          variant="neutral"
                           onClick={() =>
                             act({ kind: 'send', username: match.username })
                           }
@@ -205,8 +206,8 @@ export function SteamImportPage() {
                         <Button
                           aria-busy={graphAction.isPending}
                           aria-label={`${t('actions.block')} @${match.username}`}
-                          className="min-h-11 rounded-md border border-red-300 px-4 py-2 text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-60"
                           disabled={graphAction.isPending}
+                          variant="danger"
                           onClick={() =>
                             act({ kind: 'block', username: match.username })
                           }
@@ -215,7 +216,7 @@ export function SteamImportPage() {
                         </Button>
                       </div>
                     ) : (
-                      <p className="mt-3 text-sm text-slate-700">
+                      <p className="mt-3 text-ink-soft">
                         {t(
                           match.state === 'accepted'
                             ? 'status.friends'
@@ -224,7 +225,7 @@ export function SteamImportPage() {
                       </p>
                     )}
                     {match.state === 'actionable' && (
-                      <p className="mt-3 text-sm text-slate-600">
+                      <p className="mt-3 text-ink-soft">
                         {t('profile.blockConsequence')}
                       </p>
                     )}
@@ -238,38 +239,33 @@ export function SteamImportPage() {
             <ul className="grid gap-3 sm:grid-cols-2">
               {result.unmatched.map((friend) => (
                 <li key={friend.steamId64}>
-                  <article className="flex h-full flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <article className="flex h-full flex-col justify-between gap-4 rounded-card border-2 border-ink bg-card p-4 shadow-offset-card">
                     <div className="flex items-center gap-3">
                       {friend.avatarUrl ? (
                         <img
                           alt=""
-                          className="h-12 w-12 rounded-full"
+                          className="h-12 w-12 rounded-full border-2 border-ink"
                           height="48"
                           src={friend.avatarUrl}
                           width="48"
                         />
                       ) : (
-                        <span
-                          aria-hidden="true"
-                          className="grid h-12 w-12 place-items-center rounded-full bg-slate-100"
-                        >
-                          ●
-                        </span>
+                        <AvatarDisc seed={friend.steamId64} size="sm" />
                       )}
                       <div className="min-w-0">
                         {friend.personaName && (
-                          <h3 className="break-words font-semibold text-slate-950">
+                          <h3 className="break-words font-display font-semibold text-ink">
                             {friend.personaName}
                           </h3>
                         )}
-                        <p className="text-sm text-slate-600">
+                        <p className="text-ink-soft">
                           {t('steam.unmatchedDescription')}
                         </p>
                       </div>
                     </div>
                     <Button
                       aria-label={`${t('actions.copyInvitationLink')} ${friend.personaName ?? friend.steamId64}`}
-                      className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                      variant="neutral"
                       onClick={() => void copyInvitation(friend.invitationUrl)}
                     >
                       {t('actions.copyInvitationLink')}
@@ -285,12 +281,13 @@ export function SteamImportPage() {
             result.state === 'zero_friends' ||
             result.state === 'private_profile' ||
             result.state === 'upstream_failure') && (
-            <div className="rounded-lg bg-indigo-50 p-4">
-              <p className="break-all text-sm text-slate-700">
+            <div className="rounded-card border-2 border-ink bg-card p-4">
+              <p className="break-all text-ink-soft">
                 {result.invitationUrl}
               </p>
               <Button
-                className="mt-3 min-h-11 rounded-md border border-indigo-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="mt-3"
+                variant="neutral"
                 onClick={() => void copyInvitation(result.invitationUrl)}
               >
                 {t('actions.copyInvitationLink')}

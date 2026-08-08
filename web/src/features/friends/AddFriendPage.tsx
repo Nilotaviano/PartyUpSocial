@@ -78,7 +78,7 @@ export function AddFriendPage() {
       <h1
         ref={heading}
         tabIndex={-1}
-        className="text-2xl font-bold tracking-tight text-slate-950"
+        className="font-display text-h1 font-bold text-ink focus:outline-none"
       >
         {t('pages.add')}
       </h1>

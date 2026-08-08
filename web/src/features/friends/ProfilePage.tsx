@@ -6,6 +6,7 @@ import type { components } from '../../api/schema'
 import { client, isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { validateFriendContinuation } from '../../auth/friendContinuation'
+import { AvatarDisc } from './AvatarDisc'
 import { UnfriendDialog } from './FriendList'
 import {
   friendKeys,
@@ -94,23 +95,22 @@ export function ProfileActionCard({
   } as const
   return (
     <article
-      className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+      className="rounded-card border-2 border-ink bg-card p-5 shadow-offset-card"
       data-disclosure={profile.disclosure}
     >
       {profile.disclosure === 'full' ? (
         <>
           <div className="flex items-center gap-3">
-            <span
-              aria-hidden="true"
-              className="grid h-12 w-12 place-items-center rounded-full bg-indigo-100 text-xl"
-            >
-              {profile.avatar.emoji ?? '●'}
-            </span>
+            <AvatarDisc
+              emoji={profile.avatar.emoji}
+              seed={profile.username}
+              size="sm"
+            />
             <div>
-              <h2 className="text-lg font-semibold text-slate-950">
+              <h2 className="font-display text-h3 font-semibold text-ink">
                 {profile.displayName}
               </h2>
-              <p className="font-mono text-sm text-slate-600">
+              <p className="font-mono text-meta text-ink-soft">
                 @{profile.username}
               </p>
             </div>
@@ -120,7 +120,7 @@ export function ProfileActionCard({
               {profile.platforms.map((platform) => (
                 <li
                   key={`${platform.platform}:${platform.handle}`}
-                  className="break-all text-sm text-slate-700"
+                  className="break-all text-meta text-ink-soft"
                 >
                   {platform.platform}: {platform.handle}
                 </li>
@@ -130,22 +130,22 @@ export function ProfileActionCard({
         </>
       ) : (
         <>
-          <h2 className="font-mono text-lg font-semibold text-slate-950">
+          <h2 className="font-mono text-h3 font-semibold text-ink">
             @{profile.username}
           </h2>
           <p className="sr-only">{t('profile.usernameOnly')}</p>
         </>
       )}
 
-      <p className="mt-3 text-sm text-slate-600">
+      <p className="mt-3 text-ink-soft">
         {t(relationshipStatusKey[relationship])}
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         {relationship === 'none' && (
           <Button
             aria-busy={action.isPending}
-            className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
             disabled={action.isPending}
+            variant="neutral"
             onClick={() => action.mutate('send')}
           >
             {t('actions.sendRequest')}
@@ -155,16 +155,16 @@ export function ProfileActionCard({
           <>
             <Button
               aria-busy={action.isPending}
-              className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
               disabled={action.isPending}
+              variant="neutral"
               onClick={() => action.mutate('accept')}
             >
               {t('actions.accept')}
             </Button>
             <Button
               aria-busy={action.isPending}
-              className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
               disabled={action.isPending}
+              variant="neutral"
               onClick={() => action.mutate('reject')}
             >
               {t('actions.reject')}
@@ -174,8 +174,8 @@ export function ProfileActionCard({
         {relationship === 'outgoing_pending' && (
           <Button
             aria-busy={action.isPending}
-            className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
             disabled={action.isPending}
+            variant="neutral"
             onClick={() => action.mutate('cancel')}
           >
             {t('actions.cancelRequest')}
@@ -192,17 +192,17 @@ export function ProfileActionCard({
         )}
         <Button
           aria-busy={action.isPending}
-          className="min-h-11 rounded-md border border-red-300 px-4 py-2 text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-60"
           disabled={action.isPending}
+          variant="danger"
           onClick={() => action.mutate('block')}
         >
           {t('actions.block')}
         </Button>
       </div>
-      <p className="mt-3 text-sm text-slate-600">
+      <p className="mt-3 text-ink-soft">
         {t('profile.blockConsequence')}
       </p>
-      <p aria-live="polite" className="mt-3 text-sm text-emerald-700">
+      <p aria-live="polite" className="mt-3 text-ink">
         {status}
       </p>
       <FriendError error={action.error} />
@@ -258,7 +258,7 @@ export function ProfilePage() {
       <h1
         ref={heading}
         tabIndex={-1}
-        className="text-2xl font-bold tracking-tight text-slate-950"
+        className="font-display text-h1 font-bold text-ink focus:outline-none"
       >
         {t('pages.profile')}
       </h1>

@@ -35,6 +35,15 @@
     "es": "Español",
     "saved": "Idioma salvo."
   },
+  "theme": {
+    "title": "Tema",
+    "legend": "Preferência de tema",
+    "options": {
+      "system": "Seguir o sistema",
+      "light": "Claro",
+      "dark": "Escuro"
+    }
+  },
   "delete": {
     "title": "Excluir conta",
     "grace": "A exclusão inicia um período de carência de 7 dias antes dos efeitos destrutivos.",

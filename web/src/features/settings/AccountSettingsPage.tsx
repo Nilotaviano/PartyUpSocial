@@ -13,6 +13,7 @@ import { Select } from '../../components/ui/select'
 import { ReauthPrompt, type ReauthAction } from './ReauthPrompt'
 import { clearPendingSettingsAction, getPendingSettingsAction } from './reauthAction'
 import { SettingsNavigation } from './BlockedUsersPage'
+import { ThemeToggle } from './ThemeToggle'
 
 const methodsQueryKey = ['auth-methods'] as const
 
@@ -166,29 +167,30 @@ export function AccountSettingsPage() {
     : null
 
   return (
-    <main data-testid="screen-settings-account">
+    <main className="mx-auto max-w-3xl space-y-8 p-4 sm:p-8" data-testid="screen-settings-account">
       <SettingsNavigation />
-      <h1>{t('pages.account')}</h1>
-      {(location.state as { identityConfirmed?: boolean } | null)?.identityConfirmed && <p role="status">{t('reauth.confirmedIdentityChooseAction')}</p>}
-      <section aria-labelledby="account-email-heading">
-        <h2 id="account-email-heading">{t('email.title')}</h2>
-        <p>{emailMethod?.detail ?? t('email.unavailable')}</p>
+      <h1 className="font-display text-display font-bold text-ink">{t('pages.account')}</h1>
+      {(location.state as { identityConfirmed?: boolean } | null)?.identityConfirmed && <p className="text-ink" role="status">{t('reauth.confirmedIdentityChooseAction')}</p>}
+      <section aria-labelledby="account-email-heading" className="space-y-1">
+        <h2 className="font-display text-h2 font-semibold text-ink" id="account-email-heading">{t('email.title')}</h2>
+        <p className="text-ink-soft">{emailMethod?.detail ?? t('email.unavailable')}</p>
       </section>
-      <section aria-labelledby="account-password-heading">
-        <h2 id="account-password-heading">{t('password.title')}</h2>
-        <p>{methods.some((method) => method.kind.toLowerCase() === 'password') ? t('password.enabled') : t('password.notSet')}</p>
+      <section aria-labelledby="account-password-heading" className="space-y-1">
+        <h2 className="font-display text-h2 font-semibold text-ink" id="account-password-heading">{t('password.title')}</h2>
+        <p className="text-ink-soft">{methods.some((method) => method.kind.toLowerCase() === 'password') ? t('password.enabled') : t('password.notSet')}</p>
       </section>
-      <section aria-labelledby="auth-methods-heading">
-        <h2 id="auth-methods-heading">{t('authMethods.title')}</h2>
+      <section aria-labelledby="auth-methods-heading" className="space-y-3">
+        <h2 className="font-display text-h2 font-semibold text-ink" id="auth-methods-heading">{t('authMethods.title')}</h2>
         {isPending ? (
-          <p>{t('loading')}</p>
+          <p className="text-ink-soft">{t('loading')}</p>
         ) : (
-          <ul>
+          <ul className="space-y-2">
             {methods.map((method) => (
-              <li key={method.kind}>
-                <span>{method.detail ?? method.kind}</span>
+              <li className="flex flex-wrap items-center justify-between gap-2 rounded-card border-2 border-ink bg-card p-3 shadow-offset-card" key={method.kind}>
+                <span className="text-ink">{method.detail ?? method.kind}</span>
                 {method.removable && (
                   <Button
+                    variant="danger"
                     onClick={(event) => {
                       setReturnFocusTo(event.currentTarget)
                       setAction({
@@ -205,26 +207,29 @@ export function AccountSettingsPage() {
           </ul>
         )}
         {unlinkedProviders.length > 0 && (
-          <div>
-            <h3>{t('authMethods.linkTitle')}</h3>
-            {unlinkedProviders.map((provider) => (
-              <Button
-                key={provider}
-                onClick={(event) => {
-                  setReturnFocusTo(event.currentTarget)
-                  setAction({ kind: 'linkAuthMethod', provider })
-                }}
-              >
-                {t('authMethods.link', {
-                  provider: provider === 'google' ? 'Google' : 'Steam',
-                })}
-              </Button>
-            ))}
+          <div className="space-y-2">
+            <h3 className="font-display text-h3 font-semibold text-ink">{t('authMethods.linkTitle')}</h3>
+            <div className="flex flex-wrap gap-2">
+              {unlinkedProviders.map((provider) => (
+                <Button
+                  key={provider}
+                  variant="neutral"
+                  onClick={(event) => {
+                    setReturnFocusTo(event.currentTarget)
+                    setAction({ kind: 'linkAuthMethod', provider })
+                  }}
+                >
+                  {t('authMethods.link', {
+                    provider: provider === 'google' ? 'Google' : 'Steam',
+                  })}
+                </Button>
+              ))}
+            </div>
           </div>
         )}
       </section>
-      <section aria-labelledby="language-heading">
-        <h2 id="language-heading">{t('language.title')}</h2>
+      <section aria-labelledby="language-heading" className="space-y-2">
+        <h2 className="font-display text-h2 font-semibold text-ink" id="language-heading">{t('language.title')}</h2>
         <Label htmlFor="locale">{t('language.label')}</Label>
         <Select.Root value={locale} onValueChange={(value) => void saveLocale(value)}>
           <Select.Trigger id="locale" aria-label={t('language.label')}>
@@ -246,21 +251,26 @@ export function AccountSettingsPage() {
             </Select.Content>
           </Select.Portal>
         </Select.Root>
-        {saved && <p role="status">{t('language.saved')}</p>}
+        {saved && <p className="text-ink" role="status">{t('language.saved')}</p>}
       </section>
-      <section aria-labelledby="time-zone-heading">
-        <h2 id="time-zone-heading">{t('fields.timeZone', { ns: 'profile' })}</h2>
-        <form onSubmit={(event) => void saveTimeZone(event)}>
+      <section aria-labelledby="theme-heading" className="space-y-2">
+        <h2 className="font-display text-h2 font-semibold text-ink" id="theme-heading">{t('theme.title')}</h2>
+        <ThemeToggle />
+      </section>
+      <section aria-labelledby="time-zone-heading" className="space-y-2">
+        <h2 className="font-display text-h2 font-semibold text-ink" id="time-zone-heading">{t('fields.timeZone', { ns: 'profile' })}</h2>
+        <form className="space-y-2" onSubmit={(event) => void saveTimeZone(event)}>
           <Label htmlFor="account-time-zone">{t('fields.timeZone', { ns: 'profile' })}</Label>
           <Input id="account-time-zone" name="timeZone" defaultValue={session?.profile?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone} required />
-          <Button type="submit">{t('actions.saveTimeZone', { ns: 'profile' })}</Button>
+          <Button type="submit" variant="primary">{t('actions.saveTimeZone', { ns: 'profile' })}</Button>
         </form>
       </section>
-      <section aria-labelledby="delete-account-heading">
-        <h2 id="delete-account-heading">{t('delete.title')}</h2>
-        <p>{t('delete.grace')}</p>
-        <p>{t('delete.loginCancels')}</p>
+      <section aria-labelledby="delete-account-heading" className="space-y-2">
+        <h2 className="font-display text-h2 font-semibold text-ink" id="delete-account-heading">{t('delete.title')}</h2>
+        <p className="text-ink-soft">{t('delete.grace')}</p>
+        <p className="text-ink-soft">{t('delete.loginCancels')}</p>
         <Button
+          variant="danger"
           onClick={(event) => {
             setReturnFocusTo(event.currentTarget)
             setAction({ kind: 'deleteAccount' })
@@ -268,7 +278,7 @@ export function AccountSettingsPage() {
         >
           {t('delete.start')}
         </Button>
-        {graceEndsAt && <p role="status">{t('delete.scheduled', { graceEndsAt })}</p>}
+        {graceEndsAt && <p className="text-ink" role="status">{t('delete.scheduled', { graceEndsAt })}</p>}
       </section>
       {errorMessage && <p role="alert">{errorMessage}</p>}
       <ReauthPrompt

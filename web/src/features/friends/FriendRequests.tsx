@@ -40,7 +40,9 @@ export function FriendRequests({
 
   if (items.length === 0) {
     return (
-      <p>{t(direction === 'incoming' ? 'empty.incoming' : 'empty.outgoing')}</p>
+      <p className="text-ink-soft">
+        {t(direction === 'incoming' ? 'empty.incoming' : 'empty.outgoing')}
+      </p>
     )
   }
 
@@ -60,8 +62,8 @@ export function FriendRequests({
       <ul className="grid gap-3 sm:grid-cols-2">
         {items.map((request) => (
           <li key={request.friendshipId}>
-            <article className="flex h-full flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <p className="font-mono font-semibold text-slate-950">
+            <article className="flex h-full flex-col justify-between gap-4 rounded-card border-2 border-ink bg-card p-4 shadow-offset-card">
+              <p className="font-mono font-semibold text-ink">
                 @{request.username}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -70,8 +72,8 @@ export function FriendRequests({
                     <Button
                       aria-busy={action.isPending}
                       aria-label={`${t('actions.accept')} @${request.username}`}
-                      className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
                       disabled={action.isPending}
+                      variant="neutral"
                       onClick={() => mutate('accept', request)}
                     >
                       {t('actions.accept')}
@@ -79,8 +81,8 @@ export function FriendRequests({
                     <Button
                       aria-busy={action.isPending}
                       aria-label={`${t('actions.reject')} @${request.username}`}
-                      className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
                       disabled={action.isPending}
+                      variant="neutral"
                       onClick={() => mutate('reject', request)}
                     >
                       {t('actions.reject')}
@@ -90,8 +92,8 @@ export function FriendRequests({
                   <Button
                     aria-busy={action.isPending}
                     aria-label={`${t('actions.cancelRequest')} @${request.username}`}
-                    className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
                     disabled={action.isPending}
+                    variant="neutral"
                     onClick={() => mutate('cancel', request)}
                   >
                     {t('actions.cancelRequest')}

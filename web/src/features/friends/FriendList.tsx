@@ -5,6 +5,7 @@ import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { Dialog } from '../../components/ui/dialog'
+import { AvatarDisc } from './AvatarDisc'
 import {
   friendKeys,
   invalidateFriendGraph,
@@ -41,28 +42,28 @@ export function UnfriendDialog({
       <Dialog.Trigger asChild>
         <Button
           aria-label={`${t('actions.unfriend')} @${username}`}
-          className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
           disabled={pending}
+          variant="danger"
         >
           {t('actions.unfriend')}
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-slate-950/40" />
+        <Dialog.Overlay className="fixed inset-0 bg-ink/40" />
         <Dialog.Content
           aria-describedby="unfriend-dialog-description"
-          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-xl focus:outline-none"
+          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-card border-2 border-ink bg-card p-6 shadow-offset-dialog focus:outline-none"
           onOpenAutoFocus={(event) => {
             event.preventDefault()
             cancelButton.current?.focus()
           }}
         >
-          <Dialog.Title className="text-lg font-semibold text-slate-950">
+          <Dialog.Title className="font-display text-h2 font-semibold text-ink">
             {t('dialogs.unfriendTitle', { username: `@${username}` })}
           </Dialog.Title>
           <Dialog.Description
             id="unfriend-dialog-description"
-            className="mt-2 text-sm text-slate-700"
+            className="mt-2 text-ink-soft"
           >
             {t('dialogs.unfriendBody')}
           </Dialog.Description>
@@ -70,7 +71,7 @@ export function UnfriendDialog({
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
                 type="button"
               >
                 {t('actions.cancel', { ns: 'settings' })}
@@ -78,8 +79,8 @@ export function UnfriendDialog({
             </Dialog.Close>
             <Button
               aria-busy={pending}
-              className="min-h-11 rounded-md bg-red-700 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-60"
               disabled={pending}
+              variant="danger"
               onClick={() => void confirm()}
             >
               {t('actions.confirmUnfriend')}
@@ -114,7 +115,7 @@ export function FriendList({ items, onStatus }: FriendListProps) {
     },
   })
 
-  if (items.length === 0) return <p>{t('empty.friends')}</p>
+  if (items.length === 0) return <p className="text-ink-soft">{t('empty.friends')}</p>
 
   return (
     <ul className="grid gap-4 sm:grid-cols-2">
@@ -125,22 +126,20 @@ export function FriendList({ items, onStatus }: FriendListProps) {
         }
         return (
           <li key={friend.friendshipId}>
-            <article className="flex h-full flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <article className="flex h-full flex-col justify-between gap-4 rounded-card border-2 border-ink bg-card p-4 shadow-offset-card">
               <Link
-                className="flex min-h-11 items-center gap-3 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="flex min-h-11 items-center gap-3 rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                 to={`/u/${friend.username}`}
               >
-                <span
-                  aria-hidden="true"
-                  className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-slate-100 text-2xl"
-                >
-                  {friend.avatar.emoji ?? '●'}
-                </span>
+                <AvatarDisc
+                  emoji={friend.avatar.emoji}
+                  seed={friend.username}
+                />
                 <span className="min-w-0">
-                  <span className="block truncate font-semibold text-slate-950">
+                  <span className="block truncate font-display font-semibold text-ink">
                     {friend.displayName}
                   </span>
-                  <span className="block truncate font-mono text-sm text-slate-600">
+                  <span className="block truncate font-mono text-meta text-ink-soft">
                     @{friend.username}
                   </span>
                 </span>
@@ -156,14 +155,14 @@ export function FriendList({ items, onStatus }: FriendListProps) {
                 <Button
                   aria-busy={action.isPending}
                   aria-label={`${t('actions.block')} @${friend.username}`}
-                  className="min-h-11 rounded-md border border-red-300 px-4 py-2 text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
                   disabled={action.isPending}
+                  variant="danger"
                   onClick={() => action.mutate({ kind: 'block', ...base })}
                 >
                   {t('actions.block')}
                 </Button>
               </div>
-              <p className="text-sm text-slate-600">
+              <p className="text-meta text-ink-soft">
                 {t('profile.blockConsequence')}
               </p>
             </article>

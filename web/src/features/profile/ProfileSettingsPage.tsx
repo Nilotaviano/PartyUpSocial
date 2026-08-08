@@ -92,41 +92,41 @@ export function ProfileSettingsPage() {
   async function confirmAction(proof: { currentPassword?: string; reauthToken?: string }) {
     if (action?.kind === 'unlinkPlatform') await unlinkPlatform(action.id, proof)
   }
-  if (isPending) return <main data-testid="screen-settings-profile"><SettingsNavigation /><p>{t('loading')}</p></main>
+  if (isPending) return <main className="mx-auto max-w-3xl space-y-6 p-4 sm:p-8" data-testid="screen-settings-profile"><SettingsNavigation /><p className="text-ink-soft">{t('loading')}</p></main>
 
   return (
-    <main data-testid="screen-settings-profile">
+    <main className="mx-auto max-w-3xl space-y-6 p-4 sm:p-8" data-testid="screen-settings-profile">
       <SettingsNavigation />
-      <h1>{t('pages.profile')}</h1>
+      <h1 className="font-display text-display font-bold text-ink">{t('pages.profile')}</h1>
       <ProfileError error={error} />
-      <form onSubmit={(event) => void save(event, '/api/v1/me/username')}>
+      <form className="space-y-2" onSubmit={(event) => void save(event, '/api/v1/me/username')}>
         <Label htmlFor="profile-username">{t('fields.username')}</Label>
         <Input id="profile-username" name="username" defaultValue={profile?.username ?? ''} required />
-        <p>{t('usernameCooldown')}</p>
-        <Button disabled={saving} type="submit">{t('actions.saveUsername')}</Button>
+        <p className="text-meta text-ink-soft">{t('usernameCooldown')}</p>
+        <Button disabled={saving} type="submit" variant="primary">{t('actions.saveUsername')}</Button>
       </form>
-      <form onSubmit={(event) => void save(event, '/api/v1/me/display-name')}>
+      <form className="space-y-2" onSubmit={(event) => void save(event, '/api/v1/me/display-name')}>
         <Label htmlFor="profile-display-name">{t('fields.displayName')}</Label>
         <Input id="profile-display-name" name="displayName" defaultValue={profile?.displayName ?? ''} required />
-        <Button disabled={saving} type="submit">{t('actions.saveDisplayName')}</Button>
+        <Button disabled={saving} type="submit" variant="neutral">{t('actions.saveDisplayName')}</Button>
       </form>
-      <form onSubmit={(event) => void save(event, '/api/v1/me/avatar')}>
+      <form className="space-y-2" onSubmit={(event) => void save(event, '/api/v1/me/avatar')}>
         <Label htmlFor="profile-avatar">{t('fields.avatar')}</Label>
         <Input id="profile-avatar" name="emoji" defaultValue={profile?.avatar?.emoji ?? 'game'} required />
-        <Button disabled={saving} type="submit">{t('actions.saveAvatar')}</Button>
+        <Button disabled={saving} type="submit" variant="neutral">{t('actions.saveAvatar')}</Button>
       </form>
-      <form onSubmit={(event) => void save(event, '/api/v1/me/time-zone')}>
+      <form className="space-y-2" onSubmit={(event) => void save(event, '/api/v1/me/time-zone')}>
         <Label htmlFor="profile-time-zone">{t('fields.timeZone')}</Label>
         <Input id="profile-time-zone" name="timeZone" defaultValue={profile?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone} required />
-        <Button disabled={saving} type="submit">{t('actions.saveTimeZone')}</Button>
+        <Button disabled={saving} type="submit" variant="neutral">{t('actions.saveTimeZone')}</Button>
       </form>
-      <section aria-labelledby="platform-links-heading">
-        <h2 id="platform-links-heading">{t('platformLinks.title')}</h2>
-        {profile?.platformLinks.length ? <ul>{profile.platformLinks.map((link) => <li key={link.id}>
-          <span>{t('platformLinks.item', { platform: link.platform, handle: link.handle })}</span>
-          {link.platform.toLowerCase() === 'steam' && <p>{t('platformLinks.steamUnlinkNotice')}</p>}
-          <Button onClick={() => void unlinkPlatform(link.id)}>{t('platformLinks.unlink', { platform: link.platform })}</Button>
-        </li>)}</ul> : <p>{t('platformLinks.empty')}</p>}
+      <section aria-labelledby="platform-links-heading" className="space-y-3">
+        <h2 className="font-display text-h2 font-semibold text-ink" id="platform-links-heading">{t('platformLinks.title')}</h2>
+        {profile?.platformLinks.length ? <ul className="space-y-3">{profile.platformLinks.map((link) => <li className="rounded-card border-2 border-ink bg-card p-4 shadow-offset-card" key={link.id}>
+          <span className="text-ink">{t('platformLinks.item', { platform: link.platform, handle: link.handle })}</span>
+          {link.platform.toLowerCase() === 'steam' && <p className="mt-1 text-meta text-ink-soft">{t('platformLinks.steamUnlinkNotice')}</p>}
+          <Button className="mt-2" variant="danger" onClick={() => void unlinkPlatform(link.id)}>{t('platformLinks.unlink', { platform: link.platform })}</Button>
+        </li>)}</ul> : <p className="text-ink-soft">{t('platformLinks.empty')}</p>}
       </section>
       <ProfileError error={formError} />
       <ReauthPrompt action={action} methods={methods} onOpenChange={(open) => { if (!open) { clearPendingSettingsAction(); setAction(null) } }} onConfirmed={confirmAction} />

@@ -26,10 +26,10 @@ export function SettingsNavigation() {
           <li key={to}>
             <NavLink
               className={({ isActive }) =>
-                `inline-flex min-h-11 items-center rounded-md px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
+                `inline-flex min-h-11 items-center rounded-full border-2 px-4 py-2 font-display font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                   isActive
-                    ? 'bg-indigo-100 font-semibold text-indigo-950'
-                    : 'text-slate-700 hover:bg-slate-100'
+                    ? 'border-ink bg-accent text-accent-ink dark:border-accent-ink'
+                    : 'border-transparent text-ink-soft'
                 }`
               }
               end
@@ -74,19 +74,19 @@ export function BlockedUsersPage() {
       <h1
         ref={heading}
         tabIndex={-1}
-        className="text-3xl font-bold tracking-tight text-slate-950 focus:outline-none"
+        className="font-display text-display font-bold text-ink focus:outline-none"
       >
         {t('pages.blocked')}
       </h1>
-      <p className="mt-2 text-slate-700">{t('empty.blockedHelp')}</p>
-      <p aria-live="polite" className="mt-3 text-sm text-emerald-700">
+      <p className="mt-2 text-ink-soft">{t('empty.blockedHelp')}</p>
+      <p aria-live="polite" className="mt-3 text-ink">
         {status}
       </p>
 
       {blocks.isPending && (
         <p
           aria-hidden="true"
-          className="mt-6 motion-safe:animate-pulse text-slate-500"
+          className="mt-6 motion-safe:animate-pulse text-ink-soft"
         >
           {t('status.loading')}
         </p>
@@ -100,7 +100,7 @@ export function BlockedUsersPage() {
         </p>
       )}
       {blocks.data?.length === 0 && (
-        <p className="mt-6">{t('empty.blocked')}</p>
+        <p className="mt-6 text-ink-soft">{t('empty.blocked')}</p>
       )}
       {blocks.data && blocks.data.length > 0 && (
         <ul className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -111,21 +111,22 @@ export function BlockedUsersPage() {
             return (
               <li
                 key={blocked.blockId}
-                className="flex flex-col items-start justify-between gap-4 rounded-xl sm:flex-row sm:items-center border border-slate-200 bg-white p-4 shadow-sm"
+                className="flex flex-col items-start justify-between gap-4 rounded-card border-2 border-ink bg-card p-4 shadow-offset-card sm:flex-row sm:items-center"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-mono font-semibold text-slate-950">
+                  <p className="truncate font-mono font-semibold text-ink">
                     @{blocked.username}
                   </p>
-                  <p className="text-sm text-slate-600">
+                  <p className="text-meta text-ink-soft">
                     {t('labels.blockedOn', { date })}
                   </p>
                 </div>
                 <Button
                   aria-busy={unblock.isPending}
                   aria-label={`${t('actions.unblock')} @${blocked.username}`}
-                  className="min-h-11 shrink-0 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
+                  className="shrink-0"
                   disabled={unblock.isPending}
+                  variant="neutral"
                   onClick={() =>
                     unblock.mutate({
                       kind: 'unblock',

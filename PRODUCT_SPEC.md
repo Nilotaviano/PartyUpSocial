@@ -670,6 +670,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-178 | Admins see a usage dashboard covering registrations, active users, sessions/polls created, confirmation rate, and 30-day repeat scheduling. | Confirmed |
 | D-179 | Admins see a user list with per-user stats and ban state. | Confirmed |
 | D-180 | Admins can ban/unban. Ban = sign-out everywhere + login blocked + hidden from lookup/discovery, content untouched, unban restores; the admin may optionally also remove the user's content (the D-092 effects without the tombstone), which unban does not reverse. | Confirmed |
+| D-181 | The app offers a theme preference — system (default), light, dark — set in settings, stored client-side only (localStorage); no server or API involvement. | Confirmed |
 
 ## 15. Open questions
 

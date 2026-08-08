@@ -39,19 +39,19 @@ export function FriendsPage() {
         <h1
           ref={heading}
           tabIndex={-1}
-          className="text-3xl font-bold tracking-tight text-slate-950 focus:outline-none"
+          className="font-display text-display font-bold text-ink focus:outline-none"
         >
           {t('pages.list')}
         </h1>
         <Link
-          className="inline-flex min-h-11 items-center rounded-md bg-indigo-600 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          className="inline-flex min-h-11 items-center gap-2 rounded-control border-2 border-ink bg-primary px-4 py-2 font-display font-semibold text-primary-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
           to="/friends/import/steam"
         >
           {t('actions.importSteam')}
         </Link>
       </header>
 
-      <p aria-live="polite" className="text-sm text-emerald-700">
+      <p aria-live="polite" className="text-ink">
         {status}
       </p>
       {error && (
@@ -66,14 +66,14 @@ export function FriendsPage() {
       <section aria-labelledby="friends-list-heading" className="space-y-4">
         <h2
           id="friends-list-heading"
-          className="text-xl font-semibold text-slate-950"
+          className="font-display text-h2 font-semibold text-ink"
         >
           {t('sections.friends')} ({friendItems.length})
         </h2>
         {friends.isPending ? (
           <p
             aria-hidden="true"
-            className="motion-safe:animate-pulse text-slate-500"
+            className="motion-safe:animate-pulse text-ink-soft"
           >
             {t('status.loading')}
           </p>
@@ -88,14 +88,14 @@ export function FriendsPage() {
       <section aria-labelledby="incoming-heading" className="space-y-4">
         <h2
           id="incoming-heading"
-          className="text-xl font-semibold text-slate-950"
+          className="font-display text-h2 font-semibold text-ink"
         >
           {t('sections.incoming')} ({incoming.length})
         </h2>
         {requests.isPending ? (
           <p
             aria-hidden="true"
-            className="motion-safe:animate-pulse text-slate-500"
+            className="motion-safe:animate-pulse text-ink-soft"
           >
             {t('status.loading')}
           </p>
@@ -111,14 +111,14 @@ export function FriendsPage() {
       <section aria-labelledby="outgoing-heading" className="space-y-4">
         <h2
           id="outgoing-heading"
-          className="text-xl font-semibold text-slate-950"
+          className="font-display text-h2 font-semibold text-ink"
         >
           {t('sections.outgoing')} ({outgoing.length})
         </h2>
         {requests.isPending ? (
           <p
             aria-hidden="true"
-            className="motion-safe:animate-pulse text-slate-500"
+            className="motion-safe:animate-pulse text-ink-soft"
           >
             {t('status.loading')}
           </p>

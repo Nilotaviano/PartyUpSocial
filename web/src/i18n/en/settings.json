@@ -35,6 +35,15 @@
     "es": "Español",
     "saved": "Language saved."
   },
+  "theme": {
+    "title": "Theme",
+    "legend": "Theme preference",
+    "options": {
+      "system": "Match system",
+      "light": "Light",
+      "dark": "Dark"
+    }
+  },
   "delete": {
     "title": "Delete account",
     "grace": "Deletion starts a 7-day grace period before destructive effects occur.",

@@ -35,6 +35,15 @@
     "es": "Español",
     "saved": "Idioma guardado."
   },
+  "theme": {
+    "title": "Tema",
+    "legend": "Preferencia de tema",
+    "options": {
+      "system": "Seguir el sistema",
+      "light": "Claro",
+      "dark": "Oscuro"
+    }
+  },
   "delete": {
     "title": "Eliminar cuenta",
     "grace": "La eliminación inicia un período de gracia de 7 días antes de los efectos destructivos.",

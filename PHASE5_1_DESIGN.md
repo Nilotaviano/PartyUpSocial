@@ -65,8 +65,9 @@ page `#161D10` · card `#212B18` · ink `#EDE8D4` · ink-soft `#A8B09B` · prima
 3. **S3 Home + sessions (list/detail/create/edit/invite) + discover.**
 4. **S4 Calendar: WeekGrid, agenda, layers, find-a-time** + layer-token mapping (geometry assertion already guarding since S1).
 5. **S5 Friends + profile + settings**, including the theme toggle control (system/light/dark radio) — its labels are the phase's only new i18n keys, added in all three locales (key-parity gate).
-6. **S6 Dark-theme audit pass** all surfaces + recomputed contrast sweep both themes.
-7. **S7 Closeout:** axe sweep — `AuditedRoutes` gains a theme dimension (each route audited light and dark; runtime doubles, accepted); browser lane; three-locale visual check; TRACEABILITY + doc deltas.
+6. **S5.5 Responsive sweep** (owner directive 2026-08-08 after a live iPhone overflow report): no route may scroll horizontally at 360px and up. Known defect: the App.tsx header nav is a no-wrap flex row that overflows phone widths — on <sm it becomes a horizontally scrollable chip row (the nav scrolls, never the page); desktop unchanged. Audit every surface for fixed widths, nowrap rows, and dialog min-widths; WeekGrid's 44px floor already fits 390px (64+7×44=372) and must not be shrunk.
+7. **S6 Dark-theme audit pass** all surfaces + recomputed contrast sweep both themes.
+8. **S7 Closeout:** axe sweep — `AuditedRoutes` gains a theme dimension (each route audited light and dark; runtime doubles, accepted); browser lane; three-locale visual check; TRACEABILITY + doc deltas.
 
 ## 5. Out of scope
 

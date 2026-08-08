@@ -46,7 +46,7 @@ export function FriendCodeInput({
           }
           autoCapitalize="characters"
           autoComplete="off"
-          className="min-h-11 min-w-56 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono tracking-wider"
+          className="min-w-56 flex-1 font-mono tracking-wider"
           id="friend-code"
           inputMode="text"
           maxLength={14}
@@ -54,14 +54,11 @@ export function FriendCodeInput({
           spellCheck={false}
           value={value}
         />
-        <Button
-          className="min-h-11 rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-          type="submit"
-        >
+        <Button type="submit" variant="primary">
           {t('actions.resolve')}
         </Button>
       </div>
-      <p className="text-sm text-slate-600" id="friend-code-help">
+      <p className="text-meta text-ink-soft" id="friend-code-help">
         {t('labels.friendCodeHelp')}
       </p>
       {invalid && (
