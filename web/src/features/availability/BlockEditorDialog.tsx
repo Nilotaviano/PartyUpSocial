@@ -70,9 +70,9 @@ export function BlockEditorDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-slate-950/40" />
+        <Dialog.Overlay className="fixed inset-0 bg-ink/40" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-xl focus:outline-none"
+          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-card border-2 border-ink bg-card p-6 shadow-offset-dialog focus:outline-none"
           onCloseAutoFocus={(event) => {
             event.preventDefault()
             triggerRef.current?.focus()
@@ -82,7 +82,7 @@ export function BlockEditorDialog({
             startRef.current?.focus()
           }}
         >
-          <Dialog.Title className="text-lg font-semibold text-slate-950">
+          <Dialog.Title className="font-display text-lg font-semibold text-ink">
             {t('block.editHeading')}
           </Dialog.Title>
           <form
@@ -108,12 +108,12 @@ export function BlockEditorDialog({
               <p role="alert">{t(`validation.${validationError}`)}</p>
             )}
             <div>
-              <label className="block font-medium text-slate-900" htmlFor="block-start">
+              <label className="block font-medium text-ink" htmlFor="block-start">
                 {t('block.start')}
               </label>
               <input
                 ref={startRef}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                 id="block-start"
                 step={900}
                 type="datetime-local"
@@ -122,11 +122,11 @@ export function BlockEditorDialog({
               />
             </div>
             <div>
-              <label className="block font-medium text-slate-900" htmlFor="block-end">
+              <label className="block font-medium text-ink" htmlFor="block-end">
                 {t('block.end')}
               </label>
               <input
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                 id="block-end"
                 step={900}
                 type="datetime-local"
@@ -137,7 +137,7 @@ export function BlockEditorDialog({
             <div className="flex flex-wrap justify-end gap-2">
               {onDelete && (
                 <button
-                  className="min-h-11 rounded-md border border-red-300 px-4 py-2 text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  className="min-h-11 rounded-control border-2 border-ink bg-danger px-4 py-2 font-display font-semibold text-danger-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
                   type="button"
                   onClick={onDelete}
                 >
@@ -146,14 +146,14 @@ export function BlockEditorDialog({
               )}
               <Dialog.Close asChild>
                 <button
-                  className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                  className="min-h-11 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
                   type="button"
                 >
                   {t('block.cancel')}
                 </button>
               </Dialog.Close>
               <button
-                className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="min-h-11 rounded-control border-2 border-ink bg-primary px-4 py-2 font-display font-semibold text-primary-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
                 type="submit"
               >
                 {t('block.save')}

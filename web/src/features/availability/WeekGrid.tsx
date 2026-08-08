@@ -394,7 +394,7 @@ export function WeekGrid({
             <div
               key={day}
               aria-colindex={day + 2}
-              className="min-h-11 min-w-11 flex-1 text-center text-sm font-medium"
+              className="min-h-11 min-w-11 flex-1 text-center font-display text-sm font-medium text-ink"
               role="columnheader"
             >
               {dayLabels[day]}
@@ -406,7 +406,7 @@ export function WeekGrid({
             <div
               aria-colindex={1}
               aria-rowindex={slot + 2}
-              className="min-h-11 w-16 shrink-0 pr-2 text-right text-xs text-slate-500"
+              className="min-h-11 w-16 shrink-0 pr-2 text-right text-xs text-ink-soft"
               role="rowheader"
             >
               {slot % 4 === 0
@@ -426,6 +426,21 @@ export function WeekGrid({
               const isFocused = focused.day === day && focused.slot === slot
               const key = `${day}:${slot}`
               const state = inSelection ? 'selected' : busy ? 'busy' : 'free'
+
+              // §3: the selection ring is drawn around the *band*, not per
+              // cell. A drag/keyboard selection is always one column wide
+              // (a single day), so the left/right band edges coincide with
+              // every selected cell's own edges; only the top and bottom
+              // band edges depend on position within the run.
+              let selectionEdges = ''
+              if (inSelection && selection) {
+                const lo = Math.min(selection.anchorSlot, selection.endSlot)
+                const hi = Math.max(selection.anchorSlot, selection.endSlot)
+                const edges = ['left', 'right']
+                if (slot === lo) edges.push('top')
+                if (slot === hi) edges.push('bottom')
+                selectionEdges = edges.join(' ')
+              }
 
               // Every layer contributes to one accessible name per cell —
               // never a color-only signal, and never a second gridcell for
@@ -455,7 +470,9 @@ export function WeekGrid({
                   aria-colindex={day + 2}
                   aria-label={labelParts.join(' – ')}
                   aria-rowindex={slot + 2}
-                  className="min-h-11 min-w-11 flex-1 border border-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                  className="relative isolate min-h-11 min-w-11 flex-1 border border-ink/25 bg-free data-[busy=true]:bg-busy focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus data-[state=selected]:before:absolute data-[state=selected]:before:inset-0 data-[state=selected]:before:z-[-1] data-[state=selected]:before:bg-ink/6 data-[state=selected]:before:content-[''] data-[selection-edge~=top]:border-t-2 data-[selection-edge~=top]:border-t-ink data-[selection-edge~=bottom]:border-b-2 data-[selection-edge~=bottom]:border-b-ink data-[selection-edge~=left]:border-l-2 data-[selection-edge~=left]:border-l-ink data-[selection-edge~=right]:border-r-2 data-[selection-edge~=right]:border-r-ink"
+                  data-busy={busy || undefined}
+                  data-selection-edge={selectionEdges || undefined}
                   data-state={state}
                   role="gridcell"
                   tabIndex={isFocused ? 0 : -1}
@@ -479,7 +496,7 @@ export function WeekGrid({
                   onPointerUp={handlePointerUp}
                 >
                   {busy && (
-                    <span aria-hidden="true" className="text-xs">
+                    <span aria-hidden="true" className="text-xs text-busy-ink">
                       &bull;
                     </span>
                   )}
@@ -487,7 +504,7 @@ export function WeekGrid({
                   {cellFriends.length > 0 && (
                     <span
                       aria-hidden="true"
-                      className="block text-xs text-indigo-700"
+                      className="block text-xs text-ink"
                       data-layer="friend"
                     >
                       &#9675;
@@ -499,8 +516,8 @@ export function WeekGrid({
                       aria-hidden="true"
                       className={`block truncate text-[10px] leading-tight ${
                         session.viewerRelation === 'inherited'
-                          ? 'italic text-slate-600'
-                          : 'font-semibold text-emerald-800'
+                          ? 'italic text-free-ink'
+                          : 'font-semibold text-free-ink'
                       }`}
                       data-layer="session"
                       data-viewer-relation={session.viewerRelation}

@@ -28,14 +28,14 @@ export function AgendaView({ entries, dateLabelFormatter, timeLabelFormatter }: 
   }
 
   return (
-    <ul aria-label={t('a11y.agendaLabel')} className="divide-y divide-slate-200">
+    <ul aria-label={t('a11y.agendaLabel')} className="divide-y divide-ink/25">
       {sorted.map((entry) => (
         <li key={entry.id} className="flex min-h-11 items-center gap-4 py-2">
-          <span className="w-28 text-sm text-slate-600">{dateLabelFormatter(entry.start)}</span>
-          <span className="w-32 text-sm text-slate-600">
+          <span className="w-28 text-sm text-ink-soft">{dateLabelFormatter(entry.start)}</span>
+          <span className="w-32 text-sm text-ink-soft">
             {timeLabelFormatter(entry.start)}–{timeLabelFormatter(entry.end)}
           </span>
-          <span className="font-medium text-slate-900">{entry.title}</span>
+          <span className="font-medium text-ink">{entry.title}</span>
         </li>
       ))}
     </ul>

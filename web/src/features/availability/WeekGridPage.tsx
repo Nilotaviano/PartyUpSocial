@@ -471,7 +471,7 @@ export function WeekGridPage() {
       className="mx-auto max-w-5xl space-y-6 p-4 sm:p-8"
       data-testid="screen-calendar"
     >
-      <h1 className="text-3xl font-bold tracking-tight text-slate-950">
+      <h1 className="font-display text-3xl font-bold tracking-tight text-ink">
         {t('calendar.heading')}
       </h1>
 
@@ -480,7 +480,7 @@ export function WeekGridPage() {
       <div role="tablist">
         <Link
           aria-selected={!isAgenda}
-          className="mr-2 inline-flex min-h-11 items-center rounded-md px-4 py-2"
+          className="mr-2 inline-flex min-h-11 items-center rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus aria-selected:bg-accent aria-selected:text-accent-ink dark:aria-selected:border-accent-ink"
           role="tab"
           to="/calendar"
         >
@@ -488,7 +488,7 @@ export function WeekGridPage() {
         </Link>
         <Link
           aria-selected={isAgenda}
-          className="inline-flex min-h-11 items-center rounded-md px-4 py-2"
+          className="inline-flex min-h-11 items-center rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus aria-selected:bg-accent aria-selected:text-accent-ink dark:aria-selected:border-accent-ink"
           role="tab"
           to="/calendar/agenda"
         >
@@ -498,14 +498,14 @@ export function WeekGridPage() {
 
       <div className="flex items-center gap-2">
         <button
-          className="min-h-11 min-w-11 rounded-md border border-slate-300 px-3"
+          className="min-h-11 min-w-11 rounded-control border-2 border-ink bg-card px-3 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
           type="button"
           onClick={() => setWeekOffset((value) => value - 1)}
         >
           {t('calendar.previousWeek')}
         </button>
         <button
-          className="min-h-11 min-w-11 rounded-md border border-slate-300 px-3"
+          className="min-h-11 min-w-11 rounded-control border-2 border-ink bg-card px-3 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
           type="button"
           onClick={() => setWeekOffset((value) => value + 1)}
         >

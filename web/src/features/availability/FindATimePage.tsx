@@ -122,19 +122,19 @@ export function FindATimePage() {
       <h1
         ref={heading}
         tabIndex={-1}
-        className="text-3xl font-bold tracking-tight text-slate-950 focus:outline-none"
+        className="font-display text-3xl font-bold tracking-tight text-ink focus:outline-none"
       >
         {t('findATime.heading')}
       </h1>
-      <p className="text-slate-600">{t('findATime.subheading')}</p>
+      <p className="text-ink-soft">{t('findATime.subheading')}</p>
 
       {anyError && <p role="alert">{errorMessage(anyError)}</p>}
 
       <section aria-labelledby="find-a-time-friends-heading">
-        <h2 id="find-a-time-friends-heading" className="text-xl font-semibold text-slate-950">
+        <h2 id="find-a-time-friends-heading" className="font-display text-xl font-semibold text-ink">
           {t('findATime.friendsLabel')}
         </h2>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-ink-soft">
           {selectedFriends.length === 0
             ? t('findATime.friendsAllDefault')
             : t('findATime.friendsSelected', { count: selectedFriends.length })}
@@ -175,10 +175,10 @@ export function FindATimePage() {
           overlaps.data.consideredFriends &&
           overlaps.data.consideredFriends.length > 0 && (
             <div className="mt-3" data-testid="find-a-time-considered-friends">
-              <h3 className="text-sm font-medium text-slate-700">
+              <h3 className="text-sm font-medium text-ink-soft">
                 {t('findATime.consideredHeading')}
               </h3>
-              <ul className="mt-1 space-y-1 text-sm text-slate-600">
+              <ul className="mt-1 space-y-1 text-sm text-ink-soft">
                 {overlaps.data.consideredFriends.map((friend) => (
                   <li key={friend.ordinal}>
                     {friend.displayName ?? t('detail.anonymous', { ns: 'sessions' })}
@@ -190,14 +190,14 @@ export function FindATimePage() {
       </section>
 
       <section aria-labelledby="find-a-time-range-heading">
-        <h2 id="find-a-time-range-heading" className="text-xl font-semibold text-slate-950">
+        <h2 id="find-a-time-range-heading" className="font-display text-xl font-semibold text-ink">
           {t('findATime.rangeLabel')}
         </h2>
-        <label className="mt-2 block" htmlFor="find-a-time-range-days">
+        <label className="mt-2 block text-ink" htmlFor="find-a-time-range-days">
           {t('findATime.rangeLabel')}
         </label>
         <input
-          className="mt-1 min-h-11 w-24 rounded-md border border-slate-300 px-3 py-2"
+          className="mt-1 min-h-11 w-24 rounded-control border-2 border-ink bg-card px-3 py-2 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           id="find-a-time-range-days"
           max={92}
           min={1}
@@ -206,11 +206,11 @@ export function FindATimePage() {
           onChange={(event) => setRangeDays(Number(event.target.value) || DEFAULT_RANGE_DAYS)}
         />
 
-        <label className="mt-3 block" htmlFor="find-a-time-duration">
+        <label className="mt-3 block text-ink" htmlFor="find-a-time-duration">
           {t('create.duration', { ns: 'sessions' })}
         </label>
         <input
-          className="mt-1 min-h-11 w-24 rounded-md border border-slate-300 px-3 py-2"
+          className="mt-1 min-h-11 w-24 rounded-control border-2 border-ink bg-card px-3 py-2 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           id="find-a-time-duration"
           min={15}
           step={15}
@@ -222,11 +222,11 @@ export function FindATimePage() {
 
       {/* §12-44: context only — never fed into the overlap search. */}
       <section aria-labelledby="find-a-time-mine-heading">
-        <h2 id="find-a-time-mine-heading" className="text-xl font-semibold text-slate-950">
+        <h2 id="find-a-time-mine-heading" className="font-display text-xl font-semibold text-ink">
           {t('calendar.layers.myAvailability', { ns: 'availability' })}
         </h2>
         {myMerged.length > 0 && (
-          <ul className="mt-2 space-y-1 text-sm text-slate-600">
+          <ul className="mt-2 space-y-1 text-sm text-ink-soft">
             {myMerged.map((entry, index) => (
               <li key={index}>
                 {timeFormat.format(new Date(entry.start))} –{' '}
@@ -238,7 +238,7 @@ export function FindATimePage() {
       </section>
 
       <section aria-labelledby="find-a-time-results-heading">
-        <h2 id="find-a-time-results-heading" className="text-xl font-semibold text-slate-950">
+        <h2 id="find-a-time-results-heading" className="font-display text-xl font-semibold text-ink">
           {t('findATime.resultsHeading')}
         </h2>
         {overlaps.isPending && (
@@ -256,24 +256,24 @@ export function FindATimePage() {
               return (
                 <li
                   key={`${window.start}-${index}`}
-                  className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                  className="rounded-card border-2 border-ink bg-card p-4 shadow-offset-card"
                 >
-                  <p className="font-semibold text-slate-950">
+                  <p className="font-display font-semibold text-ink">
                     {timeFormat.format(new Date(window.start))} –{' '}
                     {timeFormat.format(new Date(window.end))}
                   </p>
-                  <p className="text-sm text-slate-600">
+                  <p className="text-sm text-ink-soft">
                     {t('findATime.available', { count: window.available.length })}
                     {' · '}
                     {t('findATime.maybe', { count: window.maybe.length })}
                   </p>
                   {overMinutes > 0 && (
-                    <p role="status" className="mt-1 text-sm text-amber-700">
+                    <p role="status" className="mt-1 text-sm font-semibold text-danger">
                       {t('findATime.overDurationWarning', { minutes: overMinutes })}
                     </p>
                   )}
                   <Link
-                    className="mt-3 inline-flex min-h-11 items-center rounded-md bg-indigo-600 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                    className="mt-3 inline-flex min-h-11 items-center rounded-control border-2 border-ink bg-primary px-4 py-2 font-display font-semibold text-primary-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
                     to={buildPrefillUrl(window, plannedDuration)}
                   >
                     {t('findATime.scheduleCta')}

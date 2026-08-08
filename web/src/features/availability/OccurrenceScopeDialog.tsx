@@ -36,9 +36,9 @@ export function OccurrenceScopeDialog({
       }}
     >
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-slate-950/40" />
+        <Dialog.Overlay className="fixed inset-0 bg-ink/40" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-xl focus:outline-none"
+          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-card border-2 border-ink bg-card p-6 shadow-offset-dialog focus:outline-none"
           onCloseAutoFocus={(event) => {
             event.preventDefault()
             triggerRef.current?.focus()
@@ -48,7 +48,7 @@ export function OccurrenceScopeDialog({
             firstRadio.current?.focus()
           }}
         >
-          <Dialog.Title className="text-lg font-semibold text-slate-950">
+          <Dialog.Title className="font-display text-lg font-semibold text-ink">
             {t('block.scopeHeading')}
           </Dialog.Title>
           <fieldset className="mt-4 space-y-2">
@@ -78,14 +78,14 @@ export function OccurrenceScopeDialog({
           <div className="mt-6 flex flex-wrap justify-end gap-2">
             <Dialog.Close asChild>
               <button
-                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="min-h-11 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
                 type="button"
               >
                 {t('block.cancel')}
               </button>
             </Dialog.Close>
             <button
-              className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              className="min-h-11 rounded-control border-2 border-ink bg-primary px-4 py-2 font-display font-semibold text-primary-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
               type="button"
               onClick={() => onConfirm(scope)}
             >

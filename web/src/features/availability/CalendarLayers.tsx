@@ -71,7 +71,7 @@ export function CalendarLayers({ friends, onChange }: CalendarLayersProps) {
 
   return (
     <fieldset className="space-y-3">
-      <legend className="font-medium text-slate-900">{t('calendar.layers.heading')}</legend>
+      <legend className="font-display font-medium text-ink">{t('calendar.layers.heading')}</legend>
       <label className="flex min-h-11 items-center gap-2">
         <input
           checked={myAvailability}
@@ -106,8 +106,8 @@ export function CalendarLayers({ friends, onChange }: CalendarLayersProps) {
       </label>
 
       {friendAvailability && friends.length > 0 && (
-        <fieldset className="ml-6 space-y-1 border-l border-slate-200 pl-4">
-          <legend className="text-sm font-medium text-slate-700">
+        <fieldset className="ml-6 space-y-1 border-l border-ink/25 pl-4">
+          <legend className="text-sm font-medium text-ink-soft">
             {t('calendar.layers.friendFilterHeading')}
           </legend>
           {friends.map((friend) => (
