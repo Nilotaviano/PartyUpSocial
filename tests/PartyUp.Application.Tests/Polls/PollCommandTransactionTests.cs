@@ -5,7 +5,6 @@ using PartyUp.Application.Tests.Friends;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
-using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users;
 
 namespace PartyUp.Application.Tests.Polls;
@@ -14,7 +13,14 @@ namespace PartyUp.Application.Tests.Polls;
 /// A-016 proof, mirroring <c>SessionCommandTransactionTests</c>: the aggregate write and the
 /// notification materialization sit inside one <see cref="IUnitOfWork.ExecuteAsync{T}"/> — a thrown
 /// failure mid-materialization rolls the aggregate write back too, so no poll ever exists without its
-/// creation notifications (and vice versa).
+/// creation notifications (and vice versa). Insertion-only: proving the same guarantee for a
+/// <em>mutation</em> command (Cancel, Finalize) against this file's in-memory fakes would be
+/// misleading — the fake keeps the very same mutable <see cref="Poll"/> instance across a
+/// snapshot/restore, so restoring the dictionary entry never undoes in-place field mutation the way a
+/// real Postgres <c>ROLLBACK</c> undoes row changes. Cancel/Finalize's A-016 rollback is proven at the
+/// integration level instead (<c>PollCancelTests.Cancel_RollsBackWhenNotificationMaterializationFails_A016</c>,
+/// <c>PollFinalizationCommandTests.Finalize_RollsBackWhenNotificationMaterializationFails_A016</c>),
+/// against the real transactional store this guarantee actually depends on.
 /// </summary>
 public sealed class PollCommandTransactionTests
 {
@@ -80,7 +86,7 @@ internal sealed class FakePollRepository : IPollRepository
     public Task<Poll?> FindNoTrackingAsync(PollId id, CancellationToken cancellationToken) => FindAsync(id, cancellationToken);
 
     public Task<PollForUpdate?> LoadForUpdateAsync(PollId id, CancellationToken cancellationToken) =>
-        Task.FromResult(_polls.TryGetValue(id, out Poll? poll) ? new PollForUpdate(poll) : null);
+        Task.FromResult(_polls.TryGetValue(id, out Poll? poll) ? new PollForUpdate(poll, []) : null);
 
     internal Dictionary<PollId, Poll> Snapshot() => new(_polls);
 

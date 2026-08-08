@@ -81,6 +81,8 @@ public static class DependencyInjection
         services.AddScoped<PollGuestManagementUseCases>();
         services.AddScoped<GuestPollUseCases>();
         services.AddScoped<PollJoinRequestUseCases>();
+        services.AddScoped<CancelPollUseCase>();
+        services.AddScoped<FinalizePollUseCase>();
         services.AddScoped<IBlockEffectsExecutor, BlockEffectsExecutor>();
         services.AddScoped<IBlockEffectScopeProvider, SessionBlockEffectScopeProvider>();
         services.AddScoped<IReminderScheduleWriter, SessionReminderScheduleWriter>();

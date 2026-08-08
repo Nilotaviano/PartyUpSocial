@@ -70,6 +70,22 @@ internal static class PollTestHelpers
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
         scope.ServiceProvider.GetRequiredService<IClock>());
 
+    internal static CancelPollUseCase BuildCancelUseCase(AsyncServiceScope scope) => new(
+        scope.ServiceProvider.GetRequiredService<IPollRepository>(),
+        scope.ServiceProvider.GetRequiredService<IPollLockRepository>(),
+        scope.ServiceProvider.GetRequiredService<IPollNotificationMaterializer>(),
+        scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
+        scope.ServiceProvider.GetRequiredService<IClock>());
+
+    internal static FinalizePollUseCase BuildFinalizeUseCase(AsyncServiceScope scope) => new(
+        scope.ServiceProvider.GetRequiredService<IPollRepository>(),
+        scope.ServiceProvider.GetRequiredService<IPollLockRepository>(),
+        scope.ServiceProvider.GetRequiredService<ISessionRepository>(),
+        scope.ServiceProvider.GetRequiredService<IPollNotificationMaterializer>(),
+        scope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
+        scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
+        scope.ServiceProvider.GetRequiredService<IClock>());
+
     /// <summary>Seeds an accepted friendship between organizer and counterpart so D-125's create-time check passes.</summary>
     internal static async Task SeedAcceptedFriendshipAsync(
         AppDbContext context,

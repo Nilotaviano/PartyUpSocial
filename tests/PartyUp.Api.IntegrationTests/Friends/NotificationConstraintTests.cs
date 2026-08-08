@@ -38,6 +38,20 @@ public sealed class NotificationConstraintTests : IAsyncLifetime
             NotificationSubject.ForSelectedOption(pollId, sessionId, optionStart),
             clock);
 
+        // notifications.poll_id is FK-enforced (fk_notifications_polls_poll_id), so the subject's
+        // poll must exist as a row before the notification can be inserted.
+        await using (AppDbContext pollSeed = _database.CreateContext())
+        {
+            await pollSeed.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO polls
+                    (id, organizer_id, title, duration_minutes, platform, notes, min_attendance,
+                     max_capacity, is_private, deadline_choice, deadline, status, created_at, selection_window_end)
+                VALUES
+                    ({pollId.Value}, {users[0].Id.Value}, 'Selected-option subject', 60, 3, '', 1, NULL, true, 3,
+                     {optionStart}, 0, {optionStart}, {optionStart})
+                """);
+        }
+
         await using (AppDbContext context = _database.CreateContext())
         {
             context.Notifications.AddRange(steamMatch, selectedOption);

@@ -1,0 +1,105 @@
+using NodaTime;
+using PartyUp.Application.Abstractions;
+using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Notifications;
+using PartyUp.Domain.Polls;
+using PartyUp.Domain.Sessions;
+
+namespace PartyUp.Application.Polls;
+
+public sealed record FinalizePollResult(bool Succeeded, string? Code, Poll? Poll, Session? Session)
+{
+    public static FinalizePollResult Ok(Poll poll, Session session) => new(true, null, poll, session);
+
+    public static FinalizePollResult Failed(string code) => new(false, code, null, null);
+}
+
+/// <summary>
+/// Organizer finalization (PHASE6_DESIGN.md §2 "Finalize", DOMAIN_MODEL §6.4): the clock-gated window
+/// (due Close applied first, then <c>Deadline &lt;= now &lt; SelectionWindowEndsAt</c>) is entirely
+/// the aggregate's own guard inside <see cref="Poll.Finalize"/> — this use case's job is the single
+/// A-016 transaction around it: lock order per the organizer-only single-actor idiom (users, then the
+/// poll parent — <see cref="PollOptionUseCases.DeleteOptionAsync"/>'s shape), persist the session
+/// <see cref="Poll.Finalize"/> mints (<see cref="ISessionRepository.Add"/>), carry the poll's
+/// <see cref="NotificationMute"/> rows onto the session (§12-15 — the re-parented guest links/identities
+/// are already carried by the aggregate call itself, tracked-entity FK changes needing no separate
+/// persistence step), materialize every event the finalization branch raised (option-selected in
+/// every branch, §12-16), and replan the durable reminder handoff for every registered participant —
+/// <see cref="ISessionReminderHandoffWriter.ReplanAsync"/> is itself the "only if still future, only if
+/// Going/Maybe, only if not terminal" gate (§9), so this use case calls it uniformly rather than
+/// re-deriving that gate.
+/// </summary>
+public sealed class FinalizePollUseCase(
+    IPollRepository polls,
+    IPollLockRepository pollLocks,
+    ISessionRepository sessions,
+    IPollNotificationMaterializer materializer,
+    ISessionReminderHandoffWriter reminders,
+    IUnitOfWork unitOfWork,
+    IClock clock)
+{
+    public Task<FinalizePollResult> FinalizeAsync(
+        PollId pollId,
+        UserId organizerId,
+        PollOptionId optionId,
+        CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteAsync(
+            async ct =>
+            {
+                await pollLocks.LockUsersAsync([organizerId], ct);
+                await pollLocks.LockPollsAsync([pollId], ct);
+
+                PollForUpdate? forUpdate = await polls.LoadForUpdateAsync(pollId, ct);
+                if (forUpdate is null)
+                {
+                    return FinalizePollResult.Failed("poll_not_found");
+                }
+
+                Poll poll = forUpdate.Poll;
+                if (poll.OrganizerId != organizerId)
+                {
+                    return FinalizePollResult.Failed("poll_not_found");
+                }
+
+                PollFinalizationResult result;
+                try
+                {
+                    result = poll.Finalize(optionId, clock);
+                }
+                catch (DomainException exception)
+                {
+                    return FinalizePollResult.Failed(PollOptionUseCases.CodeFor(exception));
+                }
+
+                Session session = result.Session;
+                sessions.Add(session);
+
+                // §12-15: the poll's mutes carry onto the session finalization created -- a
+                // re-parent of the already-tracked row, not a delete-and-recreate, mirroring the
+                // guest link/identity re-parent Poll.Finalize already performed on the aggregate.
+                foreach (NotificationMute mute in forUpdate.Mutes)
+                {
+                    mute.AttachToSession(session.Id);
+                }
+
+                IReadOnlyList<IDomainEvent> events = poll.DequeueEvents();
+                await materializer.MaterializeAsync(poll, events, ct);
+
+                HashSet<UserId> reminderRecipients = [];
+                foreach (Participation participation in session.Participations)
+                {
+                    if (participation.UserId is { } userId)
+                    {
+                        reminderRecipients.Add(userId);
+                    }
+                }
+
+                foreach (UserId recipientId in reminderRecipients)
+                {
+                    await reminders.ReplanAsync(session, recipientId, ct);
+                }
+
+                return FinalizePollResult.Ok(poll, session);
+            },
+            cancellationToken);
+}

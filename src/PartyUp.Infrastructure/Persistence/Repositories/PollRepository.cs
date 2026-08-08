@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Polls;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Polls;
 
 namespace PartyUp.Infrastructure.Persistence.Repositories;
@@ -41,7 +42,16 @@ public sealed class PollRepository(AppDbContext context) : IPollRepository
         Poll? poll = await LoadWithChildren(context.Polls)
             .FirstOrDefaultAsync(poll => poll.Id == id, cancellationToken);
 
-        return poll is null ? null : new PollForUpdate(poll);
+        if (poll is null)
+        {
+            return null;
+        }
+
+        List<NotificationMute> mutes = await context.NotificationMutes
+            .Where(mute => mute.PollId == id)
+            .ToListAsync(cancellationToken);
+
+        return new PollForUpdate(poll, mutes);
     }
 
     private static IQueryable<Poll> LoadWithChildren(IQueryable<Poll> query) =>
