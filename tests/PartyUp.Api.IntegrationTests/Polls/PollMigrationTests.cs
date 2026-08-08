@@ -75,6 +75,44 @@ public sealed class PollMigrationTests : IAsyncLifetime
         Assert.Equal(
             "timestamp with time zone",
             await ColumnTypeAsync(context, "polls", "selection_window_end"));
+
+        // §1 partial uniques: the WHERE half is load-bearing — the duplicate-row probes above use
+        // only non-null values, which a plain unique index would also reject — so pin each filter
+        // in the live index definition.
+        await AssertIndexFilterAsync(context, "ux_poll_participants_poll_user", "user_id IS NOT NULL");
+        await AssertIndexFilterAsync(context, "ux_poll_participants_poll_guest", "guest_identity_id IS NOT NULL");
+        await AssertIndexFilterAsync(context, "ux_poll_votes_option_user", "user_id IS NOT NULL");
+        await AssertIndexFilterAsync(context, "ux_poll_votes_option_guest", "guest_identity_id IS NOT NULL");
+        await AssertIndexFilterAsync(context, "ux_join_requests_poll_pending_requester", "poll_id IS NOT NULL");
+        await AssertIndexFilterAsync(context, "ux_join_requests_poll_pending_requester", "status = 0");
+    }
+
+    [Fact]
+    public async Task NonPendingPollJoinRequestDoesNotBlockANewPendingOne_D118()
+    {
+        await using AppDbContext context = CreateContext();
+        await context.Database.MigrateAsync();
+
+        UserId organizerId = await SeedUserAsync(context);
+        UserId requesterId = await SeedUserAsync(context);
+        Guid pollId = await InsertPollAsync(context, organizerId);
+
+        // §5.3 "one OPEN request per (target, user)": Lapsed (4) and Rejected (2) rows must not
+        // block a fresh Pending (0) row — the status = 0 half of the filter is what allows this.
+        await ExecuteAsync(context, $"""
+            INSERT INTO join_requests (id, poll_id, requester_user_id, status, created_at)
+            VALUES ({Guid.CreateVersion7()}, {pollId}, {requesterId.Value}, 4, now())
+            """);
+        await ExecuteAsync(context, $"""
+            INSERT INTO join_requests (id, poll_id, requester_user_id, status, created_at)
+            VALUES ({Guid.CreateVersion7()}, {pollId}, {requesterId.Value}, 2, now())
+            """);
+        await ExecuteAsync(context, $"""
+            INSERT INTO join_requests (id, poll_id, requester_user_id, status, created_at)
+            VALUES ({Guid.CreateVersion7()}, {pollId}, {requesterId.Value}, 0, now())
+            """);
+
+        Assert.Equal(3, await CountJoinRequestsAsync(context, pollId, requesterId));
     }
 
     [Fact]
@@ -241,7 +279,7 @@ public sealed class PollMigrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task DanglingOriginPollIdOnSessionIsRejected()
+    public async Task DanglingOriginPollIdOnSessionIsRejected_D160()
     {
         await using AppDbContext context = CreateContext();
         await context.Database.MigrateAsync();
@@ -262,7 +300,7 @@ public sealed class PollMigrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task DanglingNotificationPollIdIsRejected()
+    public async Task DanglingNotificationPollIdIsRejected_D120()
     {
         await using AppDbContext context = CreateContext();
         await context.Database.MigrateAsync();
@@ -279,7 +317,7 @@ public sealed class PollMigrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task DanglingGuestLinkPollIdIsRejected()
+    public async Task DanglingGuestLinkPollIdIsRejected_D048()
     {
         await using AppDbContext context = CreateContext();
         await context.Database.MigrateAsync();
@@ -295,7 +333,7 @@ public sealed class PollMigrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task DanglingGuestIdentityPollIdIsRejected()
+    public async Task DanglingGuestIdentityPollIdIsRejected_D048()
     {
         await using AppDbContext context = CreateContext();
         await context.Database.MigrateAsync();
@@ -311,7 +349,7 @@ public sealed class PollMigrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task DanglingJoinRequestPollIdIsRejected()
+    public async Task DanglingJoinRequestPollIdIsRejected_D118()
     {
         await using AppDbContext context = CreateContext();
         await context.Database.MigrateAsync();
@@ -405,6 +443,41 @@ public sealed class PollMigrationTests : IAsyncLifetime
         command.Parameters.Add(parameter);
 
         Assert.Equal(relation, await command.ExecuteScalarAsync());
+    }
+
+    private static async Task AssertIndexFilterAsync(AppDbContext context, string index, string filterFragment)
+    {
+        DbConnection connection = context.Database.GetDbConnection();
+        await EnsureOpenAsync(connection);
+        await using DbCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT pg_get_indexdef(to_regclass('public.' || @index)::regclass)";
+        DbParameter parameter = command.CreateParameter();
+        parameter.ParameterName = "index";
+        parameter.Value = index;
+        command.Parameters.Add(parameter);
+
+        string definition = Assert.IsType<string>(await command.ExecuteScalarAsync());
+        Assert.Contains("WHERE", definition);
+        Assert.Contains(filterFragment, definition);
+    }
+
+    private static async Task<long> CountJoinRequestsAsync(AppDbContext context, Guid pollId, UserId requesterId)
+    {
+        DbConnection connection = context.Database.GetDbConnection();
+        await EnsureOpenAsync(connection);
+        await using DbCommand command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT count(*) FROM join_requests WHERE poll_id = @poll AND requester_user_id = @requester";
+        DbParameter pollParameter = command.CreateParameter();
+        pollParameter.ParameterName = "poll";
+        pollParameter.Value = pollId;
+        command.Parameters.Add(pollParameter);
+        DbParameter requesterParameter = command.CreateParameter();
+        requesterParameter.ParameterName = "requester";
+        requesterParameter.Value = requesterId.Value;
+        command.Parameters.Add(requesterParameter);
+
+        return Assert.IsType<long>(await command.ExecuteScalarAsync());
     }
 
     private static async Task AssertConstraintExistsAsync(AppDbContext context, string constraint)

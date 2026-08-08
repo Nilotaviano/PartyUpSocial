@@ -112,6 +112,57 @@ public sealed class PollPersistenceTests : IAsyncLifetime
         Assert.Equal(VoteChoice.Maybe, revisedVote.Choice);
     }
 
+    [Fact]
+    public async Task SelectionWindowEnd_StoresDeadlinePlus48Hours_D088()
+    {
+        var clock = new MutableClock(Origin);
+
+        await using (AppDbContext seedContext = CreateContext())
+        {
+            await seedContext.Database.MigrateAsync();
+        }
+
+        Guid pollId;
+        Instant deadline;
+
+        await using (AppDbContext context = CreateContext())
+        {
+            UserId organizerId = await SeedUserAsync(context, clock);
+
+            Poll poll = Poll.Create(
+                organizerId,
+                new PollDetails(
+                    SessionTitle.Create("Window proof"),
+                    Duration15.FromMinutes(60),
+                    Platform.NotApplicable,
+                    null,
+                    SessionNotes.Empty,
+                    minAttendance: 1,
+                    maxCapacity: null,
+                    isPrivate: true),
+                PollDeadlineChoice.Hours24,
+                [Origin + Duration.FromHours(72), Origin + Duration.FromHours(96)],
+                [],
+                clock);
+
+            deadline = poll.Deadline;
+            pollId = poll.Id.Value;
+            context.Polls.Add(poll);
+            await context.SaveChangesAsync();
+        }
+
+        await using AppDbContext reloadContext = CreateContext();
+        Instant stored = await reloadContext.Set<Poll>()
+            .AsNoTracking()
+            .Where(poll => poll.Id == PollId.From(pollId))
+            .Select(poll => EF.Property<Instant>(poll, "SelectionWindowEnd"))
+            .SingleAsync();
+
+        // D-088's 48 hours as a literal, not via PollSelectionWindow.EndsAt — this must fail if the
+        // insert-time generator ever writes anything other than deadline + 48h.
+        Assert.Equal(deadline + Duration.FromHours(48), stored);
+    }
+
     private static async Task<UserId> SeedUserAsync(AppDbContext context, MutableClock clock)
     {
         User user = User.BeginOnboarding(

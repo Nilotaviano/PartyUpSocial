@@ -89,7 +89,6 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
             .WithMany()
             .HasForeignKey("ReminderHandoffId")
             .OnDelete(DeleteBehavior.Restrict);
-        // D-160/§1 retro FK: poll_id shipped bare (NotificationConfiguration.cs:42-43, pre-Polls-DbSet).
         builder.HasOne<Poll>()
             .WithMany()
             .HasForeignKey(notification => notification.PollId)
