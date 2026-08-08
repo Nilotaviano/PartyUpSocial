@@ -131,7 +131,7 @@ public sealed class PollJoinRequestUseCases(
 
     /// <summary>
     /// Resolves through <see cref="PollActorVisibilityGate"/> before any domain call -- a stranger or
-    /// blocked requester gets the same <c>poll_not_found</c> a missing poll gives (F2).
+    /// blocked requester gets the same <c>poll_not_found</c> a missing poll gives.
     /// </summary>
     public Task<PollJoinRequestCommandResult> WithdrawJoinRequestAsync(
         PollId pollId,

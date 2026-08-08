@@ -19,9 +19,9 @@ public sealed record PollForUpdate(Poll Poll, IReadOnlyList<NotificationMute> Mu
 /// <summary>
 /// One roster row as the voter-grid view renders it (mirrors <c>RosterEntry</c>).
 /// <see cref="MaskedForViewer"/> is set only by <see cref="PollReadUseCases"/> applying the D-076
-/// blocked-pair rule — never by the repository. <see cref="ParticipationId"/> (ticket-P6-S4a-fix1 F5,
-/// session precedent <c>RosterEntry.ParticipationId</c>) is the stable row key: the
-/// <see cref="PollParticipantId"/> itself, never a user id, so a masked entry stays unkeyable-to-identity.
+/// blocked-pair rule — never by the repository. <see cref="ParticipationId"/> (session precedent
+/// <c>RosterEntry.ParticipationId</c>) is the stable row key: the <see cref="PollParticipantId"/>
+/// itself, never a user id, so a masked entry stays unkeyable-to-identity.
 /// </summary>
 public sealed record PollRosterEntry(
     PollParticipantId ParticipationId,
@@ -32,10 +32,10 @@ public sealed record PollRosterEntry(
 
 /// <summary>
 /// One candidate option with its tallies and the requesting viewer's own vote, if any.
-/// <see cref="SuggestedByMasked"/> (ticket-P6-S4a-fix1 F3) mirrors <see cref="PollRosterEntry.MaskedForViewer"/>:
-/// set only by <see cref="PollReadUseCases"/> when the suggester is the roster's masked-for-viewer
-/// row -- the wire contract omits the suggester's user id when it is set, matching the roster's own
-/// D-076 omission rather than leaking the real id through a second, unmasked channel.
+/// <see cref="SuggestedByMasked"/> mirrors <see cref="PollRosterEntry.MaskedForViewer"/>: set only by
+/// <see cref="PollReadUseCases"/> when the suggester is the roster's masked-for-viewer row -- the
+/// wire contract omits the suggester's user id when it is set, matching the roster's own D-076
+/// omission rather than leaking the real id through a second, unmasked channel.
 /// </summary>
 public sealed record PollOptionGridEntry(
     PollOptionId Id,

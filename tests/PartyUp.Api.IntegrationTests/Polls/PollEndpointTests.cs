@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
 using PartyUp.Api.IntegrationTests.Sessions;
+using PartyUp.Application.Sessions;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Users;
@@ -311,7 +312,14 @@ public sealed class PollEndpointTests : IAsyncLifetime, IDisposable
         Assert.NotEqual(Guid.Empty, maskedEntry.GetProperty("participationId").GetGuid());
     }
 
-    /// <summary>ticket-P6-S4a-fix1 F4: the join-requests list returns the A-072 page shape, not a bare array.</summary>
+    /// <summary>
+    /// The join-requests list returns the A-072 page shape, not a bare array: a single-page fixture
+    /// proves the envelope and content, a 21-request fixture proves the real page-size boundary and
+    /// cursor round-trip (not merely an always-present, always-null <c>nextCursor</c> field), and a
+    /// cursor minted for a different list is rejected rather than silently honored (A-072's own rule,
+    /// reused by this poll route through the shared <c>SessionListCursor</c>/<c>SessionListScope</c>
+    /// machinery).
+    /// </summary>
     [Fact]
     public async Task ListJoinRequests_ReturnsTheA072PageShape_F4()
     {
@@ -332,9 +340,66 @@ public sealed class PollEndpointTests : IAsyncLifetime, IDisposable
         using JsonDocument page = await SessionEndpointTestSupport.SuccessJsonAsync(
             await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}/join-requests"));
         Assert.True(page.RootElement.TryGetProperty("items", out JsonElement items));
-        Assert.True(page.RootElement.TryGetProperty("nextCursor", out _));
+        Assert.True(page.RootElement.TryGetProperty("nextCursor", out JsonElement nextCursor));
+        Assert.Equal(JsonValueKind.Null, nextCursor.ValueKind);
         Assert.Equal(1, items.GetArrayLength());
         Assert.Equal(requesterId.Value, items[0].GetProperty("requesterId").GetGuid());
+
+        // A cursor minted for a different list's scope is rejected outright, never silently honored.
+        string crossScopeCursor = new SessionListCursor(
+            _factory.Clock.GetCurrentInstant(), Guid.NewGuid(), SessionListScope.Upcoming).Encode();
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}/join-requests?cursor={crossScopeCursor}"),
+            HttpStatusCode.BadRequest,
+            "invalid_cursor");
+    }
+
+    /// <summary>The page-size boundary and cursor round-trip: 21 requests force a genuine two-page split.</summary>
+    [Fact]
+    public async Task ListJoinRequests_PagesAtTheTwentyItemBoundaryAndRejectsAStaleCursorReplayAcrossPages_F4()
+    {
+        const int RequestCount = 21;
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-page21-org-{Guid.NewGuid():N}@example.test");
+        UserId fillerId = await _factory.SeedUserAsync(email: $"poll-page21-filler-{Guid.NewGuid():N}@example.test");
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, fillerId);
+
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        Guid pollId = await CreatePollAsync(organizerSession, [fillerId]);
+
+        List<Guid> requesterIds = [];
+        for (int i = 0; i < RequestCount; i++)
+        {
+            UserId requesterId = await _factory.SeedUserAsync(email: $"poll-page21-req{i}-{Guid.NewGuid():N}@example.test");
+            await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, requesterId);
+            using SessionHttpSession requesterSession = await SessionEndpointTestSupport.SignInAsync(_factory, requesterId);
+            Assert.Equal(
+                HttpStatusCode.Created,
+                (await requesterSession.SendUnsafeAsync(HttpMethod.Post, $"/api/v1/polls/{pollId:D}/join-requests")).StatusCode);
+            requesterIds.Add(requesterId.Value);
+        }
+
+        using JsonDocument firstPage = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}/join-requests"));
+        JsonElement firstItems = firstPage.RootElement.GetProperty("items");
+        Assert.Equal(20, firstItems.GetArrayLength());
+        Assert.True(firstPage.RootElement.TryGetProperty("nextCursor", out JsonElement firstCursorElement));
+        string? firstCursor = firstCursorElement.GetString();
+        Assert.False(string.IsNullOrEmpty(firstCursor));
+
+        using JsonDocument secondPage = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}/join-requests?cursor={firstCursor}"));
+        JsonElement secondItems = secondPage.RootElement.GetProperty("items");
+        Assert.Equal(1, secondItems.GetArrayLength());
+        Assert.True(secondPage.RootElement.TryGetProperty("nextCursor", out JsonElement secondCursorElement));
+        Assert.Equal(JsonValueKind.Null, secondCursorElement.ValueKind);
+
+        // Every requester id appears exactly once across the two pages, no duplicate or dropped row.
+        Guid[] seenIds =
+        [
+            .. firstItems.EnumerateArray().Select(i => i.GetProperty("requesterId").GetGuid()),
+            .. secondItems.EnumerateArray().Select(i => i.GetProperty("requesterId").GetGuid()),
+        ];
+        Assert.Equal(requesterIds.OrderBy(id => id), seenIds.OrderBy(id => id));
     }
 
     [Fact]

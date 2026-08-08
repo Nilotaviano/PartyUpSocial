@@ -29,23 +29,8 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
     ];
 
     /// <summary>
-    /// S8 hardening (closes the round-1/round-2 "swap-hole": a bare count anchor passes even when one
-    /// operation is silently swapped for another, so nothing short of the full set closes it).
-    /// Every non-Phase-5 operation id in the shipped document uses a raw <c>.WithName("…")</c> string
-    /// literal rather than an <c>ApiOperationIds</c> constant (the pre-Phase-4 surface predates that
-    /// convention), so this is a hand-authored closed list, not a re-derivation from a constants class
-    /// that does not enumerate them. Captured against this test factory's own <c>Testing</c>-environment
-    /// host (which additionally maps the four <c>/api/v1/_slice2/*</c> sign-in helper routes
-    /// <c>Program.cs</c> only registers under that environment name): the 89 operation ids the Phase 5
-    /// surface was built on top of, plus the 12 new ones in <see cref="NewPhase5OperationIds"/> above —
-    /// 101 total. A deliberate future change to the shipped surface must update this list explicitly;
-    /// it is not meant to silently absorb an added, removed, or renamed operation.
-    /// </summary>
-    /// <summary>
-    /// ticket-P6-S4a-fix1 F1: the fifteen operation ids the Phase 6 poll HTTP surface (S4a) added on
-    /// top of the Phase 5 count this file's own anchor already includes -- same rationale as
-    /// <see cref="PreExistingOperationIds"/>, kept as its own list rather than folded in so the two
-    /// slices' provenance stays legible.
+    /// The fifteen operation ids the Phase 6 poll HTTP surface added, kept as its own list separate
+    /// from <see cref="PreExistingOperationIds"/> so the two slices' provenance stays legible.
     /// </summary>
     private static readonly string[] NewPollOperationIds =
     [
@@ -57,6 +42,20 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         ApiOperationIds.RejectPollJoinRequest,
     ];
 
+    /// <summary>
+    /// S8 hardening (closes the round-1/round-2 "swap-hole": a bare count anchor passes even when one
+    /// operation is silently swapped for another, so nothing short of the full set closes it).
+    /// Every non-Phase-5 operation id in the shipped document uses a raw <c>.WithName("…")</c> string
+    /// literal rather than an <c>ApiOperationIds</c> constant (the pre-Phase-4 surface predates that
+    /// convention), so this is a hand-authored closed list, not a re-derivation from a constants class
+    /// that does not enumerate them. Captured against this test factory's own <c>Testing</c>-environment
+    /// host (which additionally maps the four <c>/api/v1/_slice2/*</c> sign-in helper routes
+    /// <c>Program.cs</c> only registers under that environment name): the 89 operation ids the Phase 5
+    /// surface was built on top of, plus the 12 new ones in <see cref="NewPhase5OperationIds"/> and the
+    /// 15 poll ones in <see cref="NewPollOperationIds"/> — 116 total. A deliberate future change to the
+    /// shipped surface must update this list explicitly; it is not meant to silently absorb an added,
+    /// removed, or renamed operation.
+    /// </summary>
     private static readonly string[] PreExistingOperationIds =
     [
         "AcceptFriendRequest", "ApproveSessionJoinRequest", "BanAdminUser", "BlockUser",

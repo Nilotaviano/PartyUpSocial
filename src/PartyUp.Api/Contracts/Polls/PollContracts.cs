@@ -118,8 +118,8 @@ public sealed record CreatePollGuestLinksRequest(int Count);
 public sealed record PollOptionResponse(
     Guid Id,
     string StartTime,
-    // ticket-P6-S4a-fix1 F3: a masked-for-viewer suggester's user id must be ABSENT, not present-as-
-    // null -- matching PollRosterEntryResponse.UserId's own JsonIgnore mechanics (D-076).
+    // D-076: a masked-for-viewer suggester's user id is absent, matching PollRosterEntryResponse.UserId's
+    // own JsonIgnore mechanics.
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? SuggestedByUserId,
     Guid? SuggestedByGuestIdentityId,
     int AvailableCount,
@@ -131,8 +131,8 @@ public sealed record PollOptionResponse(
         new(
             entry.Id.Value,
             SessionWireFormat.Format(entry.StartTime),
-            // ticket-P6-S4a-fix1 F3: a masked-for-viewer suggester's user id is omitted here too --
-            // the roster already masks their identity, and this is a second channel that must agree.
+            // The roster already masks a blocked-pair suggester's identity; this is a second wire
+            // channel that must agree with it.
             entry.SuggestedByMasked ? null : entry.SuggestedBy.UserId?.Value,
             entry.SuggestedBy.GuestIdentityId?.Value,
             entry.AvailableCount,
@@ -143,8 +143,8 @@ public sealed record PollOptionResponse(
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record PollRosterEntryResponse(
-    // ticket-P6-S4a-fix1 F5: the stable row key, session precedent RosterEntryResponse.ParticipationId
-    // -- the PollParticipant id itself, never a user id, so a masked entry stays unkeyable-to-identity.
+    // The stable row key (session precedent RosterEntryResponse.ParticipationId): the PollParticipant
+    // id itself, never a user id, so a masked entry stays unkeyable-to-identity.
     Guid ParticipationId,
     // D-076: a masked entry's userId is absent, mirroring RosterEntryResponse.
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? UserId,

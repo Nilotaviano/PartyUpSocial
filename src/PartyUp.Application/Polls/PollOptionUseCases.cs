@@ -37,7 +37,7 @@ public sealed class PollOptionUseCases(
     /// <summary>
     /// Resolves through <see cref="PollActorVisibilityGate"/> before any domain call -- a stranger or
     /// blocked actor gets the same <c>poll_not_found</c> a missing poll gives, never a
-    /// state-revealing <c>poll_voting_closed</c> (F2).
+    /// state-revealing <c>poll_voting_closed</c>.
     /// </summary>
     public Task<SuggestOptionResult> SuggestOptionAsync(
         PollId pollId,

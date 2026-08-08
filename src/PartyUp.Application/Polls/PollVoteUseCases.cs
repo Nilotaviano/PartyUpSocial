@@ -12,7 +12,7 @@ namespace PartyUp.Application.Polls;
 /// aggregate-enforced write-once). Guests vote through <see cref="GuestPollUseCases"/> instead.
 /// Resolves through <see cref="PollActorVisibilityGate"/> before any domain call -- a stranger or
 /// blocked actor gets the same <c>poll_not_found</c> a missing poll gives, never a state-revealing
-/// <c>poll_voting_closed</c> (F2).
+/// <c>poll_voting_closed</c>.
 /// </summary>
 public sealed class PollVoteUseCases(
     IPollRepository polls,

@@ -61,13 +61,13 @@ public sealed class FinalizePollUseCase(
                     return FinalizePollResult.Failed("poll_not_found");
                 }
 
-                // Ruling A (ticket-P6-S4a-fix1): mirrors Poll.Finalize's own unconditional window
-                // check (Poll.cs:489-503) so the two windows surface distinct, honest codes instead
-                // of collapsing into poll_voting_closed -- a transition attempted before the deadline
-                // is not yet legal (poll_invalid_transition); one attempted from the 48-hour selection
-                // window's close onward is the design-named poll_selection_window_closed. Both are
-                // evaluated ahead of, and instead of, the domain call so its WindowClosed exception is
-                // never produced for these two cases.
+                // Mirrors Poll.Finalize's own unconditional window check (Poll.cs:489-503) so the two
+                // windows surface distinct, honest codes instead of collapsing into poll_voting_closed
+                // -- a transition attempted before the deadline is not yet legal
+                // (poll_invalid_transition); one attempted from the 48-hour selection window's close
+                // onward is the design-named poll_selection_window_closed. Both are evaluated ahead
+                // of, and instead of, the domain call so its WindowClosed exception is never produced
+                // for these two cases.
                 Instant now = clock.GetCurrentInstant();
                 if (now < poll.Deadline)
                 {
@@ -79,9 +79,9 @@ public sealed class FinalizePollUseCase(
                     return FinalizePollResult.Failed("poll_selection_window_closed");
                 }
 
-                // Ruling B (ticket-P6-S4a-fix1) / §12-12: a poll deleted down to zero options can only
-                // be canceled or expire -- surface the honest poll_zero_options precondition instead
-                // of the option lookup's generic poll_option_not_found. Guarded to the two non-terminal
+                // §12-12: a poll deleted down to zero options can only be canceled or expire --
+                // surface the honest poll_zero_options precondition instead of the option lookup's
+                // generic poll_option_not_found. Guarded to the two non-terminal
                 // statuses this branch can actually reach so an already-terminal poll (never reachable
                 // with zero options once Finalized, but theoretically so once Canceled/Expired) still
                 // reports through the domain call as poll_terminal.

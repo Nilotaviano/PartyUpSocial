@@ -2,12 +2,15 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
 using PartyUp.Api.Hosting;
 using PartyUp.Api.IntegrationTests.Sessions;
 using PartyUp.Application.Polls;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Users;
+using PartyUp.Infrastructure.Persistence;
 
 namespace PartyUp.Api.IntegrationTests.Polls;
 
@@ -188,6 +191,66 @@ public sealed class PollProblemCodeClosureTests : IAsyncLifetime, IDisposable
     }
 
     /// <summary>
+    /// A block-and-unblock cycle leaves a poll participant permanently Removed (§12-24) while
+    /// restoring ordinary visibility: with the block row gone, rule 4 no longer fires, and rule 2
+    /// re-admits the removed voter through a still-Active mutual friend who extends access. The
+    /// visibility gate lets the write through on that basis, and it is <c>Poll.Vote</c>'s own
+    /// <c>RequireActiveParticipant</c> guard that must turn it away -- proving <c>poll_participant_removed</c>
+    /// stays reachable over HTTP rather than silently regressing to a leaked 409 through
+    /// <c>DomainExceptionMapper</c>'s generic fallback.
+    /// </summary>
+    [Fact]
+    public async Task PollParticipantRemoved_VoteAfterBlockThenUnblock_Is404()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-code-removed-org-{Guid.NewGuid():N}@example.test");
+        UserId removedVoterId = await _factory.SeedUserAsync(email: $"poll-code-removed-voter-{Guid.NewGuid():N}@example.test");
+        UserId extenderId = await _factory.SeedUserAsync(email: $"poll-code-removed-extender-{Guid.NewGuid():N}@example.test");
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, removedVoterId);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, extenderId);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, removedVoterId, extenderId);
+
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        using SessionHttpSession removedVoterSession = await SessionEndpointTestSupport.SignInAsync(_factory, removedVoterId);
+        (Guid pollId, Guid optionId) = await CreatePollWithFirstOptionAsync(
+            organizerSession, [removedVoterId, extenderId]);
+
+        // Block resolution goes by username through the registry table, which a freshly seeded user
+        // never claims a row in (PartyUpApiFactory.SeedUserAsync, by design -- see its own remark) --
+        // claim one here, mirroring SessionBlockScopeTests.EnsureDistinctUsernamesAsync's pattern.
+        string removedVoterUsername = $"removedvoter{Guid.NewGuid():N}"[..20];
+        await using (AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            User removedVoterUser = await context.DomainUsers.SingleAsync(u => u.Id == removedVoterId);
+            Username username = Username.Create(removedVoterUsername);
+            removedVoterUser.ChangeUsername(username, _factory.Clock);
+            context.UsernameRegistry.Add(UsernameRegistryEntry.ClaimNew(username, removedVoterId));
+            await context.SaveChangesAsync();
+        }
+
+        // Organizer blocks the voter -- the shipped block-effect scope marks their PollParticipant
+        // Removed (§4 item 3) in the same transaction.
+        HttpResponseMessage blockCreated = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post, "/api/v1/blocks", JsonContent.Create(new { targetUsername = removedVoterUsername }));
+        Assert.Equal(HttpStatusCode.Created, blockCreated.StatusCode);
+        using JsonDocument blockBody = await SessionEndpointTestSupport.SuccessJsonAsync(blockCreated);
+        Guid blockId = blockBody.RootElement.GetProperty("blockId").GetGuid();
+
+        // Organizer unblocks -- the Block row is gone, but removal is permanent for this poll (§12-24).
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await organizerSession.SendUnsafeAsync(HttpMethod.Delete, $"/api/v1/blocks/{blockId:D}")).StatusCode);
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await removedVoterSession.SendUnsafeAsync(
+                HttpMethod.Put,
+                $"/api/v1/polls/{pollId:D}/options/{optionId:D}/vote",
+                JsonContent.Create(new { choice = "available" })),
+            HttpStatusCode.NotFound,
+            "poll_participant_removed");
+    }
+
+    /// <summary>
     /// Ruling A (ticket-P6-S4a-fix1): the WindowClosed collapse split into three distinct, honest
     /// outcomes across three separate polls (finalize is one-shot per poll).
     /// </summary>
@@ -303,6 +366,7 @@ public sealed class PollProblemCodeClosureTests : IAsyncLifetime, IDisposable
             "poll_invalid_transition", // FinalizeWindow_ProducesThreeDistinctOutcomes_RulingA outcome 1
             "poll_selection_window_closed", // FinalizeWindow_.../CancelWindow_...
             "poll_zero_options", // Finalize_OnAZeroOptionPoll_IsPollZeroOptions_RulingB
+            "poll_participant_removed", // PollParticipantRemoved_VoteAfterBlockThenUnblock_Is404
         };
 
         // Exercised by named sibling tests elsewhere in the Polls folder.
@@ -311,15 +375,7 @@ public sealed class PollProblemCodeClosureTests : IAsyncLifetime, IDisposable
             "poll_not_found", // PollEndpointTests + PollFailClosedTests (many)
         };
 
-        // F2's fix (ticket-P6-S4a-fix1) makes the only path to a Removed poll participant --
-        // block-effect scope removal -- unconditionally also a blocked pair with the organizer
-        // (D-065's poll analogue), and VisibilityEngine's rule 4 (block) is evaluated first. So the
-        // removed actor's own subsequent vote/suggest/withdraw now resolves to poll_not_found before
-        // ever reaching the domain's RemovalIsPermanent guard, and no third party can trigger the
-        // guard on someone else's behalf (approve/reject already re-check the block pair first).
-        // poll_participant_removed stays a real, tested domain invariant (see the Application-layer
-        // poll option/vote tests) with no live HTTP repro to close over.
-        HashSet<string> acceptedUntestedResiduals = new(StringComparer.Ordinal) { "poll_participant_removed" };
+        HashSet<string> acceptedUntestedResiduals = new(StringComparer.Ordinal);
 
         HashSet<string> covered = new(exercisedInThisFile, StringComparer.Ordinal);
         covered.UnionWith(exercisedBySiblingTests);

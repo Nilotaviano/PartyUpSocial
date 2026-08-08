@@ -501,11 +501,11 @@ public static class PollEndpoints
     }
 
     /// <summary>
-    /// ticket-P6-S4a-fix1 F4: the A-072 page shape (<c>SessionEndpoints.cs:751-780</c>'s idiom),
-    /// keyset-paged over the already-loaded aggregate's own child collection rather than a separate
-    /// query -- the join-request count on one poll is bounded, so the cursor exists for shape parity
-    /// with the session route (and a future move to a dedicated query needs no wire change), not
-    /// because a single poll's requests risk outgrowing one page today.
+    /// The A-072 page shape (<c>SessionEndpoints.cs:751-780</c>'s idiom), keyset-paged over the
+    /// already-loaded aggregate's own child collection rather than a separate query -- the
+    /// join-request count on one poll is bounded, so the cursor exists for shape parity with the
+    /// session route (and a future move to a dedicated query needs no wire change), not because a
+    /// single poll's requests risk outgrowing one page today.
     /// </summary>
     private static async Task<IResult> ListPollJoinRequestsAsync(
         Guid pollId,
@@ -619,8 +619,8 @@ public static class PollEndpoints
 
     /// <summary>
     /// The single status map for every <see cref="PollOptionUseCases.CodeFor"/>-produced code plus
-    /// the two application-layer pre-check codes (ticket-P6-S4a-fix1 Rulings A/B) (shared by every
-    /// poll command handler above): <c>poll_not_found</c>/<c>poll_option_not_found</c>/
+    /// the two application-layer pre-check codes the finalize/cancel window split adds (shared by
+    /// every poll command handler above): <c>poll_not_found</c>/<c>poll_option_not_found</c>/
     /// <c>poll_guest_not_found</c>/<c>poll_participant_removed</c> are all fail-closed 404s (D-114/D-125's
     /// hidden-equals-missing rule extended to a removed voter, §12-24); <c>poll_option_cap</c>/
     /// <c>poll_voting_closed</c>/<c>poll_selection_window_closed</c>/<c>poll_zero_options</c> are 422
