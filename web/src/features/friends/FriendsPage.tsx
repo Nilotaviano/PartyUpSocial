@@ -1,15 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { isApiError } from '../../api/client'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
+import { FriendCodeInput } from './FriendCodeInput'
 import { FriendList } from './FriendList'
 import { FriendRequests } from './FriendRequests'
 import { ShareCard } from './ShareCard'
 import { friendKeys, getFriendRequests, getFriends } from './friendGraph'
 
 export function FriendsPage() {
+  const navigate = useNavigate()
   const { t } = useTranslation(['friends', 'errors'])
   const heading = useRef<HTMLHeadingElement>(null)
   const [status, setStatus] = useState('')
@@ -64,6 +66,19 @@ export function FriendsPage() {
         </p>
       )}
 
+      <section aria-labelledby="find-by-code-heading" className="space-y-2">
+        <h2
+          id="find-by-code-heading"
+          className="text-h2 font-display font-semibold text-ink"
+        >
+          {t('sections.findByCode')}
+        </h2>
+        <FriendCodeInput
+          onResolve={(friendCode) => navigate('/add/' + friendCode)}
+        />
+      </section>
+      <ShareCard />
+
       <section aria-labelledby="friends-list-heading" className="space-y-4">
         <h2
           id="friends-list-heading"
@@ -80,7 +95,6 @@ export function FriendsPage() {
           </p>
         ) : (
           <>
-            {friendItems.length === 0 && <ShareCard />}
             <FriendList items={friendItems} onStatus={setStatus} />
           </>
         )}

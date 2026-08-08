@@ -373,6 +373,25 @@ export function WeekGrid({
     }
   }
 
+  // The browser reclaims the pointer (scroll takeover, alert, tab switch)
+  // with pointercancel, not pointerup — without this the grid would keep
+  // touch-none and data-touch-dragging until the next tap. Abandon the
+  // selection: a reclaimed gesture commits nothing.
+  function handlePointerCancel(event: React.PointerEvent) {
+    if (event.pointerType !== 'touch') return
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = undefined
+    }
+    touchOrigin.current = null
+    stopAutoScroll()
+    if (dragging.current) {
+      dragging.current = false
+      setIsTouchDragging(false)
+      setSelection(null)
+    }
+  }
+
   const slotIndexes = Array.from({ length: slots }, (_, index) => index)
   const dayIndexes = [0, 1, 2, 3, 4, 5, 6]
 
@@ -493,6 +512,7 @@ export function WeekGrid({
                   onMouseEnter={() => handleMouseEnter(day, slot)}
                   onPointerDown={(event) => handlePointerDown(event, day, slot)}
                   onPointerMove={(event) => handlePointerMove(event, day, slot)}
+                  onPointerCancel={handlePointerCancel}
                   onPointerUp={handlePointerUp}
                 >
                   {busy && (
