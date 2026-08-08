@@ -42,6 +42,25 @@ public sealed class CancelPollUseCase(
                     return PollCommandResult.Failed("poll_not_found");
                 }
 
+                // Ruling A (ticket-P6-S4a-fix1): a cancel attempted from the 48-hour selection
+                // window's close onward gets the same design-named poll_selection_window_closed
+                // Finalize does, instead of Poll.Cancel's own due-transition-then-status-guard path
+                // (which would surface the generic poll_invalid_transition). Scoped to the two
+                // statuses this window can actually still affect, so an already decision-terminal poll
+                // (Finalized/Canceled) keeps its own domain-driven code. The due Expire transition
+                // still applies and materializes here (ApplyDueTransitions, same call Poll.Cancel
+                // itself would have made) so a failed command never skips the materialized-status
+                // invariant's own due transition (§1) -- only the reported problem code changes.
+                if (poll.Status is PollStatus.Polling or PollStatus.Closed
+                    && clock.GetCurrentInstant() >= poll.SelectionWindowEndsAt)
+                {
+                    poll.ApplyDueTransitions(clock);
+                    IReadOnlyList<IDomainEvent> dueEvents = poll.DequeueEvents();
+                    await materializer.MaterializeAsync(poll, dueEvents, ct);
+
+                    return PollCommandResult.Failed("poll_selection_window_closed");
+                }
+
                 try
                 {
                     poll.Cancel(clock);

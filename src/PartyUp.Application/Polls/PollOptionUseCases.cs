@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
 
@@ -27,10 +28,17 @@ public sealed record SuggestOptionResult(bool Succeeded, string? Code, Poll? Pol
 public sealed class PollOptionUseCases(
     IPollRepository polls,
     IPollLockRepository pollLocks,
+    IFriendshipRepository friendships,
+    IBlockRepository blocks,
     IPollNotificationMaterializer materializer,
     IUnitOfWork unitOfWork,
     IClock clock)
 {
+    /// <summary>
+    /// Resolves through <see cref="PollActorVisibilityGate"/> before any domain call -- a stranger or
+    /// blocked actor gets the same <c>poll_not_found</c> a missing poll gives, never a
+    /// state-revealing <c>poll_voting_closed</c> (F2).
+    /// </summary>
     public Task<SuggestOptionResult> SuggestOptionAsync(
         PollId pollId,
         UserId actorId,
@@ -39,10 +47,8 @@ public sealed class PollOptionUseCases(
         unitOfWork.ExecuteAsync(
             async ct =>
             {
-                await pollLocks.LockUsersAsync([actorId], ct);
-                await pollLocks.LockPollsAsync([pollId], ct);
-
-                PollForUpdate? forUpdate = await polls.LoadForUpdateAsync(pollId, ct);
+                PollForUpdate? forUpdate = await PollActorVisibilityGate.LoadVisibleForUpdateAsync(
+                    pollId, actorId, polls, pollLocks, friendships, blocks, ct);
                 if (forUpdate is null)
                 {
                     return SuggestOptionResult.Failed("poll_not_found");

@@ -147,6 +147,14 @@ public enum SessionListScope
     History = 2,
     JoinRequests = 3,
     Discover = 4,
+
+    /// <summary>
+    /// ticket-P6-S4a-fix1 F4 (disclosed extension): <c>GET /polls/{id}/join-requests</c> reuses this
+    /// shared A-072 cursor idiom rather than duplicating it -- despite the "Session" name, the cursor
+    /// and page types carry no session-specific state, so a poll-owned scope is a new enum member,
+    /// not a new mechanism.
+    /// </summary>
+    PollJoinRequests = 5,
 }
 
 /// <summary>The A-072 keyset cursor: the list's sort-key instant, the tie-breaking id, and the

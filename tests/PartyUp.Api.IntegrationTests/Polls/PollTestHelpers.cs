@@ -36,6 +36,8 @@ internal static class PollTestHelpers
     internal static PollOptionUseCases BuildOptionUseCases(AsyncServiceScope scope) => new(
         scope.ServiceProvider.GetRequiredService<IPollRepository>(),
         scope.ServiceProvider.GetRequiredService<IPollLockRepository>(),
+        scope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
+        scope.ServiceProvider.GetRequiredService<IBlockRepository>(),
         scope.ServiceProvider.GetRequiredService<IPollNotificationMaterializer>(),
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
         scope.ServiceProvider.GetRequiredService<IClock>());
@@ -43,6 +45,8 @@ internal static class PollTestHelpers
     internal static PollVoteUseCases BuildVoteUseCases(AsyncServiceScope scope) => new(
         scope.ServiceProvider.GetRequiredService<IPollRepository>(),
         scope.ServiceProvider.GetRequiredService<IPollLockRepository>(),
+        scope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
+        scope.ServiceProvider.GetRequiredService<IBlockRepository>(),
         scope.ServiceProvider.GetRequiredService<IPollNotificationMaterializer>(),
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
         scope.ServiceProvider.GetRequiredService<IClock>());

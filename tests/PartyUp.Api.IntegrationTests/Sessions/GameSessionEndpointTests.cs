@@ -1320,7 +1320,9 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
     /// <summary>
     /// Reflects <see cref="PartyUpOpenApiTransformer"/>'s private problem-code registry so the closure
     /// assertion above tracks the OpenAPI-declared inventory itself rather than a second, driftable
-    /// hand-maintained copy.
+    /// hand-maintained copy. Bounded to the Phase 4 section only (<c>session_not_found</c> up to but
+    /// excluding <c>poll_not_found</c>, ticket-P6-S4a-fix1 F1): the Phase 6 poll codes appended after
+    /// it get their own closure, <see cref="PartyUp.Api.IntegrationTests.Polls.PollProblemCodeClosureTests"/>.
     /// </summary>
     private static string[] Phase4DocumentedProblemCodes()
     {
@@ -1328,7 +1330,8 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
             "ProblemCodes", BindingFlags.NonPublic | BindingFlags.Static)!;
         var allCodes = (string[])field.GetValue(null)!;
         int phase4Start = Array.IndexOf(allCodes, "session_not_found");
-        return allCodes[phase4Start..];
+        int phase6Start = Array.IndexOf(allCodes, "poll_not_found");
+        return allCodes[phase4Start..phase6Start];
     }
 
     // ---- shared fixtures ----------------------------------------------------------------------

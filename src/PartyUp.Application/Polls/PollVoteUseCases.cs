@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
 
@@ -9,10 +10,15 @@ namespace PartyUp.Application.Polls;
 /// The registered voter surface (PHASE6_DESIGN.md §2 "Vote/revise"): guard <c>now &lt; Deadline</c>
 /// (D-079), upsert per (option, participant), first submission sets FirstResponseAt (§12-13,
 /// aggregate-enforced write-once). Guests vote through <see cref="GuestPollUseCases"/> instead.
+/// Resolves through <see cref="PollActorVisibilityGate"/> before any domain call -- a stranger or
+/// blocked actor gets the same <c>poll_not_found</c> a missing poll gives, never a state-revealing
+/// <c>poll_voting_closed</c> (F2).
 /// </summary>
 public sealed class PollVoteUseCases(
     IPollRepository polls,
     IPollLockRepository pollLocks,
+    IFriendshipRepository friendships,
+    IBlockRepository blocks,
     IPollNotificationMaterializer materializer,
     IUnitOfWork unitOfWork,
     IClock clock)
@@ -26,10 +32,8 @@ public sealed class PollVoteUseCases(
         unitOfWork.ExecuteAsync(
             async ct =>
             {
-                await pollLocks.LockUsersAsync([actorId], ct);
-                await pollLocks.LockPollsAsync([pollId], ct);
-
-                PollForUpdate? forUpdate = await polls.LoadForUpdateAsync(pollId, ct);
+                PollForUpdate? forUpdate = await PollActorVisibilityGate.LoadVisibleForUpdateAsync(
+                    pollId, actorId, polls, pollLocks, friendships, blocks, ct);
                 if (forUpdate is null)
                 {
                     return PollCommandResult.Failed("poll_not_found");

@@ -49,6 +49,7 @@ public sealed class PollReadUseCases(
             await reads.FindDisplayNamesAsync(registeredIds, cancellationToken);
 
         List<PollRosterEntry> roster = [];
+        HashSet<UserId> maskedUserIds = [];
         foreach (PollParticipant participant in poll.Participants)
         {
             DisplayName? displayName = participant.UserId is { } userId
@@ -60,7 +61,13 @@ public sealed class PollReadUseCases(
             bool masked = participant.UserId is { } participantUserId &&
                 viewer.BlockedCounterpartIds.Contains(participantUserId);
 
+            if (masked && participant.UserId is { } maskedUserId)
+            {
+                maskedUserIds.Add(maskedUserId);
+            }
+
             roster.Add(new PollRosterEntry(
+                participant.Id,
                 participant.Participant,
                 masked ? null : displayName,
                 participant.IsActive,
@@ -102,8 +109,11 @@ public sealed class PollReadUseCases(
                 }
             }
 
+            bool suggesterMasked = option.SuggestedBy.UserId is { } suggesterId && maskedUserIds.Contains(suggesterId);
+
             options.Add(new PollOptionGridEntry(
-                option.Id, option.StartTime, option.SuggestedBy, available, maybe, unavailable, ownVote));
+                option.Id, option.StartTime, option.SuggestedBy, suggesterMasked,
+                available, maybe, unavailable, ownVote));
         }
 
         return new PollDetail(

@@ -41,6 +41,22 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
     /// 101 total. A deliberate future change to the shipped surface must update this list explicitly;
     /// it is not meant to silently absorb an added, removed, or renamed operation.
     /// </summary>
+    /// <summary>
+    /// ticket-P6-S4a-fix1 F1: the fifteen operation ids the Phase 6 poll HTTP surface (S4a) added on
+    /// top of the Phase 5 count this file's own anchor already includes -- same rationale as
+    /// <see cref="PreExistingOperationIds"/>, kept as its own list rather than folded in so the two
+    /// slices' provenance stays legible.
+    /// </summary>
+    private static readonly string[] NewPollOperationIds =
+    [
+        ApiOperationIds.CreatePoll, ApiOperationIds.GetPoll, ApiOperationIds.SuggestPollOption,
+        ApiOperationIds.DeletePollOption, ApiOperationIds.VoteOnPollOption, ApiOperationIds.FinalizePoll,
+        ApiOperationIds.CancelPoll, ApiOperationIds.CreatePollGuestLinks, ApiOperationIds.RevokePollGuestLink,
+        ApiOperationIds.RemovePollGuest, ApiOperationIds.RequestPollJoin, ApiOperationIds.WithdrawPollJoinRequest,
+        ApiOperationIds.ListPollJoinRequests, ApiOperationIds.ApprovePollJoinRequest,
+        ApiOperationIds.RejectPollJoinRequest,
+    ];
+
     private static readonly string[] PreExistingOperationIds =
     [
         "AcceptFriendRequest", "ApproveSessionJoinRequest", "BanAdminUser", "BlockUser",
@@ -110,7 +126,7 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
 
         // S8 hardening: the exact shipped set, not merely its count — a swap (one operation added,
         // a different one silently removed) leaves the count anchor green while this catches it.
-        string[] expectedOperationIds = [.. PreExistingOperationIds, .. NewPhase5OperationIds];
+        string[] expectedOperationIds = [.. PreExistingOperationIds, .. NewPhase5OperationIds, .. NewPollOperationIds];
         Assert.Equal(
             expectedOperationIds.OrderBy(id => id, StringComparer.Ordinal).ToArray(),
             operationIds.OrderBy(id => id, StringComparer.Ordinal).ToArray());

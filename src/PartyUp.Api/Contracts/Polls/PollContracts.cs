@@ -118,7 +118,9 @@ public sealed record CreatePollGuestLinksRequest(int Count);
 public sealed record PollOptionResponse(
     Guid Id,
     string StartTime,
-    Guid? SuggestedByUserId,
+    // ticket-P6-S4a-fix1 F3: a masked-for-viewer suggester's user id must be ABSENT, not present-as-
+    // null -- matching PollRosterEntryResponse.UserId's own JsonIgnore mechanics (D-076).
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? SuggestedByUserId,
     Guid? SuggestedByGuestIdentityId,
     int AvailableCount,
     int MaybeCount,
@@ -129,7 +131,9 @@ public sealed record PollOptionResponse(
         new(
             entry.Id.Value,
             SessionWireFormat.Format(entry.StartTime),
-            entry.SuggestedBy.UserId?.Value,
+            // ticket-P6-S4a-fix1 F3: a masked-for-viewer suggester's user id is omitted here too --
+            // the roster already masks their identity, and this is a second channel that must agree.
+            entry.SuggestedByMasked ? null : entry.SuggestedBy.UserId?.Value,
             entry.SuggestedBy.GuestIdentityId?.Value,
             entry.AvailableCount,
             entry.MaybeCount,
@@ -139,6 +143,9 @@ public sealed record PollOptionResponse(
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record PollRosterEntryResponse(
+    // ticket-P6-S4a-fix1 F5: the stable row key, session precedent RosterEntryResponse.ParticipationId
+    // -- the PollParticipant id itself, never a user id, so a masked entry stays unkeyable-to-identity.
+    Guid ParticipationId,
     // D-076: a masked entry's userId is absent, mirroring RosterEntryResponse.
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? UserId,
     Guid? GuestIdentityId,
@@ -147,6 +154,7 @@ public sealed record PollRosterEntryResponse(
 {
     public static PollRosterEntryResponse From(PollRosterEntry entry) =>
         new(
+            entry.ParticipationId.Value,
             entry.MaskedForViewer ? null : entry.Participant.UserId?.Value,
             entry.Participant.GuestIdentityId?.Value,
             entry.DisplayName?.Value,

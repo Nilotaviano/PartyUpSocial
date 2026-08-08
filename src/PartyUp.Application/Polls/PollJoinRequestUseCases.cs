@@ -129,6 +129,10 @@ public sealed class PollJoinRequestUseCases(
             },
             cancellationToken);
 
+    /// <summary>
+    /// Resolves through <see cref="PollActorVisibilityGate"/> before any domain call -- a stranger or
+    /// blocked requester gets the same <c>poll_not_found</c> a missing poll gives (F2).
+    /// </summary>
     public Task<PollJoinRequestCommandResult> WithdrawJoinRequestAsync(
         PollId pollId,
         UserId requesterId,
@@ -136,10 +140,8 @@ public sealed class PollJoinRequestUseCases(
         unitOfWork.ExecuteAsync(
             async ct =>
             {
-                await pollLocks.LockUsersAsync([requesterId], ct);
-                await pollLocks.LockPollsAsync([pollId], ct);
-
-                PollForUpdate? forUpdate = await polls.LoadForUpdateAsync(pollId, ct);
+                PollForUpdate? forUpdate = await PollActorVisibilityGate.LoadVisibleForUpdateAsync(
+                    pollId, requesterId, polls, pollLocks, friendships, blocks, ct);
                 if (forUpdate is null)
                 {
                     return PollJoinRequestCommandResult.Failed("poll_not_found");

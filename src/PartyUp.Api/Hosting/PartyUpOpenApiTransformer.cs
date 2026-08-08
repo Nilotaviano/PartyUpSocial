@@ -67,6 +67,11 @@ public sealed class PartyUpOpenApiTransformer :
         "poll_participant_removed",
         "poll_conflict",
         "poll_guest_not_found",
+
+        // ticket-P6-S4a-fix1 Rulings A/B: the two application-layer pre-check codes the shipped
+        // WindowClosed collapse and the zero-option finalize precondition need (PHASE6_DESIGN.md §4).
+        "poll_selection_window_closed",
+        "poll_zero_options",
     ];
 
     private static readonly HashSet<string> FriendOperationIds =

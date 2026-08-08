@@ -90,13 +90,15 @@ public sealed class PollCancelTests : IAsyncLifetime, IDisposable
     }
 
     /// <summary>
-    /// D-156: a poll past the 48-hour selection window has already expired -- Cancel applies due
-    /// transitions first (§1), and the aggregate's own guard surfaces this as an invalid transition
-    /// (not terminal-state) because the due Expire happens inside the same call, ahead of the status
-    /// check <c>Cancel</c> itself makes.
+    /// D-156 / ticket-P6-S4a-fix1 Ruling A: a poll past the 48-hour selection window has already
+    /// expired. <c>CancelPollUseCase</c> now surfaces this as the design-named
+    /// <c>poll_selection_window_closed</c> (not the generic <c>poll_invalid_transition</c> the
+    /// aggregate's own due-transition-then-status-guard path would have produced), but still applies
+    /// and materializes the due Expire transition itself (§1's materialized-status invariant), so the
+    /// reload assertion below is unchanged.
     /// </summary>
     [Fact]
-    public async Task Cancel_AfterSelectionWindowEnds_SurfacesInvalidTransition_D156()
+    public async Task Cancel_AfterSelectionWindowEnds_SurfacesSelectionWindowClosed_D156_RulingA()
     {
         (PollId pollId, UserId organizerId, _) = await SeedPollAsync(PollDeadlineChoice.Hours6);
 
@@ -107,7 +109,7 @@ public sealed class PollCancelTests : IAsyncLifetime, IDisposable
             .CancelAsync(pollId, organizerId, default);
 
         Assert.False(result.Succeeded);
-        Assert.Equal("poll_invalid_transition", result.Code);
+        Assert.Equal("poll_selection_window_closed", result.Code);
 
         await using AsyncServiceScope readScope = _factory.Services.CreateAsyncScope();
         AppDbContext readContext = readScope.ServiceProvider.GetRequiredService<AppDbContext>();

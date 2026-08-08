@@ -5,8 +5,10 @@ using PartyUp.Api.Contracts.Sessions;
 using PartyUp.Api.ErrorHandling;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Polls;
+using PartyUp.Application.Sessions;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
+using PartyUp.Domain.Sessions;
 
 namespace PartyUp.Api.Endpoints;
 
@@ -21,6 +23,8 @@ namespace PartyUp.Api.Endpoints;
 /// </summary>
 public static class PollEndpoints
 {
+    private const int PollJoinRequestPageSize = 20;
+
     public static RouteGroupBuilder MapPollEndpoints(this RouteGroupBuilder api)
     {
         RouteGroupBuilder polls = api.MapGroup(string.Empty)
@@ -65,7 +69,8 @@ public static class PollEndpoints
                 .WithName(ApiOperationIds.CancelPoll)
                 .Produces(StatusCodes.Status204NoContent))
             .ProducesPartyUpProblem(StatusCodes.Status404NotFound)
-            .ProducesPartyUpProblem(StatusCodes.Status409Conflict);
+            .ProducesPartyUpProblem(StatusCodes.Status409Conflict)
+            .ProducesPartyUpProblem(StatusCodes.Status422UnprocessableEntity);
 
         BodyOperation(polls.MapPost("/polls/{pollId:guid}/guest-links", CreatePollGuestLinksAsync)
                 .WithName(ApiOperationIds.CreatePollGuestLinks)
@@ -98,7 +103,7 @@ public static class PollEndpoints
 
         Common(polls.MapGet("/polls/{pollId:guid}/join-requests", ListPollJoinRequestsAsync)
                 .WithName(ApiOperationIds.ListPollJoinRequests)
-                .Produces<IReadOnlyList<PollJoinRequestViewResponse>>())
+                .Produces<SessionPageResponse<PollJoinRequestViewResponse>>())
             .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
 
         Unsafe(polls.MapPost(
@@ -495,8 +500,16 @@ public static class PollEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>
+    /// ticket-P6-S4a-fix1 F4: the A-072 page shape (<c>SessionEndpoints.cs:751-780</c>'s idiom),
+    /// keyset-paged over the already-loaded aggregate's own child collection rather than a separate
+    /// query -- the join-request count on one poll is bounded, so the cursor exists for shape parity
+    /// with the session route (and a future move to a dedicated query needs no wire change), not
+    /// because a single poll's requests risk outgrowing one page today.
+    /// </summary>
     private static async Task<IResult> ListPollJoinRequestsAsync(
         Guid pollId,
+        string? cursor,
         ICurrentUserAccessor currentUser,
         IPollRepository polls,
         HttpContext context,
@@ -508,14 +521,44 @@ public static class PollEndpoints
             return Problem(context, StatusCodes.Status401Unauthorized, "unauthorized");
         }
 
+        SessionListCursor? decodedCursor = null;
+        if (!string.IsNullOrEmpty(cursor))
+        {
+            decodedCursor = SessionListCursor.TryDecode(cursor, SessionListScope.PollJoinRequests);
+            if (decodedCursor is null)
+            {
+                return Problem(context, StatusCodes.Status400BadRequest, "invalid_cursor");
+            }
+        }
+
         Poll? poll = await polls.FindNoTrackingAsync(PollId.From(pollId), cancellationToken);
         if (poll is null || poll.OrganizerId != actorId.Value)
         {
             return Problem(context, StatusCodes.Status404NotFound, "poll_not_found");
         }
 
-        var response = poll.JoinRequests.Select(PollJoinRequestViewResponse.From).ToArray();
-        return Results.Ok(response);
+        IEnumerable<JoinRequest> ordered = poll.JoinRequests
+            .OrderBy(r => r.CreatedAt)
+            .ThenBy(r => r.Id.Value);
+
+        if (decodedCursor is { } after)
+        {
+            ordered = ordered.Where(r =>
+                r.CreatedAt > after.SortKey || (r.CreatedAt == after.SortKey && r.Id.Value.CompareTo(after.Id) > 0));
+        }
+
+        List<JoinRequest> page = ordered.Take(PollJoinRequestPageSize + 1).ToList();
+        string? nextCursor = null;
+        if (page.Count > PollJoinRequestPageSize)
+        {
+            JoinRequest last = page[PollJoinRequestPageSize - 1];
+            nextCursor = new SessionListCursor(last.CreatedAt, last.Id.Value, SessionListScope.PollJoinRequests).Encode();
+            page.RemoveAt(PollJoinRequestPageSize);
+        }
+
+        return Results.Ok(new SessionPageResponse<PollJoinRequestViewResponse>(
+            page.Select(PollJoinRequestViewResponse.From).ToArray(),
+            nextCursor));
     }
 
     private static async Task<IResult> ApprovePollJoinRequestAsync(
@@ -575,18 +618,21 @@ public static class PollEndpoints
     // ---- shared helpers -----------------------------------------------------------------------
 
     /// <summary>
-    /// The single status map for every <see cref="PollOptionUseCases.CodeFor"/>-produced code
-    /// (shared by every poll command handler above): <c>poll_not_found</c>/<c>poll_option_not_found</c>/
+    /// The single status map for every <see cref="PollOptionUseCases.CodeFor"/>-produced code plus
+    /// the two application-layer pre-check codes (ticket-P6-S4a-fix1 Rulings A/B) (shared by every
+    /// poll command handler above): <c>poll_not_found</c>/<c>poll_option_not_found</c>/
     /// <c>poll_guest_not_found</c>/<c>poll_participant_removed</c> are all fail-closed 404s (D-114/D-125's
     /// hidden-equals-missing rule extended to a removed voter, §12-24); <c>poll_option_cap</c>/
-    /// <c>poll_voting_closed</c> are 422 (D-171/D-079 window guards); <c>poll_terminal</c>/
-    /// <c>poll_invalid_transition</c>/<c>poll_conflict</c> are 409; everything else is 400.
+    /// <c>poll_voting_closed</c>/<c>poll_selection_window_closed</c>/<c>poll_zero_options</c> are 422
+    /// (window/precondition guards); <c>poll_terminal</c>/<c>poll_invalid_transition</c>/
+    /// <c>poll_conflict</c> are 409; everything else is 400.
     /// </summary>
     private static int StatusToCodeStatus(string code) => code switch
     {
         "poll_not_found" or "poll_option_not_found" or "poll_guest_not_found" or "poll_participant_removed" =>
             StatusCodes.Status404NotFound,
-        "poll_option_cap" or "poll_voting_closed" => StatusCodes.Status422UnprocessableEntity,
+        "poll_option_cap" or "poll_voting_closed" or "poll_selection_window_closed" or "poll_zero_options" =>
+            StatusCodes.Status422UnprocessableEntity,
         "poll_terminal" or "poll_invalid_transition" or "poll_conflict" => StatusCodes.Status409Conflict,
         _ => StatusCodes.Status400BadRequest,
     };

@@ -219,6 +219,124 @@ public sealed class PollEndpointTests : IAsyncLifetime, IDisposable
         Assert.True(organizerEntry.TryGetProperty("displayName", out _));
     }
 
+    /// <summary>
+    /// ticket-P6-S4a-fix1 F3: a blocked co-participant's suggested option carries no user id on the
+    /// wire either -- the roster already masks them, and this is the second channel that must agree.
+    /// </summary>
+    [Fact]
+    public async Task AMaskedSuggesterHasNoUserIdOnTheirSuggestedOption_F3()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-suggestmask-org-{Guid.NewGuid():N}@example.test");
+        UserId blockedId = await _factory.SeedUserAsync(email: $"poll-suggestmask-blocked-{Guid.NewGuid():N}@example.test");
+        UserId unblockedId = await _factory.SeedUserAsync(email: $"poll-suggestmask-friend-{Guid.NewGuid():N}@example.test");
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, blockedId);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, unblockedId);
+
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        using SessionHttpSession blockedSession = await SessionEndpointTestSupport.SignInAsync(_factory, blockedId);
+        using SessionHttpSession unblockedSession = await SessionEndpointTestSupport.SignInAsync(_factory, unblockedId);
+        Guid pollId = await CreatePollAsync(organizerSession, [blockedId, unblockedId]);
+
+        Instant blockedSuggestion = _factory.Clock.GetCurrentInstant() + Duration.FromDays(3);
+        Instant unblockedSuggestion = _factory.Clock.GetCurrentInstant() + Duration.FromDays(4);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await blockedSession.SendUnsafeAsync(
+                HttpMethod.Post,
+                $"/api/v1/polls/{pollId:D}/options",
+                JsonContent.Create(new { startTime = SessionEndpointTestSupport.Iso(blockedSuggestion) }))).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await unblockedSession.SendUnsafeAsync(
+                HttpMethod.Post,
+                $"/api/v1/polls/{pollId:D}/options",
+                JsonContent.Create(new { startTime = SessionEndpointTestSupport.Iso(unblockedSuggestion) }))).StatusCode);
+
+        await using (AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            User blockedUser = await context.DomainUsers.SingleAsync(u => u.Id == blockedId);
+            context.Blocks.Add(Block.Create(organizerId, blockedId, blockedUser.Username!.Value, _factory.Clock));
+            await context.SaveChangesAsync();
+        }
+
+        using JsonDocument detail = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}"));
+        JsonElement options = detail.RootElement.GetProperty("options");
+
+        JsonElement blockedOption = options.EnumerateArray()
+            .Single(o => SessionEndpointTestSupport.Iso(blockedSuggestion) ==
+                o.GetProperty("startTime").GetString());
+        Assert.False(blockedOption.TryGetProperty("suggestedByUserId", out _));
+
+        JsonElement unblockedOption = options.EnumerateArray()
+            .Single(o => SessionEndpointTestSupport.Iso(unblockedSuggestion) ==
+                o.GetProperty("startTime").GetString());
+        Assert.True(unblockedOption.TryGetProperty("suggestedByUserId", out JsonElement suggesterId));
+        Assert.Equal(unblockedId.Value, suggesterId.GetGuid());
+    }
+
+    /// <summary>ticket-P6-S4a-fix1 F5: the roster's row key is the participation id, never a user id.</summary>
+    [Fact]
+    public async Task RosterEntriesCarryAStableParticipationIdRowKey_F5()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-rowkey-org-{Guid.NewGuid():N}@example.test");
+        UserId blockedId = await _factory.SeedUserAsync(email: $"poll-rowkey-blocked-{Guid.NewGuid():N}@example.test");
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, blockedId);
+
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        Guid pollId = await CreatePollAsync(organizerSession, [blockedId]);
+
+        await using (AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            User blockedUser = await context.DomainUsers.SingleAsync(u => u.Id == blockedId);
+            context.Blocks.Add(Block.Create(organizerId, blockedId, blockedUser.Username!.Value, _factory.Clock));
+            await context.SaveChangesAsync();
+        }
+
+        using JsonDocument detail = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}"));
+        JsonElement roster = detail.RootElement.GetProperty("roster");
+        Assert.Equal(2, roster.GetArrayLength());
+
+        Guid[] participationIds = [.. roster.EnumerateArray().Select(entry => entry.GetProperty("participationId").GetGuid())];
+        Assert.Equal(2, participationIds.Distinct().Count());
+        Assert.All(participationIds, id => Assert.NotEqual(Guid.Empty, id));
+
+        // The masked row's key is its participation id, not the (absent) user id -- unkeyable-to-identity.
+        JsonElement maskedEntry = roster.EnumerateArray()
+            .Single(entry => !entry.TryGetProperty("userId", out _) && !entry.TryGetProperty("displayName", out _));
+        Assert.NotEqual(Guid.Empty, maskedEntry.GetProperty("participationId").GetGuid());
+    }
+
+    /// <summary>ticket-P6-S4a-fix1 F4: the join-requests list returns the A-072 page shape, not a bare array.</summary>
+    [Fact]
+    public async Task ListJoinRequests_ReturnsTheA072PageShape_F4()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-page-org-{Guid.NewGuid():N}@example.test");
+        UserId fillerId = await _factory.SeedUserAsync(email: $"poll-page-filler-{Guid.NewGuid():N}@example.test");
+        UserId requesterId = await _factory.SeedUserAsync(email: $"poll-page-req-{Guid.NewGuid():N}@example.test");
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, fillerId);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, requesterId);
+
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        using SessionHttpSession requesterSession = await SessionEndpointTestSupport.SignInAsync(_factory, requesterId);
+        Guid pollId = await CreatePollAsync(organizerSession, [fillerId]);
+
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await requesterSession.SendUnsafeAsync(HttpMethod.Post, $"/api/v1/polls/{pollId:D}/join-requests")).StatusCode);
+
+        using JsonDocument page = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}/join-requests"));
+        Assert.True(page.RootElement.TryGetProperty("items", out JsonElement items));
+        Assert.True(page.RootElement.TryGetProperty("nextCursor", out _));
+        Assert.Equal(1, items.GetArrayLength());
+        Assert.Equal(requesterId.Value, items[0].GetProperty("requesterId").GetGuid());
+    }
+
     [Fact]
     public async Task ProblemResponses_AreShapedProblemJsonWithTheExactCode()
     {

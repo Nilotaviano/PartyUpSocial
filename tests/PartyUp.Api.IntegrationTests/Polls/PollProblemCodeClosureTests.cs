@@ -1,0 +1,390 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Reflection;
+using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using NodaTime;
+using PartyUp.Api.Hosting;
+using PartyUp.Api.IntegrationTests.Sessions;
+using PartyUp.Application.Polls;
+using PartyUp.Domain.Kernel;
+
+namespace PartyUp.Api.IntegrationTests.Polls;
+
+/// <summary>
+/// ticket-P6-S4a-fix1 F1: the closed Phase 6 poll problem-code inventory
+/// (<see cref="PartyUpOpenApiTransformer"/>'s <c>ProblemCodes</c> array, the section appended after
+/// <c>poll_not_found</c>) — every code the poll HTTP surface can produce, exercised here or by a
+/// named sibling test, plus the accepted untested residual and its rationale. Mirrors
+/// <c>GameSessionEndpointTests.EveryDocumentedProblemCodeMapsToItsDocumentedStatus</c>'s closure
+/// idiom exactly, scoped to the poll section the Phase 4 test no longer swallows.
+/// Also covers Ruling A's three distinct finalize/cancel window outcomes and Ruling B's zero-option
+/// precondition.
+/// </summary>
+[Trait("Category", "Integration")]
+public sealed class PollProblemCodeClosureTests : IAsyncLifetime, IDisposable
+{
+    private readonly PartyUpApiFactory _factory = new();
+
+    public Task InitializeAsync() => _factory.StartAsync();
+
+    public Task DisposeAsync() => _factory.StopAsync();
+
+    public void Dispose() => _factory.Dispose();
+
+    [Fact]
+    public async Task PollValidation_MalformedSuggestStartTime_Is400()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-code-val-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        Guid pollId = await CreatePollAsync(organizerSession, []);
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(
+                HttpMethod.Post,
+                $"/api/v1/polls/{pollId:D}/options",
+                JsonContent.Create(new { startTime = "not-an-instant" })),
+            HttpStatusCode.BadRequest,
+            "poll_validation");
+    }
+
+    [Fact]
+    public async Task PollOptionCap_ThirteenthDistinctSuggestion_Is422_D171()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-code-cap-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        Instant baseTime = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
+
+        // Two at creation, ten more suggested to reach the twelve-option cap (D-080), then a
+        // thirteenth distinct instant trips D-171's suggestion-time cap error.
+        Guid pollId = await CreatePollAsync(organizerSession, [baseTime, baseTime + Duration.FromHours(1)]);
+        for (int i = 2; i < 12; i++)
+        {
+            HttpResponseMessage suggested = await organizerSession.SendUnsafeAsync(
+                HttpMethod.Post,
+                $"/api/v1/polls/{pollId:D}/options",
+                JsonContent.Create(new { startTime = SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(i)) }));
+            Assert.Equal(HttpStatusCode.OK, suggested.StatusCode);
+        }
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(
+                HttpMethod.Post,
+                $"/api/v1/polls/{pollId:D}/options",
+                JsonContent.Create(new { startTime = SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(12)) })),
+            HttpStatusCode.UnprocessableEntity,
+            "poll_option_cap");
+    }
+
+    [Fact]
+    public async Task PollOptionNotFound_DeletingAnUnknownOption_Is404()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-code-optnf-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        Guid pollId = await CreatePollAsync(organizerSession, []);
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(
+                HttpMethod.Delete, $"/api/v1/polls/{pollId:D}/options/{Guid.NewGuid():D}"),
+            HttpStatusCode.NotFound,
+            "poll_option_not_found");
+    }
+
+    [Fact]
+    public async Task PollVotingClosed_VotingAfterTheDeadline_Is422_D079()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-code-vc-org-{Guid.NewGuid():N}@example.test");
+        UserId friendId = await _factory.SeedUserAsync(email: $"poll-code-vc-friend-{Guid.NewGuid():N}@example.test");
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, friendId);
+
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        using SessionHttpSession friendSession = await SessionEndpointTestSupport.SignInAsync(_factory, friendId);
+        (Guid pollId, Guid optionId) = await CreatePollWithFirstOptionAsync(organizerSession, [friendId]);
+
+        _factory.Clock.Advance(Duration.FromHours(25));
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await friendSession.SendUnsafeAsync(
+                HttpMethod.Put,
+                $"/api/v1/polls/{pollId:D}/options/{optionId:D}/vote",
+                JsonContent.Create(new { choice = "available" })),
+            HttpStatusCode.UnprocessableEntity,
+            "poll_voting_closed");
+    }
+
+    [Fact]
+    public async Task PollTerminal_DeletingAnOptionAfterFinalization_Is409()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-code-term-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        (Guid pollId, Guid optionId) = await CreatePollWithFirstOptionAsync(organizerSession, []);
+
+        _factory.Clock.Advance(Duration.FromHours(25));
+        HttpResponseMessage finalize = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post, $"/api/v1/polls/{pollId:D}/finalize", JsonContent.Create(new { optionId }));
+        Assert.Equal(HttpStatusCode.OK, finalize.StatusCode);
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(
+                HttpMethod.Delete, $"/api/v1/polls/{pollId:D}/options/{optionId:D}"),
+            HttpStatusCode.Conflict,
+            "poll_terminal");
+    }
+
+    [Fact]
+    public async Task PollGuestNotFound_RemovingAnUnknownGuest_Is404()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-code-gnf-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        Guid pollId = await CreatePollAsync(organizerSession, []);
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(
+                HttpMethod.Post, $"/api/v1/polls/{pollId:D}/guests/{Guid.NewGuid():D}/remove"),
+            HttpStatusCode.NotFound,
+            "poll_guest_not_found");
+    }
+
+    [Fact]
+    public async Task PollConflict_RevokingAClaimedGuestLink_Is409_D150()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-code-conflict-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+
+        HttpResponseMessage created = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/polls",
+            JsonContent.Create(new
+            {
+                title = "Guest link conflict fixture",
+                optionStartTimes = new[]
+                {
+                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
+                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
+                },
+                isPrivate = true,
+                minAttendance = 1,
+                guestLinkCount = 1,
+            }));
+        using JsonDocument body = await SessionEndpointTestSupport.SuccessJsonAsync(created);
+        Guid pollId = body.RootElement.GetProperty("poll").GetProperty("id").GetGuid();
+        Guid guestLinkId = body.RootElement.GetProperty("guestLinks")[0].GetProperty("guestLinkId").GetGuid();
+
+        // Bypasses the not-yet-shipped poll guest HTTP surface (S4b) to seed a claimed guest,
+        // mirroring GameSessionEndpointTests.ClaimGuestDirectlyAsync's precedent.
+        await using (AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
+        {
+            var useCase = scope.ServiceProvider.GetRequiredService<GuestPollUseCases>();
+            GuestPollCommandResult claimed = await useCase.ClaimGuestLinkAsync(
+                PollId.From(pollId), GuestLinkId.From(guestLinkId), DisplayName.Create("Late Claimant"), default);
+            Assert.True(claimed.Succeeded, claimed.Code);
+        }
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(
+                HttpMethod.Delete, $"/api/v1/polls/{pollId:D}/guest-links/{guestLinkId:D}"),
+            HttpStatusCode.Conflict,
+            "poll_conflict");
+    }
+
+    /// <summary>
+    /// Ruling A (ticket-P6-S4a-fix1): the WindowClosed collapse split into three distinct, honest
+    /// outcomes across three separate polls (finalize is one-shot per poll).
+    /// </summary>
+    [Fact]
+    public async Task FinalizeWindow_ProducesThreeDistinctOutcomes_RulingA()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-code-window-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+
+        // Outcome 1: finalize attempted before the deadline -- not yet a legal transition.
+        (Guid earlyPollId, Guid earlyOptionId) = await CreatePollWithFirstOptionAsync(organizerSession, []);
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(
+                HttpMethod.Post,
+                $"/api/v1/polls/{earlyPollId:D}/finalize",
+                JsonContent.Create(new { optionId = earlyOptionId })),
+            HttpStatusCode.Conflict,
+            "poll_invalid_transition");
+
+        // Outcome 2: finalize inside the legitimate window (Deadline <= now < Deadline+48h) succeeds.
+        (Guid onTimePollId, Guid onTimeOptionId) = await CreatePollWithFirstOptionAsync(organizerSession, []);
+        _factory.Clock.Advance(Duration.FromHours(25));
+        HttpResponseMessage onTimeFinalize = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            $"/api/v1/polls/{onTimePollId:D}/finalize",
+            JsonContent.Create(new { optionId = onTimeOptionId }));
+        Assert.Equal(HttpStatusCode.OK, onTimeFinalize.StatusCode);
+
+        // Outcome 3: finalize attempted from the 48-hour selection window's close onward.
+        (Guid latePollId, Guid lateOptionId) = await CreatePollWithFirstOptionAsync(organizerSession, []);
+        _factory.Clock.Advance(Duration.FromHours(73)); // 24h deadline + 48h window + margin
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(
+                HttpMethod.Post,
+                $"/api/v1/polls/{latePollId:D}/finalize",
+                JsonContent.Create(new { optionId = lateOptionId })),
+            HttpStatusCode.UnprocessableEntity,
+            "poll_selection_window_closed");
+    }
+
+    /// <summary>Ruling A's cancel branch: the same design-named code once the selection window has closed.</summary>
+    [Fact]
+    public async Task CancelWindow_PastTheSelectionWindow_IsSelectionWindowClosed_RulingA()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-code-cancelwin-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        Guid pollId = await CreatePollAsync(organizerSession, []);
+
+        _factory.Clock.Advance(Duration.FromHours(73));
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(HttpMethod.Post, $"/api/v1/polls/{pollId:D}/cancel"),
+            HttpStatusCode.UnprocessableEntity,
+            "poll_selection_window_closed");
+    }
+
+    /// <summary>Ruling B / §12-12: finalize on a poll deleted down to zero options.</summary>
+    [Fact]
+    public async Task Finalize_OnAZeroOptionPoll_IsPollZeroOptions_RulingB()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-code-zero-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        Guid pollId = await CreatePollAsync(organizerSession, []);
+
+        using JsonDocument detail = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}"));
+        Guid[] optionIds = [.. detail.RootElement.GetProperty("options").EnumerateArray().Select(o => o.GetProperty("id").GetGuid())];
+        foreach (Guid optionId in optionIds)
+        {
+            Assert.Equal(
+                HttpStatusCode.NoContent,
+                (await organizerSession.SendUnsafeAsync(HttpMethod.Delete, $"/api/v1/polls/{pollId:D}/options/{optionId:D}")).StatusCode);
+        }
+
+        _factory.Clock.Advance(Duration.FromHours(25)); // past the deadline, still inside the 48h window
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(
+                HttpMethod.Post,
+                $"/api/v1/polls/{pollId:D}/finalize",
+                JsonContent.Create(new { optionId = Guid.NewGuid() })),
+            HttpStatusCode.UnprocessableEntity,
+            "poll_zero_options");
+    }
+
+    /// <summary>
+    /// Reflects <see cref="PartyUpOpenApiTransformer"/>'s private problem-code registry, scoped to the
+    /// Phase 6 poll section (from <c>poll_not_found</c> onward) -- <c>GameSessionEndpointTests</c>'s
+    /// Phase 4 closure no longer includes this section (F1).
+    /// </summary>
+    private static string[] PollDocumentedProblemCodes()
+    {
+        FieldInfo field = typeof(PartyUpOpenApiTransformer).GetField(
+            "ProblemCodes", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var allCodes = (string[])field.GetValue(null)!;
+        int phase6Start = Array.IndexOf(allCodes, "poll_not_found");
+        return allCodes[phase6Start..];
+    }
+
+    [Fact]
+    public void EveryDocumentedPollProblemCodeIsExercisedOrAcceptedAsAResidual()
+    {
+        // Exercised directly by a [Fact] in this file.
+        HashSet<string> exercisedInThisFile = new(StringComparer.Ordinal)
+        {
+            "poll_validation",
+            "poll_option_cap",
+            "poll_option_not_found",
+            "poll_voting_closed",
+            "poll_terminal",
+            "poll_guest_not_found",
+            "poll_conflict",
+            "poll_invalid_transition", // FinalizeWindow_ProducesThreeDistinctOutcomes_RulingA outcome 1
+            "poll_selection_window_closed", // FinalizeWindow_.../CancelWindow_...
+            "poll_zero_options", // Finalize_OnAZeroOptionPoll_IsPollZeroOptions_RulingB
+        };
+
+        // Exercised by named sibling tests elsewhere in the Polls folder.
+        HashSet<string> exercisedBySiblingTests = new(StringComparer.Ordinal)
+        {
+            "poll_not_found", // PollEndpointTests + PollFailClosedTests (many)
+        };
+
+        // F2's fix (ticket-P6-S4a-fix1) makes the only path to a Removed poll participant --
+        // block-effect scope removal -- unconditionally also a blocked pair with the organizer
+        // (D-065's poll analogue), and VisibilityEngine's rule 4 (block) is evaluated first. So the
+        // removed actor's own subsequent vote/suggest/withdraw now resolves to poll_not_found before
+        // ever reaching the domain's RemovalIsPermanent guard, and no third party can trigger the
+        // guard on someone else's behalf (approve/reject already re-check the block pair first).
+        // poll_participant_removed stays a real, tested domain invariant (see the Application-layer
+        // poll option/vote tests) with no live HTTP repro to close over.
+        HashSet<string> acceptedUntestedResiduals = new(StringComparer.Ordinal) { "poll_participant_removed" };
+
+        HashSet<string> covered = new(exercisedInThisFile, StringComparer.Ordinal);
+        covered.UnionWith(exercisedBySiblingTests);
+        covered.UnionWith(acceptedUntestedResiduals);
+
+        Assert.Equal(
+            PollDocumentedProblemCodes().OrderBy(code => code, StringComparer.Ordinal),
+            covered.OrderBy(code => code, StringComparer.Ordinal));
+    }
+
+    // ---- fixture helpers ------------------------------------------------------------------------
+
+    private async Task<Guid> CreatePollAsync(SessionHttpSession organizerSession, IReadOnlyList<Instant> optionStartTimes)
+    {
+        Instant baseTime = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
+        IReadOnlyList<Instant> times = optionStartTimes.Count >= 2
+            ? optionStartTimes
+            : [baseTime, baseTime + Duration.FromHours(1)];
+
+        HttpResponseMessage created = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/polls",
+            JsonContent.Create(new
+            {
+                title = "Closure fixture poll",
+                optionStartTimes = times.Select(SessionEndpointTestSupport.Iso).ToArray(),
+                isPrivate = true,
+                minAttendance = 1,
+                inviteeUserIds = Array.Empty<Guid>(),
+            }));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        using JsonDocument body = await SessionEndpointTestSupport.SuccessJsonAsync(created);
+        return body.RootElement.GetProperty("poll").GetProperty("id").GetGuid();
+    }
+
+    private async Task<Guid> CreatePollWithInviteesAsync(SessionHttpSession organizerSession, IReadOnlyList<UserId> inviteeIds)
+    {
+        Instant baseTime = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
+        HttpResponseMessage created = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/polls",
+            JsonContent.Create(new
+            {
+                title = "Closure fixture poll",
+                optionStartTimes = new[]
+                {
+                    SessionEndpointTestSupport.Iso(baseTime),
+                    SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)),
+                },
+                isPrivate = inviteeIds.Count == 0,
+                minAttendance = 1,
+                inviteeUserIds = inviteeIds.Select(id => id.Value).ToArray(),
+            }));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        using JsonDocument body = await SessionEndpointTestSupport.SuccessJsonAsync(created);
+        return body.RootElement.GetProperty("poll").GetProperty("id").GetGuid();
+    }
+
+    private async Task<(Guid PollId, Guid OptionId)> CreatePollWithFirstOptionAsync(
+        SessionHttpSession organizerSession, IReadOnlyList<UserId> inviteeIds)
+    {
+        Guid pollId = await CreatePollWithInviteesAsync(organizerSession, inviteeIds);
+        using JsonDocument detail = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}"));
+        Guid optionId = detail.RootElement.GetProperty("options")[0].GetProperty("id").GetGuid();
+        return (pollId, optionId);
+    }
+}
