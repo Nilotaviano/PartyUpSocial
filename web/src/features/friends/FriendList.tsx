@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
 import { AvatarDisc } from './AvatarDisc'
 import {
@@ -49,7 +50,7 @@ export function UnfriendDialog({
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-ink/40" />
+        <Dialog.Overlay className="fixed inset-0 bg-scrim" />
         <Dialog.Content
           aria-describedby="unfriend-dialog-description"
           className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-card border-2 border-ink bg-card p-6 shadow-offset-dialog focus:outline-none"
@@ -71,7 +72,7 @@ export function UnfriendDialog({
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
+                className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
                 type="button"
               >
                 {t('actions.cancel', { ns: 'settings' })}

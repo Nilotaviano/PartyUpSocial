@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Navigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
 import { friendKeys, getFriends } from '../friends/friendGraph'
 import {
@@ -34,7 +35,7 @@ function RevokeGuestLinkDialog({ pending, onConfirm }: RevokeGuestLinkDialogProp
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-ink/40" />
+        <Dialog.Overlay className="fixed inset-0 bg-scrim" />
         <Dialog.Content
           aria-describedby="revoke-guest-link-description"
           aria-label={t('a11y.dialogLabel')}
@@ -57,7 +58,7 @@ function RevokeGuestLinkDialog({ pending, onConfirm }: RevokeGuestLinkDialogProp
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className="min-h-11 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
+                className={`px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
                 type="button"
               >
                 {t('dirty.stay')}

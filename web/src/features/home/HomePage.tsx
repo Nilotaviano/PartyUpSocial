@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { raisedInteractiveClasses } from '../../components/ui/classes'
 import {
   availabilityKeys,
   getHomeSuggestions,
@@ -337,7 +338,7 @@ export function HomePage() {
           {t('findATime.heading', { ns: 'availability' })}
         </h2>
         <Link
-          className="mt-1 inline-flex min-h-11 items-center gap-2 rounded-control border-2 border-ink bg-primary px-4 py-2 font-display font-semibold text-primary-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className={`mt-1 inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
           to="/find-a-time"
         >
           {t('findATime.heading', { ns: 'availability' })}

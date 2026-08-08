@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link, Navigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
 import { useSession } from '../../auth/useSession'
 import {
@@ -58,7 +59,7 @@ function CancelSessionDialog({ pending, onConfirm }: CancelDialogProps) {
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-ink/40" />
+        <Dialog.Overlay className="fixed inset-0 bg-scrim" />
         <Dialog.Content
           aria-describedby="cancel-session-description"
           aria-label={t('a11y.dialogLabel')}
@@ -81,7 +82,7 @@ function CancelSessionDialog({ pending, onConfirm }: CancelDialogProps) {
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
+                className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
                 type="button"
               >
                 {t('dirty.stay')}
@@ -131,7 +132,7 @@ function RemoveGuestDialog({
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-ink/40" />
+        <Dialog.Overlay className="fixed inset-0 bg-scrim" />
         <Dialog.Content
           aria-describedby="remove-guest-description"
           aria-label={t('a11y.dialogLabel')}
@@ -154,7 +155,7 @@ function RemoveGuestDialog({
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
+                className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
                 type="button"
               >
                 {t('dirty.stay')}
@@ -365,13 +366,13 @@ export function SessionDetailPage() {
           {isOrganizer && (
             <div className="flex flex-wrap gap-2">
               <Link
-                className="inline-flex min-h-11 items-center gap-2 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
+                className={`inline-flex items-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
                 to={`/sessions/${sessionId}/edit`}
               >
                 {t('edit.heading')}
               </Link>
               <Link
-                className="inline-flex min-h-11 items-center gap-2 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
+                className={`inline-flex items-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
                 to={`/sessions/${sessionId}/invite`}
               >
                 {t('invite.heading')}

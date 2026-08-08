@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
+import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { friendKeys, getFriends } from '../friends/friendGraph'
 import {
   availabilityKeys,
@@ -273,7 +274,7 @@ export function FindATimePage() {
                     </p>
                   )}
                   <Link
-                    className="mt-3 inline-flex min-h-11 items-center rounded-control border-2 border-ink bg-primary px-4 py-2 font-display font-semibold text-primary-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
+                    className={`mt-3 inline-flex items-center px-4 py-2 text-primary-ink bg-primary ${raisedInteractiveClasses}`}
                     to={buildPrefillUrl(window, plannedDuration)}
                   >
                     {t('findATime.scheduleCta')}

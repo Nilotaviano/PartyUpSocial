@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
 import { useDirtyGuard } from '../../components/useDirtyGuard'
 import { friendKeys, getFriends } from '../friends/friendGraph'
@@ -28,7 +29,7 @@ export function DiscardDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-ink/40" />
+        <Dialog.Overlay className="fixed inset-0 bg-scrim" />
         <Dialog.Content
           aria-describedby="discard-dialog-description"
           aria-label={t('a11y.dialogLabel')}
@@ -55,7 +56,7 @@ export function DiscardDialog({
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
+                className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
                 type="button"
               >
                 {t('dirty.stay')}
@@ -542,7 +543,7 @@ export function SessionCreatePage() {
             <input
               aria-describedby={fieldErrors.maxCapacity ? 'max-error' : undefined}
               aria-invalid={Boolean(fieldErrors.maxCapacity)}
-              className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:opacity-50"
+              className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:text-ink-soft disabled:opacity-100"
               disabled={form.unlimited}
               id="field-max"
               min={1}
@@ -637,7 +638,7 @@ export function SessionCreatePage() {
         <div className="flex flex-wrap justify-end gap-2">
           <button
             ref={cancelTrigger}
-            className="min-h-11 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
+            className={`px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
             type="button"
             onClick={requestCancel}
           >

@@ -3,7 +3,7 @@ import * as SelectPrimitive from '@radix-ui/react-select'
 import type { ComponentProps } from 'react'
 
 const triggerClasses =
-  'inline-flex min-h-11 w-full items-center justify-between gap-2 rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:pointer-events-none disabled:opacity-50'
+  'inline-flex min-h-11 w-full items-center justify-between gap-2 rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:pointer-events-none disabled:pointer-events-none disabled:opacity-50'
 const contentClasses =
   'overflow-hidden rounded-control border-2 border-ink bg-card font-body text-ink shadow-offset-card'
 const viewportClasses = 'p-1'

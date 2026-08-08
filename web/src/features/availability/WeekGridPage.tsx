@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router'
 import { isApiError } from '../../api/client'
+import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { getViewerProfile, viewerProfileKey } from '../sessions/sessionQueries'
 import { AgendaView, type AgendaEntry } from './AgendaView'
 import { BlockEditorDialog, type BlockEditorValue } from './BlockEditorDialog'
@@ -480,7 +481,7 @@ export function WeekGridPage() {
       <div role="tablist">
         <Link
           aria-selected={!isAgenda}
-          className="mr-2 inline-flex min-h-11 items-center rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus aria-selected:bg-accent aria-selected:text-accent-ink dark:aria-selected:border-accent-ink"
+          className={`mr-2 inline-flex items-center px-4 py-2 bg-card text-ink aria-selected:bg-accent aria-selected:text-accent-ink dark:aria-selected:border-accent-ink ${raisedInteractiveClasses}`}
           role="tab"
           to="/calendar"
         >
@@ -488,7 +489,7 @@ export function WeekGridPage() {
         </Link>
         <Link
           aria-selected={isAgenda}
-          className="inline-flex min-h-11 items-center rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus aria-selected:bg-accent aria-selected:text-accent-ink dark:aria-selected:border-accent-ink"
+          className={`inline-flex items-center px-4 py-2 bg-card text-ink aria-selected:bg-accent aria-selected:text-accent-ink dark:aria-selected:border-accent-ink ${raisedInteractiveClasses}`}
           role="tab"
           to="/calendar/agenda"
         >
@@ -498,14 +499,14 @@ export function WeekGridPage() {
 
       <div className="flex items-center gap-2">
         <button
-          className="min-h-11 min-w-11 rounded-control border-2 border-ink bg-card px-3 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
+          className={`min-w-11 px-3 text-ink bg-card ${raisedInteractiveClasses}`}
           type="button"
           onClick={() => setWeekOffset((value) => value - 1)}
         >
           {t('calendar.previousWeek')}
         </button>
         <button
-          className="min-h-11 min-w-11 rounded-control border-2 border-ink bg-card px-3 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
+          className={`min-w-11 px-3 text-ink bg-card ${raisedInteractiveClasses}`}
           type="button"
           onClick={() => setWeekOffset((value) => value + 1)}
         >

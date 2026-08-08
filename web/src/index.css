@@ -24,6 +24,7 @@
   --color-shadow: #20301c;
   --color-qr: #fffdf5;
   --color-qr-ink: #1b2408;
+  --color-scrim: rgb(0 0 0 / 0.4);
 
   /* Radius */
   --radius-card: 1.125rem;
@@ -52,7 +53,10 @@
  * Dark override ("club after dark"), PHASE5_1_DESIGN.md §1. Deliberately
  * unlayered (not inside @layer) — unlayered rules beat @theme's layered
  * :root output regardless of source order. --color-qr/-qr-ink are never
- * overridden here (QR scannability).
+ * overridden here (QR scannability). --color-scrim is also never overridden
+ * here: it is a theme-invariant black overlay (dialog/panel scrims), not a
+ * surface or text token — a light-side ink-alpha wash would invert to a
+ * pale haze on dark surfaces, so it stays a fixed black across both themes.
  */
 [data-theme='dark'] {
   --color-page: #161d10;

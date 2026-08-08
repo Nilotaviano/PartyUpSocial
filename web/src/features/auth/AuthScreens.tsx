@@ -10,6 +10,7 @@ import {
 } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { Checkbox } from '../../components/ui/checkbox'
+import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { startExternalProviderWithRetry } from '../../auth/externalIntent'
@@ -120,8 +121,7 @@ function ErrorAlert({ error }: { error: unknown }) {
   ) : null
 }
 
-const linkButtonBase =
-  'inline-flex min-h-11 items-center justify-center gap-2 rounded-control border-2 border-ink px-4 py-2 font-display font-semibold shadow-offset-control active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
+const linkButtonBase = `inline-flex items-center justify-center gap-2 px-4 py-2 ${raisedInteractiveClasses}`
 
 export function Welcome() {
   const { t } = useTranslation(['common', 'auth'])

@@ -33,6 +33,14 @@ type AvatarDiscProps = {
   emoji?: string | null
   size?: keyof typeof SIZE_CLASSES
   className?: string
+  /**
+   * D-076 posture: "Anonymous User" masking renders in the busy pair —
+   * deliberately ordinary, never a distinct style. Forces the busy
+   * fill/ring and the neutral `'●'` placeholder regardless of `emoji`, so a
+   * masked identity never leaks its real avatar. The ordinary treatment exists ahead of
+   * the first masked roster call site.
+   */
+  masked?: boolean
 }
 
 export function AvatarDisc({
@@ -40,12 +48,13 @@ export function AvatarDisc({
   emoji,
   size = 'md',
   className,
+  masked = false,
 }: AvatarDiscProps) {
   const variant = stableFillVariant(seed)
   const classes = [
     'grid shrink-0 place-items-center rounded-full border-2 font-display',
     SIZE_CLASSES[size],
-    FILL_CLASSES[variant],
+    masked ? 'border-ink bg-busy text-busy-ink' : FILL_CLASSES[variant],
     className,
   ]
     .filter(Boolean)
@@ -53,7 +62,7 @@ export function AvatarDisc({
 
   return (
     <span aria-hidden="true" className={classes}>
-      {emoji ?? '●'}
+      {masked ? '●' : (emoji ?? '●')}
     </span>
   )
 }

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
+import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { FriendList } from './FriendList'
 import { FriendRequests } from './FriendRequests'
 import { ShareCard } from './ShareCard'
@@ -44,7 +45,7 @@ export function FriendsPage() {
           {t('pages.list')}
         </h1>
         <Link
-          className="inline-flex min-h-11 items-center gap-2 rounded-control border-2 border-ink bg-primary px-4 py-2 font-display font-semibold text-primary-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
+          className={`inline-flex items-center gap-2 px-4 py-2 text-primary-ink bg-primary ${raisedInteractiveClasses}`}
           to="/friends/import/steam"
         >
           {t('actions.importSteam')}

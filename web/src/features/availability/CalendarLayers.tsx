@@ -78,6 +78,7 @@ export function CalendarLayers({ friends, onChange }: CalendarLayersProps) {
           type="checkbox"
           onChange={(event) => setMyAvailability(event.target.checked)}
         />
+        <span aria-hidden="true" className="h-3 w-3 rounded-full border border-ink/40 bg-free" />
         {t('calendar.layers.myAvailability')}
       </label>
       <label className="flex min-h-11 items-center gap-2">
@@ -86,6 +87,7 @@ export function CalendarLayers({ friends, onChange }: CalendarLayersProps) {
           type="checkbox"
           onChange={(event) => setFriendAvailability(event.target.checked)}
         />
+        <span aria-hidden="true" className="h-3 w-3 rounded-full border border-ink/40 bg-ink" />
         {t('calendar.layers.friendAvailability')}
       </label>
       <label className="flex min-h-11 items-center gap-2">
@@ -94,6 +96,7 @@ export function CalendarLayers({ friends, onChange }: CalendarLayersProps) {
           type="checkbox"
           onChange={(event) => setSessions(event.target.checked)}
         />
+        <span aria-hidden="true" className="h-3 w-3 rounded-full border border-ink/40 bg-free-ink" />
         {t('calendar.layers.sessions')}
       </label>
       <label className="flex min-h-11 items-center gap-2">
@@ -102,6 +105,7 @@ export function CalendarLayers({ friends, onChange }: CalendarLayersProps) {
           type="checkbox"
           onChange={(event) => setPollOptions(event.target.checked)}
         />
+        <span aria-hidden="true" className="h-3 w-3 rounded-full border border-ink/40 bg-maybe" />
         {t('calendar.layers.pollOptions')}
       </label>
 

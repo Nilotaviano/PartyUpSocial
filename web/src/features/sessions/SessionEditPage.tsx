@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { useDirtyGuard } from '../../components/useDirtyGuard'
 import { DiscardDialog } from './SessionCreatePage'
 import {
@@ -311,7 +312,7 @@ export function SessionEditPage() {
               {t('create.max')}
             </label>
             <input
-              className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:opacity-50"
+              className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:text-ink-soft disabled:opacity-100"
               disabled={form.clearMax}
               id="field-max"
               min={1}
@@ -334,7 +335,7 @@ export function SessionEditPage() {
               {t('create.notes')}
             </label>
             <textarea
-              className="mt-1 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:opacity-50"
+              className="mt-1 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:text-ink-soft disabled:opacity-100"
               disabled={form.clearNotes}
               id="field-notes"
               value={form.notes}
@@ -355,7 +356,7 @@ export function SessionEditPage() {
               {t('create.game')}
             </label>
             <input
-              className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:opacity-50"
+              className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:text-ink-soft disabled:opacity-100"
               disabled={form.clearGame}
               id="field-game"
               value={form.gameName}
@@ -388,7 +389,7 @@ export function SessionEditPage() {
           <div className="flex flex-wrap justify-end gap-2">
             <button
               ref={cancelTrigger}
-              className="min-h-11 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
+              className={`px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
               type="button"
               onClick={requestCancel}
             >

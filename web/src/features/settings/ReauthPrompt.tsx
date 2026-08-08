@@ -152,7 +152,7 @@ export function ReauthPrompt({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay
-          className="fixed inset-0 z-40 bg-ink/40"
+          className="fixed inset-0 z-40 bg-scrim"
           data-testid="reauth-overlay"
         />
         <Dialog.Content
