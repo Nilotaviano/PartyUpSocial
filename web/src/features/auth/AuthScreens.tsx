@@ -125,6 +125,43 @@ const linkButtonBase =
 
 export function Welcome() {
   const { t } = useTranslation(['common', 'auth'])
+  const { data: session } = useSession()
+  const [showLoginOptions, setShowLoginOptions] = useState(false)
+  const [error, setError] = useState<unknown>()
+
+  async function external(provider: string) {
+    setError(undefined)
+    try {
+      await startExternalProviderWithRetry(
+        async () => {
+          const { data } = await client.POST('/api/v1/auth/external/intent', {
+            params: { header: { 'X-CSRF-TOKEN': '' } },
+            body: {
+              provider,
+              mode: 'login',
+              returnTo: null,
+              ageGateAttested: attested(),
+              currentPassword: null,
+              reauthToken: null,
+            },
+          })
+          if (!data) throw new ApiError(500, 'request_failed')
+          return data
+        },
+        async (intent) => {
+          window.location.assign(
+            '/api/v1/auth/external/' +
+              provider +
+              '/start?intent=' +
+              encodeURIComponent(intent),
+          )
+        },
+      )
+    } catch (caught) {
+      setError(caught)
+    }
+  }
+
   return (
     <main
       className="mx-auto flex min-h-[80vh] max-w-3xl flex-col justify-center gap-8 p-4 sm:p-8"
@@ -138,21 +175,47 @@ export function Welcome() {
           <h1 className="max-w-[16ch] font-display text-4xl leading-[1.05] font-extrabold text-ink sm:text-5xl">
             {t('app.tagline')}
           </h1>
-          <div className="flex flex-wrap gap-3">
-            <Link className={`${linkButtonBase} bg-primary text-primary-ink`} to="/login">
-              {t('pages.login', { ns: 'auth' })}
-            </Link>
-            <Link className={`${linkButtonBase} bg-card text-ink`} to="/register">
-              {t('pages.register', { ns: 'auth' })}
-            </Link>
-          </div>
+          {showLoginOptions ? (
+            <div className="flex flex-wrap gap-3">
+              {session?.providers.includes('google') && (
+                <Button variant="neutral" onClick={() => void external('google')}>
+                  {t('providers.google', { ns: 'auth' })}
+                </Button>
+              )}
+              {session?.providers.includes('steam') && (
+                <Button variant="neutral" onClick={() => void external('steam')}>
+                  {t('providers.steam', { ns: 'auth' })}
+                </Button>
+              )}
+              <Link className={`${linkButtonBase} bg-primary text-primary-ink`} to="/login">
+                {t('providers.email', { ns: 'auth' })}
+              </Link>
+              <Link className={`${linkButtonBase} bg-card text-ink`} to="/register">
+                {t('pages.register', { ns: 'auth' })}
+              </Link>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-3">
+              <Button
+                aria-expanded={false}
+                variant="primary"
+                onClick={() => setShowLoginOptions(true)}
+              >
+                {t('pages.login', { ns: 'auth' })}
+              </Button>
+              <Link className={`${linkButtonBase} bg-card text-ink`} to="/register">
+                {t('pages.register', { ns: 'auth' })}
+              </Link>
+            </div>
+          )}
+          <ErrorAlert error={error} />
         </div>
         {/* Decorative miniature of the product's own week grid — the one
             surface that explains PartyUp without words. Colors are grid
             tokens; the ringed column is the selection band idiom. */}
         <div
           aria-hidden="true"
-          className="hidden rotate-2 rounded-card border-2 border-ink bg-card p-4 shadow-offset-card sm:block"
+          className="max-w-sm rotate-2 rounded-card border-2 border-ink bg-card p-4 shadow-offset-card"
         >
           <div className="mb-3 flex items-center gap-2">
             <span className="h-2.5 w-10 rounded-full bg-ink/20" />
