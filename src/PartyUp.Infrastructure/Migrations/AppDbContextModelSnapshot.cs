@@ -495,6 +495,237 @@ namespace PartyUp.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("PartyUp.Domain.Polls.Poll", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_session_id");
+
+                    b.Property<Instant>("Deadline")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deadline");
+
+                    b.Property<short>("DeadlineChoice")
+                        .HasColumnType("smallint")
+                        .HasColumnName("deadline_choice");
+
+                    b.Property<int>("Duration")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_minutes");
+
+                    b.Property<bool>("IsPrivate")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_private");
+
+                    b.Property<int?>("MaxCapacity")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_capacity");
+
+                    b.Property<int>("MinAttendance")
+                        .HasColumnType("integer")
+                        .HasColumnName("min_attendance");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
+                    b.Property<Guid>("OrganizerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organizer_id");
+
+                    b.Property<short>("Platform")
+                        .HasColumnType("smallint")
+                        .HasColumnName("platform");
+
+                    b.Property<Guid?>("SelectedOptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("selected_option_id");
+
+                    b.Property<Instant>("SelectionWindowEnd")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("selection_window_end");
+
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id")
+                        .HasName("pk_polls");
+
+                    b.HasIndex("OrganizerId", "Status", "Deadline")
+                        .HasDatabaseName("ix_polls_organizer_status_deadline");
+
+                    b.HasIndex("Status", "Deadline", "Id")
+                        .HasDatabaseName("ix_polls_status_deadline_id");
+
+                    b.ToTable("polls", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_polls_capacity", "max_capacity IS NULL OR max_capacity >= min_attendance");
+
+                            t.HasCheckConstraint("ck_polls_duration", "duration_minutes BETWEEN 15 AND 1440 AND duration_minutes % 15 = 0");
+
+                            t.HasCheckConstraint("ck_polls_game_shape", "(game_steam_app_id IS NULL OR platform = 0) AND (game_steam_app_id IS NULL OR game_name IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_polls_min_attendance", "min_attendance >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Polls.PollOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("PollId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("poll_id");
+
+                    b.Property<Instant>("StartTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("start_time");
+
+                    b.Property<Guid?>("SuggestedByGuestIdentityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("suggested_by_guest_identity_id");
+
+                    b.Property<Guid?>("SuggestedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("suggested_by_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_poll_options");
+
+                    b.HasIndex("PollId", "StartTime")
+                        .IsUnique()
+                        .HasDatabaseName("ux_poll_options");
+
+                    b.ToTable("poll_options", (string)null);
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Polls.PollParticipant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Instant?>("FirstResponseAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_response_at");
+
+                    b.Property<Guid?>("GuestIdentityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("guest_identity_id");
+
+                    b.Property<Guid>("PollId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("poll_id");
+
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_poll_participants");
+
+                    b.HasIndex("PollId", "GuestIdentityId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_poll_participants_poll_guest")
+                        .HasFilter("guest_identity_id IS NOT NULL");
+
+                    b.HasIndex("PollId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_poll_participants_poll_user")
+                        .HasFilter("user_id IS NOT NULL");
+
+                    b.ToTable("poll_participants", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_poll_participants_participant", "(user_id IS NOT NULL) <> (guest_identity_id IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Polls.PollVote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<short>("Choice")
+                        .HasColumnType("smallint")
+                        .HasColumnName("choice");
+
+                    b.Property<Guid?>("GuestIdentityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("guest_identity_id");
+
+                    b.Property<Guid>("OptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_id");
+
+                    b.Property<Guid>("PollId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("poll_id");
+
+                    b.Property<Instant>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("submitted_at");
+
+                    b.Property<Instant>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_poll_votes");
+
+                    b.HasIndex("OptionId", "GuestIdentityId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_poll_votes_option_guest")
+                        .HasFilter("guest_identity_id IS NOT NULL");
+
+                    b.HasIndex("OptionId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_poll_votes_option_user")
+                        .HasFilter("user_id IS NOT NULL");
+
+                    b.ToTable("poll_votes", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_poll_votes_participant", "(user_id IS NOT NULL) <> (guest_identity_id IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("PartyUp.Domain.Sessions.GuestIdentity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -612,6 +843,11 @@ namespace PartyUp.Infrastructure.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_join_requests");
+
+                    b.HasIndex("PollId", "RequesterId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_join_requests_poll_pending_requester")
+                        .HasFilter("poll_id IS NOT NULL AND status = 0");
 
                     b.HasIndex("SessionId", "RequesterId")
                         .IsUnique()
@@ -1406,6 +1642,12 @@ namespace PartyUp.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_notifications_users_actor_user_id");
 
+                    b.HasOne("PartyUp.Domain.Polls.Poll", null)
+                        .WithMany()
+                        .HasForeignKey("PollId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_notifications_polls_poll_id");
+
                     b.HasOne("PartyUp.Domain.Users.User", null)
                         .WithMany()
                         .HasForeignKey("RecipientUserId")
@@ -1430,8 +1672,124 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasConstraintName("fk_notification_mutes_users_user_id");
                 });
 
+            modelBuilder.Entity("PartyUp.Domain.Polls.Poll", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Sessions.Session", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_polls_sessions_created_session_id");
+
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_polls_users_organizer_id");
+
+                    b.HasOne("PartyUp.Domain.Polls.PollOption", null)
+                        .WithMany()
+                        .HasForeignKey("SelectedOptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_polls_poll_options_selected_option_id");
+
+                    b.OwnsOne("PartyUp.Domain.Kernel.SessionGame", "Game", b1 =>
+                        {
+                            b1.Property<Guid>("PollId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Name")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("game_name");
+
+                            b1.Property<long?>("SteamAppId")
+                                .HasColumnType("bigint")
+                                .HasColumnName("game_steam_app_id");
+
+                            b1.HasKey("PollId");
+
+                            b1.ToTable("polls");
+
+                            b1.WithOwner()
+                                .HasForeignKey("PollId")
+                                .HasConstraintName("fk_polls_polls_id");
+                        });
+
+                    b.Navigation("Game");
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Polls.PollOption", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Polls.Poll", null)
+                        .WithMany("Options")
+                        .HasForeignKey("PollId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_poll_options_polls_poll_id");
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Polls.PollParticipant", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Sessions.GuestIdentity", null)
+                        .WithMany()
+                        .HasForeignKey("GuestIdentityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_poll_participants_guest_identities_guest_identity_id");
+
+                    b.HasOne("PartyUp.Domain.Polls.Poll", null)
+                        .WithMany("Participants")
+                        .HasForeignKey("PollId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_poll_participants_polls_poll_id");
+
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_poll_participants_users_user_id");
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Polls.PollVote", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Sessions.GuestIdentity", null)
+                        .WithMany()
+                        .HasForeignKey("GuestIdentityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_poll_votes_guest_identities_guest_identity_id");
+
+                    b.HasOne("PartyUp.Domain.Polls.PollOption", null)
+                        .WithMany()
+                        .HasForeignKey("OptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_poll_votes_poll_options_option_id");
+
+                    b.HasOne("PartyUp.Domain.Polls.Poll", null)
+                        .WithMany("Votes")
+                        .HasForeignKey("PollId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_poll_votes_polls_poll_id");
+
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_poll_votes_users_user_id");
+                });
+
             modelBuilder.Entity("PartyUp.Domain.Sessions.GuestIdentity", b =>
                 {
+                    b.HasOne("PartyUp.Domain.Polls.Poll", null)
+                        .WithMany("GuestIdentities")
+                        .HasForeignKey("PollId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_guest_identities_polls_poll_id");
+
                     b.HasOne("PartyUp.Domain.Sessions.Session", null)
                         .WithMany("GuestIdentities")
                         .HasForeignKey("SessionId")
@@ -1447,6 +1805,12 @@ namespace PartyUp.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_guest_links_guest_identities_guest_identity_id");
 
+                    b.HasOne("PartyUp.Domain.Polls.Poll", null)
+                        .WithMany("GuestLinks")
+                        .HasForeignKey("PollId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_guest_links_polls_poll_id");
+
                     b.HasOne("PartyUp.Domain.Sessions.Session", null)
                         .WithMany("GuestLinks")
                         .HasForeignKey("SessionId")
@@ -1456,6 +1820,12 @@ namespace PartyUp.Infrastructure.Migrations
 
             modelBuilder.Entity("PartyUp.Domain.Sessions.JoinRequest", b =>
                 {
+                    b.HasOne("PartyUp.Domain.Polls.Poll", null)
+                        .WithMany("JoinRequests")
+                        .HasForeignKey("PollId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_join_requests_polls_poll_id");
+
                     b.HasOne("PartyUp.Domain.Users.User", null)
                         .WithMany()
                         .HasForeignKey("RequesterId")
@@ -1500,6 +1870,12 @@ namespace PartyUp.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_sessions_users_organizer_id");
+
+                    b.HasOne("PartyUp.Domain.Polls.Poll", null)
+                        .WithMany()
+                        .HasForeignKey("OriginPollId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_sessions_polls_origin_poll_id");
 
                     b.OwnsOne("PartyUp.Domain.Kernel.SessionGame", "Game", b1 =>
                         {
@@ -1592,6 +1968,21 @@ namespace PartyUp.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_steam_identities_users_user_id");
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Polls.Poll", b =>
+                {
+                    b.Navigation("GuestIdentities");
+
+                    b.Navigation("GuestLinks");
+
+                    b.Navigation("JoinRequests");
+
+                    b.Navigation("Options");
+
+                    b.Navigation("Participants");
+
+                    b.Navigation("Votes");
                 });
 
             modelBuilder.Entity("PartyUp.Domain.Sessions.Session", b =>

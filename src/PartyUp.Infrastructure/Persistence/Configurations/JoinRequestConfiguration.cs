@@ -23,6 +23,10 @@ public sealed class JoinRequestConfiguration : IEntityTypeConfiguration<JoinRequ
         builder.Ignore(request => request.IsPending);
         builder.HasIndex(request => new { request.SessionId, request.Status, request.CreatedAt, request.Id }).HasDatabaseName("ix_join_requests_session_status_created_id");
         builder.HasIndex(request => new { request.SessionId, request.RequesterId }).IsUnique().HasFilter("session_id IS NOT NULL AND status = 0").HasDatabaseName("ux_join_requests_session_pending_requester");
+        // §1/§5.3: the poll-side analogue of the shipped session-filtered index — completes "one
+        // open request per (target, user)" for the poll target (enum stored as int, matching the
+        // shipped session-side filter).
+        builder.HasIndex(request => new { request.PollId, request.RequesterId }).IsUnique().HasFilter("poll_id IS NOT NULL AND status = 0").HasDatabaseName("ux_join_requests_poll_pending_requester");
         builder.HasOne<User>().WithMany().HasForeignKey(request => request.RequesterId).OnDelete(DeleteBehavior.Restrict);
     }
 }

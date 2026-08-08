@@ -54,6 +54,7 @@ public sealed class FriendGraphMigrationTests : IAsyncLifetime
             "constraint:fk_friendships_users_requested_by",
             "constraint:fk_friendships_users_user_hi_id",
             "constraint:fk_friendships_users_user_lo_id",
+            "constraint:fk_notifications_polls_poll_id",
             "constraint:fk_notifications_session_reminder_handoffs_reminder_handoff_id",
             "constraint:fk_notifications_users_actor_user_id",
             "constraint:fk_notifications_users_recipient_user_id",

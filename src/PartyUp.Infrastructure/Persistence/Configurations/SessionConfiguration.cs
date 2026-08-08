@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Persistence.Converters;
@@ -63,6 +64,9 @@ public sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
         builder.HasIndex(session => new { session.OrganizerId, session.Status, session.StartTime }).HasDatabaseName("ix_sessions_organizer_status_start");
         builder.HasIndex(session => new { session.Status, session.StartTime, session.Id }).HasDatabaseName("ix_sessions_status_start_id");
         builder.HasOne<User>().WithMany().HasForeignKey(session => session.OrganizerId).OnDelete(DeleteBehavior.Restrict);
+        // D-160/§1 retro FK: origin_poll_id shipped bare (20260804154500_AddFixedTimeSessions.cs:63)
+        // ahead of the Polls DbSet; this migration wires it up.
+        builder.HasOne<Poll>().WithMany().HasForeignKey(session => session.OriginPollId).OnDelete(DeleteBehavior.Restrict);
         builder.Property<uint>("xmin").IsRowVersion();
     }
 }

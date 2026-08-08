@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using PartyUp.Domain.Availability;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Notifications;
+using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Auth;
@@ -56,6 +57,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<AvailabilitySeries> AvailabilitySeries => Set<AvailabilitySeries>();
 
     public DbSet<AvailabilityOccurrenceSkip> AvailabilityOccurrenceSkips => Set<AvailabilityOccurrenceSkip>();
+
+    public DbSet<Poll> Polls => Set<Poll>();
+
+    public DbSet<PollOption> PollOptions => Set<PollOption>();
+
+    public DbSet<PollParticipant> PollParticipants => Set<PollParticipant>();
+
+    public DbSet<PollVote> PollVotes => Set<PollVote>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -114,5 +123,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.ApplyConfiguration(new AvailabilityBlockConfiguration());
         builder.ApplyConfiguration(new AvailabilitySeriesConfiguration());
         builder.ApplyConfiguration(new AvailabilityOccurrenceSkipConfiguration());
+        builder.ApplyConfiguration(new PollConfiguration());
+        builder.ApplyConfiguration(new PollOptionConfiguration());
+        builder.ApplyConfiguration(new PollParticipantConfiguration());
+        builder.ApplyConfiguration(new PollVoteConfiguration());
     }
 }
