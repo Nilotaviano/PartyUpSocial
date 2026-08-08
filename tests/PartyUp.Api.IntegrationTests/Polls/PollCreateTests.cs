@@ -132,7 +132,7 @@ public sealed class PollCreateTests : IAsyncLifetime, IDisposable
 
     /// <summary>D-080/D-131: identical instants merge on the way in; fewer than two distinct options after dedupe is rejected.</summary>
     [Fact]
-    public async Task CreatePoll_DedupesIdenticalInstants_AndRejectsBelowMinimum()
+    public async Task CreatePoll_DedupesIdenticalInstants_AndRejectsBelowMinimum_D080_D131()
     {
         UserId organizerId = await _factory.SeedUserAsync(email: "poll-create-dedupe-organizer@example.test");
         Instant now = _factory.Clock.GetCurrentInstant();

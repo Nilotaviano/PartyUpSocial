@@ -62,7 +62,7 @@ public sealed class PollGuestTests : IAsyncLifetime, IDisposable
     }
 
     /// <summary>
-    /// D-126 multi-device proof, not a sequential-call tautology: two contexts race a rename of the
+    /// D-126 multi-device proof: two contexts race a rename of the
     /// same claimed link while genuinely blocked on the same held poll parent lock, and only the write
     /// that actually acquires the lock second survives -- no version/conflict rejection either way.
     /// Run twice with the queuing order swapped, so the surviving value flips with it: a build that

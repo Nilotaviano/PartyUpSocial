@@ -146,7 +146,7 @@ public sealed class PollOptionTests : IAsyncLifetime, IDisposable
     /// notification row addressed to the organizer.
     /// </summary>
     [Fact]
-    public async Task SuggestOption_ByMember_NotifiesOnlyTheOrganizer()
+    public async Task SuggestOption_ByMember_NotifiesOnlyTheOrganizer_D120()
     {
         (PollId pollId, UserId organizerId, UserId voterId, Instant baseTime) = await SeedPollWithVoterAsync();
 
@@ -164,7 +164,7 @@ public sealed class PollOptionTests : IAsyncLifetime, IDisposable
 
     /// <summary>§10: the organizer suggesting their own option is silent -- no notification row at all.</summary>
     [Fact]
-    public async Task SuggestOption_ByOrganizer_IsSilent()
+    public async Task SuggestOption_ByOrganizer_IsSilent_D120()
     {
         (PollId pollId, UserId organizerId, UserId _, Instant baseTime) = await SeedPollWithVoterAsync();
 

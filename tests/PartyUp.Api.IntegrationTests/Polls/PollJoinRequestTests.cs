@@ -151,7 +151,7 @@ public sealed class PollJoinRequestTests : IAsyncLifetime, IDisposable
     /// block-boundary check must fail it closed regardless of the still-intact extender path.
     /// </summary>
     [Fact]
-    public async Task RequestJoin_FromBlockedUser_FailsClosedWithNoWriteOrNotification()
+    public async Task RequestJoin_FromBlockedUser_FailsClosedWithNoWriteOrNotification_D118()
     {
         UserId organizerId = await _factory.SeedUserAsync(email: $"poll-jr-blocked-organizer-{Guid.NewGuid():N}@example.test");
         UserId extenderId = await _factory.SeedUserAsync(email: $"poll-jr-blocked-extender-{Guid.NewGuid():N}@example.test");
@@ -217,7 +217,7 @@ public sealed class PollJoinRequestTests : IAsyncLifetime, IDisposable
 
     /// <summary>A private poll's uninvited stranger cannot even resolve visibility -- same indistinguishable 404, no write.</summary>
     [Fact]
-    public async Task RequestJoin_FromStrangerOnPrivatePoll_FailsClosed()
+    public async Task RequestJoin_FromStrangerOnPrivatePoll_FailsClosed_D118()
     {
         UserId organizerId = await _factory.SeedUserAsync(email: $"poll-jr-private-organizer-{Guid.NewGuid():N}@example.test");
         UserId invitedFriendId = await _factory.SeedUserAsync(email: $"poll-jr-private-friend-{Guid.NewGuid():N}@example.test");
