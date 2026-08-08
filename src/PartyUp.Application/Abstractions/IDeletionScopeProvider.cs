@@ -119,6 +119,36 @@ public interface IDeletionScopeProvider
             }
         }
 
+        // Phase 6: the poll analogue of the session rule directly above -- kept in this one static
+        // method (rather than a second, easy-to-drift copy) precisely because the doc comment above
+        // requires ExecuteDeletionForUserUseCase's post-reload recompute to agree with whatever
+        // DiscoverAffectedUserIdsAsync's default already walked.
+        foreach (var poll in scope.Polls)
+        {
+            if (poll.OrganizerId == id)
+            {
+                foreach (var participant in poll.Participants)
+                {
+                    if (participant.UserId is { } userId)
+                    {
+                        ids.Add(userId);
+                    }
+                }
+
+                foreach (var request in poll.JoinRequests)
+                {
+                    if (request.Status == JoinRequestStatus.Pending)
+                    {
+                        ids.Add(request.RequesterId);
+                    }
+                }
+            }
+            else
+            {
+                ids.Add(poll.OrganizerId);
+            }
+        }
+
         return ids;
     }
 }

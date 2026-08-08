@@ -85,7 +85,7 @@ public static class DependencyInjection
         services.AddScoped<FinalizePollUseCase>();
         services.AddScoped<PollTransitionUseCase>();
         services.AddScoped<IBlockEffectsExecutor, BlockEffectsExecutor>();
-        services.AddScoped<IBlockEffectScopeProvider, SessionBlockEffectScopeProvider>();
+        services.AddScoped<IBlockEffectScopeProvider, BlockEffectScopeProvider>();
         services.AddScoped<IReminderScheduleWriter, SessionReminderScheduleWriter>();
         services.AddScoped<IDeletionResultApplier, DeletionResultApplier>();
         services.AddScoped<ISessionNotificationMaterializer, SessionNotificationMaterializer>();

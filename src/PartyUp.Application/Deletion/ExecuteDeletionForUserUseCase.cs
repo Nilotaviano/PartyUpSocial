@@ -1,6 +1,7 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users;
 using PartyUp.Domain.Users.DeletionExecution;
@@ -17,11 +18,11 @@ namespace PartyUp.Application.Deletion;
 /// reload's recomputed candidate set differs from what was discovered. A changed set cannot retry
 /// inside the poisoned transaction, so it surfaces as <see cref="DeletionScopeChangedException"/> and
 /// <see cref="ExecuteAsync"/> retries the entire attempt — discovery included — in a fresh transaction,
-/// at most 3 attempts with a jittered 20/50/100 ms backoff. <paramref name="sessionLocks"/> and
-/// <paramref name="materializer"/> default to <see langword="null"/> for callers that construct this
-/// type directly without the widened session scope (the bulk lock and session-event materialization are
-/// simply skipped, falling back to the single-row subject lock); production resolution always supplies
-/// both through DI.
+/// at most 3 attempts with a jittered 20/50/100 ms backoff. <paramref name="sessionLocks"/>,
+/// <paramref name="materializer"/> and <paramref name="pollMaterializer"/> default to
+/// <see langword="null"/> for callers that construct this type directly without the widened session/poll
+/// scope (the bulk lock and event materialization are simply skipped, falling back to the single-row
+/// subject lock); production resolution always supplies all three through DI.
 /// </summary>
 public sealed class ExecuteDeletionForUserUseCase(
     IUserRepository users,
@@ -33,7 +34,8 @@ public sealed class ExecuteDeletionForUserUseCase(
     IUnitOfWork unitOfWork,
     IClock clock,
     ISessionLockRepository? sessionLocks = null,
-    ISessionNotificationMaterializer? materializer = null)
+    ISessionNotificationMaterializer? materializer = null,
+    IPollNotificationMaterializer? pollMaterializer = null)
 {
     private const int MaxAttempts = 3;
     private static readonly int[] BackoffFloorsMilliseconds = [20, 50, 100];
@@ -107,6 +109,20 @@ public sealed class ExecuteDeletionForUserUseCase(
                     // DOMAIN_MODEL.md §11 step 5: the deleting user receives no notifications from
                     // steps 1-3 of their own deletion's derived Session events.
                     await materializer.MaterializeAsync(session, events, userId, cancellationToken);
+                }
+            }
+        }
+
+        if (pollMaterializer is not null)
+        {
+            foreach (Poll poll in scope.Polls)
+            {
+                IReadOnlyList<IDomainEvent> events = poll.DequeueEvents();
+                if (events.Count > 0)
+                {
+                    // §11 step 2 / D-170: the owned-poll expiry notification, with the same
+                    // deleting-user exclusion the session half above applies.
+                    await pollMaterializer.MaterializeAsync(poll, events, userId, cancellationToken);
                 }
             }
         }

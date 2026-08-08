@@ -190,6 +190,7 @@ public sealed class FriendBlockConcurrencyTests : IAsyncLifetime
             new PartyUp.Infrastructure.Deletion.DeletionScopeProvider(
                 context,
                 new SessionLockRepository(context),
+                new PollLockRepository(context),
                 new UsernameRegistryRepository(context),
                 new AvailabilityRepository(context)),
             new AvailabilityRepository(context));

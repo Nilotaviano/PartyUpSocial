@@ -96,6 +96,35 @@ public sealed class BlockEffectsExecutorTests
         Assert.Empty(actual.DequeueEvents());
     }
 
+    /// <summary>
+    /// PHASE6_DESIGN.md §2.1 / ticket-P6-S3.md §4: the poll analogue of P4-NOTIFY-01 is an empty event
+    /// set (design ruling). <see cref="BlockEffects.Apply"/> removes the counterpart's poll participant
+    /// row and lapses their pending join request under lock, but the executor's poll drain
+    /// (<c>BlockEffectsExecutor.cs:60-63</c>) always discards the poll's dequeued events rather than
+    /// forwarding them to any materializer — pre-finalization poll roster changes produce zero
+    /// materialized poll notifications, whether or not an <see cref="IPollNotificationMaterializer"/>
+    /// exists on this port at all (it does not; only sessions have one here).
+    /// </summary>
+    [Fact]
+    public async Task Execute_DrainsPollEventsWithoutMaterializingAnyPollNotification_D077()
+    {
+        IClock clock = FriendTestData.Clock();
+        User blocker = FriendTestData.Active("poll-drain-blocker", "Poll Drain Blocker");
+        User blocked = FriendTestData.Active("poll-drain-blocked", "Poll Drain Blocked");
+        Poll poll = BlockExecutorTestData.Poll(blocker.Id, blocked.Id, clock);
+        Block block = Block.Create(blocker.Id, blocked.Id, blocked.Username!.Value, clock);
+        var executor = new BlockEffectsExecutor(
+            new RecordingBlockEffectScopeProvider(new BlockEffectScope([], [poll])),
+            new BlockTestFriendshipRepository([]),
+            new RecordingReminderScheduleWriter(),
+            clock);
+
+        await executor.ExecuteAsync(block, [], default);
+
+        Assert.True(poll.FindParticipant(ParticipantRef.ForUser(blocked.Id))!.IsRemoved);
+        Assert.Empty(poll.DequeueEvents());
+    }
+
 }
 
 internal sealed class RecordingBlockEffectScopeProvider(BlockEffectScope scope)

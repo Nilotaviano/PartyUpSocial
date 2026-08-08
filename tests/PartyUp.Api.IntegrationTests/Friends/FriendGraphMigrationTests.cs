@@ -74,6 +74,7 @@ public sealed class FriendGraphMigrationTests : IAsyncLifetime
             "index:pk_notifications",
             "index:ux_blocks_ordered_pair",
             "index:ux_friendships_pair",
+            "index:ux_notifications_poll_deadline_once",
             "index:ux_notifications_session_reminder_once",
             "index:ux_notifications_steam_match_once",
         ];

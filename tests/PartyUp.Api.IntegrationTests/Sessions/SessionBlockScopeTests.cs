@@ -3,13 +3,16 @@ using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Friends;
+using PartyUp.Application.Polls;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Friends;
 using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Persistence.Repositories;
+using PartyUp.Api.IntegrationTests.Polls;
 
 namespace PartyUp.Api.IntegrationTests.Sessions;
 
@@ -65,9 +68,10 @@ public sealed class SessionBlockScopeTests : IAsyncLifetime, IDisposable
         AppDbContext blockContext = blockScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var counts = new ScopeLoadCounts();
         var countingScope = new CountingBlockEffectScopeProvider(
-            new SessionBlockEffectScopeProvider(
+            new BlockEffectScopeProvider(
                 blockContext,
-                blockScope.ServiceProvider.GetRequiredService<ISessionLockRepository>()),
+                blockScope.ServiceProvider.GetRequiredService<ISessionLockRepository>(),
+                blockScope.ServiceProvider.GetRequiredService<IPollLockRepository>()),
             counts);
         var executor = new BlockEffectsExecutor(
             countingScope,
@@ -189,6 +193,183 @@ public sealed class SessionBlockScopeTests : IAsyncLifetime, IDisposable
         Assert.Equal(2, await verify.Blocks.CountAsync());
     }
 
+    /// <summary>
+    /// PHASE6_DESIGN.md §2.1: the renamed <see cref="BlockEffectScopeProvider"/>'s poll half feeds
+    /// <see cref="BlockEffects.Apply"/> a real, non-Removed <see cref="PollParticipant"/> candidate —
+    /// same fail-closed, DI-registered path <see cref="BlockUserUseCase"/> already uses in production.
+    /// </summary>
+    [Fact]
+    public async Task RealScope_RemovesTheCounterpartsPollParticipant_D077()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: "poll-scope-organizer@example.test");
+        UserId participantId = await _factory.SeedUserAsync(email: "poll-scope-participant@example.test");
+        await EnsureDistinctUsernamesAsync(organizerId, participantId);
+
+        PollId pollId;
+        await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await PollTestHelpers.SeedAcceptedFriendshipAsync(context, organizerId, participantId, _factory.Clock);
+            await context.SaveChangesAsync();
+
+            Instant now = _factory.Clock.GetCurrentInstant();
+            CreatePollResult created = await PollTestHelpers.BuildCreateUseCase(seedScope).ExecuteAsync(
+                new CreatePollCommand(
+                    organizerId,
+                    "Block scope poll",
+                    DurationMinutes: 60,
+                    Platform: null,
+                    Game: null,
+                    Notes: null,
+                    MinAttendance: 1,
+                    MaxCapacity: null,
+                    IsPrivate: false,
+                    OptionStartTimes: [now + Duration.FromHours(72), now + Duration.FromHours(96)],
+                    DeadlineChoice: PollDeadlineChoice.Hours24,
+                    InviteeUserIds: [participantId],
+                    GuestLinkCount: null),
+                default);
+            Assert.True(created.Succeeded, created.Code);
+            pollId = created.Poll!.Id;
+        }
+
+        await using AsyncServiceScope blockScope = _factory.Services.CreateAsyncScope();
+        BlockGraphCommandResult result = await BlockAsync(
+            blockScope,
+            organizerId,
+            participantId,
+            blockScope.ServiceProvider.GetRequiredService<IFriendPairLocker>());
+
+        Assert.True(result.Succeeded, result.Code);
+
+        await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
+        AppDbContext verify = verification.ServiceProvider.GetRequiredService<AppDbContext>();
+        PollParticipant participant = await verify.PollParticipants.AsNoTracking()
+            .SingleAsync(p => p.PollId == pollId && p.UserId == participantId);
+        Assert.True(participant.IsRemoved);
+    }
+
+    /// <summary>
+    /// Same port, the open-join-request arm: the counterpart never became a <see cref="PollParticipant"/>
+    /// row, only a pending <see cref="JoinRequest"/> the block must still lapse.
+    /// </summary>
+    [Fact]
+    public async Task RealScope_LapsesTheCounterpartsOpenPollJoinRequest_D077()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: "poll-scope-jr-organizer@example.test");
+        UserId invitedId = await _factory.SeedUserAsync(email: "poll-scope-jr-invited@example.test");
+        UserId requesterId = await _factory.SeedUserAsync(email: "poll-scope-jr-requester@example.test");
+        await EnsureDistinctUsernamesAsync(organizerId, invitedId, requesterId);
+
+        PollId pollId;
+        JoinRequestId requestId;
+        await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await PollTestHelpers.SeedAcceptedFriendshipAsync(context, organizerId, invitedId, _factory.Clock);
+            await PollTestHelpers.SeedAcceptedFriendshipAsync(context, organizerId, requesterId, _factory.Clock);
+            await context.SaveChangesAsync();
+
+            Instant now = _factory.Clock.GetCurrentInstant();
+            CreatePollResult created = await PollTestHelpers.BuildCreateUseCase(seedScope).ExecuteAsync(
+                new CreatePollCommand(
+                    organizerId,
+                    "Block scope join-request poll",
+                    DurationMinutes: 60,
+                    Platform: null,
+                    Game: null,
+                    Notes: null,
+                    MinAttendance: 1,
+                    MaxCapacity: null,
+                    IsPrivate: false,
+                    OptionStartTimes: [now + Duration.FromHours(72), now + Duration.FromHours(96)],
+                    DeadlineChoice: PollDeadlineChoice.Hours24,
+                    InviteeUserIds: [invitedId],
+                    GuestLinkCount: null),
+                default);
+            Assert.True(created.Succeeded, created.Code);
+            pollId = created.Poll!.Id;
+
+            PollJoinRequestCommandResult joined = await PollTestHelpers.BuildJoinRequestUseCases(seedScope)
+                .RequestJoinAsync(pollId, requesterId, default);
+            Assert.True(joined.Succeeded, joined.Code);
+            requestId = joined.JoinRequest!.Id;
+        }
+
+        await using AsyncServiceScope blockScope = _factory.Services.CreateAsyncScope();
+        BlockGraphCommandResult result = await BlockAsync(
+            blockScope,
+            organizerId,
+            requesterId,
+            blockScope.ServiceProvider.GetRequiredService<IFriendPairLocker>());
+
+        Assert.True(result.Succeeded, result.Code);
+
+        await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
+        AppDbContext verify = verification.ServiceProvider.GetRequiredService<AppDbContext>();
+        JoinRequest request = await verify.JoinRequests.AsNoTracking().SingleAsync(r => r.Id == requestId);
+        Assert.Equal(JoinRequestStatus.Lapsed, request.Status);
+    }
+
+    /// <summary>
+    /// P3-LK-01/A-068: proves the poll-parent lock statement never runs before the session-parent lock
+    /// statement in a single scope load, for a pair that qualifies on both kinds of parent — the
+    /// concrete lock-order guarantee the concurrent-session test above already exercises for two
+    /// session parents alone.
+    /// </summary>
+    [Fact]
+    public async Task RealScope_LocksSessionParentsBeforePollParents()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: "poll-scope-order-organizer@example.test");
+        UserId counterpartId = await _factory.SeedUserAsync(email: "poll-scope-order-counterpart@example.test");
+        await EnsureDistinctUsernamesAsync(organizerId, counterpartId);
+
+        await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Session session = Session.Create(organizerId, SessionDetailsFor(), [], _factory.Clock);
+            session.Invite(counterpartId, _factory.Clock);
+            session.Rsvp(ParticipantRef.ForUser(counterpartId), ParticipationStatus.Going, _factory.Clock);
+            _ = session.DequeueEvents();
+            context.Sessions.Add(session);
+            await PollTestHelpers.SeedAcceptedFriendshipAsync(context, organizerId, counterpartId, _factory.Clock);
+            await context.SaveChangesAsync();
+
+            Instant now = _factory.Clock.GetCurrentInstant();
+            CreatePollResult created = await PollTestHelpers.BuildCreateUseCase(seedScope).ExecuteAsync(
+                new CreatePollCommand(
+                    organizerId,
+                    "Lock order poll",
+                    DurationMinutes: 60,
+                    Platform: null,
+                    Game: null,
+                    Notes: null,
+                    MinAttendance: 1,
+                    MaxCapacity: null,
+                    IsPrivate: false,
+                    OptionStartTimes: [now + Duration.FromHours(72), now + Duration.FromHours(96)],
+                    DeadlineChoice: PollDeadlineChoice.Hours24,
+                    InviteeUserIds: [counterpartId],
+                    GuestLinkCount: null),
+                default);
+            Assert.True(created.Succeeded, created.Code);
+        }
+
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context2 = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var order = new LockOrderRecorder();
+        var provider = new BlockEffectScopeProvider(
+            context2,
+            new RecordingSessionLockRepository(
+                new SessionLockRepository(context2), order),
+            new RecordingPollLockRepository(
+                new PollLockRepository(context2), order));
+
+        await provider.LoadForUpdateAsync(organizerId, counterpartId, default);
+
+        Assert.Equal(["session", "poll"], order.Calls);
+    }
+
     private async Task<BlockGraphCommandResult> BlockAsync(
         AsyncServiceScope scope,
         UserId actorId,
@@ -303,5 +484,41 @@ internal sealed class AttemptingFriendPairLocker(IFriendPairLocker inner, PairAt
         Task<LockedFriendPair?> attempt = inner.LockAsync(first, second, cancellationToken);
         gate.Attempted.TrySetResult();
         return await attempt;
+    }
+}
+
+/// <summary>Records which of the two lock kinds a single <c>LoadForUpdateAsync</c> call reaches first.</summary>
+internal sealed class LockOrderRecorder
+{
+    private readonly List<string> _calls = [];
+
+    internal IReadOnlyList<string> Calls => _calls;
+
+    internal void Record(string kind) => _calls.Add(kind);
+}
+
+internal sealed class RecordingSessionLockRepository(ISessionLockRepository inner, LockOrderRecorder order)
+    : ISessionLockRepository
+{
+    public Task LockUsersAsync(IReadOnlyCollection<UserId> userIds, CancellationToken cancellationToken) =>
+        inner.LockUsersAsync(userIds, cancellationToken);
+
+    public Task LockSessionsAsync(IReadOnlyCollection<SessionId> sessionIds, CancellationToken cancellationToken)
+    {
+        order.Record("session");
+        return inner.LockSessionsAsync(sessionIds, cancellationToken);
+    }
+}
+
+internal sealed class RecordingPollLockRepository(IPollLockRepository inner, LockOrderRecorder order)
+    : IPollLockRepository
+{
+    public Task LockUsersAsync(IReadOnlyCollection<UserId> userIds, CancellationToken cancellationToken) =>
+        inner.LockUsersAsync(userIds, cancellationToken);
+
+    public Task LockPollsAsync(IReadOnlyCollection<PollId> pollIds, CancellationToken cancellationToken)
+    {
+        order.Record("poll");
+        return inner.LockPollsAsync(pollIds, cancellationToken);
     }
 }

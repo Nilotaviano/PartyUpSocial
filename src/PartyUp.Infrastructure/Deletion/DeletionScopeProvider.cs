@@ -3,6 +3,7 @@ using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Availability;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users;
 using PartyUp.Domain.Users.DeletionExecution;
@@ -25,6 +26,7 @@ namespace PartyUp.Infrastructure.Deletion;
 public sealed class DeletionScopeProvider(
     AppDbContext context,
     ISessionLockRepository sessionLocks,
+    IPollLockRepository pollLocks,
     IUsernameRegistryRepository usernames,
     IAvailabilityRepository availability)
     : IDeletionScopeProvider
@@ -144,6 +146,55 @@ public sealed class DeletionScopeProvider(
             .ToListAsync(cancellationToken);
         ids.UnionWith(requestedOrganizers);
 
+        List<PollId> ownedPollIds = await context.Polls
+            .Where(poll => poll.OrganizerId == id)
+            .Select(poll => poll.Id)
+            .ToListAsync(cancellationToken);
+
+        if (ownedPollIds.Count > 0)
+        {
+            List<UserId> ownedPollParticipants = await context.PollParticipants
+                .Where(participant =>
+                    ownedPollIds.Contains(participant.PollId) && participant.UserId != null)
+                .Select(participant => participant.UserId!.Value)
+                .ToListAsync(cancellationToken);
+            ids.UnionWith(ownedPollParticipants);
+
+            List<UserId> ownedPollRequesters = await context.JoinRequests
+                .Where(request =>
+                    request.PollId != null &&
+                    ownedPollIds.Contains(request.PollId.Value) &&
+                    request.Status == JoinRequestStatus.Pending)
+                .Select(request => request.RequesterId)
+                .ToListAsync(cancellationToken);
+            ids.UnionWith(ownedPollRequesters);
+        }
+
+        List<UserId> participatedPollOrganizers = await context.PollParticipants
+            .Where(participant => participant.UserId == id)
+            .Join(
+                context.Polls,
+                participant => participant.PollId,
+                poll => poll.Id,
+                (participant, poll) => poll.OrganizerId)
+            .Where(organizerId => organizerId != id)
+            .ToListAsync(cancellationToken);
+        ids.UnionWith(participatedPollOrganizers);
+
+        List<UserId> requestedPollOrganizers = await context.JoinRequests
+            .Where(request =>
+                request.RequesterId == id &&
+                request.PollId != null &&
+                request.Status == JoinRequestStatus.Pending)
+            .Join(
+                context.Polls,
+                request => request.PollId!.Value,
+                poll => poll.Id,
+                (request, poll) => poll.OrganizerId)
+            .Where(organizerId => organizerId != id)
+            .ToListAsync(cancellationToken);
+        ids.UnionWith(requestedPollOrganizers);
+
         return ids;
     }
 
@@ -163,18 +214,39 @@ public sealed class DeletionScopeProvider(
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        if (sessionIds.Count == 0)
+        List<Session> sessions = [];
+        if (sessionIds.Count > 0)
         {
-            return baseline with { Sessions = [] };
+            await sessionLocks.LockSessionsAsync(sessionIds, cancellationToken);
+
+            sessions = await LoadWithChildren(context.Sessions)
+                .Where(session => sessionIds.Contains(session.Id))
+                .ToListAsync(cancellationToken);
         }
 
-        await sessionLocks.LockSessionsAsync(sessionIds, cancellationToken);
-
-        List<Session> sessions = await LoadWithChildren(context.Sessions)
-            .Where(session => sessionIds.Contains(session.Id))
+        // Poll parents lock strictly after every session parent above (P3-LK-01), so a subject with
+        // both session and poll scope always acquires the two parent kinds in the same order.
+        List<PollId> pollIds = await context.Polls
+            .Where(poll =>
+                poll.OrganizerId == id ||
+                poll.Participants.Any(participant => participant.UserId == id) ||
+                poll.JoinRequests.Any(request =>
+                    request.RequesterId == id && request.Status == JoinRequestStatus.Pending))
+            .Select(poll => poll.Id)
+            .Distinct()
             .ToListAsync(cancellationToken);
 
-        return baseline with { Sessions = sessions };
+        List<Poll> polls = [];
+        if (pollIds.Count > 0)
+        {
+            await pollLocks.LockPollsAsync(pollIds, cancellationToken);
+
+            polls = await LoadPollWithChildren(context.Polls)
+                .Where(poll => pollIds.Contains(poll.Id))
+                .ToListAsync(cancellationToken);
+        }
+
+        return baseline with { Sessions = sessions, Polls = polls };
     }
 
     /// <summary>
@@ -202,6 +274,15 @@ public sealed class DeletionScopeProvider(
             .Include(session => session.JoinRequests)
             .Include(session => session.GuestIdentities)
             .Include(session => session.GuestLinks);
+
+    private static IQueryable<Poll> LoadPollWithChildren(IQueryable<Poll> query) =>
+        query
+            .Include(poll => poll.Options)
+            .Include(poll => poll.Participants)
+            .Include(poll => poll.Votes)
+            .Include(poll => poll.JoinRequests)
+            .Include(poll => poll.GuestIdentities)
+            .Include(poll => poll.GuestLinks);
 
     private static UserId Lower(UserId first, UserId second) =>
         first.Value.CompareTo(second.Value) < 0 ? first : second;
