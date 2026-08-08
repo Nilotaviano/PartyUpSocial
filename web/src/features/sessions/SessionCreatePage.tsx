@@ -28,11 +28,11 @@ export function DiscardDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-slate-950/40" />
+        <Dialog.Overlay className="fixed inset-0 bg-ink/40" />
         <Dialog.Content
           aria-describedby="discard-dialog-description"
           aria-label={t('a11y.dialogLabel')}
-          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-xl focus:outline-none"
+          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-card border-2 border-ink bg-card p-6 shadow-offset-dialog focus:outline-none"
           onCloseAutoFocus={(event) => {
             event.preventDefault()
             triggerRef.current?.focus()
@@ -42,12 +42,12 @@ export function DiscardDialog({
             cancelButton.current?.focus()
           }}
         >
-          <Dialog.Title className="text-lg font-semibold text-slate-950">
+          <Dialog.Title className="text-h2 font-display font-semibold text-ink">
             {t('dirty.title')}
           </Dialog.Title>
           <Dialog.Description
             id="discard-dialog-description"
-            className="mt-2 text-sm text-slate-700"
+            className="mt-2 text-ink-soft"
           >
             {t('dirty.body')}
           </Dialog.Description>
@@ -55,19 +55,15 @@ export function DiscardDialog({
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
                 type="button"
               >
                 {t('dirty.stay')}
               </button>
             </Dialog.Close>
-            <button
-              className="min-h-11 rounded-md bg-red-700 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-              type="button"
-              onClick={onDiscard}
-            >
+            <Button type="button" variant="danger" onClick={onDiscard}>
               {t('dirty.discard')}
-            </button>
+            </Button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
@@ -309,11 +305,11 @@ export function SessionCreatePage() {
       <h1
         ref={heading}
         tabIndex={-1}
-        className="text-3xl font-bold tracking-tight text-slate-950 focus:outline-none"
+        className="text-display font-display font-bold text-ink focus:outline-none"
       >
         {t('create.heading')}
       </h1>
-      <p className="text-sm text-slate-600">{t('create.defaults')}</p>
+      <p className="text-ink-soft">{t('create.defaults')}</p>
 
       {prefill?.startWasClamped && (
         <p aria-live="polite" role="status">
@@ -333,17 +329,22 @@ export function SessionCreatePage() {
       {Object.keys(fieldErrors).length > 0 && (
         <div
           ref={summaryRef}
-          className="rounded-md border border-red-300 bg-red-50 p-4"
+          className="rounded-card border-2 border-danger bg-danger/10 p-4"
           role="alert"
           tabIndex={-1}
         >
-          <p className="font-semibold text-red-900">
+          <p className="font-display font-semibold text-ink">
             {t('a11y.validationSummary')}
           </p>
-          <ul className="mt-2 list-disc pl-5 text-sm text-red-800">
+          <ul className="mt-2 list-disc pl-5 text-ink">
             {Object.entries(fieldErrors).map(([field, message]) => (
               <li key={field}>
-                <a href={`#${fieldIds[field] ?? `field-${field}`}`}>{message}</a>
+                <a
+                  className="font-semibold text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                  href={`#${fieldIds[field] ?? `field-${field}`}`}
+                >
+                  {message}
+                </a>
               </li>
             ))}
           </ul>
@@ -363,13 +364,13 @@ export function SessionCreatePage() {
 
       <form className="space-y-5" noValidate onSubmit={handleSubmit}>
         <div>
-          <label className="block font-medium text-slate-900" htmlFor="field-title">
+          <label className="block font-body font-semibold text-ink" htmlFor="field-title">
             {t('create.title')}
           </label>
           <input
             aria-describedby={fieldErrors.title ? 'title-error' : undefined}
             aria-invalid={Boolean(fieldErrors.title)}
-            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             id="field-title"
             required
             value={form.title}
@@ -383,13 +384,13 @@ export function SessionCreatePage() {
         </div>
 
         <div>
-          <label className="block font-medium text-slate-900" htmlFor="field-start">
+          <label className="block font-body font-semibold text-ink" htmlFor="field-start">
             {t('create.start')}
           </label>
           <input
             aria-describedby={fieldErrors.start ? 'start-error' : undefined}
             aria-invalid={Boolean(fieldErrors.start)}
-            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             id="field-start"
             step={900}
             type="datetime-local"
@@ -405,7 +406,7 @@ export function SessionCreatePage() {
 
         <div>
           <label
-            className="block font-medium text-slate-900"
+            className="block font-body font-semibold text-ink"
             htmlFor="field-duration"
           >
             {t('create.duration')}
@@ -415,7 +416,7 @@ export function SessionCreatePage() {
               fieldErrors.durationMinutes ? 'duration-error' : undefined
             }
             aria-invalid={Boolean(fieldErrors.durationMinutes)}
-            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             id="field-duration"
             min={15}
             step={15}
@@ -432,13 +433,13 @@ export function SessionCreatePage() {
 
         <div>
           <label
-            className="block font-medium text-slate-900"
+            className="block font-body font-semibold text-ink"
             htmlFor="field-platform"
           >
             {t('create.platform')}
           </label>
           <select
-            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             id="field-platform"
             value={form.platform}
             onChange={(event) => update('platform', event.target.value)}
@@ -452,7 +453,7 @@ export function SessionCreatePage() {
         </div>
 
         <fieldset>
-          <legend className="font-medium text-slate-900">
+          <legend className="font-body font-semibold text-ink">
             {t('create.game')}
           </legend>
           {form.platform === 'Steam' && (
@@ -481,7 +482,7 @@ export function SessionCreatePage() {
             {t('create.gameFreeText')}
           </label>
           <input
-            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             id="field-game-name"
             value={form.gameName}
             onChange={(event) => update('gameName', event.target.value)}
@@ -489,7 +490,7 @@ export function SessionCreatePage() {
           {form.platform === 'Steam' && form.gameSource === 'catalog' && (
             <input
               aria-label={t('create.steamAppId')}
-              className="mt-2 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2"
+              className="mt-2 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               value={form.gameAppId}
               onChange={(event) => update('gameAppId', event.target.value)}
             />
@@ -498,13 +499,13 @@ export function SessionCreatePage() {
 
         <div>
           <label
-            className="block font-medium text-slate-900"
+            className="block font-body font-semibold text-ink"
             htmlFor="field-notes"
           >
             {t('create.notes')}
           </label>
           <textarea
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             id="field-notes"
             value={form.notes}
             onChange={(event) => update('notes', event.target.value)}
@@ -513,7 +514,7 @@ export function SessionCreatePage() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="block font-medium text-slate-900" htmlFor="field-min">
+            <label className="block font-body font-semibold text-ink" htmlFor="field-min">
               {t('create.min')}
             </label>
             <input
@@ -521,7 +522,7 @@ export function SessionCreatePage() {
                 fieldErrors.minAttendance ? 'min-error' : undefined
               }
               aria-invalid={Boolean(fieldErrors.minAttendance)}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2"
+              className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               id="field-min"
               min={1}
               type="number"
@@ -535,13 +536,13 @@ export function SessionCreatePage() {
             )}
           </div>
           <div>
-            <label className="block font-medium text-slate-900" htmlFor="field-max">
+            <label className="block font-body font-semibold text-ink" htmlFor="field-max">
               {t('create.max')}
             </label>
             <input
               aria-describedby={fieldErrors.maxCapacity ? 'max-error' : undefined}
               aria-invalid={Boolean(fieldErrors.maxCapacity)}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 disabled:bg-slate-100"
+              className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:opacity-50"
               disabled={form.unlimited}
               id="field-max"
               min={1}
@@ -575,7 +576,7 @@ export function SessionCreatePage() {
         </label>
 
         <fieldset id="field-invitees">
-          <legend className="font-medium text-slate-900">
+          <legend className="font-body font-semibold text-ink">
             {t('create.invitees')}
           </legend>
           {fieldErrors.inviteeUserIds && (
@@ -609,7 +610,7 @@ export function SessionCreatePage() {
 
         <div>
           <label
-            className="block font-medium text-slate-900"
+            className="block font-body font-semibold text-ink"
             htmlFor="field-guest-links"
           >
             {t('create.guestLinks')}
@@ -618,7 +619,7 @@ export function SessionCreatePage() {
             aria-describedby={
               fieldErrors.guestLinkCount ? 'guest-links-error' : undefined
             }
-            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2"
+            className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             id="field-guest-links"
             max={20}
             min={0}
@@ -636,7 +637,7 @@ export function SessionCreatePage() {
         <div className="flex flex-wrap justify-end gap-2">
           <button
             ref={cancelTrigger}
-            className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+            className="min-h-11 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
             type="button"
             onClick={requestCancel}
           >
@@ -644,9 +645,9 @@ export function SessionCreatePage() {
           </button>
           <Button
             aria-busy={submit.isPending}
-            className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
             disabled={submit.isPending}
             type="submit"
+            variant="primary"
           >
             {t('create.submit')}
           </Button>

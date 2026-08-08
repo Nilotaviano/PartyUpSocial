@@ -66,13 +66,13 @@ export function SessionListPage({ scope }: SessionListPageProps) {
         <h1
           ref={heading}
           tabIndex={-1}
-          className="text-3xl font-bold tracking-tight text-slate-950 focus:outline-none"
+          className="text-display font-display font-bold text-ink focus:outline-none"
         >
           {headingText}
         </h1>
         {scope === 'upcoming' && (
           <Link
-            className="min-h-11 inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+            className="inline-flex min-h-11 items-center gap-2 rounded-control border-2 border-ink bg-primary px-4 py-2 font-display font-semibold text-primary-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             to="/sessions/new"
           >
             {t('create.heading')}
@@ -81,7 +81,7 @@ export function SessionListPage({ scope }: SessionListPageProps) {
       </header>
 
       {isPending && (
-        <p role="status" className="motion-safe:animate-pulse text-slate-500">
+        <p role="status" className="motion-safe:animate-pulse text-ink-soft">
           {t('common.loading', { ns: 'common' })}
         </p>
       )}
@@ -94,7 +94,7 @@ export function SessionListPage({ scope }: SessionListPageProps) {
         </p>
       )}
 
-      {!isPending && items.length === 0 && <p>{emptyText}</p>}
+      {!isPending && items.length === 0 && <p className="text-ink-soft">{emptyText}</p>}
 
       {items.length > 0 && (
         <ul className="space-y-3">
@@ -103,18 +103,18 @@ export function SessionListPage({ scope }: SessionListPageProps) {
             return (
               <li key={session.id}>
                 <Link
-                  className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                  className="block rounded-card border-2 border-ink bg-card p-4 shadow-offset-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                   to={`/sessions/${session.id}`}
                 >
-                  <p className="font-semibold text-slate-950">
+                  <p className="font-display font-semibold text-ink">
                     {session.title}
                     {inProgress && (
-                      <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                      <span className="ml-2 rounded-full border-2 border-ink bg-accent px-2 py-0.5 font-display text-xs font-bold text-accent-ink dark:border-accent-ink">
                         {t('list.inProgress')}
                       </span>
                     )}
                   </p>
-                  <p className="text-sm text-slate-600">
+                  <p className="text-ink-soft">
                     {new Intl.DateTimeFormat(i18n.language, {
                       dateStyle: 'medium',
                       timeStyle: 'short',
@@ -131,8 +131,8 @@ export function SessionListPage({ scope }: SessionListPageProps) {
       {nextCursor && (
         <Button
           aria-busy={isFetchingNextPage}
-          className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
           disabled={isFetchingNextPage}
+          variant="neutral"
           onClick={() => setCursors((current) => [...current, nextCursor])}
         >
           {t('list.loadMore')}

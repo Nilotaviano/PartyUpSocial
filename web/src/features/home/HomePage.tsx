@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
+import { Button } from '../../components/ui/button'
 import {
   availabilityKeys,
   getHomeSuggestions,
@@ -142,7 +143,7 @@ export function HomePage() {
       <h1
         ref={heading}
         tabIndex={-1}
-        className="text-3xl font-bold tracking-tight text-slate-950 focus:outline-none"
+        className="text-display font-display font-bold text-ink focus:outline-none"
       >
         {t('home.heading')}
       </h1>
@@ -156,49 +157,51 @@ export function HomePage() {
         aria-labelledby="home-actionable-heading"
         data-testid="home-region-actionable"
       >
-        <h2 id="home-actionable-heading" className="text-xl font-semibold text-slate-950">
+        <h2 id="home-actionable-heading" className="text-h2 font-display font-semibold text-ink">
           {t('home.actionable.heading')}
         </h2>
 
         {actionable.isPending && (
-          <p role="status">{t('common.loading', { ns: 'common' })}</p>
+          <p role="status" className="motion-safe:animate-pulse text-ink-soft">
+            {t('common.loading', { ns: 'common' })}
+          </p>
         )}
 
         {!actionable.isPending && !hasActionable && (
-          <p>{t('home.actionable.empty')}</p>
+          <p className="text-ink-soft">{t('home.actionable.empty')}</p>
         )}
 
         {invitations.length > 0 && (
           <div className="mt-3">
-            <h3 className="font-semibold text-slate-900">
+            <h3 className="font-display font-semibold text-ink">
               {t('home.actionable.invitationsHeading')}
             </h3>
             <ul className="mt-2 space-y-2">
               {invitations.map(({ session, invitedAt }) => (
                 <li
                   key={session.id}
-                  className="rounded-md border border-slate-200 p-3"
+                  className="rounded-card border-2 border-ink bg-card p-3 shadow-offset-card"
                   data-invited-at={invitedAt}
                 >
                   <Link
-                    className="font-medium text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                    className="font-medium text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                     to={`/sessions/${session.id}`}
                   >
                     {session.title}
                   </Link>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {(['Going', 'Maybe', 'Declined'] as const).map((choice) => (
-                      <button
+                      <Button
                         key={choice}
-                        className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                         disabled={respond.isPending}
                         type="button"
+                        variant="neutral"
                         onClick={() =>
                           respond.mutate({ sessionId: session.id, response: choice })
                         }
                       >
                         {t(`rsvp.${choice.toLowerCase()}`, { ns: 'sessions' })}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </li>
@@ -209,31 +212,31 @@ export function HomePage() {
 
         {joinRequests.length > 0 && (
           <div className="mt-3">
-            <h3 className="font-semibold text-slate-900">
+            <h3 className="font-display font-semibold text-ink">
               {t('home.actionable.joinRequestsHeading')}
             </h3>
             <ul className="mt-2 space-y-2">
               {joinRequests.map((request) => (
                 <li
                   key={request.joinRequestId}
-                  className="rounded-md border border-slate-200 p-3"
+                  className="rounded-card border-2 border-ink bg-card p-3 shadow-offset-card"
                 >
                   <Link
-                    className="font-medium text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                    className="font-medium text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                     to={`/sessions/${request.session.id}`}
                   >
                     {request.session.title}
                   </Link>
-                  <p className="text-sm text-slate-600">
+                  <p className="text-ink-soft">
                     {t('home.actionable.requestedBy', {
                       name: request.requester.displayName ?? t('detail.anonymous', { ns: 'sessions' }),
                     })}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                    <Button
                       disabled={approve.isPending}
                       type="button"
+                      variant="neutral"
                       onClick={() =>
                         approve.mutate({
                           sessionId: request.session.id,
@@ -242,11 +245,11 @@ export function HomePage() {
                       }
                     >
                       {t('join.approve', { ns: 'sessions' })}
-                    </button>
-                    <button
-                      className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                    </Button>
+                    <Button
                       disabled={reject.isPending}
                       type="button"
+                      variant="neutral"
                       onClick={() =>
                         reject.mutate({
                           sessionId: request.session.id,
@@ -255,7 +258,7 @@ export function HomePage() {
                       }
                     >
                       {t('join.reject', { ns: 'sessions' })}
-                    </button>
+                    </Button>
                   </div>
                 </li>
               ))}
@@ -265,7 +268,7 @@ export function HomePage() {
 
         {hasActionable && hasMoreActionable && (
           <Link
-            className="mt-3 inline-flex min-h-11 items-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+            className="mt-3 inline-flex min-h-11 items-center font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             to="/sessions/upcoming"
           >
             {t('home.actionable.seeAll')}
@@ -278,10 +281,10 @@ export function HomePage() {
         aria-labelledby="home-polls-heading"
         data-testid="home-region-polls"
       >
-        <h2 id="home-polls-heading" className="text-xl font-semibold text-slate-950">
+        <h2 id="home-polls-heading" className="text-h2 font-display font-semibold text-ink">
           {t('home.polls.heading')}
         </h2>
-        <p>{t('home.polls.empty')}</p>
+        <p className="text-ink-soft">{t('home.polls.empty')}</p>
       </section>
 
       {/* D-103 region 3 */}
@@ -289,25 +292,27 @@ export function HomePage() {
         aria-labelledby="home-upcoming-heading"
         data-testid="home-region-upcoming"
       >
-        <h2 id="home-upcoming-heading" className="text-xl font-semibold text-slate-950">
+        <h2 id="home-upcoming-heading" className="text-h2 font-display font-semibold text-ink">
           {t('home.upcoming.heading')}
         </h2>
         {upcoming.isPending && (
-          <p role="status">{t('common.loading', { ns: 'common' })}</p>
+          <p role="status" className="motion-safe:animate-pulse text-ink-soft">
+            {t('common.loading', { ns: 'common' })}
+          </p>
         )}
         {!upcoming.isPending && upcomingItems.length === 0 && (
-          <p>{t('home.upcoming.empty')}</p>
+          <p className="text-ink-soft">{t('home.upcoming.empty')}</p>
         )}
         {upcomingItems.length > 0 && (
           <ul className="mt-2 space-y-2">
             {upcomingItems.map((session) => (
               <li key={session.id}>
                 <Link
-                  className="block rounded-md border border-slate-200 p-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                  className="block rounded-card border-2 border-ink bg-card p-3 shadow-offset-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                   to={`/sessions/${session.id}`}
                 >
-                  <p className="font-medium text-slate-950">{session.title}</p>
-                  <p className="text-sm text-slate-600">
+                  <p className="font-medium text-ink">{session.title}</p>
+                  <p className="text-ink-soft">
                     {timeFormat.format(new Date(session.startTime))}
                   </p>
                 </Link>
@@ -316,7 +321,7 @@ export function HomePage() {
           </ul>
         )}
         <Link
-          className="mt-3 inline-flex min-h-11 items-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          className="mt-3 inline-flex min-h-11 items-center font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           to="/sessions/upcoming"
         >
           {t('home.upcoming.seeAll')}
@@ -328,37 +333,39 @@ export function HomePage() {
         aria-labelledby="home-findatime-heading"
         data-testid="home-region-findatime"
       >
-        <h2 id="home-findatime-heading" className="text-xl font-semibold text-slate-950">
+        <h2 id="home-findatime-heading" className="text-h2 font-display font-semibold text-ink">
           {t('findATime.heading', { ns: 'availability' })}
         </h2>
         <Link
-          className="mt-1 inline-flex min-h-11 items-center rounded-md bg-indigo-600 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          className="mt-1 inline-flex min-h-11 items-center gap-2 rounded-control border-2 border-ink bg-primary px-4 py-2 font-display font-semibold text-primary-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           to="/find-a-time"
         >
           {t('findATime.heading', { ns: 'availability' })}
         </Link>
 
-        <h3 className="mt-4 font-semibold text-slate-900">
+        <h3 className="mt-4 font-display font-semibold text-ink">
           {t('findATime.suggestionsHeading', { ns: 'availability' })}
         </h3>
         {suggestions.isPending && (
-          <p role="status">{t('common.loading', { ns: 'common' })}</p>
+          <p role="status" className="motion-safe:animate-pulse text-ink-soft">
+            {t('common.loading', { ns: 'common' })}
+          </p>
         )}
         {!suggestions.isPending && suggestionItems.length === 0 && (
-          <p>{t('findATime.empty', { ns: 'availability' })}</p>
+          <p className="text-ink-soft">{t('findATime.empty', { ns: 'availability' })}</p>
         )}
         {suggestionItems.length > 0 && (
           <ul className="mt-2 space-y-2" data-testid="home-suggestions-list">
             {suggestionItems.map((window, index) => (
               <li
                 key={`${window.start}-${index}`}
-                className="rounded-md border border-slate-200 p-3"
+                className="rounded-card border-2 border-ink bg-card p-3 shadow-offset-card"
               >
-                <p>
+                <p className="text-ink">
                   {timeFormat.format(new Date(window.start))} –{' '}
                   {timeFormat.format(new Date(window.end))}
                 </p>
-                <p className="text-sm text-slate-600">
+                <p className="text-ink-soft">
                   {t('findATime.available', { ns: 'availability', count: window.available.length })}
                 </p>
               </li>
@@ -367,7 +374,7 @@ export function HomePage() {
         )}
         {suggestions.data?.hasMore && (
           <Link
-            className="mt-3 inline-flex min-h-11 items-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+            className="mt-3 inline-flex min-h-11 items-center font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             to="/find-a-time"
           >
             {t('findATime.seeAll', { ns: 'availability' })}
@@ -380,25 +387,27 @@ export function HomePage() {
         aria-labelledby="home-discover-heading"
         data-testid="home-region-discover"
       >
-        <h2 id="home-discover-heading" className="text-xl font-semibold text-slate-950">
+        <h2 id="home-discover-heading" className="text-h2 font-display font-semibold text-ink">
           {t('home.discoverable.heading')}
         </h2>
         {discover.isPending && (
-          <p role="status">{t('common.loading', { ns: 'common' })}</p>
+          <p role="status" className="motion-safe:animate-pulse text-ink-soft">
+            {t('common.loading', { ns: 'common' })}
+          </p>
         )}
         {!discover.isPending && discoverItems.length === 0 && (
-          <p>{t('home.discoverable.empty')}</p>
+          <p className="text-ink-soft">{t('home.discoverable.empty')}</p>
         )}
         {discoverItems.length > 0 && (
           <ul className="mt-2 space-y-2" data-testid="home-discover-list">
             {discoverItems.map((session) => (
               <li key={session.id}>
                 <Link
-                  className="block rounded-md border border-slate-200 p-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                  className="block rounded-card border-2 border-ink bg-card p-3 shadow-offset-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                   to={`/sessions/${session.id}`}
                 >
-                  <p className="font-medium text-slate-950">{session.title}</p>
-                  <p className="text-sm text-slate-600">
+                  <p className="font-medium text-ink">{session.title}</p>
+                  <p className="text-ink-soft">
                     {timeFormat.format(new Date(session.startTime))}
                   </p>
                 </Link>
@@ -407,7 +416,7 @@ export function HomePage() {
           </ul>
         )}
         <Link
-          className="mt-3 inline-flex min-h-11 items-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          className="mt-3 inline-flex min-h-11 items-center font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           to="/discover"
         >
           {t('home.discoverable.seeAll')}

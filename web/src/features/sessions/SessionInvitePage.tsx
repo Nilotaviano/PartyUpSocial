@@ -29,31 +29,27 @@ function RevokeGuestLinkDialog({ pending, onConfirm }: RevokeGuestLinkDialogProp
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <button
-          className="min-h-11 rounded-md border border-red-300 px-3 py-2 text-sm text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-          disabled={pending}
-          type="button"
-        >
+        <Button disabled={pending} variant="danger">
           {t('invite.revoke')}
-        </button>
+        </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-slate-950/40" />
+        <Dialog.Overlay className="fixed inset-0 bg-ink/40" />
         <Dialog.Content
           aria-describedby="revoke-guest-link-description"
           aria-label={t('a11y.dialogLabel')}
-          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-xl focus:outline-none"
+          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-card border-2 border-ink bg-card p-6 shadow-offset-dialog focus:outline-none"
           onOpenAutoFocus={(event) => {
             event.preventDefault()
             cancelButton.current?.focus()
           }}
         >
-          <Dialog.Title className="text-lg font-semibold text-slate-950">
+          <Dialog.Title className="text-h2 font-display font-semibold text-ink">
             {t('invite.revoke')}
           </Dialog.Title>
           <Dialog.Description
             id="revoke-guest-link-description"
-            className="mt-2 text-sm text-slate-700"
+            className="mt-2 text-ink-soft"
           >
             {t('invite.revokeConfirm')}
           </Dialog.Description>
@@ -61,22 +57,22 @@ function RevokeGuestLinkDialog({ pending, onConfirm }: RevokeGuestLinkDialogProp
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="min-h-11 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
                 type="button"
               >
                 {t('dirty.stay')}
               </button>
             </Dialog.Close>
-            <button
-              className="min-h-11 rounded-md bg-red-700 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            <Button
               type="button"
+              variant="danger"
               onClick={() => {
                 setOpen(false)
                 onConfirm()
               }}
             >
               {t('invite.revoke')}
-            </button>
+            </Button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
@@ -158,12 +154,12 @@ export function SessionInvitePage() {
       <h1
         ref={heading}
         tabIndex={-1}
-        className="text-3xl font-bold tracking-tight text-slate-950 focus:outline-none"
+        className="text-display font-display font-bold text-ink focus:outline-none"
       >
         {t('invite.heading')}
       </h1>
 
-      <p aria-live="polite" className="text-sm text-emerald-700">
+      <p aria-live="polite" className="text-ink">
         {status}
       </p>
 
@@ -177,13 +173,13 @@ export function SessionInvitePage() {
       )}
 
       <section aria-labelledby="invite-registered-heading">
-        <h2 id="invite-registered-heading" className="text-xl font-semibold text-slate-950">
+        <h2 id="invite-registered-heading" className="text-h2 font-display font-semibold text-ink">
           {t('invite.registered')}
         </h2>
         <ul className="mt-2 space-y-1">
           {(friends.data ?? []).map((friend) => (
             <li key={friend.friendshipId}>
-              <label className="inline-flex min-h-11 items-center gap-2">
+              <label className="inline-flex min-h-11 items-center gap-2 text-ink">
                 <input
                   checked={selected.includes(friend.userId)}
                   type="checkbox"
@@ -203,8 +199,9 @@ export function SessionInvitePage() {
         </ul>
         <Button
           aria-busy={invite.isPending}
-          className="mt-3 min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
+          className="mt-3"
           disabled={invite.isPending || selected.length === 0}
+          variant="primary"
           onClick={() => invite.mutate()}
         >
           {t('invite.registered')}
@@ -212,14 +209,14 @@ export function SessionInvitePage() {
       </section>
 
       <section aria-labelledby="invite-guest-heading">
-        <h2 id="invite-guest-heading" className="text-xl font-semibold text-slate-950">
+        <h2 id="invite-guest-heading" className="text-h2 font-display font-semibold text-ink">
           {t('invite.guest')}
         </h2>
-        <label className="mt-2 block" htmlFor="guest-link-count">
+        <label className="mt-2 block font-body font-semibold text-ink" htmlFor="guest-link-count">
           {t('create.guestLinks')}
         </label>
         <input
-          className="mt-1 min-h-11 w-24 rounded-md border border-slate-300 px-3 py-2"
+          className="mt-1 min-h-11 w-24 rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           id="guest-link-count"
           max={20}
           min={1}
@@ -229,8 +226,9 @@ export function SessionInvitePage() {
         />
         <Button
           aria-busy={createLinks.isPending}
-          className="ml-2 min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          className="ml-2"
           disabled={createLinks.isPending}
+          variant="neutral"
           onClick={() => createLinks.mutate()}
         >
           {t('invite.createLink')}
@@ -241,18 +239,18 @@ export function SessionInvitePage() {
             {guestLinks.map((link) => (
               <li
                 key={link.guestLinkId}
-                className="flex items-center justify-between gap-2 rounded-md border border-slate-200 p-3"
+                className="flex items-center justify-between gap-2 rounded-card border-2 border-ink bg-card p-3"
               >
-                <span className="truncate font-mono text-sm">{link.url}</span>
+                <span className="truncate font-mono text-ink">{link.url}</span>
                 <span className="flex gap-2">
-                  <button
+                  <Button
                     aria-label={t('a11y.copyLink')}
-                    className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                     type="button"
+                    variant="ghost"
                     onClick={() => void copy(link.url)}
                   >
                     {t('invite.copyLink')}
-                  </button>
+                  </Button>
                   <RevokeGuestLinkDialog
                     pending={revoke.isPending}
                     onConfirm={() => revoke.mutate(link.guestLinkId)}

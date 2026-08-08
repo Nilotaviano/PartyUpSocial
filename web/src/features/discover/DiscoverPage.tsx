@@ -49,13 +49,13 @@ export function DiscoverPage() {
       <h1
         ref={heading}
         tabIndex={-1}
-        className="text-3xl font-bold tracking-tight text-slate-950 focus:outline-none"
+        className="text-display font-display font-bold text-ink focus:outline-none"
       >
         {t('discover.heading')}
       </h1>
 
       {isPending && (
-        <p role="status" className="motion-safe:animate-pulse text-slate-500">
+        <p role="status" className="motion-safe:animate-pulse text-ink-soft">
           {t('common.loading', { ns: 'common' })}
         </p>
       )}
@@ -69,22 +69,22 @@ export function DiscoverPage() {
         </p>
       )}
 
-      {!isPending && items.length === 0 && <p>{t('discover.empty')}</p>}
+      {!isPending && items.length === 0 && <p className="text-ink-soft">{t('discover.empty')}</p>}
 
       {items.length > 0 && (
         <ul className="space-y-3">
           {items.map((session) => (
             <li key={session.id}>
               <Link
-                className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="block rounded-card border-2 border-ink bg-card p-4 shadow-offset-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                 data-viewer-relation={session.viewerRelation}
                 to={`/sessions/${session.id}`}
               >
-                <p className="font-semibold text-slate-950">{session.title}</p>
-                <p className="text-sm text-slate-600">
+                <p className="font-display font-semibold text-ink">{session.title}</p>
+                <p className="text-ink-soft">
                   {timeFormat.format(new Date(session.startTime))}
                 </p>
-                <p className="text-sm text-slate-600">
+                <p className="text-ink-soft">
                   {t('discover.organizedBy', {
                     name: session.organizer.displayName ?? t('detail.anonymous', { ns: 'sessions' }),
                   })}
@@ -98,8 +98,8 @@ export function DiscoverPage() {
       {nextCursor && (
         <Button
           aria-busy={isFetchingNextPage}
-          className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
           disabled={isFetchingNextPage}
+          variant="neutral"
           onClick={() => setCursors((current) => [...current, nextCursor])}
         >
           {t('discover.loadMore')}

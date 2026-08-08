@@ -53,30 +53,27 @@ function CancelSessionDialog({ pending, onConfirm }: CancelDialogProps) {
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <Button
-          className="min-h-11 rounded-md border border-red-300 px-4 py-2 text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-          disabled={pending}
-        >
+        <Button disabled={pending} variant="danger">
           {t('cancel.action')}
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-slate-950/40" />
+        <Dialog.Overlay className="fixed inset-0 bg-ink/40" />
         <Dialog.Content
           aria-describedby="cancel-session-description"
           aria-label={t('a11y.dialogLabel')}
-          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-xl focus:outline-none"
+          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-card border-2 border-ink bg-card p-6 shadow-offset-dialog focus:outline-none"
           onOpenAutoFocus={(event) => {
             event.preventDefault()
             cancelButton.current?.focus()
           }}
         >
-          <Dialog.Title className="text-lg font-semibold text-slate-950">
+          <Dialog.Title className="text-h2 font-display font-semibold text-ink">
             {t('cancel.title')}
           </Dialog.Title>
           <Dialog.Description
             id="cancel-session-description"
-            className="mt-2 text-sm text-slate-700"
+            className="mt-2 text-ink-soft"
           >
             {t('cancel.body')}
           </Dialog.Description>
@@ -84,22 +81,22 @@ function CancelSessionDialog({ pending, onConfirm }: CancelDialogProps) {
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
                 type="button"
               >
                 {t('dirty.stay')}
               </button>
             </Dialog.Close>
-            <button
-              className="min-h-11 rounded-md bg-red-700 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            <Button
               type="button"
+              variant="danger"
               onClick={() => {
                 setOpen(false)
                 onConfirm()
               }}
             >
               {t('cancel.confirm')}
-            </button>
+            </Button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
@@ -127,29 +124,29 @@ function RemoveGuestDialog({
       <Dialog.Trigger asChild>
         <Button
           aria-label={`${t('invite.removeGuest')} ${displayName}`}
-          className="min-h-11 rounded-md border border-red-300 px-3 py-2 text-sm text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
           disabled={pending}
+          variant="danger"
         >
           {t('invite.removeGuest')}
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-slate-950/40" />
+        <Dialog.Overlay className="fixed inset-0 bg-ink/40" />
         <Dialog.Content
           aria-describedby="remove-guest-description"
           aria-label={t('a11y.dialogLabel')}
-          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-xl focus:outline-none"
+          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-card border-2 border-ink bg-card p-6 shadow-offset-dialog focus:outline-none"
           onOpenAutoFocus={(event) => {
             event.preventDefault()
             cancelButton.current?.focus()
           }}
         >
-          <Dialog.Title className="text-lg font-semibold text-slate-950">
+          <Dialog.Title className="text-h2 font-display font-semibold text-ink">
             {t('invite.removeGuest')}
           </Dialog.Title>
           <Dialog.Description
             id="remove-guest-description"
-            className="mt-2 text-sm text-slate-700"
+            className="mt-2 text-ink-soft"
           >
             {t('invite.removeGuestConfirm')}
           </Dialog.Description>
@@ -157,22 +154,22 @@ function RemoveGuestDialog({
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
                 type="button"
               >
                 {t('dirty.stay')}
               </button>
             </Dialog.Close>
-            <button
-              className="min-h-11 rounded-md bg-red-700 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            <Button
               type="button"
+              variant="danger"
               onClick={() => {
                 setOpen(false)
                 onConfirm()
               }}
             >
               {t('invite.removeGuest')}
-            </button>
+            </Button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
@@ -331,12 +328,12 @@ export function SessionDetailPage() {
         ref={heading}
         aria-live="polite"
         tabIndex={-1}
-        className="text-3xl font-bold tracking-tight text-slate-950 focus:outline-none"
+        className="text-display font-display font-bold text-ink focus:outline-none"
       >
         {data?.title ?? t('common.loading', { ns: 'common' })}
       </h1>
 
-      <p aria-live="polite" className="text-sm text-emerald-700">
+      <p aria-live="polite" className="text-ink">
         {status}
       </p>
 
@@ -351,30 +348,30 @@ export function SessionDetailPage() {
 
       {data && (
         <>
-          <p>
+          <p className="text-ink">
             {new Intl.DateTimeFormat(i18n.language, {
               dateStyle: 'medium',
               timeStyle: 'short',
               timeZone: viewerTimeZone,
             }).format(new Date(data.startTime))}
             {inProgress && (
-              <span className="ml-2 font-semibold text-emerald-700">
+              <span className="ml-2 rounded-full border-2 border-ink bg-accent px-2 py-0.5 font-display text-xs font-bold text-accent-ink dark:border-accent-ink">
                 {t('detail.inProgress')}
               </span>
             )}
           </p>
-          {data.notes && <p>{data.notes}</p>}
+          {data.notes && <p className="text-ink">{data.notes}</p>}
 
           {isOrganizer && (
             <div className="flex flex-wrap gap-2">
               <Link
-                className="min-h-11 inline-flex items-center rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="inline-flex min-h-11 items-center gap-2 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
                 to={`/sessions/${sessionId}/edit`}
               >
                 {t('edit.heading')}
               </Link>
               <Link
-                className="min-h-11 inline-flex items-center rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="inline-flex min-h-11 items-center gap-2 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
                 to={`/sessions/${sessionId}/invite`}
               >
                 {t('invite.heading')}
@@ -387,59 +384,62 @@ export function SessionDetailPage() {
           )}
 
           <section aria-labelledby="rsvp-heading">
-            <h2 id="rsvp-heading" className="text-xl font-semibold text-slate-950">
+            <h2 id="rsvp-heading" className="text-h2 font-display font-semibold text-ink">
               {t('rsvp.heading')}
             </h2>
             <div className="mt-2 flex flex-wrap gap-2">
-              {(['Going', 'Maybe', 'Declined'] as const).map((choice) => (
-                <button
-                  key={choice}
-                  aria-pressed={viewerEntry?.status === choice.toLowerCase()}
-                  className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                  disabled={respond.isPending}
-                  type="button"
-                  onClick={() => respond.mutate(choice)}
-                >
-                  {t(`rsvp.${choice.toLowerCase()}`)}
-                </button>
-              ))}
-              <button
-                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              {(['Going', 'Maybe', 'Declined'] as const).map((choice) => {
+                const pressed = viewerEntry?.status === choice.toLowerCase()
+                return (
+                  <Button
+                    key={choice}
+                    aria-pressed={pressed}
+                    disabled={respond.isPending}
+                    type="button"
+                    variant={pressed ? 'primary' : 'neutral'}
+                    onClick={() => respond.mutate(choice)}
+                  >
+                    {t(`rsvp.${choice.toLowerCase()}`)}
+                  </Button>
+                )
+              })}
+              <Button
                 disabled={leave.isPending}
                 type="button"
+                variant="neutral"
                 onClick={() => leave.mutate()}
               >
                 {t('rsvp.leave')}
-              </button>
+              </Button>
             </div>
 
             {canRequestJoin && (
               <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                <Button
                   disabled={join.isPending}
                   type="button"
+                  variant="neutral"
                   onClick={() => join.mutate()}
                 >
                   {t('join.request')}
-                </button>
-                <button
-                  className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                </Button>
+                <Button
                   disabled={withdraw.isPending}
                   type="button"
+                  variant="neutral"
                   onClick={() => withdraw.mutate()}
                 >
                   {t('join.withdraw')}
-                </button>
+                </Button>
               </div>
             )}
 
             <div className="mt-4">
-              <label className="font-medium text-slate-900" htmlFor="reminder-select">
+              <label className="font-body font-semibold text-ink" htmlFor="reminder-select">
                 {t('reminder.label')}
               </label>
               <select
-                className="mt-1 min-h-11 rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 min-h-11 rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                 id="reminder-select"
                 value={viewerEntry?.reminderChoice ?? ''}
                 onChange={(event) =>
@@ -461,7 +461,7 @@ export function SessionDetailPage() {
             <section aria-labelledby="join-requests-heading">
               <h2
                 id="join-requests-heading"
-                className="text-xl font-semibold text-slate-950"
+                className="text-h2 font-display font-semibold text-ink"
               >
                 {t('join.request')}
               </h2>
@@ -469,26 +469,26 @@ export function SessionDetailPage() {
                 {joinRequests.data.items.map((request) => (
                   <li
                     key={request.id}
-                    className="flex items-center justify-between gap-2 rounded-md border border-slate-200 p-3"
+                    className="flex items-center justify-between gap-2 rounded-card border-2 border-ink bg-card p-3"
                   >
-                    <span>
+                    <span className="text-ink">
                       {request.requester?.displayName ?? t('detail.anonymous')}
                     </span>
                     <span className="flex gap-2">
-                      <button
-                        className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={() => approve.mutate(request.id)}
                       >
                         {t('join.approve')}
-                      </button>
-                      <button
-                        className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                      </Button>
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={() => reject.mutate(request.id)}
                       >
                         {t('join.reject')}
-                      </button>
+                      </Button>
                     </span>
                   </li>
                 ))}
@@ -497,7 +497,7 @@ export function SessionDetailPage() {
           )}
 
           <section aria-label={t('a11y.rosterLabel')} aria-labelledby="roster-heading">
-            <h2 id="roster-heading" className="text-xl font-semibold text-slate-950">
+            <h2 id="roster-heading" className="text-h2 font-display font-semibold text-ink">
               {t('detail.roster')}
             </h2>
             {(
@@ -509,7 +509,7 @@ export function SessionDetailPage() {
               ] as const
             ).map(([key, entries]) => (
               <div key={key} className="mt-3">
-                <h3 className="font-semibold text-slate-900">
+                <h3 className="font-display font-semibold text-ink">
                   {t(`detail.${key}`)} ({entries.length})
                 </h3>
                 <ul>
@@ -519,7 +519,7 @@ export function SessionDetailPage() {
                       className="flex items-center justify-between gap-2 py-1"
                       data-testid={`roster-entry-${entry.participationId}`}
                     >
-                      <span>{entry.displayName ?? t('detail.anonymous')}</span>
+                      <span className="text-ink">{entry.displayName ?? t('detail.anonymous')}</span>
                       {isOrganizer && entry.origin === 'guestLink' && (
                         <RemoveGuestDialog
                           displayName={entry.displayName ?? t('detail.anonymous')}
@@ -538,7 +538,7 @@ export function SessionDetailPage() {
 
           {waitlisted.length > 0 && (
             <section aria-label={t('a11y.waitlistLabel')} aria-labelledby="waitlist-heading">
-              <h2 id="waitlist-heading" className="text-xl font-semibold text-slate-950">
+              <h2 id="waitlist-heading" className="text-h2 font-display font-semibold text-ink">
                 {t('waitlist.heading')} ({waitlisted.length})
               </h2>
               <ul>
@@ -547,23 +547,23 @@ export function SessionDetailPage() {
                     key={entry.participationId}
                     className="flex items-center justify-between gap-2 py-1"
                   >
-                    <span>{entry.displayName ?? t('detail.anonymous')}</span>
+                    <span className="text-ink">{entry.displayName ?? t('detail.anonymous')}</span>
                     {isOrganizer && (
                       <span className="flex gap-2">
-                        <button
-                          className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                        <Button
                           type="button"
+                          variant="ghost"
                           onClick={() => promote.mutate(entry.participationId)}
                         >
                           {t('waitlist.promote')}
-                        </button>
-                        <button
-                          className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                        </Button>
+                        <Button
                           type="button"
+                          variant="ghost"
                           onClick={() => rejectWaitlist.mutate(entry.participationId)}
                         >
                           {t('waitlist.reject')}
-                        </button>
+                        </Button>
                       </span>
                     )}
                   </li>

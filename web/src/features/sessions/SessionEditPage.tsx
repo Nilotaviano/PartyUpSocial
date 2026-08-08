@@ -188,7 +188,7 @@ export function SessionEditPage() {
       <h1
         ref={heading}
         tabIndex={-1}
-        className="text-3xl font-bold tracking-tight text-slate-950 focus:outline-none"
+        className="text-display font-display font-bold text-ink focus:outline-none"
       >
         {t('edit.heading')}
       </h1>
@@ -214,17 +214,22 @@ export function SessionEditPage() {
       {Object.keys(fieldErrors).length > 0 && (
         <div
           ref={summaryRef}
-          className="rounded-md border border-red-300 bg-red-50 p-4"
+          className="rounded-card border-2 border-danger bg-danger/10 p-4"
           role="alert"
           tabIndex={-1}
         >
-          <p className="font-semibold text-red-900">
+          <p className="font-display font-semibold text-ink">
             {t('a11y.validationSummary')}
           </p>
-          <ul className="mt-2 list-disc pl-5 text-sm text-red-800">
+          <ul className="mt-2 list-disc pl-5 text-ink">
             {Object.entries(fieldErrors).map(([field, message]) => (
               <li key={field}>
-                <a href={`#${fieldIds[field] ?? `field-${field}`}`}>{message}</a>
+                <a
+                  className="font-semibold text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                  href={`#${fieldIds[field] ?? `field-${field}`}`}
+                >
+                  {message}
+                </a>
               </li>
             ))}
           </ul>
@@ -245,12 +250,12 @@ export function SessionEditPage() {
       {form && (
         <form className="space-y-5" noValidate onSubmit={handleSubmit}>
           <div>
-            <label className="block font-medium text-slate-900" htmlFor="field-title">
+            <label className="block font-body font-semibold text-ink" htmlFor="field-title">
               {t('create.title')}
             </label>
             <input
               aria-invalid={Boolean(fieldErrors.title)}
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2"
+              className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               id="field-title"
               value={form.title}
               onChange={(event) => update('title', event.target.value)}
@@ -259,14 +264,14 @@ export function SessionEditPage() {
           </div>
 
           <div>
-            <label className="block font-medium text-slate-900" htmlFor="field-start">
+            <label className="block font-body font-semibold text-ink" htmlFor="field-start">
               {t('create.start')}
             </label>
             {locked ? (
               <p>{t('edit.startLocked')}</p>
             ) : (
               <input
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                 id="field-start"
                 step={900}
                 type="datetime-local"
@@ -278,7 +283,7 @@ export function SessionEditPage() {
 
           <div>
             <label
-              className="block font-medium text-slate-900"
+              className="block font-body font-semibold text-ink"
               htmlFor="field-min"
             >
               {t('create.min')}
@@ -288,7 +293,7 @@ export function SessionEditPage() {
             ) : (
               <input
                 aria-invalid={Boolean(fieldErrors.minAttendance)}
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2"
+                className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                 id="field-min"
                 min={1}
                 type="number"
@@ -302,11 +307,11 @@ export function SessionEditPage() {
           </div>
 
           <div>
-            <label className="block font-medium text-slate-900" htmlFor="field-max">
+            <label className="block font-body font-semibold text-ink" htmlFor="field-max">
               {t('create.max')}
             </label>
             <input
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 disabled:bg-slate-100"
+              className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:opacity-50"
               disabled={form.clearMax}
               id="field-max"
               min={1}
@@ -325,11 +330,11 @@ export function SessionEditPage() {
           </div>
 
           <div>
-            <label className="block font-medium text-slate-900" htmlFor="field-notes">
+            <label className="block font-body font-semibold text-ink" htmlFor="field-notes">
               {t('create.notes')}
             </label>
             <textarea
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 disabled:bg-slate-100"
+              className="mt-1 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:opacity-50"
               disabled={form.clearNotes}
               id="field-notes"
               value={form.notes}
@@ -346,11 +351,11 @@ export function SessionEditPage() {
           </div>
 
           <div>
-            <label className="block font-medium text-slate-900" htmlFor="field-game">
+            <label className="block font-body font-semibold text-ink" htmlFor="field-game">
               {t('create.game')}
             </label>
             <input
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 disabled:bg-slate-100"
+              className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:opacity-50"
               disabled={form.clearGame}
               id="field-game"
               value={form.gameName}
@@ -375,7 +380,7 @@ export function SessionEditPage() {
               />
               {t('create.private')}
             </label>
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="mt-1 text-ink-soft">
               {t('edit.privacyDisclosure')}
             </p>
           </div>
@@ -383,7 +388,7 @@ export function SessionEditPage() {
           <div className="flex flex-wrap justify-end gap-2">
             <button
               ref={cancelTrigger}
-              className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              className="min-h-11 rounded-control border-2 border-ink bg-card px-4 py-2 font-display font-semibold text-ink shadow-offset-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed"
               type="button"
               onClick={requestCancel}
             >
@@ -391,9 +396,9 @@ export function SessionEditPage() {
             </button>
             <Button
               aria-busy={save.isPending}
-              className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
               disabled={save.isPending}
               type="submit"
+              variant="primary"
             >
               {t('edit.save')}
             </Button>
