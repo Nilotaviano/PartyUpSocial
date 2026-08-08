@@ -8,6 +8,17 @@ using Microsoft.Playwright;
 namespace PartyUp.BrowserTests.Accessibility;
 
 /// <summary>
+/// The theme dimension every <see cref="AuditedRoutes"/> entry is now scanned under (PHASE5_1_DESIGN.md
+/// §4 slice 8) — <c>Light</c> and <c>Dark</c> are both seeded explicitly (never left to the browser's
+/// own default color scheme) so neither audit run's result depends on an unstated ambient preference.
+/// </summary>
+public enum AuditedTheme
+{
+    Light,
+    Dark,
+}
+
+/// <summary>
 /// A-082/P5-AXE-02 (PHASE5_DESIGN.md §9, §11 "Browser lane (S1)"): axe-core over every checked-in
 /// Phase 4 route (<see cref="AuditedRoutes"/>) at the shipped WCAG 2.2 AA tag set — any violation of
 /// any impact fails unless it is a dated, route+rule-scoped entry in <see cref="AxeExclusions"/>.
@@ -39,7 +50,7 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
         string SessionId,
         string GuestLinkUrl,
         string OwnFriendCode,
-        IReadOnlyDictionary<string, AxeResultItem[]> OnboardingFindings);
+        IReadOnlyDictionary<(string Step, AuditedTheme Theme), AxeResultItem[]> OnboardingFindings);
 
     /// <summary>
     /// One real registered account, one private session and one guest link — enough live entity ids
@@ -79,14 +90,24 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
                 return _context;
             }
 
-            Dictionary<string, AxeResultItem[]> onboardingFindings = new(StringComparer.Ordinal);
+            Dictionary<(string Step, AuditedTheme Theme), AxeResultItem[]> onboardingFindings = [];
             RegisteredUser organizer = await fixture.RegisterAndOnboardAsync(
                 await fixture.NewContextAsync(),
                 "axeorganizer",
                 "Axe Organizer",
                 onOnboardingStep: async (step, page) =>
                 {
-                    onboardingFindings[step] = await RunAxeAsync(page);
+                    // Both themes are captured off this one live pause in the wizard's own walk
+                    // (see this class's remarks and PlaywrightFixture.RegisterAndOnboardAsync's
+                    // onOnboardingStep parameter) rather than a second registration walk — the
+                    // class-level remarks above document this collection's registration budget as
+                    // already fully spent. Each capture re-seeds localStorage and reloads the exact
+                    // same step URL, so it is self-correcting regardless of which theme the previous
+                    // step's capture left behind.
+                    onboardingFindings[(step, AuditedTheme.Light)] =
+                        await CaptureThemedOnboardingStepAxeAsync(page, AuditedTheme.Light);
+                    onboardingFindings[(step, AuditedTheme.Dark)] =
+                        await CaptureThemedOnboardingStepAxeAsync(page, AuditedTheme.Dark);
                 });
 
             await organizer.Page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/sessions/new");
@@ -177,11 +198,61 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
         return result.Violations;
     }
 
-    public static IEnumerable<object[]> Routes() => AuditedRoutes.All.Select(route => new object[] { route });
+    private const string ThemeStorageKey = "partyup:theme";
+
+    private static string ThemeValue(AuditedTheme theme) => theme == AuditedTheme.Dark ? "dark" : "light";
+
+    /// <summary>
+    /// Seeds <c>partyup:theme</c> before the page's very first navigation via
+    /// <see cref="IPage.AddInitScriptAsync"/> — this only works on a page that has not yet loaded
+    /// any document (a freshly created page/tab), which is exactly what both call sites below pass
+    /// in. Explicit for both themes (never relies on the browser's own default color scheme) so a
+    /// broken seed cannot silently audit light twice.
+    /// </summary>
+    private static async Task SeedThemeBeforeFirstNavigationAsync(IPage page, AuditedTheme theme)
+    {
+        await page.AddInitScriptAsync(
+            $"try {{ localStorage.setItem('{ThemeStorageKey}', '{ThemeValue(theme)}'); }} catch (e) {{}}");
+    }
+
+    /// <summary>
+    /// Fails loudly (rather than silently auditing the wrong theme) if the seed above did not take:
+    /// reads the <c>data-theme</c> attribute <c>index.html</c>'s own inline script sets before first
+    /// paint and asserts it matches.
+    /// </summary>
+    private static async Task AssertThemeAppliedAsync(IPage page, AuditedTheme theme)
+    {
+        string? actual = await page.EvaluateAsync<string?>(
+            "document.documentElement.getAttribute('data-theme')");
+        Assert.Equal(ThemeValue(theme), actual);
+    }
+
+    /// <summary>
+    /// The onboarding-route half of the theme dimension: no fresh navigation is available (see this
+    /// class's remarks), so this re-seeds <c>partyup:theme</c> on the wizard's own live page and
+    /// reloads the exact same step URL — <c>index.html</c>'s inline script reads localStorage again
+    /// before that reload's first paint, same as a fresh <c>GotoAsync</c> would.
+    /// </summary>
+    private static async Task<AxeResultItem[]> CaptureThemedOnboardingStepAxeAsync(IPage page, AuditedTheme theme)
+    {
+        await page.EvaluateAsync(
+            "value => { try { localStorage.setItem('partyup:theme', value); } catch (e) {} }",
+            ThemeValue(theme));
+        await page.ReloadAsync();
+        await AssertThemeAppliedAsync(page, theme);
+        return await RunAxeAsync(page);
+    }
+
+    public static IEnumerable<object[]> Routes() =>
+        from route in AuditedRoutes.All
+        from theme in new[] { AuditedTheme.Light, AuditedTheme.Dark }
+        select new object[] { route, theme };
 
     [Theory]
     [MemberData(nameof(Routes))]
-    public async Task EveryAuditedRouteHasNoWcagViolationOutsideTheDatedExclusionList_D139(AuditedRoute route)
+    public async Task EveryAuditedRouteHasNoWcagViolationOutsideTheDatedExclusionList_D139(
+        AuditedRoute route,
+        AuditedTheme theme)
     {
         AuditContext context = await GetContextAsync();
 
@@ -190,7 +261,7 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
         {
             // Captured live during GetContextAsync's registration walk — see this class's own
             // remarks and PlaywrightFixture.RegisterAndOnboardAsync's onOnboardingStep parameter.
-            violations = context.OnboardingFindings[route.OnboardingStepKey];
+            violations = context.OnboardingFindings[(route.OnboardingStepKey, theme)];
         }
         else
         {
@@ -203,6 +274,7 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
                 // open browser contexts across the run.
                 guestContext = await fixture.NewContextAsync();
                 page = await guestContext.NewPageAsync();
+                await SeedThemeBeforeFirstNavigationAsync(page, theme);
                 await page.GotoAsync(context.GuestLinkUrl);
             }
             else
@@ -211,12 +283,19 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
                     .Replace("{sessionId}", context.SessionId, StringComparison.Ordinal)
                     .Replace("{username}", context.Organizer.Username, StringComparison.Ordinal)
                     .Replace("{code}", context.OwnFriendCode, StringComparison.Ordinal);
-                page = context.Organizer.Page;
+                // A fresh tab on the organizer's own authenticated context (never the organizer's
+                // persistent page) — shares its cookies so the route still renders signed-in, but
+                // never navigated before, so the theme seed below is guaranteed to land before this
+                // page's first paint. Closed in the finally below so per-theme runs don't accumulate
+                // open tabs on that context across the route loop.
+                page = await context.Organizer.Page.Context.NewPageAsync();
+                await SeedThemeBeforeFirstNavigationAsync(page, theme);
                 await page.GotoAsync(PlaywrightFixture.WebBaseUrl + path);
             }
 
             try
             {
+                await AssertThemeAppliedAsync(page, theme);
                 violations = await RunAxeAsync(page);
             }
             finally
@@ -224,6 +303,10 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
                 if (guestContext is not null)
                 {
                     await guestContext.CloseAsync();
+                }
+                else
+                {
+                    await page.CloseAsync();
                 }
             }
         }
@@ -240,14 +323,14 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
         if (unexpected.Length > 0)
         {
             Directory.CreateDirectory(AxeArtifactsDirectory);
-            string dumpPath = Path.Combine(AxeArtifactsDirectory, $"{route.Name}.json");
+            string dumpPath = Path.Combine(AxeArtifactsDirectory, $"{route.Name}.{ThemeValue(theme)}.json");
             await File.WriteAllTextAsync(dumpPath, JsonSerializer.Serialize(unexpected, DumpJsonOptions));
         }
 
         Assert.True(
             unexpected.Length == 0,
-            $"Route '{route.Name}' has {unexpected.Length} un-excluded axe violation(s): " +
-            string.Join(", ", unexpected.Select(v => $"{v.Id} ({v.Impact})")) +
+            $"Route '{route.Name}' ({ThemeValue(theme)}) has {unexpected.Length} un-excluded axe " +
+            "violation(s): " + string.Join(", ", unexpected.Select(v => $"{v.Id} ({v.Impact})")) +
             $". Details in {AxeArtifactsDirectory}.");
     }
 
