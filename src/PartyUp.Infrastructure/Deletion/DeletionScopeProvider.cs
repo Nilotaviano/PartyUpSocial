@@ -228,7 +228,7 @@ public sealed class DeletionScopeProvider(
         // both session and poll scope always acquires the two parent kinds in the same order.
         List<PollId> pollIds = await context.Polls
             .Where(poll =>
-                (poll.OrganizerId == id && (poll.Status == PollStatus.Polling || poll.Status == PollStatus.Closed)) ||
+                poll.OrganizerId == id ||
                 poll.Participants.Any(participant => participant.UserId == id) ||
                 poll.JoinRequests.Any(request =>
                     request.RequesterId == id && request.Status == JoinRequestStatus.Pending))
