@@ -186,9 +186,10 @@ public sealed class PollGuestHttpTests : IAsyncLifetime, IDisposable
     /// <summary>
     /// The finalization handover end-to-end (ticket-P6-S4b): mint, claim, vote, organizer finalizes —
     /// the poll credential's link has re-parented onto the created session (tokens preserved, D-048),
-    /// so the poll route now serves the finalized notice carrying the re-exchange URL; re-exchanging
-    /// the same preserved raw token mints a SESSION credential that works on the session routes. No
-    /// silent cookie upgrade — the poll-typed cookie is never itself flipped into a session credential.
+    /// so the poll route now serves the finalized notice (state + sessionId, no re-exchange URL — the
+    /// server never stores the raw token, A-015); re-exchanging the same preserved raw token mints a
+    /// SESSION credential that works on the session routes. No silent cookie upgrade — the poll-typed
+    /// cookie is never itself flipped into a session credential.
     /// </summary>
     [Fact]
     public async Task FinalizationHandover_MintClaimVoteFinalize_ThenReExchangeMintsASessionCredential()
@@ -220,7 +221,7 @@ public sealed class PollGuestHttpTests : IAsyncLifetime, IDisposable
         using JsonDocument noticeBody = await SessionEndpointTestSupport.SuccessJsonAsync(notice);
         Assert.Equal("finalized", noticeBody.RootElement.GetProperty("state").GetString());
         Assert.Equal(sessionId, noticeBody.RootElement.GetProperty("sessionId").GetGuid());
-        Assert.Equal("/g/{token}", noticeBody.RootElement.GetProperty("reExchangeUrl").GetString());
+        Assert.False(noticeBody.RootElement.TryGetProperty("reExchangeUrl", out _));
         Assert.DoesNotContain(token, await notice.Content.ReadAsStringAsync(), StringComparison.Ordinal);
 
         // Re-exchanging the preserved raw token now mints a SESSION credential for the same link —
@@ -249,6 +250,94 @@ public sealed class PollGuestHttpTests : IAsyncLifetime, IDisposable
         Assert.Equal(HttpStatusCode.OK, stalePoll.StatusCode);
         using JsonDocument stalePollBody = JsonDocument.Parse(await stalePoll.Content.ReadAsStringAsync());
         Assert.Equal("finalized", stalePollBody.RootElement.GetProperty("state").GetString());
+    }
+
+    /// <summary>
+    /// LOW finding 3 (round-1 review): a link revoked by organizer removal (D-044) BEFORE finalization
+    /// is carried onto the created session with its revoked state preserved — finalization is not a
+    /// blanket override, so the poll route must resolve against that carried-over state and serve the
+    /// revoked notice, not the finalized one.
+    /// </summary>
+    [Fact]
+    public async Task RemovedGuest_ThenFinalize_PollRouteServesRevokedNotice_NotFinalized_D044()
+    {
+        (SessionHttpSession organizer, Guid pollId, Guid optionId, Guid guestLinkId, string token) =
+            await SeedPollWithGuestLinkAsync();
+        using HttpClient guestClient = CreateGuestClient();
+        string cookieHeader = await ExchangeAsync(guestClient, token);
+
+        using JsonDocument claimed = await ClaimAsync(guestClient, guestLinkId, cookieHeader, "Removed Guest");
+        Guid guestIdentityId = claimed.RootElement.GetProperty("guestIdentityId").GetGuid();
+
+        HttpResponseMessage removed = await organizer.SendUnsafeAsync(
+            HttpMethod.Post, $"/api/v1/polls/{pollId:D}/guests/{guestIdentityId:D}/remove");
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+
+        _factory.Clock.Advance(Duration.FromHours(25));
+        HttpResponseMessage finalize = await organizer.SendUnsafeAsync(
+            HttpMethod.Post, $"/api/v1/polls/{pollId:D}/finalize", JsonContent.Create(new { optionId }));
+        Assert.Equal(HttpStatusCode.OK, finalize.StatusCode);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/guest/{guestLinkId:N}/poll");
+        request.Headers.Add(HeaderNames.Cookie, cookieHeader);
+        HttpResponseMessage response = await guestClient.SendAsync(request);
+        using JsonDocument body = await SessionEndpointTestSupport.SuccessJsonAsync(response);
+        Assert.Equal("revoked", body.RootElement.GetProperty("state").GetString());
+        Assert.False(body.RootElement.TryGetProperty("sessionId", out _));
+    }
+
+    /// <summary>
+    /// MED-LOW finding 2 (round-1 review): the <c>ClearStaleGuestCookies</c> fix must try both
+    /// protector purposes before treating a cookie as garbage — a client holding a still-valid
+    /// poll-purpose cookie for one link must not have it wiped by visiting an unrelated session-owned
+    /// <c>/g/{token}</c> link, and vice versa. Builds requests by hand (a cookie-handling
+    /// <see cref="HttpClient"/> would auto-forward every cookie the container holds, which would mask
+    /// a wipe just as effectively as fixing it — the request must carry exactly the one cookie under
+    /// test, the same way the shipped exchange tests already inspect <c>Set-Cookie</c> directly).
+    /// </summary>
+    [Fact]
+    public async Task ClearStaleGuestCookies_NeverWipesAStillValidCredentialOfTheOtherPurpose()
+    {
+        (_, _, _, Guid pollLinkId, string pollToken) = await SeedPollWithGuestLinkAsync();
+        (Session session, string sessionToken) = await SeedSessionWithGuestLinkAsync();
+        Guid sessionLinkId = session.GuestLinks[0].Id.Value;
+
+        using HttpClient client = CreateGuestClient();
+        string pollCookieHeader = await ExchangeAsync(client, pollToken);
+
+        // A second, unrelated exchange (a session-owned link) must not clear the poll cookie above —
+        // ClearStaleGuestCookies runs over every pu.g.* cookie the request carries.
+        var sessionExchangeRequest = new HttpRequestMessage(HttpMethod.Get, $"/g/{sessionToken}");
+        sessionExchangeRequest.Headers.Add(HeaderNames.Cookie, pollCookieHeader);
+        HttpResponseMessage sessionExchange = await client.SendAsync(sessionExchangeRequest);
+        Assert.Equal(HttpStatusCode.Found, sessionExchange.StatusCode);
+        Assert.DoesNotContain(
+            GuestExchangeTests.SetCookiesOf(sessionExchange),
+            c => c.Name.Value == $"pu.g.{pollLinkId:N}" && c.MaxAge == TimeSpan.Zero);
+
+        var pollStillWorksRequest = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/guest/{pollLinkId:N}/poll");
+        pollStillWorksRequest.Headers.Add(HeaderNames.Cookie, pollCookieHeader);
+        HttpResponseMessage pollStillWorks = await client.SendAsync(pollStillWorksRequest);
+        Assert.Equal(HttpStatusCode.OK, pollStillWorks.StatusCode);
+
+        // The inverse: an unrelated poll exchange must not clear a still-valid session cookie.
+        string sessionCookieHeader = GuestExchangeTests.CookieHeader(
+            GuestExchangeTests.SetCookiesOf(sessionExchange)
+                .Single(c => c.Name.Value!.StartsWith("pu.g.", StringComparison.Ordinal)));
+
+        (_, _, _, _, string secondPollToken) = await SeedPollWithGuestLinkAsync();
+        var pollExchangeRequest = new HttpRequestMessage(HttpMethod.Get, $"/g/{secondPollToken}");
+        pollExchangeRequest.Headers.Add(HeaderNames.Cookie, sessionCookieHeader);
+        HttpResponseMessage pollExchange = await client.SendAsync(pollExchangeRequest);
+        Assert.Equal(HttpStatusCode.Found, pollExchange.StatusCode);
+        Assert.DoesNotContain(
+            GuestExchangeTests.SetCookiesOf(pollExchange),
+            c => c.Name.Value == $"pu.g.{sessionLinkId:N}" && c.MaxAge == TimeSpan.Zero);
+
+        var sessionStillWorksRequest = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/guest/{sessionLinkId:N}/session");
+        sessionStillWorksRequest.Headers.Add(HeaderNames.Cookie, sessionCookieHeader);
+        HttpResponseMessage sessionStillWorks = await client.SendAsync(sessionStillWorksRequest);
+        Assert.Equal(HttpStatusCode.OK, sessionStillWorks.StatusCode);
     }
 
     /// <summary>A-015: the raw token appears only in the mint response and the /g/ redirect Location — never in any guest poll response body.</summary>

@@ -73,13 +73,12 @@ public sealed class PartyUpOpenApiTransformer :
         "poll_selection_window_closed",
         "poll_zero_options",
 
-        // PHASE6_DESIGN.md §4 (ticket-P6-S4b): the poll guest arm's own codes — GuestPollUseCases
-        // (Application layer, already shipped) already produces the first two; the guest HTTP
-        // surface is what makes them reachable. poll_guest_link_not_found/poll_guest_link_inactive
-        // are both fail-closed 404s (§12-24's hidden-equals-missing rule); guest_link_not_claimed is
-        // the explicit vote-before-claim 409 (D-017).
-        "poll_guest_link_not_found",
-        "poll_guest_link_inactive",
+        // PHASE6_DESIGN.md §4 (ticket-P6-S4b): the poll guest arm's own code — the explicit
+        // vote-before-claim 409 (D-017), the only GuestPollUseCases guest-arm failure code actually
+        // reachable over HTTP. GuestPollUseCases.RequireClaimedGuest's other two failure branches
+        // (missing/inactive link) are unreachable here: GuestPollEndpoints.MutateAsync's own link
+        // resolution already forecloses both before the command ever runs (a missing link surfaces as
+        // poll_not_found, an inactive one as guest_link_terminal), so they are not documented.
         "guest_link_not_claimed",
     ];
 

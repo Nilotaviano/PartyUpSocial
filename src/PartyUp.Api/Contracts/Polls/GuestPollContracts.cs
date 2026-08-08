@@ -18,15 +18,15 @@ public sealed record RenameGuestPollIdentityRequest(string? DisplayName);
 /// does, flattened onto this record instead of nested, matching the shipped guest-session convention.
 /// The <c>finalized</c> state is this arm's own addition — <see cref="GuestSessionResponse"/> has no
 /// analogue because a session-owned link is never re-parented — carrying no live poll fields, only the
-/// created session id and the re-exchange path the bearer's already-known raw token completes (the
-/// server never stores that token itself, A-015, so it cannot fill in the placeholder).
+/// created session id. It carries no re-exchange URL: the server never stores the bearer's raw token
+/// (A-015), so it cannot reconstruct one — the web client renders its own "re-open your invitation
+/// link" copy from <c>state:"finalized"</c> alone.
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record GuestPollResponse(
     string State,
     Guid PollId,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? SessionId,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ReExchangeUrl,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Title,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? DurationMinutes,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Platform,
@@ -43,20 +43,12 @@ public sealed record GuestPollResponse(
     public const string LiveState = "live";
     public const string FinalizedState = "finalized";
 
-    /// <summary>
-    /// A-015: the server never stores the raw bearer token, so it cannot fill this in — the SPA
-    /// substitutes the token it already holds from the original <c>/g/{token}</c> visit that landed
-    /// it here.
-    /// </summary>
-    public const string FinalizedReExchangeUrlTemplate = "/g/{token}";
-
     public static GuestPollResponse Live(GuestPollDetail guestDetail)
     {
         PollDetail detail = guestDetail.Detail;
         return new GuestPollResponse(
             LiveState,
             detail.Id.Value,
-            null,
             null,
             detail.Title.Value,
             detail.Duration.TotalMinutes,
@@ -73,11 +65,10 @@ public sealed record GuestPollResponse(
     }
 
     public static GuestPollResponse Terminal(Guid pollId, GuestLinkView notice) =>
-        new(NoticeState(notice), pollId, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        new(NoticeState(notice), pollId, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
     public static GuestPollResponse Finalized(Guid pollId, Guid sessionId) =>
-        new(FinalizedState, pollId, sessionId, FinalizedReExchangeUrlTemplate,
-            null, null, null, null, null, null, null, null, null, null, null, null);
+        new(FinalizedState, pollId, sessionId, null, null, null, null, null, null, null, null, null, null, null, null);
 
     private static string NoticeState(GuestLinkView notice) => notice switch
     {

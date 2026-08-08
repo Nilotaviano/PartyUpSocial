@@ -66,6 +66,7 @@ public static class GuestPollEndpoints
     private static async Task<IResult> GetGuestPollAsync(
         Guid guestLinkId,
         IPollRepository polls,
+        ISessionRepository sessions,
         GuestPollReadUseCases reads,
         PollGuestLinkCredentialProtector protector,
         IClock clock,
@@ -84,13 +85,15 @@ public static class GuestPollEndpoints
             return Problem(context, StatusCodes.Status404NotFound, "poll_not_found");
         }
 
-        // §5.4 handover: finalization re-parents this link's row onto the created session with its
-        // token preserved (tokens preserved, D-048); the poll's own _guestLinks collection no longer
-        // carries it, so ResolveGuestLink would always throw NotFound here — the finalized notice is
-        // this arm's own terminal branch, checked before that lookup ever runs.
+        // §5.4 handover: finalization re-parents EVERY one of the poll's guest links (including one
+        // already revoked pre-finalization, D-044) onto the created session with State preserved,
+        // and clears the poll's own collection — so once Finalized, resolution runs against the
+        // session it created, not the poll (whose ResolveGuestLink would always throw NotFound for a
+        // link it no longer carries), and a pre-finalization revocation still serves its own notice
+        // rather than being swallowed by the finalized-handover branch.
         if (poll.Status == PollStatus.Finalized)
         {
-            return Results.Ok(GuestPollResponse.Finalized(credential.PollId.Value, poll.CreatedSessionId!.Value.Value));
+            return await ResolveFinalizedNoticeAsync(poll, sessions, credential, protector, clock, context, cancellationToken);
         }
 
         GuestLinkView view;
@@ -121,6 +124,47 @@ public static class GuestPollEndpoints
         }
 
         return Results.Ok(GuestPollResponse.Live(detail));
+    }
+
+    /// <summary>
+    /// The Finalized-poll branch: resolves the link's notice against the SESSION it now lives on
+    /// rather than assuming "finalized" unconditionally — a link revoked before finalization (D-044
+    /// removal, or a cancellation) carries that terminal state onto the session unchanged, and only a
+    /// link still Active at handover time renders the finalized notice.
+    /// </summary>
+    private static async Task<IResult> ResolveFinalizedNoticeAsync(
+        Poll poll,
+        ISessionRepository sessions,
+        PollGuestLinkCredential credential,
+        PollGuestLinkCredentialProtector protector,
+        IClock clock,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        SessionId sessionId = poll.CreatedSessionId!.Value;
+        Session? session = await sessions.FindAsync(sessionId, cancellationToken);
+        if (session is null)
+        {
+            return Problem(context, StatusCodes.Status404NotFound, "poll_not_found");
+        }
+
+        GuestLinkView view;
+        try
+        {
+            view = session.ResolveGuestLink(credential.GuestLinkId, clock);
+        }
+        catch (DomainException)
+        {
+            return Problem(context, StatusCodes.Status404NotFound, "poll_not_found");
+        }
+
+        if (view != GuestLinkView.LiveView)
+        {
+            ReissueTerminalCredential(context, protector, clock, credential);
+            return Results.Ok(GuestPollResponse.Terminal(credential.PollId.Value, view));
+        }
+
+        return Results.Ok(GuestPollResponse.Finalized(credential.PollId.Value, sessionId.Value));
     }
 
     private static async Task<IResult> ClaimGuestPollLinkAsync(
