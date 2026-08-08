@@ -442,6 +442,11 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasDatabaseName("ux_notifications_session_reminder_once")
                         .HasFilter("type = 12");
 
+                    b.HasIndex("PollId", "RecipientUserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_notifications_poll_deadline_once")
+                        .HasFilter("type = 15");
+
                     b.HasIndex("RecipientUserId", "ActorUserId")
                         .IsUnique()
                         .HasDatabaseName("ux_notifications_steam_match_once")

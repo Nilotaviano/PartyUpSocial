@@ -76,6 +76,14 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
             .IsUnique()
             .HasFilter("type = 12")
             .HasDatabaseName("ux_notifications_session_reminder_once");
+        builder.HasIndex(notification => new
+            {
+                notification.PollId,
+                notification.RecipientUserId,
+            })
+            .IsUnique()
+            .HasFilter("type = 15")
+            .HasDatabaseName("ux_notifications_poll_deadline_once");
 
         builder.HasOne<User>()
             .WithMany()

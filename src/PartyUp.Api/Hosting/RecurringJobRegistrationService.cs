@@ -31,6 +31,14 @@ public sealed partial class RecurringJobRegistrationService(
                     "session-reminder-due",
                     job => job.ExecuteAsync(CancellationToken.None),
                     Cron.Minutely);
+                recurringJobs.AddOrUpdate<PollDueSweepJob>(
+                    "poll-due-sweep",
+                    job => job.ExecuteAsync(CancellationToken.None),
+                    Cron.Minutely);
+                recurringJobs.AddOrUpdate<PollDeadlineApproachingJob>(
+                    "poll-deadline-approaching",
+                    job => job.ExecuteAsync(CancellationToken.None),
+                    Cron.Minutely);
                 return;
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

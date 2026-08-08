@@ -83,6 +83,7 @@ public static class DependencyInjection
         services.AddScoped<PollJoinRequestUseCases>();
         services.AddScoped<CancelPollUseCase>();
         services.AddScoped<FinalizePollUseCase>();
+        services.AddScoped<PollTransitionUseCase>();
         services.AddScoped<IBlockEffectsExecutor, BlockEffectsExecutor>();
         services.AddScoped<IBlockEffectScopeProvider, SessionBlockEffectScopeProvider>();
         services.AddScoped<IReminderScheduleWriter, SessionReminderScheduleWriter>();
@@ -116,6 +117,9 @@ public static class DependencyInjection
         services.AddScoped<SessionDueCandidateStore>();
         services.AddScoped<SessionDueSweepJob>();
         services.AddScoped<SessionReminderDueJob>();
+        services.AddScoped<PollDueCandidateStore>();
+        services.AddScoped<PollDueSweepJob>();
+        services.AddScoped<PollDeadlineApproachingJob>();
         // SessionDeletionEffectsUseCase depends on ExecuteDeletionForUserUseCase; both are registered
         // here (rather than split with Program.cs) so a caller only needs to add IClock (registered in
         // Program.cs, not here) alongside AddInfrastructure to resolve the whole graph.
