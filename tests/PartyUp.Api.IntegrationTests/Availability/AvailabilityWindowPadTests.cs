@@ -162,10 +162,11 @@ public sealed class AvailabilityWindowPadTests : IAsyncLifetime
         var availabilityReads = new AvailabilityReadRepository(readContext);
         var friendships = new FriendshipRepository(readContext);
         var sessionReads = new SessionReadRepository(readContext);
+        var pollReads = new PollReadRepository(readContext);
 
         ReadMyAvailabilityUseCase myAvailability = new(availabilityReads, DateTimeZoneProviders.Tzdb);
         GetCalendarViewUseCase calendarView = new(
-            myAvailability, friendships, availabilityReads, sessionReads, DateTimeZoneProviders.Tzdb);
+            myAvailability, friendships, availabilityReads, sessionReads, pollReads, DateTimeZoneProviders.Tzdb);
 
         // (a) trailing, through all three surfaces.
         MyAvailabilityLayer myLayerTrailing = await myAvailability.ExecuteAsync(ownerId, trailingWindow, default);

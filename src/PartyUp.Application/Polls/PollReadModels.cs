@@ -68,3 +68,46 @@ public sealed record PollDetail(
     SessionId? CreatedSessionId,
     IReadOnlyList<PollOptionGridEntry> Options,
     IReadOnlyList<PollRosterEntry> Roster);
+
+// ---- PHASE6_DESIGN.md §4.1 "GET /polls": the two-band list read ---------------------------------
+
+/// <summary>
+/// One poll as either list band renders it. <c>OptionCount</c> lets the client show "N options" on
+/// the card without a second round trip; the per-option instants are not carried here -- only
+/// <see cref="PollDetail"/> (a detail read) does that.
+/// </summary>
+public sealed record PollSummary(
+    PollId Id,
+    UserId OrganizerId,
+    SessionTitle Title,
+    PollStatus Status,
+    bool IsPrivate,
+    Instant Deadline,
+    Instant SelectionWindowEndsAt,
+    Instant CreatedAt,
+    int OptionCount);
+
+// ---- PHASE6_DESIGN.md §4 "GET /{id}/finalization-preview" ---------------------------------------
+
+/// <summary>
+/// One roster row as the preview renders it -- the shared <c>Poll.Finalize</c> allocation function's
+/// own output (a created, never-persisted <c>Session</c>'s <c>Participation</c> rows), carrying a
+/// resolved display name the same way <see cref="PollRosterEntry"/> does. No masking is applied here:
+/// the preview is organizer-only (never rendered to a blocked counterpart).
+/// </summary>
+public sealed record PollFinalizationPreviewRosterEntry(
+    ParticipantRef Participant,
+    DisplayName? DisplayName,
+    ParticipationStatus Status,
+    bool IsWaitlisted);
+
+/// <summary>
+/// One candidate option's preview: what finalizing on this option, right now, would produce --
+/// identical to the outcome <see cref="FinalizePollUseCase"/> commits, because both call the same
+/// <c>Poll.Finalize</c> (design §5 "Preview guarantee").
+/// </summary>
+public sealed record PollFinalizationPreviewOption(
+    PollOptionId OptionId,
+    Instant StartTime,
+    bool MeetsMinimum,
+    IReadOnlyList<PollFinalizationPreviewRosterEntry> Roster);

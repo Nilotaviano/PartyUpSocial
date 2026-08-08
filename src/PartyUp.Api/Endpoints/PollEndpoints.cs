@@ -24,6 +24,7 @@ namespace PartyUp.Api.Endpoints;
 public static class PollEndpoints
 {
     private const int PollJoinRequestPageSize = 20;
+    private const int PollListPageSize = 20;
 
     public static RouteGroupBuilder MapPollEndpoints(this RouteGroupBuilder api)
     {
@@ -35,10 +36,22 @@ public static class PollEndpoints
                 .Produces<CreatePollResponse>(StatusCodes.Status201Created))
             .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
 
+        Common(polls.MapGet("/polls", ListPollsAsync)
+                .WithName(ApiOperationIds.ListPolls)
+                .Produces<SessionPageResponse<PollSummaryResponse>>())
+            .ProducesPartyUpProblem(StatusCodes.Status400BadRequest);
+
         Common(polls.MapGet("/polls/{pollId:guid}", GetPollAsync)
                 .WithName(ApiOperationIds.GetPoll)
                 .Produces<PollDetailResponse>())
             .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
+
+        Common(polls.MapGet("/polls/{pollId:guid}/finalization-preview", GetPollFinalizationPreviewAsync)
+                .WithName(ApiOperationIds.GetPollFinalizationPreview)
+                .Produces<PollFinalizationPreviewResponse>())
+            .ProducesPartyUpProblem(StatusCodes.Status404NotFound)
+            .ProducesPartyUpProblem(StatusCodes.Status409Conflict)
+            .ProducesPartyUpProblem(StatusCodes.Status422UnprocessableEntity);
 
         BodyOperation(polls.MapPost("/polls/{pollId:guid}/options", SuggestPollOptionAsync)
                 .WithName(ApiOperationIds.SuggestPollOption)
@@ -238,6 +251,81 @@ public static class PollEndpoints
         }
 
         return Results.Ok(PollDetailResponse.From(detail));
+    }
+
+    /// <summary>
+    /// PHASE6_DESIGN.md §4.1: the two bands, one route, distinguished by <c>?band=</c> -- absent or
+    /// <c>"involved"</c> is §7 rule 1 in {Polling, Closed}; <c>"discoverable"</c> is §7 rule 2's
+    /// non-private <c>Polling</c> set (the D-118 entry point). A-072 cursors are scoped per band so a
+    /// cursor issued for one is rejected by the other, mirroring <c>ListSessionsAsync</c>'s
+    /// scope/discover split.
+    /// </summary>
+    private static async Task<IResult> ListPollsAsync(
+        string? band,
+        string? cursor,
+        ICurrentUserAccessor currentUser,
+        ListPollsUseCase useCase,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Problem(context, StatusCodes.Status401Unauthorized, "unauthorized");
+        }
+
+        if (band is not null && band is not ("involved" or "discoverable"))
+        {
+            return Problem(context, StatusCodes.Status400BadRequest, "poll_validation");
+        }
+
+        bool discoverable = band == "discoverable";
+        SessionListScope scope = discoverable ? SessionListScope.PollsDiscoverable : SessionListScope.PollsInvolved;
+
+        SessionListCursor? decodedCursor = null;
+        if (!string.IsNullOrEmpty(cursor))
+        {
+            decodedCursor = SessionListCursor.TryDecode(cursor, scope);
+            if (decodedCursor is null)
+            {
+                return Problem(context, StatusCodes.Status400BadRequest, "invalid_cursor");
+            }
+        }
+
+        SessionPage<PollSummary> page = discoverable
+            ? await useCase.ListDiscoverableAsync(actorId.Value, decodedCursor, PollListPageSize, cancellationToken)
+            : await useCase.ListInvolvedAsync(actorId.Value, decodedCursor, PollListPageSize, cancellationToken);
+
+        return Results.Ok(SessionPageResponse.From(page, PollSummaryResponse.From));
+    }
+
+    /// <summary>
+    /// PHASE6_DESIGN.md §4/design §5 "Preview guarantee": organizer-only, fail-closed 404; the window
+    /// and per-option-not-found/terminal outcomes share <see cref="StatusToCodeStatus"/> with every
+    /// other poll command handler, so the three-outcome taxonomy (poll_invalid_transition/
+    /// poll_selection_window_closed/poll_zero_options) matches Finalize's exactly.
+    /// </summary>
+    private static async Task<IResult> GetPollFinalizationPreviewAsync(
+        Guid pollId,
+        ICurrentUserAccessor currentUser,
+        PollFinalizationPreviewUseCase useCase,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Problem(context, StatusCodes.Status401Unauthorized, "unauthorized");
+        }
+
+        PollFinalizationPreviewResult result = await useCase.PreviewAsync(
+            PollId.From(pollId), actorId.Value, cancellationToken);
+        if (!result.Succeeded)
+        {
+            return Problem(context, StatusToCodeStatus(result.Code!), result.Code!);
+        }
+
+        return Results.Ok(PollFinalizationPreviewResponse.From(result.Options!));
     }
 
     private static async Task<IResult> SuggestPollOptionAsync(

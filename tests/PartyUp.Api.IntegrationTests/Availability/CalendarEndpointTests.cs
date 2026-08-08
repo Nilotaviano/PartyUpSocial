@@ -167,8 +167,67 @@ public sealed class CalendarEndpointTests : IAsyncLifetime, IDisposable
             .RootElement.GetProperty("session").GetProperty("id").GetGuid();
     }
 
+    /// <summary>
+    /// ticket-P6-S4c: the poll layer fills (PHASE6_DESIGN.md §5 calendar bullet, D-111) -- an
+    /// involved poll's in-range option instants populate <c>pollOptions</c>, replacing the Phase 5
+    /// declared-and-empty pin. Out-of-range options and a poll the viewer is not involved in stay
+    /// absent, so the layer is genuinely range- and rule-1-scoped, not a bare "poll exists" flag.
+    /// </summary>
     [Fact]
-    public async Task PollLayerIsDeclaredAndEmpty_D111()
+    public async Task PollLayerPopulatesInvolvedPollOptionsInRange_D111()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"cal-poll-org-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+
+        Instant inRangeStart = _factory.Clock.GetCurrentInstant() + Duration.FromDays(2);
+        Instant outOfRangeStart = _factory.Clock.GetCurrentInstant() + Duration.FromDays(30);
+
+        HttpResponseMessage created = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/polls",
+            JsonContent.Create(new
+            {
+                title = "Calendar poll layer fixture",
+                optionStartTimes = new[] { Iso(inRangeStart), Iso(outOfRangeStart) },
+                isPrivate = true,
+                minAttendance = 1,
+            }));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        using JsonDocument createdBody = await SessionEndpointTestSupport.SuccessJsonAsync(created);
+        JsonElement pollElement = createdBody.RootElement.GetProperty("poll");
+        Guid pollId = pollElement.GetProperty("id").GetGuid();
+        Guid inRangeOptionId = pollElement.GetProperty("options").EnumerateArray()
+            .Single(o => o.GetProperty("startTime").GetString() == Iso(inRangeStart))
+            .GetProperty("id").GetGuid();
+
+        Instant from = _factory.Clock.GetCurrentInstant();
+        Instant to = from + Duration.FromDays(7);
+        HttpResponseMessage calendar = await organizerSession.GetAsync(
+            $"/api/v1/calendar?from={Uri.EscapeDataString(Iso(from))}&to={Uri.EscapeDataString(Iso(to))}");
+        using JsonDocument body = await SessionEndpointTestSupport.SuccessJsonAsync(calendar);
+
+        JsonElement pollOptions = body.RootElement.GetProperty("pollOptions");
+        Assert.Equal(JsonValueKind.Array, pollOptions.ValueKind);
+        JsonElement pollLayerEntry = Assert.Single(pollOptions.EnumerateArray());
+        Assert.Equal(pollId, pollLayerEntry.GetProperty("pollId").GetGuid());
+        Assert.Equal("Calendar poll layer fixture", pollLayerEntry.GetProperty("title").GetString());
+
+        // Only the in-range instant is present -- the out-of-range option is filtered, not merely
+        // unasserted (D-111's flip must be a genuine range scope, not "one poll = one row").
+        JsonElement optionsElement = pollLayerEntry.GetProperty("options");
+        JsonElement optionEntry = Assert.Single(optionsElement.EnumerateArray());
+        Assert.Equal(inRangeOptionId, optionEntry.GetProperty("optionId").GetGuid());
+        Assert.False(optionEntry.TryGetProperty("ownVote", out _));
+
+        // Every declared layer is present on the one atomic response (A-080).
+        Assert.True(body.RootElement.TryGetProperty("myAvailability", out _));
+        Assert.True(body.RootElement.TryGetProperty("friendAvailability", out _));
+        Assert.True(body.RootElement.TryGetProperty("sessions", out _));
+    }
+
+    /// <summary>A viewer with no involvement in any poll still gets the declared-empty shape (D-111's original claim, narrowed).</summary>
+    [Fact]
+    public async Task PollLayerStaysEmptyForAnUninvolvedViewer_D111()
     {
         UserId viewerId = await _factory.SeedUserAsync(email: $"cal-polls-{Guid.NewGuid():N}@example.test");
         using SessionHttpSession session = await SessionEndpointTestSupport.SignInAsync(_factory, viewerId);
@@ -182,11 +241,6 @@ public sealed class CalendarEndpointTests : IAsyncLifetime, IDisposable
         JsonElement pollOptions = body.RootElement.GetProperty("pollOptions");
         Assert.Equal(JsonValueKind.Array, pollOptions.ValueKind);
         Assert.Empty(pollOptions.EnumerateArray());
-
-        // Every declared layer is present on the one atomic response (A-080).
-        Assert.True(body.RootElement.TryGetProperty("myAvailability", out _));
-        Assert.True(body.RootElement.TryGetProperty("friendAvailability", out _));
-        Assert.True(body.RootElement.TryGetProperty("sessions", out _));
     }
 
     private static string Iso(Instant instant) => InstantPattern.ExtendedIso.Format(instant);

@@ -50,6 +50,12 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         ApiOperationIds.RenameGuestPollIdentity,
     ];
 
+    /// <summary>The two operation ids ticket-P6-S4c's list/preview routes added.</summary>
+    private static readonly string[] NewPollListOperationIds =
+    [
+        ApiOperationIds.ListPolls, ApiOperationIds.GetPollFinalizationPreview,
+    ];
+
     /// <summary>
     /// S8 hardening (closes the round-1/round-2 "swap-hole": a bare count anchor passes even when one
     /// operation is silently swapped for another, so nothing short of the full set closes it).
@@ -60,8 +66,9 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
     /// host (which additionally maps the four <c>/api/v1/_slice2/*</c> sign-in helper routes
     /// <c>Program.cs</c> only registers under that environment name): the 89 operation ids the Phase 5
     /// surface was built on top of, plus the 12 new ones in <see cref="NewPhase5OperationIds"/>, the
-    /// 15 poll ones in <see cref="NewPollOperationIds"/>, and the 5 poll guest-arm ones in
-    /// <see cref="NewGuestPollOperationIds"/> (ticket-P6-S4b) — 121 total. A deliberate future change
+    /// 15 poll ones in <see cref="NewPollOperationIds"/>, the 5 poll guest-arm ones in
+    /// <see cref="NewGuestPollOperationIds"/> (ticket-P6-S4b), and the 2 list/preview ones in
+    /// <see cref="NewPollListOperationIds"/> (ticket-P6-S4c) — 123 total. A deliberate future change
     /// to the shipped surface must update this list explicitly; it is not meant to silently absorb an
     /// added, removed, or renamed operation.
     /// </summary>
@@ -135,7 +142,10 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         // S8 hardening: the exact shipped set, not merely its count — a swap (one operation added,
         // a different one silently removed) leaves the count anchor green while this catches it.
         string[] expectedOperationIds =
-            [.. PreExistingOperationIds, .. NewPhase5OperationIds, .. NewPollOperationIds, .. NewGuestPollOperationIds];
+        [
+            .. PreExistingOperationIds, .. NewPhase5OperationIds, .. NewPollOperationIds,
+            .. NewGuestPollOperationIds, .. NewPollListOperationIds,
+        ];
         Assert.Equal(
             expectedOperationIds.OrderBy(id => id, StringComparer.Ordinal).ToArray(),
             operationIds.OrderBy(id => id, StringComparer.Ordinal).ToArray());

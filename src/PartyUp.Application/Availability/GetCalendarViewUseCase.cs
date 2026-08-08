@@ -3,14 +3,25 @@ using PartyUp.Application.Abstractions;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Availability;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Polls;
 
 namespace PartyUp.Application.Availability;
 
 /// <summary>
-/// A-080: Phase 6's poll layer, declared and always empty so Phase 6 can add data without a contract
-/// change (§1.2). Carries no members yet — Phase 6 defines its shape.
+/// One candidate instant on an involved poll, with the viewer's own current vote (PHASE6_DESIGN.md
+/// §5 calendar bullet) -- null when the viewer has not voted on this option yet.
 /// </summary>
-public sealed record CalendarPollOption;
+public sealed record CalendarPollOptionInstant(PollOptionId OptionId, Instant StartTime, VoteChoice? OwnVote);
+
+/// <summary>
+/// A-080's poll layer, filled by S4c (§1.2 declared it empty in Phase 5): one row per poll the viewer
+/// is involved in (§7 rule 1 only -- the calendar is personal, not a discovery surface) whose options
+/// overlap the requested range.
+/// </summary>
+public sealed record CalendarPollOption(
+    PollId PollId,
+    SessionTitle Title,
+    IReadOnlyList<CalendarPollOptionInstant> Options);
 
 /// <summary>PHASE5_DESIGN.md A-080: {myAvailability, friendAvailability, sessions, pollOptions} for one range, atomically.</summary>
 public sealed record CalendarView(
@@ -26,13 +37,16 @@ public sealed record CalendarView(
 /// never reach <c>OverlapEngine</c> here (§12-44 — this use case runs no overlap search at all).
 /// <c>friendAvailability</c> carries ranges and an owner id only (no block/series id, A-080). The
 /// <c>sessions</c> layer is <see cref="ISessionReadRepository.ListCalendarSessionsAsync"/>, access-kind
-/// <c>any</c>, wider than Discover (A-077 (d)). <c>pollOptions</c> is declared and always empty.
+/// <c>any</c>, wider than Discover (A-077 (d)). <c>pollOptions</c> (S4c) is
+/// <see cref="Abstractions.IPollReadRepository.ListCalendarPollOptionsAsync"/>, narrower than
+/// <c>sessions</c> -- rule 1 only, since a poll a viewer merely could join has no seat to show yet.
 /// </summary>
 public sealed class GetCalendarViewUseCase(
     ReadMyAvailabilityUseCase myAvailability,
     IFriendshipRepository friendships,
     IAvailabilityReadRepository availabilityReads,
     ISessionReadRepository sessionReads,
+    IPollReadRepository pollReads,
     IDateTimeZoneProvider zoneProvider)
 {
     public async Task<CalendarView> ExecuteAsync(UserId viewerId, TimeRange range, CancellationToken cancellationToken)
@@ -59,6 +73,9 @@ public sealed class GetCalendarViewUseCase(
         IReadOnlyList<SessionSummary> sessions =
             await sessionReads.ListCalendarSessionsAsync(viewerId, range, cancellationToken);
 
-        return new CalendarView(mine, friendAvailability, sessions, []);
+        IReadOnlyList<CalendarPollOption> pollOptions =
+            await pollReads.ListCalendarPollOptionsAsync(viewerId, range, cancellationToken);
+
+        return new CalendarView(mine, friendAvailability, sessions, pollOptions);
     }
 }

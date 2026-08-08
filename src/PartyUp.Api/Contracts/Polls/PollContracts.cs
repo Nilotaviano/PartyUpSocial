@@ -228,3 +228,71 @@ public sealed record PollJoinRequestViewResponse(
             PollWireFormat.JoinRequestStatus(request.Status),
             SessionWireFormat.Format(request.CreatedAt));
 }
+
+// ---- PHASE6_DESIGN.md §4.1 "GET /polls" ----------------------------------------------------------
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record PollSummaryResponse(
+    Guid Id,
+    Guid OrganizerId,
+    string Title,
+    string Status,
+    bool IsPrivate,
+    string Deadline,
+    string SelectionWindowEndsAt,
+    string CreatedAt,
+    int OptionCount)
+{
+    public static PollSummaryResponse From(PollSummary summary) =>
+        new(
+            summary.Id.Value,
+            summary.OrganizerId.Value,
+            summary.Title.Value,
+            PollWireFormat.Status(summary.Status),
+            summary.IsPrivate,
+            SessionWireFormat.Format(summary.Deadline),
+            SessionWireFormat.Format(summary.SelectionWindowEndsAt),
+            SessionWireFormat.Format(summary.CreatedAt),
+            summary.OptionCount);
+}
+
+// ---- PHASE6_DESIGN.md §4 "GET /{id}/finalization-preview" -----------------------------------------
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record PollFinalizationPreviewRosterEntryResponse(
+    Guid? UserId,
+    Guid? GuestIdentityId,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DisplayName,
+    string Status,
+    bool IsWaitlisted)
+{
+    public static PollFinalizationPreviewRosterEntryResponse From(PollFinalizationPreviewRosterEntry entry) =>
+        new(
+            entry.Participant.UserId?.Value,
+            entry.Participant.GuestIdentityId?.Value,
+            entry.DisplayName?.Value,
+            SessionWireFormat.ParticipationStatus(entry.Status),
+            entry.IsWaitlisted);
+}
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record PollFinalizationPreviewOptionResponse(
+    Guid OptionId,
+    string StartTime,
+    bool MeetsMinimum,
+    IReadOnlyList<PollFinalizationPreviewRosterEntryResponse> Roster)
+{
+    public static PollFinalizationPreviewOptionResponse From(PollFinalizationPreviewOption option) =>
+        new(
+            option.OptionId.Value,
+            SessionWireFormat.Format(option.StartTime),
+            option.MeetsMinimum,
+            option.Roster.Select(PollFinalizationPreviewRosterEntryResponse.From).ToArray());
+}
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record PollFinalizationPreviewResponse(IReadOnlyList<PollFinalizationPreviewOptionResponse> Options)
+{
+    public static PollFinalizationPreviewResponse From(IReadOnlyList<PollFinalizationPreviewOption> options) =>
+        new(options.Select(PollFinalizationPreviewOptionResponse.From).ToArray());
+}

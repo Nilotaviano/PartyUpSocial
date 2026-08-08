@@ -154,6 +154,12 @@ public enum SessionListScope
     /// session-specific state, so a poll-owned scope is a new enum member, not a new mechanism.
     /// </summary>
     PollJoinRequests = 5,
+
+    /// <summary>PHASE6_DESIGN.md §4.1: <c>GET /polls</c>'s involved band (§7 rule 1).</summary>
+    PollsInvolved = 6,
+
+    /// <summary>PHASE6_DESIGN.md §4.1: <c>GET /polls</c>'s discoverable band (§7 rule 2, the D-118 entry point).</summary>
+    PollsDiscoverable = 7,
 }
 
 /// <summary>The A-072 keyset cursor: the list's sort-key instant, the tie-breaking id, and the

@@ -76,7 +76,7 @@ public static class CalendarEndpoints
             MyAvailabilityLayerResponse.From(view.MyAvailability, includeRange: false),
             [.. view.FriendAvailability.Select(entry => FriendAvailabilityEntryResponse.From(entry, ordinals))],
             [.. view.Sessions.Select(s => SessionSummaryResponse.From(s, ordinals))],
-            []);
+            [.. view.PollOptions.Select(CalendarPollOptionView.From)]);
         return Results.Ok(response);
     }
 
