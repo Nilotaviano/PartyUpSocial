@@ -120,14 +120,28 @@ function ErrorAlert({ error }: { error: unknown }) {
   ) : null
 }
 
+const linkButtonBase =
+  'inline-flex min-h-11 items-center justify-center gap-2 rounded-control border-2 border-ink px-4 py-2 font-display font-semibold shadow-offset-control active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
+
 export function Welcome() {
   const { t } = useTranslation(['common', 'auth'])
   return (
-    <main data-testid="screen-welcome">
-      <h1>{t('pages.welcome')}</h1>
-      <p>{t('app.tagline')}</p>
-      <Link to="/login">{t('pages.login', { ns: 'auth' })}</Link>
-      <Link to="/register">{t('pages.register', { ns: 'auth' })}</Link>
+    <main
+      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
+      data-testid="screen-welcome"
+    >
+      <h1 className="text-h1 font-display font-bold text-ink">
+        {t('pages.welcome')}
+      </h1>
+      <p className="text-ink-soft">{t('app.tagline')}</p>
+      <div className="flex flex-wrap gap-3">
+        <Link className={`${linkButtonBase} bg-primary text-primary-ink`} to="/login">
+          {t('pages.login', { ns: 'auth' })}
+        </Link>
+        <Link className={`${linkButtonBase} bg-card text-ink`} to="/register">
+          {t('pages.register', { ns: 'auth' })}
+        </Link>
+      </div>
     </main>
   )
 }
@@ -155,9 +169,14 @@ export function AgeGate() {
   }
 
   return (
-    <main data-testid="screen-age-gate">
-      <h1>{t('ageGate.title')}</h1>
-      <div>
+    <main
+      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
+      data-testid="screen-age-gate"
+    >
+      <h1 className="text-h1 font-display font-bold text-ink">
+        {t('ageGate.title')}
+      </h1>
+      <div className="flex items-center gap-2">
         <Checkbox.Root
           id="age-gate"
           checked={checked}
@@ -168,7 +187,7 @@ export function AgeGate() {
         <Label htmlFor="age-gate">{t('ageGate.attestation')}</Label>
       </div>
       {attempted && !checked && <p role="alert">{t('ageGate.required')}</p>}
-      <Button onClick={continueGate}>
+      <Button variant="primary" onClick={continueGate}>
         {t('common.continue', { ns: 'common' })}
       </Button>
     </main>
@@ -255,39 +274,54 @@ export function Login() {
   }
 
   return (
-    <main data-testid="screen-login">
-      <h1>{t('pages.login')}</h1>
-      <form onSubmit={submit}>
-        <Label htmlFor="login-email">{t('fields.email')}</Label>
-        <Input
-          id="login-email"
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          required
-        />
-        <Label htmlFor="login-password">{t('fields.password')}</Label>
-        <Input
-          id="login-password"
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          required
-        />
-        <Button type="submit">{t('actions.signIn')}</Button>
+    <main
+      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
+      data-testid="screen-login"
+    >
+      <h1 className="text-h1 font-display font-bold text-ink">
+        {t('pages.login')}
+      </h1>
+      <form className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card" onSubmit={submit}>
+        <div>
+          <Label htmlFor="login-email">{t('fields.email')}</Label>
+          <Input
+            id="login-email"
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="login-password">{t('fields.password')}</Label>
+          <Input
+            id="login-password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
+        </div>
+        <Button type="submit" variant="primary">
+          {t('actions.signIn')}
+        </Button>
       </form>
-      <Button onClick={() => void magic()}>{t('actions.emailLink')}</Button>
+      <Button variant="neutral" onClick={() => void magic()}>
+        {t('actions.emailLink')}
+      </Button>
       {sent && <p role="status">{t('messages.checkInbox')}</p>}
-      {session?.providers.includes('google') && (
-        <Button onClick={() => void external('google')}>
-          {t('providers.google')}
-        </Button>
-      )}
-      {session?.providers.includes('steam') && (
-        <Button onClick={() => void external('steam')}>
-          {t('providers.steam')}
-        </Button>
-      )}
+      <div className="flex flex-wrap gap-3">
+        {session?.providers.includes('google') && (
+          <Button variant="neutral" onClick={() => void external('google')}>
+            {t('providers.google')}
+          </Button>
+        )}
+        {session?.providers.includes('steam') && (
+          <Button variant="neutral" onClick={() => void external('steam')}>
+            {t('providers.steam')}
+          </Button>
+        )}
+      </div>
       <ErrorAlert error={error} />
     </main>
   )
@@ -328,21 +362,30 @@ export function Register() {
   }
 
   return (
-    <main data-testid="screen-register">
-      <h1>{t('pages.register')}</h1>
+    <main
+      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
+      data-testid="screen-register"
+    >
+      <h1 className="text-h1 font-display font-bold text-ink">
+        {t('pages.register')}
+      </h1>
       {sent ? (
         <p role="status">{t('messages.checkInbox')}</p>
       ) : (
-        <form onSubmit={submit}>
-          <Label htmlFor="register-email">{t('fields.email')}</Label>
-          <Input
-            id="register-email"
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-          <Button type="submit">{t('actions.createAccount')}</Button>
+        <form className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card" onSubmit={submit}>
+          <div>
+            <Label htmlFor="register-email">{t('fields.email')}</Label>
+            <Input
+              id="register-email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </div>
+          <Button type="submit" variant="primary">
+            {t('actions.createAccount')}
+          </Button>
         </form>
       )}
       <ErrorAlert error={error} />
@@ -394,8 +437,13 @@ export function MagicLink() {
   }, [authData, navigate, queryClient])
 
   return (
-    <main data-testid="screen-auth-magic">
-      <h1>{t('pages.magic')}</h1>
+    <main
+      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
+      data-testid="screen-auth-magic"
+    >
+      <h1 className="text-h1 font-display font-bold text-ink">
+        {t('pages.magic')}
+      </h1>
       {!authData.token && <p role="alert">{t('messages.invalidLink')}</p>}
       <ErrorAlert error={error} />
     </main>
@@ -455,8 +503,13 @@ export function AuthCallback() {
   }, [location.search, navigate, queryClient, reauth])
 
   return (
-    <main data-testid="screen-auth-callback">
-      <h1>{t('pages.callback')}</h1>
+    <main
+      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
+      data-testid="screen-auth-callback"
+    >
+      <h1 className="text-h1 font-display font-bold text-ink">
+        {t('pages.callback')}
+      </h1>
       <ErrorAlert error={error} />
     </main>
   )
@@ -545,14 +598,19 @@ function TokenForm({
   }
 
   return (
-    <main data-testid={'screen-auth-' + page}>
-      <h1>{t('pages.' + page)}</h1>
+    <main
+      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
+      data-testid={'screen-auth-' + page}
+    >
+      <h1 className="text-h1 font-display font-bold text-ink">
+        {t('pages.' + page)}
+      </h1>
       {!authData.token ? (
         <p role="alert">{t('messages.invalidLink')}</p>
       ) : (
-        <form onSubmit={submit}>
+        <form className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card" onSubmit={submit}>
           {password && (
-            <>
+            <div>
               <Label htmlFor={page + '-password'}>{t('fields.password')}</Label>
               <Input
                 id={page + '-password'}
@@ -561,9 +619,11 @@ function TokenForm({
                 onChange={(event) => setValue(event.target.value)}
                 required
               />
-            </>
+            </div>
           )}
-          <Button type="submit">{t('actions.continue')}</Button>
+          <Button type="submit" variant="primary">
+            {t('actions.continue')}
+          </Button>
         </form>
       )}
       <ErrorAlert error={error} />
@@ -614,8 +674,13 @@ export function ConfirmIdentity() {
   }, [navigate, token])
 
   return (
-    <main data-testid="screen-auth-confirm-identity">
-      <h1>{t('pages.confirmIdentity')}</h1>
+    <main
+      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
+      data-testid="screen-auth-confirm-identity"
+    >
+      <h1 className="text-h1 font-display font-bold text-ink">
+        {t('pages.confirmIdentity')}
+      </h1>
       {token ? (
         <p>{t('messages.confirmedIdentity')}</p>
       ) : (

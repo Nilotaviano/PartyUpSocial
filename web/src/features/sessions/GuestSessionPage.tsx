@@ -78,11 +78,11 @@ export function GuestSessionPage() {
         <h1
           ref={heading}
           tabIndex={-1}
-          className="text-2xl font-bold tracking-tight text-slate-950 focus:outline-none"
+          className="text-h1 font-display font-bold text-ink focus:outline-none"
         >
           {t('guest.invalid')}
         </h1>
-        <p>{t('guest.linkExpiredReopen')}</p>
+        <p className="text-ink-soft">{t('guest.linkExpiredReopen')}</p>
         {extra != null && isApiError(extra) && extra.code !== 'session_not_found' && (
           <p role="alert">
             {t(extra.code, { ns: 'errors', defaultValue: t('generic', { ns: 'errors' }) })}
@@ -110,7 +110,7 @@ export function GuestSessionPage() {
         <h1
           ref={heading}
           tabIndex={-1}
-          className="text-2xl font-bold tracking-tight text-slate-950 focus:outline-none"
+          className="text-h1 font-display font-bold text-ink focus:outline-none"
         >
           {t('common.loading', { ns: 'common' })}
         </h1>
@@ -129,7 +129,7 @@ export function GuestSessionPage() {
         <h1
           ref={heading}
           tabIndex={-1}
-          className="text-2xl font-bold tracking-tight text-slate-950 focus:outline-none"
+          className="text-h1 font-display font-bold text-ink focus:outline-none"
         >
           {t(guestTerminalLocaleKey(view.state))}
         </h1>
@@ -149,12 +149,12 @@ export function GuestSessionPage() {
         ref={heading}
         aria-live="polite"
         tabIndex={-1}
-        className="text-2xl font-bold tracking-tight text-slate-950 focus:outline-none"
+        className="text-h1 font-display font-bold text-ink focus:outline-none"
       >
         {view.title ?? t('guest.claimHeading')}
       </h1>
 
-      <p aria-live="polite" className="text-sm text-emerald-700">
+      <p aria-live="polite" className="text-body text-ink">
         {status}
       </p>
 
@@ -169,7 +169,7 @@ export function GuestSessionPage() {
         </p>
       )}
 
-      <p className="text-sm text-slate-600">{t('guest.live')}</p>
+      <p className="text-ink-soft">{t('guest.live')}</p>
 
       {view.startTime && (
         <p>
@@ -179,7 +179,7 @@ export function GuestSessionPage() {
           }).format(new Date(view.startTime))}
         </p>
       )}
-      <p className="text-xs text-slate-500">{t('guest.timezone')}</p>
+      <p className="text-meta text-ink-soft">{t('guest.timezone')}</p>
 
       {view.platform && <p>{view.platform}</p>}
       {view.game?.name && <p>{view.game.name}</p>}
@@ -187,13 +187,13 @@ export function GuestSessionPage() {
 
       {!hasClaimed && (
         <form
-          className="space-y-3"
+          className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card"
           onSubmit={(event) => {
             event.preventDefault()
             claim.mutate()
           }}
         >
-          <h2 className="text-lg font-semibold text-slate-950">
+          <h2 className="text-h2 font-display font-semibold text-ink">
             {t('guest.claimHeading')}
           </h2>
           <div>
@@ -219,12 +219,7 @@ export function GuestSessionPage() {
               </label>
             ))}
           </fieldset>
-          <Button
-            aria-busy={claim.isPending}
-            className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-            disabled={claim.isPending}
-            type="submit"
-          >
+          <Button aria-busy={claim.isPending} disabled={claim.isPending} type="submit" variant="primary">
             {t('guest.respond')}
           </Button>
         </form>
@@ -244,35 +239,33 @@ export function GuestSessionPage() {
               <input
                 key={view.guestIdentityId}
                 ref={renameInput}
-                className="min-h-11 rounded-md border border-slate-300 px-3 py-2"
+                className="min-h-11 rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                 defaultValue={view.displayName ?? ''}
                 id="guest-rename"
                 required
               />
             </div>
-            <Button
-              aria-busy={rename.isPending}
-              className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-              disabled={rename.isPending}
-              type="submit"
-            >
+            <Button aria-busy={rename.isPending} disabled={rename.isPending} type="submit" variant="primary">
               {t('guest.respond')}
             </Button>
           </form>
 
           <div className="flex flex-wrap gap-2">
-            {rsvpChoices.map((choice) => (
-              <button
-                key={choice}
-                aria-pressed={view.response?.toLowerCase() === choice.toLowerCase()}
-                className="min-h-11 rounded-md border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                disabled={respond.isPending}
-                type="button"
-                onClick={() => respond.mutate(choice)}
-              >
-                {t(`rsvp.${choice.toLowerCase()}`)}
-              </button>
-            ))}
+            {rsvpChoices.map((choice) => {
+              const pressed = view.response?.toLowerCase() === choice.toLowerCase()
+              return (
+                <Button
+                  key={choice}
+                  aria-pressed={pressed}
+                  disabled={respond.isPending}
+                  type="button"
+                  variant={pressed ? 'primary' : 'neutral'}
+                  onClick={() => respond.mutate(choice)}
+                >
+                  {t(`rsvp.${choice.toLowerCase()}`)}
+                </Button>
+              )
+            })}
           </div>
         </>
       )}

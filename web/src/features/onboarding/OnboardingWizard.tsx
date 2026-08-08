@@ -153,7 +153,9 @@ export function UsernameStep({
           {message}
         </p>
       )}
-      <Button type="submit">{t('actions.continue')}</Button>
+      <Button type="submit" variant="primary">
+        {t('actions.continue')}
+      </Button>
     </form>
   )
 }
@@ -181,7 +183,9 @@ function DisplayNameStep({
         onChange={(event) => setDisplayName(event.target.value)}
         required
       />
-      <Button type="submit">{t('actions.continue')}</Button>
+      <Button type="submit" variant="primary">
+        {t('actions.continue')}
+      </Button>
     </form>
   )
 }
@@ -196,19 +200,23 @@ function AvatarStep({
   const { t } = useTranslation('onboarding')
   const [emoji, setEmoji] = useState(value?.emoji ?? 'game')
   return (
-    <div role="radiogroup" aria-label={t('fields.avatar')}>
-      {['game', 'dice', 'arcade'].map((option) => (
-        <button
-          key={option}
-          type="button"
-          role="radio"
-          aria-checked={emoji === option}
-          onClick={() => setEmoji(option)}
-        >
-          {option}
-        </button>
-      ))}
+    <div className="space-y-4" role="radiogroup" aria-label={t('fields.avatar')}>
+      <div className="flex flex-wrap gap-2">
+        {['game', 'dice', 'arcade'].map((option) => (
+          <button
+            key={option}
+            aria-checked={emoji === option}
+            className="min-h-11 rounded-full border-2 border-ink px-4 py-2 font-display text-sm font-bold text-ink aria-checked:bg-accent aria-checked:text-accent-ink dark:aria-checked:border-accent-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            role="radio"
+            type="button"
+            onClick={() => setEmoji(option)}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
       <Button
+        variant="primary"
         onClick={() => onNext({ kind: 'emoji', emoji, platformLinkId: null })}
       >
         {t('actions.continue')}
@@ -237,6 +245,7 @@ function TimeZoneStep({
     >
       <Label htmlFor="time-zone">{t('fields.timeZone')}</Label>
       <select
+        className="min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         id="time-zone"
         value={timeZone}
         onChange={(event) => setTimeZone(event.target.value)}
@@ -244,7 +253,9 @@ function TimeZoneStep({
         <option value={timeZone}>{timeZone}</option>
         <option value="UTC">UTC</option>
       </select>
-      <Button type="submit">{t('actions.continue')}</Button>
+      <Button type="submit" variant="primary">
+        {t('actions.continue')}
+      </Button>
     </form>
   )
 }
@@ -264,10 +275,18 @@ function FriendsEducation({
 }) {
   const { t } = useTranslation('friends')
   const navigate = useNavigate()
+  // The onboarding-finish "sticker slap" (design §3): this section only
+  // mounts once activation lands on 'ready', so its own mount is the finish
+  // moment. Scale settles 1.06 -> 1 over 300ms, motion-safe only.
+  const [settled, setSettled] = useState(false)
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setSettled(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
 
   return (
     <div className="space-y-6">
-      <p className="max-w-prose text-slate-700">{t('onboarding.body')}</p>
+      <p className="max-w-prose text-ink-soft">{t('onboarding.body')}</p>
       {continuation && (
         <section
           aria-labelledby="continued-profile-heading"
@@ -275,7 +294,7 @@ function FriendsEducation({
         >
           <h2
             id="continued-profile-heading"
-            className="text-xl font-semibold text-slate-950"
+            className="text-h2 font-display font-semibold text-ink"
           >
             {t('onboarding.continuation')}
           </h2>
@@ -284,11 +303,11 @@ function FriendsEducation({
       )}
       <section
         aria-labelledby="find-by-code-heading"
-        className="space-y-3 rounded-xl border border-slate-200 bg-white p-5"
+        className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card"
       >
         <h2
           id="find-by-code-heading"
-          className="text-xl font-semibold text-slate-950"
+          className="text-h2 font-display font-semibold text-ink"
         >
           {t('sections.findByCode')}
         </h2>
@@ -300,20 +319,24 @@ function FriendsEducation({
       <section aria-labelledby="steam-onboarding-heading" className="space-y-2">
         <h2
           id="steam-onboarding-heading"
-          className="text-xl font-semibold text-slate-950"
+          className="text-h2 font-display font-semibold text-ink"
         >
           {t('pages.importSteam')}
         </h2>
         <p>{t('onboarding.steamOptional')}</p>
-        <Link className="text-indigo-700 underline" to="/friends/import/steam">
+        <Link className="font-semibold text-ink underline" to="/friends/import/steam">
           {t('actions.importSteam')}
         </Link>
       </section>
-      <div className="flex flex-wrap gap-3">
-        <Button onClick={() => navigate('/app', { replace: true })}>
+      <div
+        className={`flex flex-wrap items-center gap-3 rounded-card border-2 border-ink bg-card p-5 motion-safe:transition-[scale,box-shadow] motion-safe:duration-300 motion-safe:ease-out ${
+          settled ? 'scale-100 shadow-offset-card' : 'scale-[1.06] shadow-offset-dialog'
+        }`}
+      >
+        <Button variant="primary" onClick={() => navigate('/app', { replace: true })}>
           {t('actions.finishSetup')}
         </Button>
-        <Button onClick={() => navigate('/app', { replace: true })}>
+        <Button variant="neutral" onClick={() => navigate('/app', { replace: true })}>
           {t('actions.skipForNow')}
         </Button>
       </div>
@@ -435,7 +458,7 @@ export function OnboardingWizard() {
       <h1
         ref={heading}
         tabIndex={-1}
-        className="text-2xl font-bold tracking-tight text-slate-950"
+        className="text-h1 font-display font-bold text-ink"
       >
         {t(labels[current])}
       </h1>
@@ -469,6 +492,7 @@ export function OnboardingWizard() {
           <Button
             aria-busy={complete.isPending}
             disabled={complete.isPending}
+            variant="primary"
             onClick={() => void activate()}
           >
             {t('actions.continue')}
@@ -487,7 +511,10 @@ export function OnboardingWizard() {
       )}
       {current === 'friends' && activation === 'error' && (
         <section aria-labelledby="activation-refresh-error">
-          <h2 id="activation-refresh-error">
+          <h2
+            id="activation-refresh-error"
+            className="text-h2 font-display font-semibold text-ink"
+          >
             {t('friends:onboarding.refreshFailed')}
           </h2>
           <p role="alert">
@@ -495,7 +522,7 @@ export function OnboardingWizard() {
               t(key, { ns: 'errors', ...options }),
             )}
           </p>
-          <Button onClick={() => void refreshActivatedSession()}>
+          <Button variant="neutral" onClick={() => void refreshActivatedSession()}>
             {t('friends:actions.retry')}
           </Button>
         </section>

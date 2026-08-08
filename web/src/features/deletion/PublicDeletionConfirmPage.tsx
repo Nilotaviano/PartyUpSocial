@@ -38,17 +38,24 @@ export function PublicDeletionConfirmPage() {
     : null
 
   return (
-    <main data-testid="screen-account-deletion-confirm">
-      <h1>{t('publicDeletion.confirmTitle')}</h1>
+    <main
+      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
+      data-testid="screen-account-deletion-confirm"
+    >
+      <h1 className="text-h1 font-display font-bold text-ink">
+        {t('publicDeletion.confirmTitle')}
+      </h1>
       {!token ? (
         <p role="alert">{t('publicDeletion.invalidLink')}</p>
       ) : confirmed ? (
         <p role="status">{t('publicDeletion.confirmed')}</p>
       ) : (
-        <>
+        <div className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card">
           <p>{t('publicDeletion.confirmDescription')}</p>
-          <Button onClick={() => void confirmDeletion()}>{t('publicDeletion.confirm')}</Button>
-        </>
+          <Button variant="danger" onClick={() => void confirmDeletion()}>
+            {t('publicDeletion.confirm')}
+          </Button>
+        </div>
       )}
       {errorMessage && <p role="alert">{errorMessage}</p>}
     </main>
