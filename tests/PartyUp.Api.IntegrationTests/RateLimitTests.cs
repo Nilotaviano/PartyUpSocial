@@ -105,6 +105,28 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
             ["calendar-read"] = ["GetCalendarView", "GetMyAvailability"],
             ["home-read"] = ["GetActionableInbox"],
             ["session-list-read"] = ["ListSessions"],
+            // PHASE6_DESIGN.md §4.2 (ticket-P6-S4a): a poll-local grouping, distinct from the
+            // session split — the session-write/session-attach analogues.
+            ["poll-write"] =
+            [
+                "CreatePoll",
+                "CancelPoll",
+                "DeletePollOption",
+                "CreatePollGuestLinks",
+                "RevokePollGuestLink",
+                "RemovePollGuest",
+            ],
+            ["poll-attach"] =
+            [
+                "FinalizePoll",
+                "ApprovePollJoinRequest",
+                "RejectPollJoinRequest",
+                "RequestPollJoin",
+                "WithdrawPollJoinRequest",
+                "ListPollJoinRequests",
+            ],
+            ["poll-vote"] = ["VoteOnPollOption", "SuggestPollOption"],
+            ["poll-list-read"] = ["ListPolls", "GetPollFinalizationPreview"],
             ["default"] = [],
         };
 
@@ -119,7 +141,7 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
     [Fact]
     public void EveryDimensionCoversItsDocumentedRoutes()
     {
-        Assert.Equal(26, RateLimitPolicies.Dimensions.Count);
+        Assert.Equal(30, RateLimitPolicies.Dimensions.Count);
         Assert.Equal(ExpectedRoutes.Keys, RateLimitPolicies.Dimensions.Select(value => value.Name));
         foreach (RateLimitDimension dimension in RateLimitPolicies.Dimensions)
         {

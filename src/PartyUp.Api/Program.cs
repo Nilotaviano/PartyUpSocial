@@ -326,6 +326,7 @@ api.MapSessionEndpoints();
 api.MapGuestSessionEndpoints();
 api.MapAvailabilityEndpoints();
 api.MapCalendarEndpoints();
+api.MapPollEndpoints();
 
 // PHASE4_DESIGN.md P4-HTTP-01: A-064/A-065 are ratified in ARCHITECTURE.md before this route is
 // mapped. It sits outside the /api/v1 group by design (A-064: a transport exception, not a REST

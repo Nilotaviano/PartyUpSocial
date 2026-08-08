@@ -54,6 +54,19 @@ public sealed class PartyUpOpenApiTransformer :
         "guest_link_claimed",
         "reminder_not_eligible",
         "transient_conflict",
+
+        // PHASE6_DESIGN.md §4 (ticket-P6-S4a): the registered poll HTTP surface's closed problem-code
+        // inventory — every code PollOptionUseCases.CodeFor and the poll use cases actually produce.
+        "poll_not_found",
+        "poll_validation",
+        "poll_option_cap",
+        "poll_option_not_found",
+        "poll_voting_closed",
+        "poll_terminal",
+        "poll_invalid_transition",
+        "poll_participant_removed",
+        "poll_conflict",
+        "poll_guest_not_found",
     ];
 
     private static readonly HashSet<string> FriendOperationIds =

@@ -89,4 +89,26 @@ public static class ApiOperationIds
     public const string GetHomeSuggestions = "GetHomeSuggestions";
     public const string GetCalendarView = "GetCalendarView";
     public const string GetActionableInbox = "GetActionableInbox";
+
+    // PHASE6_DESIGN.md §4: the registered poll HTTP surface, relative to /api/v1 (ticket-P6-S4a).
+    public const string CreatePoll = "CreatePoll";
+    public const string GetPoll = "GetPoll";
+    public const string SuggestPollOption = "SuggestPollOption";
+    public const string DeletePollOption = "DeletePollOption";
+    public const string VoteOnPollOption = "VoteOnPollOption";
+    public const string FinalizePoll = "FinalizePoll";
+    public const string CancelPoll = "CancelPoll";
+    public const string CreatePollGuestLinks = "CreatePollGuestLinks";
+    public const string RevokePollGuestLink = "RevokePollGuestLink";
+    public const string RemovePollGuest = "RemovePollGuest";
+    public const string RequestPollJoin = "RequestPollJoin";
+    public const string WithdrawPollJoinRequest = "WithdrawPollJoinRequest";
+    public const string ListPollJoinRequests = "ListPollJoinRequests";
+    public const string ApprovePollJoinRequest = "ApprovePollJoinRequest";
+    public const string RejectPollJoinRequest = "RejectPollJoinRequest";
+
+    // PHASE6_DESIGN.md §4.1: reserved here (poll-list-read dimension membership only) — S4c maps
+    // the routes these ids name.
+    public const string ListPolls = "ListPolls";
+    public const string GetPollFinalizationPreview = "GetPollFinalizationPreview";
 }

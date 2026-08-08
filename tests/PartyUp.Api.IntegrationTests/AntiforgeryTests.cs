@@ -208,6 +208,31 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 JsonContent.Create(new { displayName = "Probe Guest" })),
             ["PUT /api/v1/guest/{guestLinkId:guid}/participation"] = Public(() =>
                 JsonContent.Create(new { response = "Going" })),
+            // PHASE6_DESIGN.md §4 (ticket-P6-S4a): the registered poll HTTP surface.
+            ["POST /api/v1/polls"] = Onboarded(() => JsonContent.Create(new
+            {
+                title = "Antiforgery probe",
+                optionStartTimes = new[] { "2027-01-01T00:00:00Z", "2027-01-02T00:00:00Z" },
+                isPrivate = true,
+            })),
+            ["POST /api/v1/polls/{pollId:guid}/options"] = Onboarded(() =>
+                JsonContent.Create(new { startTime = "2027-01-01T00:00:00Z" })),
+            ["DELETE /api/v1/polls/{pollId:guid}/options/{optionId:guid}"] = Onboarded(() => null),
+            ["PUT /api/v1/polls/{pollId:guid}/options/{optionId:guid}/vote"] = Onboarded(() =>
+                JsonContent.Create(new { choice = "available" })),
+            ["POST /api/v1/polls/{pollId:guid}/finalize"] = Onboarded(() =>
+                JsonContent.Create(new { optionId = Guid.Empty })),
+            ["POST /api/v1/polls/{pollId:guid}/cancel"] = Onboarded(() => null),
+            ["POST /api/v1/polls/{pollId:guid}/guest-links"] = Onboarded(() =>
+                JsonContent.Create(new { count = 1 })),
+            ["DELETE /api/v1/polls/{pollId:guid}/guest-links/{guestLinkId:guid}"] = Onboarded(() => null),
+            ["POST /api/v1/polls/{pollId:guid}/guests/{guestIdentityId:guid}/remove"] = Onboarded(() => null),
+            ["POST /api/v1/polls/{pollId:guid}/join-requests"] = Onboarded(() => null),
+            ["DELETE /api/v1/polls/{pollId:guid}/join-requests/mine"] = Onboarded(() => null),
+            ["POST /api/v1/polls/{pollId:guid}/join-requests/{requestId:guid}/approve"] =
+                Onboarded(() => null),
+            ["POST /api/v1/polls/{pollId:guid}/join-requests/{requestId:guid}/reject"] =
+                Onboarded(() => null),
         };
 
     private readonly PartyUpApiFactory _factory = new();
@@ -468,7 +493,10 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             .Replace("{sessionId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
             .Replace("{guestLinkId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
             .Replace("{participationId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
-            .Replace("{requestId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal);
+            .Replace("{requestId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
+            .Replace("{pollId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
+            .Replace("{optionId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
+            .Replace("{guestIdentityId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal);
 
     private static HttpMethod MethodFromKey(string key) =>
         new(key[..key.IndexOf(' ')]);

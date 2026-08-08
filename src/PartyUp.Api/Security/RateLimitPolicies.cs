@@ -297,6 +297,45 @@ public static class RateLimitPolicies
             TimeSpan.FromMinutes(1),
             RateLimitPartitionKind.User,
             Operations(ApiOperationIds.ListSessions)),
+        // PHASE6_DESIGN.md §4.2: four new User-partitioned dimensions, a poll-local grouping
+        // distinct from the session split (ticket-P6-S4a). Poll guest ops join the shipped
+        // guest-write dimension instead (S4b).
+        new(
+            "poll-write",
+            30,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.User,
+            Operations(
+                ApiOperationIds.CreatePoll,
+                ApiOperationIds.CancelPoll,
+                ApiOperationIds.DeletePollOption,
+                ApiOperationIds.CreatePollGuestLinks,
+                ApiOperationIds.RevokePollGuestLink,
+                ApiOperationIds.RemovePollGuest)),
+        new(
+            "poll-attach",
+            60,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.User,
+            Operations(
+                ApiOperationIds.FinalizePoll,
+                ApiOperationIds.ApprovePollJoinRequest,
+                ApiOperationIds.RejectPollJoinRequest,
+                ApiOperationIds.RequestPollJoin,
+                ApiOperationIds.WithdrawPollJoinRequest,
+                ApiOperationIds.ListPollJoinRequests)),
+        new(
+            "poll-vote",
+            60,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.User,
+            Operations(ApiOperationIds.VoteOnPollOption, ApiOperationIds.SuggestPollOption)),
+        new(
+            "poll-list-read",
+            120,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.User,
+            Operations(ApiOperationIds.ListPolls, ApiOperationIds.GetPollFinalizationPreview)),
         new(
             "default",
             300,

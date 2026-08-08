@@ -73,6 +73,7 @@ public static class DependencyInjection
         services.AddScoped<IAvailabilityReadRepository, AvailabilityReadRepository>();
         services.AddScoped<ISessionLockRepository, SessionLockRepository>();
         services.AddScoped<IPollRepository, PollRepository>();
+        services.AddScoped<IPollReadRepository, PollReadRepository>();
         services.AddScoped<IPollLockRepository, PollLockRepository>();
         services.AddScoped<IPollNotificationMaterializer, PollNotificationMaterializer>();
         services.AddScoped<CreatePollUseCase>();
@@ -81,6 +82,7 @@ public static class DependencyInjection
         services.AddScoped<PollGuestManagementUseCases>();
         services.AddScoped<GuestPollUseCases>();
         services.AddScoped<PollJoinRequestUseCases>();
+        services.AddScoped<PollReadUseCases>();
         services.AddScoped<CancelPollUseCase>();
         services.AddScoped<FinalizePollUseCase>();
         services.AddScoped<PollTransitionUseCase>();
