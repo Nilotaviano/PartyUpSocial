@@ -4,7 +4,9 @@ using NodaTime;
 using PartyUp.Application.Polls;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Polls;
+using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Persistence;
 
@@ -72,9 +74,15 @@ public sealed class PollJoinRequestTests : IAsyncLifetime, IDisposable
         Assert.Equal("poll_voting_closed", result.Code);
     }
 
-    /// <summary>D-118: approval grants Active PollParticipant access to every current option.</summary>
+    /// <summary>
+    /// D-118: approval grants the new Active PollParticipant access to every current option -- proven
+    /// by actually voting on all of them, including one the organizer suggested AFTER the request was
+    /// opened (so a stale option snapshot captured at request time could never satisfy this). If
+    /// approval instead attached the participant without option access, or option access were resolved
+    /// at request-open time rather than freshly, the vote on the late-suggested option would fail here.
+    /// </summary>
     [Fact]
-    public async Task ApproveJoinRequest_GrantsAccessToAllCurrentOptions()
+    public async Task ApproveJoinRequest_GrantsAccessToAllCurrentOptions_D118()
     {
         (PollId pollId, UserId organizerId) = await SeedNonPrivatePollAsync();
         UserId requesterId = await _factory.SeedUserAsync(email: $"poll-jr-approve-{Guid.NewGuid():N}@example.test");
@@ -95,6 +103,18 @@ public sealed class PollJoinRequestTests : IAsyncLifetime, IDisposable
             requestId = requestResult.JoinRequest!.Id;
         }
 
+        // A new option lands AFTER the request was opened -- the approval-time access grant must still
+        // cover it, not just the options that existed when the requester asked to join.
+        PollOptionId lateOptionId;
+        await using (AsyncServiceScope suggestScope = _factory.Services.CreateAsyncScope())
+        {
+            Instant now = _factory.Clock.GetCurrentInstant();
+            SuggestOptionResult suggestResult = await PollTestHelpers.BuildOptionUseCases(suggestScope)
+                .SuggestOptionAsync(pollId, organizerId, now + Duration.FromHours(4), default);
+            Assert.True(suggestResult.Succeeded, suggestResult.Code);
+            lateOptionId = suggestResult.OptionId!.Value;
+        }
+
         await using AsyncServiceScope approveScope = _factory.Services.CreateAsyncScope();
         PollJoinRequestCommandResult approveResult = await PollTestHelpers.BuildJoinRequestUseCases(approveScope)
             .ApproveJoinRequestAsync(pollId, organizerId, requestId, default);
@@ -103,41 +123,84 @@ public sealed class PollJoinRequestTests : IAsyncLifetime, IDisposable
         Poll poll = approveResult.Poll!;
         PollParticipant participant = Assert.Single(poll.Participants, p => p.UserId == requesterId);
         Assert.True(participant.IsActive);
-        Assert.Equal(poll.Options.Count, poll.Options.Count(o => true));
         Assert.Null(participant.FirstResponseAt);
+        Assert.Contains(poll.Options, o => o.Id == lateOptionId);
+
+        foreach (PollOption option in poll.Options)
+        {
+            await using AsyncServiceScope voteScope = _factory.Services.CreateAsyncScope();
+            PollCommandResult voteResult = await PollTestHelpers.BuildVoteUseCases(voteScope)
+                .VoteAsync(pollId, requesterId, option.Id, VoteChoice.Available, default);
+            Assert.True(voteResult.Succeeded, voteResult.Code);
+        }
+
+        await using AsyncServiceScope verify = _factory.Services.CreateAsyncScope();
+        AppDbContext verifyContext = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        int voteRowCount = await verifyContext.Set<PollVote>()
+            .CountAsync(v => v.PollId == pollId && v.UserId == requesterId);
+        Assert.Equal(poll.Options.Count, voteRowCount);
+        Assert.True(voteRowCount >= 3, "Expected the two original options plus the late-suggested one.");
     }
 
-    /// <summary>D-065's poll analogue: a blocked pair's request writes and notifies nothing, indistinguishable from missing.</summary>
+    /// <summary>
+    /// D-065's poll analogue, discriminating on the block itself rather than on friendlessness: the
+    /// requester is BLOCKED with the organizer but stays FRIENDS with a clean extender -- an invited,
+    /// Active registered participant who never voted (so §7 rule 2 would admit the requester through
+    /// inherited access if the block rule vanished). A build that forgot the block check, or that
+    /// re-evaluated visibility from stale pre-block friendship facts, would let this succeed; the
+    /// block-boundary check must fail it closed regardless of the still-intact extender path.
+    /// </summary>
     [Fact]
     public async Task RequestJoin_FromBlockedUser_FailsClosedWithNoWriteOrNotification()
     {
-        (PollId pollId, UserId organizerId) = await SeedNonPrivatePollAsync();
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-jr-blocked-organizer-{Guid.NewGuid():N}@example.test");
+        UserId extenderId = await _factory.SeedUserAsync(email: $"poll-jr-blocked-extender-{Guid.NewGuid():N}@example.test");
         UserId blockedRequesterId = await _factory.SeedUserAsync(email: $"poll-jr-blocked-{Guid.NewGuid():N}@example.test");
 
-        await using (AsyncServiceScope friendshipScope = _factory.Services.CreateAsyncScope())
+        PollId pollId;
+        await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
         {
-            AppDbContext friendshipContext = friendshipScope.ServiceProvider.GetRequiredService<AppDbContext>();
-            await PollTestHelpers.SeedAcceptedFriendshipAsync(friendshipContext, organizerId, blockedRequesterId, _factory.Clock);
-            await friendshipContext.SaveChangesAsync();
+            AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            // Organizer <-> extender: required for the extender to be a legitimate invitee (D-125).
+            await PollTestHelpers.SeedAcceptedFriendshipAsync(context, organizerId, extenderId, _factory.Clock);
+            // Extender <-> requester: the inherited-access path the block must still defeat.
+            await PollTestHelpers.SeedAcceptedFriendshipAsync(context, extenderId, blockedRequesterId, _factory.Clock);
+            await context.SaveChangesAsync();
+
+            Instant now = _factory.Clock.GetCurrentInstant();
+            Instant startTime = now + Duration.FromHours(2);
+            CreatePollResult created = await PollTestHelpers.BuildCreateUseCase(seedScope).ExecuteAsync(
+                new CreatePollCommand(
+                    organizerId,
+                    "Blocked requester inherited-access test",
+                    DurationMinutes: 60,
+                    Platform: null,
+                    Game: null,
+                    Notes: null,
+                    MinAttendance: 1,
+                    MaxCapacity: null,
+                    IsPrivate: false,
+                    OptionStartTimes: [startTime, startTime + Duration.FromHours(1)],
+                    DeadlineChoice: PollDeadlineChoice.Hours24,
+                    InviteeUserIds: [extenderId],
+                    GuestLinkCount: null),
+                default);
+            Assert.True(created.Succeeded, created.Code);
+            pollId = created.Poll!.Id;
+            // The extender is an Active registered participant with no votes yet -- PollVisibility's
+            // §7 rule 2 (ExtendsAccess) already admits that shape, so no vote is needed to prove the
+            // inherited path is genuinely open before the block shuts it.
+            Assert.Contains(created.Poll!.Participants, p => p.UserId == extenderId && p.IsActive);
         }
 
         await using AsyncServiceScope blockScope = _factory.Services.CreateAsyncScope();
-        AppDbContext context = blockScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        string username = (await context.DomainUsers.SingleAsync(u => u.Id == blockedRequesterId))
+        AppDbContext blockContext = blockScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        string username = (await blockContext.DomainUsers.SingleAsync(u => u.Id == blockedRequesterId))
             .Username!.Value.Value;
         Block block = Block.Create(organizerId, blockedRequesterId, Username.Create(username), _factory.Clock);
         _ = block.DequeueEvents();
-        context.Blocks.Add(block);
-        // A block clears the friendship (mirrors the shipped block executor's own effect); simulate
-        // that here without invoking the full block use case, since the pre-lock probe -- correctly --
-        // is blind to friendship once the pair is blocked, and this test targets the join-request
-        // command's own block-boundary check, not the block executor's roster-scrub. The friendship
-        // was already committed by the prior scope/SaveChanges above, so this query sees it.
-        Friendship existingFriendship = await context.Friendships.SingleAsync(f =>
-            (f.UserLoId == organizerId || f.UserHiId == organizerId)
-            && (f.UserLoId == blockedRequesterId || f.UserHiId == blockedRequesterId));
-        context.Friendships.Remove(existingFriendship);
-        await context.SaveChangesAsync();
+        blockContext.Blocks.Add(block);
+        await blockContext.SaveChangesAsync();
 
         await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
         PollJoinRequestCommandResult result = await PollTestHelpers.BuildJoinRequestUseCases(scope)
@@ -193,6 +256,133 @@ public sealed class PollJoinRequestTests : IAsyncLifetime, IDisposable
             Assert.False(result.Succeeded);
             Assert.Equal("poll_not_found", result.Code);
         }
+    }
+
+    /// <summary>
+    /// D-107: withdrawing a pending request frees the (poll, requester) partial unique index it held --
+    /// proven by a fresh RequestJoin succeeding afterward, which a still-open row (or a lingering
+    /// unique-violation) would reject.
+    /// </summary>
+    [Fact]
+    public async Task WithdrawJoinRequest_FreesThePartialUniqueForANewPendingRequest_D107()
+    {
+        (PollId pollId, UserId organizerId) = await SeedNonPrivatePollAsync();
+        UserId requesterId = await _factory.SeedUserAsync(email: $"poll-jr-withdraw-{Guid.NewGuid():N}@example.test");
+
+        await using (AsyncServiceScope friendScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = friendScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await PollTestHelpers.SeedAcceptedFriendshipAsync(context, organizerId, requesterId, _factory.Clock);
+            await context.SaveChangesAsync();
+        }
+
+        JoinRequestId firstRequestId;
+        await using (AsyncServiceScope requestScope = _factory.Services.CreateAsyncScope())
+        {
+            PollJoinRequestCommandResult firstRequest = await PollTestHelpers.BuildJoinRequestUseCases(requestScope)
+                .RequestJoinAsync(pollId, requesterId, default);
+            Assert.True(firstRequest.Succeeded, firstRequest.Code);
+            firstRequestId = firstRequest.JoinRequest!.Id;
+        }
+
+        await using (AsyncServiceScope withdrawScope = _factory.Services.CreateAsyncScope())
+        {
+            PollJoinRequestCommandResult withdrawResult = await PollTestHelpers.BuildJoinRequestUseCases(withdrawScope)
+                .WithdrawJoinRequestAsync(pollId, requesterId, default);
+            Assert.True(withdrawResult.Succeeded, withdrawResult.Code);
+        }
+
+        await using (AsyncServiceScope secondRequestScope = _factory.Services.CreateAsyncScope())
+        {
+            PollJoinRequestCommandResult secondRequest = await PollTestHelpers.BuildJoinRequestUseCases(secondRequestScope)
+                .RequestJoinAsync(pollId, requesterId, default);
+            Assert.True(secondRequest.Succeeded, secondRequest.Code);
+            Assert.NotEqual(firstRequestId, secondRequest.JoinRequest!.Id);
+        }
+
+        await using AsyncServiceScope verify = _factory.Services.CreateAsyncScope();
+        AppDbContext verifyContext = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(1, await verifyContext.JoinRequests
+            .CountAsync(r => r.PollId == pollId && r.RequesterId == requesterId && r.Status == JoinRequestStatus.Pending));
+    }
+
+    /// <summary>D-107: rejection notifies only the requester, who holds no participant row either way.</summary>
+    [Fact]
+    public async Task RejectJoinRequest_NotifiesOnlyTheRequester_D107()
+    {
+        (PollId pollId, UserId organizerId) = await SeedNonPrivatePollAsync();
+        UserId requesterId = await _factory.SeedUserAsync(email: $"poll-jr-reject-{Guid.NewGuid():N}@example.test");
+
+        await using (AsyncServiceScope friendScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = friendScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await PollTestHelpers.SeedAcceptedFriendshipAsync(context, organizerId, requesterId, _factory.Clock);
+            await context.SaveChangesAsync();
+        }
+
+        JoinRequestId requestId;
+        await using (AsyncServiceScope requestScope = _factory.Services.CreateAsyncScope())
+        {
+            PollJoinRequestCommandResult requestResult = await PollTestHelpers.BuildJoinRequestUseCases(requestScope)
+                .RequestJoinAsync(pollId, requesterId, default);
+            Assert.True(requestResult.Succeeded, requestResult.Code);
+            requestId = requestResult.JoinRequest!.Id;
+        }
+
+        await using AsyncServiceScope rejectScope = _factory.Services.CreateAsyncScope();
+        PollJoinRequestCommandResult rejectResult = await PollTestHelpers.BuildJoinRequestUseCases(rejectScope)
+            .RejectJoinRequestAsync(pollId, organizerId, requestId, default);
+        Assert.True(rejectResult.Succeeded, rejectResult.Code);
+
+        await using AsyncServiceScope verify = _factory.Services.CreateAsyncScope();
+        AppDbContext verifyContext = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(0, await verifyContext.Set<PollParticipant>().CountAsync(p => p.PollId == pollId && p.UserId == requesterId));
+        Notification notification = await verifyContext.Notifications
+            .SingleAsync(n => n.PollId == pollId && n.Type == NotificationType.PollJoinRequestRejected);
+        Assert.Equal(requesterId, notification.RecipientUserId);
+    }
+
+    /// <summary>
+    /// D-118: once the poll has left Polling (deadline reached), any still-pending request is Lapsed by
+    /// the same due-transition sweep RejectJoinRequest applies before re-checking pending status -- the
+    /// design's "no after-close reject semantics" surfaces as an invalid-transition error rather than a
+    /// silently-accepted reject on a request that is no longer actionable.
+    /// </summary>
+    [Fact]
+    public async Task RejectJoinRequest_AfterClose_SurfacesInvalidTransition_D118()
+    {
+        (PollId pollId, UserId organizerId) = await SeedNonPrivatePollAsync(PollDeadlineChoice.Hours6);
+        UserId requesterId = await _factory.SeedUserAsync(email: $"poll-jr-reject-close-{Guid.NewGuid():N}@example.test");
+
+        await using (AsyncServiceScope friendScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = friendScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await PollTestHelpers.SeedAcceptedFriendshipAsync(context, organizerId, requesterId, _factory.Clock);
+            await context.SaveChangesAsync();
+        }
+
+        JoinRequestId requestId;
+        await using (AsyncServiceScope requestScope = _factory.Services.CreateAsyncScope())
+        {
+            PollJoinRequestCommandResult requestResult = await PollTestHelpers.BuildJoinRequestUseCases(requestScope)
+                .RequestJoinAsync(pollId, requesterId, default);
+            Assert.True(requestResult.Succeeded, requestResult.Code);
+            requestId = requestResult.JoinRequest!.Id;
+        }
+
+        _factory.Clock.Advance(Duration.FromHours(7));
+
+        await using AsyncServiceScope rejectScope = _factory.Services.CreateAsyncScope();
+        PollJoinRequestCommandResult rejectResult = await PollTestHelpers.BuildJoinRequestUseCases(rejectScope)
+            .RejectJoinRequestAsync(pollId, organizerId, requestId, default);
+
+        Assert.False(rejectResult.Succeeded);
+        Assert.Equal("poll_invalid_transition", rejectResult.Code);
+
+        await using AsyncServiceScope verify = _factory.Services.CreateAsyncScope();
+        AppDbContext verifyContext = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        JoinRequest storedRequest = await verifyContext.JoinRequests.AsNoTracking().SingleAsync(r => r.Id == requestId);
+        Assert.Equal(JoinRequestStatus.Lapsed, storedRequest.Status);
     }
 
     private async Task<(PollId PollId, UserId OrganizerId)> SeedNonPrivatePollAsync(

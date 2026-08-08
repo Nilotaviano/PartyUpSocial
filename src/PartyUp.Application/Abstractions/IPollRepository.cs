@@ -7,9 +7,9 @@ namespace PartyUp.Application.Abstractions;
 /// <summary>
 /// The Poll aggregate's own persistence port, mirroring <see cref="ISessionRepository"/>
 /// (PHASE6_DESIGN.md §2). Every invariant-touching command loads through
-/// <see cref="LoadForUpdateAsync"/>, which locks the poll parent row before its deletedOptions,
+/// <see cref="LoadForUpdateAsync"/>, which locks the poll parent row before its options,
 /// participants, votes, join requests, guest identities and guest links are read — no
-/// occupancy/deletedOption-count query ever runs earlier (P3-LK-01, the poll parent's own analogue of
+/// occupancy/option-count query ever runs earlier (P3-LK-01, the poll parent's own analogue of
 /// A-068/A-069).
 /// </summary>
 public interface IPollRepository
@@ -17,9 +17,9 @@ public interface IPollRepository
     void Add(Poll poll);
 
     /// <summary>
-    /// <see cref="Poll.DeleteOption"/> removes the deletedOption (and cascades its votes) from the
-    /// aggregate's own in-memory collections only — the deletedOption/vote rows carry a required FK with no
-    /// cascade delete configured (D-080's "no floor" deletedOption semantics is a Restrict relationship, not
+    /// <see cref="Poll.DeleteOption"/> removes the option (and cascades its votes) from the
+    /// aggregate's own in-memory collections only — the option/vote rows carry a required FK with no
+    /// cascade delete configured (D-080's "no floor" option semantics is a Restrict relationship, not
     /// an owned/cascade one), so a collection-severance alone would surface an EF orphan exception
     /// rather than a delete. The application layer calls this explicitly, once, right after
     /// <see cref="Poll.DeleteOption"/> mutates the aggregate, to tell the change tracker these rows are

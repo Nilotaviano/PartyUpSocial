@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
 using PartyUp.Application.Polls;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Polls;
 using PartyUp.Infrastructure.Persistence;
 
@@ -137,6 +138,45 @@ public sealed class PollOptionTests : IAsyncLifetime, IDisposable
         Instant firstResponseAfter = (await verifyContext.Set<PollParticipant>()
             .SingleAsync(p => p.PollId == pollId && p.UserId == voterId)).FirstResponseAt!.Value;
         Assert.Equal(firstResponseBefore, firstResponseAfter);
+    }
+
+    /// <summary>
+    /// §10 recipients through the WIRED materializer, not a hand-rolled call to
+    /// <see cref="RecipientComputer.OptionSuggested"/>: a member suggesting produces exactly one
+    /// notification row addressed to the organizer.
+    /// </summary>
+    [Fact]
+    public async Task SuggestOption_ByMember_NotifiesOnlyTheOrganizer()
+    {
+        (PollId pollId, UserId organizerId, UserId voterId, Instant baseTime) = await SeedPollWithVoterAsync();
+
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        SuggestOptionResult result = await PollTestHelpers.BuildOptionUseCases(scope)
+            .SuggestOptionAsync(pollId, voterId, baseTime + Duration.FromHours(5), default);
+        Assert.True(result.Succeeded, result.Code);
+
+        await using AsyncServiceScope verify = _factory.Services.CreateAsyncScope();
+        AppDbContext verifyContext = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        Notification notification = await verifyContext.Notifications
+            .SingleAsync(n => n.PollId == pollId && n.Type == NotificationType.PollOptionSuggested);
+        Assert.Equal(organizerId, notification.RecipientUserId);
+    }
+
+    /// <summary>§10: the organizer suggesting their own option is silent -- no notification row at all.</summary>
+    [Fact]
+    public async Task SuggestOption_ByOrganizer_IsSilent()
+    {
+        (PollId pollId, UserId organizerId, UserId _, Instant baseTime) = await SeedPollWithVoterAsync();
+
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        SuggestOptionResult result = await PollTestHelpers.BuildOptionUseCases(scope)
+            .SuggestOptionAsync(pollId, organizerId, baseTime + Duration.FromHours(5), default);
+        Assert.True(result.Succeeded, result.Code);
+
+        await using AsyncServiceScope verify = _factory.Services.CreateAsyncScope();
+        AppDbContext verifyContext = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(0, await verifyContext.Notifications
+            .CountAsync(n => n.PollId == pollId && n.Type == NotificationType.PollOptionSuggested));
     }
 
     private async Task<(PollId PollId, UserId OrganizerId, UserId VoterId, Instant BaseStartTime)> SeedPollWithVoterAsync()

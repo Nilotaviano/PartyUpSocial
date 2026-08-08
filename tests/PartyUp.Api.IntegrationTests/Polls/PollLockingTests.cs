@@ -222,6 +222,72 @@ public sealed class PollLockingTests : IAsyncLifetime, IDisposable
         Assert.True(result.Succeeded, result.Code);
     }
 
+    /// <summary>
+    /// The users-before-poll ordering half of P3-LK-01 that <see cref="VoteCommandBlocksOnAnExternallyHeldPollParentLock"/>
+    /// cannot reach (that test's poll is contended, so it can't tell whether the blocking came from
+    /// the explicit <c>LockUsersAsync</c> call or from <c>LoadForUpdateAsync</c>'s own poll-row lock).
+    /// Here the poll is free and only the voter's <c>users</c> row is externally held: <see cref="PollVoteUseCases.VoteAsync"/>
+    /// must still block, proving the explicit <c>LockUsersAsync([actorId], ct)</c> call is itself
+    /// load-bearing. Removing that call would let the vote proceed uncontended (the poll is free) and
+    /// this test would go from red-on-purpose to green for the wrong reason -- it would complete well
+    /// under the 300 ms window instead of blocking, and the assertion below would fail.
+    /// </summary>
+    [Fact]
+    public async Task VoteCommandBlocksOnAnExternallyHeldUsersLock()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: "poll-lock-users-organizer@example.test");
+        UserId voterId = await _factory.SeedUserAsync(email: "poll-lock-users-voter@example.test");
+
+        PollId pollId;
+        PollOptionId optionId;
+        await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await PollTestHelpers.SeedAcceptedFriendshipAsync(context, organizerId, voterId, _factory.Clock);
+            await context.SaveChangesAsync();
+
+            Instant now = _factory.Clock.GetCurrentInstant();
+            CreatePollResult created = await PollTestHelpers.BuildCreateUseCase(seedScope).ExecuteAsync(
+                new CreatePollCommand(
+                    organizerId,
+                    "Users-lock order poll",
+                    DurationMinutes: 60,
+                    Platform: null,
+                    Game: null,
+                    Notes: null,
+                    MinAttendance: 1,
+                    MaxCapacity: null,
+                    IsPrivate: false,
+                    OptionStartTimes: [now + Duration.FromHours(2), now + Duration.FromHours(3)],
+                    DeadlineChoice: PollDeadlineChoice.Hours48,
+                    InviteeUserIds: [voterId],
+                    GuestLinkCount: null),
+                default);
+            Assert.True(created.Succeeded, created.Code);
+            pollId = created.Poll!.Id;
+            optionId = created.Poll!.Options[0].Id;
+        }
+
+        // Only the voter's users row is held -- the poll itself is completely free, isolating
+        // LockUsersAsync as the sole thing the vote command can be blocking on.
+        await using AsyncServiceScope holderScope = _factory.Services.CreateAsyncScope();
+        AppDbContext holderContext = holderScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await using var holderTransaction = await holderContext.Database.BeginTransactionAsync();
+        await holderContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM users WHERE id = {voterId.Value} FOR NO KEY UPDATE");
+
+        await using AsyncServiceScope commandScope = _factory.Services.CreateAsyncScope();
+        Task<PollCommandResult> voteTask = PollTestHelpers.BuildVoteUseCases(commandScope)
+            .VoteAsync(pollId, voterId, optionId, VoteChoice.Available, default);
+
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        Assert.False(voteTask.IsCompleted, "Vote must still be blocked on the externally held voter users row.");
+
+        await holderTransaction.RollbackAsync();
+        PollCommandResult result = await voteTask;
+        Assert.True(result.Succeeded, result.Code);
+    }
+
     private async Task<PollId> CreateBarePollAsync(UserId organizerId)
     {
         await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
