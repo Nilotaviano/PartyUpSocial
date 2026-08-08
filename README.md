@@ -23,7 +23,16 @@ Every friend group has the same problem: five people, five schedules, one game e
 
 PartyUp gives the whole friend group one place to **publish availability**, **propose sessions**, and **actually commit** — so the plan survives contact with real calendars.
 
-> 🚧 **Status:** in active development. The foundation (walking skeleton, CI/CD, deploy stack) is complete; product features are being built toward a single full-scope public launch. This repo is the real, working codebase — watch it grow.
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/welcome-dark.png">
+    <img src="docs/assets/welcome-light.png" alt="PartyUp welcome screen: 'Find time to play with your friends' beside a miniature availability week grid with a selected time band and a 21:00–23:00 session chip" width="820">
+  </picture>
+  <br>
+  <sub>The "Tabletop Club" identity — cardstock &amp; ink in the light, club-green after dark. The picture follows your theme.</sub>
+</div>
+
+> 🚧 **Status:** in active development. The foundation (walking skeleton, CI/CD, deploy stack), sessions, availability, and the full visual identity — light *and* dark, WCAG 2.2 AA with a zero-exclusion axe gate on every route in both themes — are live at [partyup.social](https://partyup.social). Polls are next; the launch is a single full-scope public release. This repo is the real, working codebase — watch it grow.
 
 ## ✨ What it does (launch scope)
 
