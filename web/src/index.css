@@ -1,1 +1,137 @@
 @import 'tailwindcss';
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@theme {
+  /* Colors — light ("daylight table"), PHASE5_1_DESIGN.md §1 */
+  --color-page: #f6f2e3;
+  --color-card: #fffdf5;
+  --color-ink: #20301c;
+  --color-ink-soft: #5f6b58;
+  --color-primary: #7cb518;
+  --color-primary-ink: #1b2408;
+  --color-accent: #ffd447;
+  --color-accent-ink: #1b2408;
+  --color-danger: #c43f1f;
+  --color-danger-ink: #ffffff;
+  --color-free: #d8efb8;
+  --color-free-ink: #33520a;
+  --color-maybe: #fff0b8;
+  --color-maybe-ink: #6e5500;
+  --color-busy: #efece0;
+  --color-busy-ink: #57534b;
+  --color-focus: #2b4ead;
+  --color-shadow: #20301c;
+  --color-qr: #fffdf5;
+  --color-qr-ink: #1b2408;
+
+  /* Radius */
+  --radius-card: 1.125rem;
+  --radius-control: 0.875rem;
+
+  /* Fonts */
+  --font-display: 'Gabarito Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Nunito Sans Variable', ui-sans-serif, system-ui, sans-serif;
+
+  /* Type scale — PHASE5_1_DESIGN.md §2 */
+  --text-display: 2.25rem;
+  --text-display--line-height: 1.05;
+  --text-h1: 1.75rem;
+  --text-h1--line-height: 1.2;
+  --text-h2: 1.375rem;
+  --text-h2--line-height: 1.25;
+  --text-h3: 1.125rem;
+  --text-h3--line-height: 1.3;
+  --text-body: 1rem;
+  --text-body--line-height: 1.55;
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.4;
+}
+
+/*
+ * Dark override ("club after dark"), PHASE5_1_DESIGN.md §1. Deliberately
+ * unlayered (not inside @layer) — unlayered rules beat @theme's layered
+ * :root output regardless of source order. --color-qr/-qr-ink are never
+ * overridden here (QR scannability).
+ */
+[data-theme='dark'] {
+  --color-page: #161d10;
+  --color-card: #212b18;
+  --color-ink: #ede8d4;
+  --color-ink-soft: #a8b09b;
+  --color-primary: #8fcb2b;
+  --color-primary-ink: #1b2408;
+  --color-accent: #ffd447;
+  --color-accent-ink: #1b2408;
+  --color-danger: #ff8a65;
+  --color-danger-ink: #1b2408;
+  --color-free: #2f4713;
+  --color-free-ink: #c9e89a;
+  --color-maybe: #4a3e0c;
+  --color-maybe-ink: #f2de8e;
+  --color-busy: #2a2e24;
+  --color-busy-ink: #b3afa3;
+  --color-focus: #9db4f5;
+  --color-shadow: rgba(237, 232, 212, 0.25);
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  [data-theme='dark'] {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-page font-body text-body text-ink;
+  }
+}
+
+/*
+ * Shadow recipe utilities via --color-shadow (PHASE5_1_DESIGN.md §1/§3).
+ * Defined as @utility, not Tailwind's --shadow-* theme namespace: that
+ * namespace emits its own box-shadow utilities and would collide.
+ */
+@utility shadow-offset-card {
+  box-shadow: 4px 4px 0 var(--color-shadow);
+}
+
+@utility shadow-offset-dialog {
+  box-shadow: 6px 6px 0 var(--color-shadow);
+}
+
+@utility shadow-offset-control {
+  box-shadow: 3px 3px 0 var(--color-shadow);
+}
+
+@utility shadow-offset-pressed {
+  box-shadow: 1px 1px 0 var(--color-shadow);
+}
+
+/* Belt-and-suspenders global focus rule, additive to per-element utilities (§3). */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}
+
+/* Migration bridge: un-restyled pages still use text-slate-500, which reads 4.24:1
+ * on the new cardstock page background — below AA. Remap it to ink-soft (5.02:1 on
+ * page, 5.53:1 on card) until slices S2-S5 replace the class; unlayered on purpose
+ * so it beats the utility. Delete with the last text-slate-500 call site. */
+.text-slate-500 {
+  color: var(--color-ink-soft);
+}
+
+/* Dialog pop motion (§3) — applied to an inner wrapper by ui/dialog.tsx. */
+@keyframes dialog-pop {
+  from {
+    transform: scale(0.96);
+  }
+  to {
+    transform: scale(1);
+  }
+}

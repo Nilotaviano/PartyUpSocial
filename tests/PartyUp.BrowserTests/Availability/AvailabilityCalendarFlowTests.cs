@@ -14,7 +14,7 @@ namespace PartyUp.BrowserTests.Availability;
 /// (`RateLimitPolicies.cs`) and the Chromium step's other classes in this collection
 /// (<c>SessionRegisteredFlowTests</c> 3, <c>SessionGuestFlowTests</c> 1, <c>AxeAuditTests</c> 1)
 /// already spend the whole budget, so this class registers exactly one account, shared (lazily,
-/// once) across both facts below — never a second.
+/// once) across the facts below — never a second.
 /// </para>
 /// </summary>
 [Trait("Category", "Integration")]
@@ -122,6 +122,50 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         Assert.True(b.X > a.X + 1, $"same-row cells must occupy distinct columns (got {a.X} vs {b.X})");
         Assert.True(Math.Abs(a.X - below!.X) < 1, $"same-column cells must share a left edge (got {a.X} vs {below.X})");
         Assert.True(below.Y > a.Y + 1, $"same-column cells must occupy distinct rows (got {a.Y} vs {below.Y})");
+    }
+
+    /// <summary>
+    /// Phase 5.1 S1 geometry gate (PHASE5_1_DESIGN.md §3 "Grid geometry gate"): the row-ordering
+    /// fact above passes at any height, so it is not a tripwire against the Gabarito/Nunito Sans
+    /// font swap moving row metrics. This fact pins the durable floor instead — every row's cells
+    /// are at least 44px tall (WCAG 2.2 target-size) and every row is the same height as the first
+    /// (no pixel-pinned baseline, since fonts legitimately move metrics slightly).
+    /// </summary>
+    [Fact]
+    public async Task GridCellsMeetGeometryFloor_D132()
+    {
+        RegisteredUser organizer = await GetOrganizerAsync();
+        IPage page = organizer.Page;
+
+        await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/calendar");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        ILocator grid = page.GetByRole(AriaRole.Grid);
+        ILocator rows = grid.Locator("[role=row]");
+        int rowCount = await rows.CountAsync();
+        Assert.True(rowCount >= 3, "expected several time-slot rows in the visible week");
+
+        double? firstRowHeight = null;
+        for (int rowIndex = 1; rowIndex < rowCount; rowIndex++)
+        {
+            ILocator cells = rows.Nth(rowIndex).Locator("[role=gridcell]");
+            int cellCount = await cells.CountAsync();
+            Assert.True(cellCount >= 1, $"row {rowIndex} has no gridcells");
+
+            for (int cellIndex = 0; cellIndex < cellCount; cellIndex++)
+            {
+                LocatorBoundingBoxResult? box = await cells.Nth(cellIndex).BoundingBoxAsync();
+                Assert.NotNull(box);
+                Assert.True(
+                    box!.Height >= 44,
+                    $"row {rowIndex} cell {cellIndex} is {box.Height}px tall, expected >= 44px");
+
+                firstRowHeight ??= box.Height;
+                Assert.True(
+                    Math.Abs(box.Height - firstRowHeight.Value) < 1,
+                    $"row {rowIndex} cell {cellIndex} height {box.Height} differs from row 1's {firstRowHeight}");
+            }
+        }
     }
 
     [Fact]

@@ -40,15 +40,15 @@ function AuthenticatedShell() {
   const { t } = useTranslation(['common', 'sessions', 'availability', 'home'])
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="min-h-screen bg-page text-ink">
+      <header className="border-b-2 border-ink bg-card">
         <nav
           aria-label={t('navigation.label')}
           className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3 sm:px-8"
         >
           <NavLink
             aria-label={t('navigation.home')}
-            className="mr-auto inline-flex min-h-11 items-center rounded-md font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+            className="mr-auto inline-flex min-h-11 items-center rounded-control font-display font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             end
             to="/app"
           >
@@ -56,10 +56,10 @@ function AuthenticatedShell() {
           </NavLink>
           <NavLink
             className={({ isActive }) =>
-              `inline-flex min-h-11 items-center rounded-md px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
+              `inline-flex min-h-11 items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 isActive
-                  ? 'bg-indigo-100 font-semibold text-indigo-950'
-                  : 'text-slate-700 hover:bg-slate-100'
+                  ? 'bg-primary font-semibold text-primary-ink'
+                  : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
               }`
             }
             to="/friends"
@@ -68,10 +68,10 @@ function AuthenticatedShell() {
           </NavLink>
           <NavLink
             className={({ isActive }) =>
-              `inline-flex min-h-11 items-center rounded-md px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
+              `inline-flex min-h-11 items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 isActive
-                  ? 'bg-indigo-100 font-semibold text-indigo-950'
-                  : 'text-slate-700 hover:bg-slate-100'
+                  ? 'bg-primary font-semibold text-primary-ink'
+                  : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
               }`
             }
             to="/sessions/upcoming"
@@ -80,10 +80,10 @@ function AuthenticatedShell() {
           </NavLink>
           <NavLink
             className={({ isActive }) =>
-              `inline-flex min-h-11 items-center rounded-md px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
+              `inline-flex min-h-11 items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 isActive
-                  ? 'bg-indigo-100 font-semibold text-indigo-950'
-                  : 'text-slate-700 hover:bg-slate-100'
+                  ? 'bg-primary font-semibold text-primary-ink'
+                  : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
               }`
             }
             to="/calendar"
@@ -92,10 +92,10 @@ function AuthenticatedShell() {
           </NavLink>
           <NavLink
             className={({ isActive }) =>
-              `inline-flex min-h-11 items-center rounded-md px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
+              `inline-flex min-h-11 items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 isActive
-                  ? 'bg-indigo-100 font-semibold text-indigo-950'
-                  : 'text-slate-700 hover:bg-slate-100'
+                  ? 'bg-primary font-semibold text-primary-ink'
+                  : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
               }`
             }
             to="/discover"
@@ -104,10 +104,10 @@ function AuthenticatedShell() {
           </NavLink>
           <NavLink
             className={({ isActive }) =>
-              `inline-flex min-h-11 items-center rounded-md px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
+              `inline-flex min-h-11 items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 isActive
-                  ? 'bg-indigo-100 font-semibold text-indigo-950'
-                  : 'text-slate-700 hover:bg-slate-100'
+                  ? 'bg-primary font-semibold text-primary-ink'
+                  : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
               }`
             }
             to="/settings/account"
