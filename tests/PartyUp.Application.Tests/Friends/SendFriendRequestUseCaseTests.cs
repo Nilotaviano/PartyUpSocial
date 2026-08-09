@@ -333,6 +333,9 @@ internal sealed class CommandNotificationRepository(List<string> calls) : INotif
         Added.Add(notification);
     }
 
+    public Task<Notification?> FindAsync(NotificationId id, CancellationToken cancellationToken) =>
+        Task.FromResult(Added.Find(notification => notification.Id == id));
+
     public Task AddSteamMatchIfAbsentAsync(
         Notification notification,
         CancellationToken cancellationToken) => Task.CompletedTask;

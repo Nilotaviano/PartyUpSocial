@@ -104,6 +104,9 @@ internal sealed class ConstraintViolatingNotificationRepository(
             (NotificationType)25;
     }
 
+    public Task<Notification?> FindAsync(NotificationId id, CancellationToken cancellationToken) =>
+        _inner.FindAsync(id, cancellationToken);
+
     public Task AddSteamMatchIfAbsentAsync(
         Notification notification,
         CancellationToken cancellationToken) =>

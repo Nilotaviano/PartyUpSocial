@@ -1,4 +1,5 @@
 using NodaTime;
+using PartyUp.Application.Push;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Notifications;
 
@@ -31,4 +32,15 @@ public interface IPushSubscriptionRepository
 
     /// <summary>§11 step 5: every subscription row for the user, active or already revoked.</summary>
     Task DeleteForUserAsync(UserId userId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// S3's fan-out source — the S1 verification carry: <c>user_id = recipient AND revoked_at IS NULL</c>
+    /// only, so a notification can never claim against another user's subscription.
+    /// </summary>
+    Task<IReadOnlyList<PushSubscriptionTarget>> ListActiveForUserAsync(
+        UserId userId,
+        CancellationToken cancellationToken);
+
+    /// <summary>§3's eviction rule: 404/410 revokes the subscription (already idempotent via <see cref="PushSubscription.Revoke"/>).</summary>
+    Task RevokeAsync(PushSubscriptionId id, IClock clock, CancellationToken cancellationToken);
 }

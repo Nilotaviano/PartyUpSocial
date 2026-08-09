@@ -81,6 +81,9 @@ internal sealed class FailingSteamImportNotificationRepository(
 
     public void Add(Notification notification) => inner.Add(notification);
 
+    public Task<Notification?> FindAsync(NotificationId id, CancellationToken cancellationToken) =>
+        inner.FindAsync(id, cancellationToken);
+
     public async Task AddSteamMatchIfAbsentAsync(
         Notification notification,
         CancellationToken cancellationToken)

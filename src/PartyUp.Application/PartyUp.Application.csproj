@@ -9,6 +9,10 @@
       <LogicalName>PartyUp.Application.Email.Templates.%(Filename)%(Extension)</LogicalName>
       <WithCulture>false</WithCulture>
     </EmbeddedResource>
+    <EmbeddedResource Include="Push\Templates\*">
+      <LogicalName>PartyUp.Application.Push.Templates.%(Filename)%(Extension)</LogicalName>
+      <WithCulture>false</WithCulture>
+    </EmbeddedResource>
     <EmbeddedResource Include="Text\Wordlists\*.txt">
       <LogicalName>PartyUp.Application.Text.Wordlists.%(Filename)%(Extension)</LogicalName>
       <WithCulture>false</WithCulture>

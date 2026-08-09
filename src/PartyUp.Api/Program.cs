@@ -29,6 +29,7 @@ using PartyUp.Infrastructure;
 using PartyUp.Infrastructure.Email;
 using PartyUp.Infrastructure.Jobs;
 using PartyUp.Infrastructure.Persistence;
+using PartyUp.Infrastructure.Push;
 using PartyUp.Infrastructure.Steam;
 using Serilog;
 using Serilog.Formatting.Compact;
@@ -55,6 +56,9 @@ builder.Services.AddSerilog((services, logger) =>
 });
 
 builder.Services.AddSingleton(new LoggingEmailSenderEnvironment(
+    builder.Environment.IsDevelopment(),
+    builder.Environment.ContentRootPath));
+builder.Services.AddSingleton(new LoggingPushSenderEnvironment(
     builder.Environment.IsDevelopment(),
     builder.Environment.ContentRootPath));
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -166,6 +170,18 @@ if (!builder.Environment.IsEnvironment("Testing"))
 {
     builder.Services.AddHangfireServer();
     builder.Services.AddHostedService<RecurringJobRegistrationService>();
+}
+
+// PHASE7_DESIGN.md §6: the browser lane's spawned-process trigger seam. Registered only when
+// Push:DispatchIntervalSeconds is set (the Playwright fixture passes it at 2s); production never sets
+// it and keeps the minutely Hangfire cadence above as the only one.
+int? pushDispatchIntervalSeconds = builder.Configuration.GetValue<int?>("Push:DispatchIntervalSeconds");
+if (pushDispatchIntervalSeconds is { } intervalSeconds && intervalSeconds > 0)
+{
+    builder.Services.AddHostedService(services => new PushDispatchTriggerService(
+        services.GetRequiredService<IServiceScopeFactory>(),
+        TimeSpan.FromSeconds(intervalSeconds),
+        services.GetRequiredService<ILogger<PushDispatchTriggerService>>()));
 }
 builder.Services.AddScoped<AuthenticateAndSignIn>();
 builder.Services.AddPartyUpCookieAuthentication(builder.Environment);

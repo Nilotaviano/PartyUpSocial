@@ -9,6 +9,9 @@ public sealed class NotificationRepository(AppDbContext context) : INotification
 {
     public void Add(Notification notification) => context.Notifications.Add(notification);
 
+    public Task<Notification?> FindAsync(NotificationId id, CancellationToken cancellationToken) =>
+        context.Notifications.AsNoTracking().FirstOrDefaultAsync(notification => notification.Id == id, cancellationToken);
+
     public async Task AddSteamMatchIfAbsentAsync(
         Notification notification,
         CancellationToken cancellationToken)

@@ -1,4 +1,5 @@
 using NodaTime;
+using PartyUp.Application.Push;
 using PartyUp.Domain.Kernel;
 
 namespace PartyUp.Application.Abstractions;
@@ -15,5 +16,14 @@ public interface INotificationPushSendRepository
         NotificationId notificationId,
         PushSubscriptionId pushSubscriptionId,
         IClock clock,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// S3's second transaction (§3's "Transaction boundary"): a single-statement, idempotent update of
+    /// one already-claimed send-log row, keyed on its own id — never re-derives which row to update.
+    /// </summary>
+    Task UpdateOutcomeAsync(
+        Guid sendLogId,
+        PushSendOutcome outcome,
         CancellationToken cancellationToken);
 }

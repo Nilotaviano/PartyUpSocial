@@ -176,6 +176,9 @@ public sealed class DeletionResultApplierTests
 
         public void Add(Notification notification) => Rows.Add(notification);
 
+        public Task<Notification?> FindAsync(NotificationId id, CancellationToken cancellationToken) =>
+            Task.FromResult(Rows.Find(row => row.Id == id));
+
         public Task AddSteamMatchIfAbsentAsync(
             Notification notification,
             CancellationToken cancellationToken) => throw new NotSupportedException();

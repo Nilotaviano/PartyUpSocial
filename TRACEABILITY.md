@@ -747,3 +747,62 @@ underlying `NotificationSubject` happens to carry one
 Infrastructure touch — every read goes through ports `SessionReadUseCases`/`PollReadUseCases` already use.
 **Not in this slice:** the HTTP list, dispatch-time `Skipped` marking, and the payload renderer — S3/S4
 own those; `IsSubjectReachableAsync` only exposes the same per-row answer for S3 to call.
+
+## Phase 7 slice S3 (transport + dispatch) test citations
+
+| Decision | Slice S3 citations |
+|---|---|
+| D-076 | `PushDispatchJobTests.UnreachableSubject_IsSkipped_D076` |
+| D-090/D-113/D-082 | `PushDispatchJobTests.WriteTimeMuteSuppressesThePush_WhileTheReminderStillDispatches_D090_D113_D082` |
+| D-113 | `PushDispatchJobTests.PostFinalizationPollMuteSuppressesViaOriginPollId_D113` |
+| D-167 | `PushDispatchJobTests.NoPushPathCanReachAGuestCredential_D167` |
+| D-112 | `PushTemplateRendererTests.Render_ResolvesEveryNotificationTypeAcrossEveryLocale_D112` |
+
+S3 ships PHASE7_DESIGN.md §3/§3.1/§6 whole: `IPushSender` (Application/Push, channel-scoped) with
+`WebPushSender` (Infrastructure, `Lib.Net.Http.WebPush`/RFC 8291+8292) and `LoggingPushSender`
+(Development-only throw guard, one JSON drop file per send containing `{subscriptionId, title, body,
+url, tag}` and never the endpoint/keys — `LoggingPushSenderTests.SendAsync_WritesOneDropFile_WithNoCredentialFields`),
+selected by the `Push:Provider` DI switch mirroring `Email:Provider`
+(`DependencyInjection.cs`). `PushPayloadFactory` + `EmbeddedPushTemplateRenderer` build `{title, body,
+url, tag}` from the S2 projection through embedded per-locale resources keyed
+`PartyUp.Application.Push.Templates.{NotificationType}.{locale}.{part}` — every `NotificationType` member
+crosses every shipped locale and both parts, closed over the enum
+(`PushTemplateRendererTests.Render_ResolvesEveryNotificationTypeAcrossEveryLocale_D112`).
+
+`PushDispatchJob` (Hangfire, `Cron.Minutely`, `[DisableConcurrentExecution]`) pages `dispatch_state = 0`
+through the new `INotificationDispatchRepository` and resolves each row to exactly one terminal
+transition: past the 24 h lateness ceiling (ruling 6) → `Skipped`
+(`PushDispatchJobTests.StalePendingRow_PastTheLatenessCeiling_IsSkipped_Ruling6`); the dispatch-time
+3-arm mute join (`poll_id` direct, `session_id` direct, or `session_id` reached through
+`sessions.origin_poll_id`) → `Skipped`, with the `SessionReminder` exemption proven both ways in the same
+test; subject unreachable through the S2 projection → `Skipped`; zero live subscriptions → `Dispatched`
+with no send-log rows (`PushDispatchJobTests.ZeroSubscriptions_DispatchesWithNoSendLogRows`); otherwise
+fan-out claims (`INotificationPushSendRepository.ClaimAsync`, unchanged from S1) then sends, with the
+coverage completion (`TryCompleteDispatchIfCoveredAsync`, a single atomic `NOT EXISTS` UPDATE) proven both
+for the crash case — a claimed-but-unwritten row re-pages once and reaches `Dispatched` with zero further
+sends (`PushDispatchJobTests.ClaimedButUnwrittenRow_RepagesOnceThenReachesDispatched_WithNoSecondSend`) —
+and for two workers racing the identical notification, which send exactly once per subscription because
+the unique constraint (not the Hangfire lock) is the guarantee
+(`PushDispatchJobTests.ConcurrentWorkers_SendExactlyOncePerSubscription_D082Analogue`, mirroring
+`ReminderDueJobTests.ConcurrentWorkers_CreateExactlyOneReminderNotification_D082`). Eviction: 410 →
+`Gone` + subscription revoked; 5xx → `Failed`, no retry, subscription intact — both proven in the same
+test against a real Postgres send-log and subscription row
+(`PushDispatchJobTests.GoneOutcomeRevokesTheSubscription_And_ServerErrorLeavesItIntactWithNoRetry`). The
+S1 verification carry — a notification can never claim against another user's subscription — is pinned by
+`PushDispatchJobTests.NeverClaimsAgainstAnotherUsersSubscription`, and D-167 (guests hold no channel at
+any layer) by `PushDispatchJobTests.NoPushPathCanReachAGuestCredential_D167`, resting on the S1-proven
+`push_subscriptions.user_id` FK to `users`.
+
+`PushSendLogPruneJob` (daily) deletes send-log rows past the 30-day retention (ruling 8).
+`PushDispatchTriggerService` (`src/PartyUp.Api/Hosting`, A-037 `PeriodicTimer` precedent) is the S6
+browser-lane trigger seam, registered only when `Push:DispatchIntervalSeconds` is configured; production
+never sets it. Both new jobs join `RecurringJobRegistrationService`'s registration, growing the pinned
+job-id set from four to six
+(`RecurringJobRegistrationServiceRetryTests.RegistersExactlyTheSixRecurringJobs_A066`).
+
+**Port extensions (S1 ports, listed per the S3 ticket's carry):** `INotificationRepository.FindAsync`;
+`INotificationPushSendRepository.UpdateOutcomeAsync`; `IPushSubscriptionRepository.ListActiveForUserAsync`
++ `.RevokeAsync`. **New port:** `INotificationDispatchRepository` (paging + the two atomic transitions +
+the mute join), Infrastructure-implemented by `NotificationDispatchRepository`. **Not in this slice:** the
+HTTP surface, the mute write path, and the reminder-default replan — S4 owns those; the web enable flow,
+preferences and `PlaywrightFixture` wiring — S5/S6 own those.

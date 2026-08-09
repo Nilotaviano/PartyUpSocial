@@ -1,0 +1,1 @@
+Se sugirió un nuevo horario para {{SubjectTitle}}: {{OptionStart}}.

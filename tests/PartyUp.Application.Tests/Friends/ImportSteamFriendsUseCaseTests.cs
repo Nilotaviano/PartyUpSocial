@@ -313,6 +313,9 @@ internal sealed class SteamImportNotificationRepository : INotificationRepositor
 
     public void Add(Notification notification) => Added.Add(notification);
 
+    public Task<Notification?> FindAsync(NotificationId id, CancellationToken cancellationToken) =>
+        Task.FromResult(Added.Find(notification => notification.Id == id));
+
     public Task AddSteamMatchIfAbsentAsync(
         Notification notification,
         CancellationToken cancellationToken)

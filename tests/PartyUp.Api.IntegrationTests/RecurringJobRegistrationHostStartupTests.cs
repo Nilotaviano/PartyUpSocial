@@ -114,15 +114,16 @@ public sealed class RecurringJobRegistrationServiceRetryTests
     /// <summary>
     /// PHASE5_DESIGN.md §7/§11: Phase 5 adds no Hangfire job and raises no notification event. Phase 6
     /// S3 adds the poll analogues (PHASE6_DESIGN.md §3) — the due sweep and the D-120
-    /// deadline-approaching notice — bringing the registered set to four. Asserted here, against the
-    /// same real <see cref="RecurringJobRegistrationService"/> production registration path the retry
-    /// tests above drive — no host, no environment name, no Hangfire storage — rather than from an
-    /// integration test under the "Testing" host, which observes an empty registration set by
-    /// construction (<c>Program.cs</c>, <c>PartyUpApiFactory.cs</c>, ARCHITECTURE.md:217) and so could
-    /// never fail if a slice added a fifth job.
+    /// deadline-approaching notice — bringing the registered set to four. Phase 7 S3 adds the push
+    /// dispatch job and the send-log prune job (PHASE7_DESIGN.md §3), bringing it to six. Asserted
+    /// here, against the same real <see cref="RecurringJobRegistrationService"/> production
+    /// registration path the retry tests above drive — no host, no environment name, no Hangfire
+    /// storage — rather than from an integration test under the "Testing" host, which observes an
+    /// empty registration set by construction (<c>Program.cs</c>, <c>PartyUpApiFactory.cs</c>,
+    /// ARCHITECTURE.md:217) and so could never fail if a slice added a seventh job.
     /// </summary>
     [Fact]
-    public async Task RegistersExactlyTheFourRecurringJobs_A066()
+    public async Task RegistersExactlyTheSixRecurringJobs_A066()
     {
         var manager = new RecordingRecurringJobManager();
         ServiceProvider provider = new ServiceCollection()
@@ -133,7 +134,7 @@ public sealed class RecurringJobRegistrationServiceRetryTests
             NullLogger<RecurringJobRegistrationService>.Instance);
 
         await service.StartAsync(CancellationToken.None);
-        await WaitUntilAsync(() => manager.RegisteredJobIds.Count >= 4, TimeSpan.FromSeconds(5));
+        await WaitUntilAsync(() => manager.RegisteredJobIds.Count >= 6, TimeSpan.FromSeconds(5));
         await service.StopAsync(CancellationToken.None);
 
         Assert.Equal(
@@ -143,6 +144,8 @@ public sealed class RecurringJobRegistrationServiceRetryTests
                 "session-reminder-due",
                 "poll-due-sweep",
                 "poll-deadline-approaching",
+                "push-dispatch",
+                "push-send-log-prune",
             },
             manager.RegisteredJobIds);
     }

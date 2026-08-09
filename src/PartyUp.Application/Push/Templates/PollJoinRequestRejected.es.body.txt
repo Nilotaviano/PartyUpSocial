@@ -1,0 +1,1 @@
+Tu solicitud para {{SubjectTitle}} fue rechazada.

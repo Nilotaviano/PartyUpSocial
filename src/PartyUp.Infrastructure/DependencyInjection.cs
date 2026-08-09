@@ -9,7 +9,9 @@ using PartyUp.Application.Auth;
 using PartyUp.Application.Availability;
 using PartyUp.Application.Email;
 using PartyUp.Application.Friends;
+using PartyUp.Application.Notifications;
 using PartyUp.Application.Polls;
+using PartyUp.Application.Push;
 using PartyUp.Application.Sessions;
 using PartyUp.Application.Text;
 using PartyUp.Infrastructure.Accounts;
@@ -21,6 +23,7 @@ using PartyUp.Infrastructure.Identity;
 using PartyUp.Infrastructure.Jobs;
 using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Persistence.Repositories;
+using PartyUp.Infrastructure.Push;
 using PartyUp.Infrastructure.Sessions;
 using PartyUp.Infrastructure.Steam;
 
@@ -66,6 +69,8 @@ public static class DependencyInjection
         services.AddScoped<IPushSubscriptionRepository, PushSubscriptionRepository>();
         services.AddScoped<INotificationPushSendRepository, NotificationPushSendRepository>();
         services.AddScoped<INotificationMuteRepository, NotificationMuteRepository>();
+        services.AddScoped<INotificationDispatchRepository, NotificationDispatchRepository>();
+        services.AddScoped<NotificationReadUseCases>();
         services.AddScoped<IFriendPairLocker, FriendPairLocker>();
         services.AddScoped<IUserGraphResolver, UserGraphResolver>();
         services.AddScoped<IFriendCodeGenerator, FriendCodeGenerator>();
@@ -128,6 +133,9 @@ public static class DependencyInjection
         services.AddScoped<PollDueCandidateStore>();
         services.AddScoped<PollDueSweepJob>();
         services.AddScoped<PollDeadlineApproachingJob>();
+        services.AddScoped<PushPayloadFactory>();
+        services.AddScoped<PushDispatchJob>();
+        services.AddScoped<PushSendLogPruneJob>();
         // SessionDeletionEffectsUseCase depends on ExecuteDeletionForUserUseCase; both are registered
         // here (rather than split with Program.cs) so a caller only needs to add IClock (registered in
         // Program.cs, not here) alongside AddInfrastructure to resolve the whole graph.
@@ -166,6 +174,7 @@ public static class DependencyInjection
                 configuration["Steam:ApiKey"]));
         services.AddSingleton<IDateTimeZoneProvider>(DateTimeZoneProviders.Tzdb);
         services.AddSingleton<IEmailTemplateRenderer, EmbeddedEmailTemplateRenderer>();
+        services.AddSingleton<IPushTemplateRenderer, EmbeddedPushTemplateRenderer>();
         services.AddSingleton<ChannelEmailDispatcher>();
         services.AddSingleton<IEmailDispatcher>(services =>
             services.GetRequiredService<ChannelEmailDispatcher>());
@@ -179,6 +188,17 @@ public static class DependencyInjection
                 "smtp" => ActivatorUtilities.CreateInstance<SmtpEmailSender>(provider),
                 _ => throw new InvalidOperationException(
                     $"Unsupported Email:Provider '{configured}'."),
+            };
+        });
+        services.AddSingleton<IPushSender>(provider =>
+        {
+            string configured = configuration["Push:Provider"]?.Trim() ?? "log";
+            return configured.ToLowerInvariant() switch
+            {
+                "log" => ActivatorUtilities.CreateInstance<LoggingPushSender>(provider),
+                "webpush" => ActivatorUtilities.CreateInstance<WebPushSender>(provider),
+                _ => throw new InvalidOperationException(
+                    $"Unsupported Push:Provider '{configured}'."),
             };
         });
 

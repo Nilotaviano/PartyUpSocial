@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Push;
 using PartyUp.Domain.Kernel;
 
 namespace PartyUp.Infrastructure.Persistence.Repositories;
@@ -24,4 +25,13 @@ public sealed class NotificationPushSendRepository(AppDbContext context) : INoti
 
         return claimed.Count > 0 ? claimed[0] : null;
     }
+
+    public async Task UpdateOutcomeAsync(
+        Guid sendLogId,
+        PushSendOutcome outcome,
+        CancellationToken cancellationToken) =>
+        await context.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE notification_push_sends SET outcome = {(short)outcome}
+            WHERE id = {sendLogId}
+            """, cancellationToken);
 }

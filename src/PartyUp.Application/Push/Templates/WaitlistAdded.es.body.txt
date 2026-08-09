@@ -1,0 +1,1 @@
+Estás en la lista de espera de {{SubjectTitle}}.
