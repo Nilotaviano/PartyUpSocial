@@ -9,6 +9,7 @@ import enErrors from './en/errors.json'
 import enFriends from './en/friends.json'
 import enHome from './en/home.json'
 import enOnboarding from './en/onboarding.json'
+import enPolls from './en/polls.json'
 import enProfile from './en/profile.json'
 import enSessions from './en/sessions.json'
 import enSettings from './en/settings.json'
@@ -19,6 +20,7 @@ import esErrors from './es/errors.json'
 import esFriends from './es/friends.json'
 import esHome from './es/home.json'
 import esOnboarding from './es/onboarding.json'
+import esPolls from './es/polls.json'
 import esProfile from './es/profile.json'
 import esSessions from './es/sessions.json'
 import esSettings from './es/settings.json'
@@ -29,6 +31,7 @@ import ptBRErrors from './pt-BR/errors.json'
 import ptBRFriends from './pt-BR/friends.json'
 import ptBRHome from './pt-BR/home.json'
 import ptBROnboarding from './pt-BR/onboarding.json'
+import ptBRPolls from './pt-BR/polls.json'
 import ptBRProfile from './pt-BR/profile.json'
 import ptBRSessions from './pt-BR/sessions.json'
 import ptBRSettings from './pt-BR/settings.json'
@@ -46,6 +49,7 @@ export const resources = {
     sessions: enSessions,
     availability: enAvailability,
     home: enHome,
+    polls: enPolls,
   },
   'pt-BR': {
     common: ptBRCommon,
@@ -58,6 +62,7 @@ export const resources = {
     sessions: ptBRSessions,
     availability: ptBRAvailability,
     home: ptBRHome,
+    polls: ptBRPolls,
   },
   es: {
     common: esCommon,
@@ -70,6 +75,7 @@ export const resources = {
     sessions: esSessions,
     availability: esAvailability,
     home: esHome,
+    polls: esPolls,
   },
 }
 
@@ -91,6 +97,7 @@ void i18n
       'sessions',
       'availability',
       'home',
+      'polls',
     ],
     resources,
     interpolation: {

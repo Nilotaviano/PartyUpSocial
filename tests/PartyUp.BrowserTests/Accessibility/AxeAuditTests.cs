@@ -50,6 +50,7 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
         string SessionId,
         string GuestLinkUrl,
         string OwnFriendCode,
+        string PollId,
         IReadOnlyDictionary<(string Step, AuditedTheme Theme), AxeResultItem[]> OnboardingFindings);
 
     /// <summary>
@@ -138,7 +139,16 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
             // created above already populates the `sessions` layer for this same account.
             await SeedWeeklyAvailabilityAsync(organizer.Page);
 
-            _context = new AuditContext(organizer, sessionId, guestLinkUrl, ownFriendCode, onboardingFindings);
+            // Phase 6 S5 (PHASE6_DESIGN.md §5/§6, ticket-P6-S5): one live poll — organizer, two
+            // options and a guest link, all minted through the same `/polls/new` create form
+            // (`CreatePollRequest.guestLinkCount` mints the link at creation, so no separate
+            // invite-page round trip is needed the way the session flow above needs one — polls has
+            // no invite/guest-management page yet, that UI is S6). Private, mirroring the session
+            // fixture's own private-poll choice (D-125 exempts a private poll from needing an
+            // invited friend), on the organizer's already-open, already-authenticated context.
+            string pollId = await CreatePollFixtureAsync(organizer.Page);
+
+            _context = new AuditContext(organizer, sessionId, guestLinkUrl, ownFriendCode, pollId, onboardingFindings);
             return _context;
         }
         finally
@@ -189,6 +199,33 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
         {
             throw new InvalidOperationException("Availability series seed returned no data.");
         }
+    }
+
+    /// <summary>
+    /// Drives the real `/polls/new` create form (PollCreatePage.tsx) to mint the live poll the
+    /// `polls`/`poll-detail` audit routes below resolve `{pollId}` against — two candidate times
+    /// (D-131's minimum), a guest link (D-125's private-guest-only arm, `guestLinkCount: 1`) and
+    /// no invited friend, mirroring the session fixture's own private-session choice above.
+    /// </summary>
+    private static async Task<string> CreatePollFixtureAsync(IPage page)
+    {
+        await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/polls/new");
+        await page.Locator("#field-title").FillAsync("Axe audit poll");
+
+        string optionOne = DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
+        string optionTwo = DateTime.UtcNow.AddDays(2).ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
+        await page.Locator("#field-option-value").FillAsync(optionOne);
+        await page.GetByRole(AriaRole.Button, new() { Name = "Add time" }).ClickAsync();
+        await page.Locator("#field-option-value").FillAsync(optionTwo);
+        await page.GetByRole(AriaRole.Button, new() { Name = "Add time" }).ClickAsync();
+
+        await page.Locator("#field-min").FillAsync("1");
+        await page.Locator("#field-max").FillAsync("4");
+        await page.GetByLabel("Private poll").CheckAsync();
+        await page.Locator("#field-guest-links").FillAsync("1");
+        await page.GetByRole(AriaRole.Button, new() { Name = "Create poll" }).ClickAsync();
+        await page.WaitForURLAsync(url => Regex.IsMatch(url, @"/polls/[0-9a-fA-F-]{36}$"));
+        return new Uri(page.Url).Segments[^1];
     }
 
     private static async Task<AxeResultItem[]> RunAxeAsync(IPage page)
@@ -282,7 +319,8 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
                 string path = route.PathTemplate
                     .Replace("{sessionId}", context.SessionId, StringComparison.Ordinal)
                     .Replace("{username}", context.Organizer.Username, StringComparison.Ordinal)
-                    .Replace("{code}", context.OwnFriendCode, StringComparison.Ordinal);
+                    .Replace("{code}", context.OwnFriendCode, StringComparison.Ordinal)
+                    .Replace("{pollId}", context.PollId, StringComparison.Ordinal);
                 // A fresh tab on the organizer's own authenticated context (never the organizer's
                 // persistent page) — shares its cookies so the route still renders signed-in, but
                 // never navigated before, so the theme seed below is guaranteed to land before this

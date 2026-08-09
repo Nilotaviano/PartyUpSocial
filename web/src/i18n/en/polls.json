@@ -1,0 +1,120 @@
+{
+  "nav": {
+    "polls": "Polls"
+  },
+  "create": {
+    "heading": "New poll",
+    "title": "Title",
+    "options": "Candidate times",
+    "optionsHelp": "Add at least two candidate times. Adding the same time twice merges it into one option.",
+    "addOption": "Add time",
+    "removeOption": "Remove",
+    "optionMerged": "That time was already added.",
+    "deadline": "Voting deadline",
+    "deadlineChoice": {
+      "hours6": "6 hours",
+      "hours12": "12 hours",
+      "hours24": "24 hours",
+      "hours48": "48 hours"
+    },
+    "duration": "Duration",
+    "platform": "Platform",
+    "game": "Game",
+    "gameCatalog": "Choose from Steam",
+    "gameFreeText": "Enter a game name",
+    "notes": "Notes",
+    "min": "Minimum attendance",
+    "max": "Maximum capacity",
+    "unlimited": "Unlimited capacity",
+    "private": "Private poll",
+    "invitees": "Invite friends",
+    "guestLinks": "Guest links",
+    "defaults": "Defaults: 4 minimum, 4 maximum, 2 hours, 24-hour deadline, no platform, not private.",
+    "submit": "Create poll",
+    "platformOther": "Other",
+    "steamAppId": "Steam app ID"
+  },
+  "validation": {
+    "required": "This field is required.",
+    "range": "Enter a value in the allowed range.",
+    "increment": "Choose a time in 15-minute increments.",
+    "minMax": "Minimum attendance cannot exceed maximum capacity.",
+    "invitedFriend": "A non-private poll needs at least one invited friend.",
+    "tooManyInvitees": "You can invite up to 50 friends.",
+    "tooManyGuestLinks": "You can create up to 20 guest links.",
+    "optionMinimum": "Add at least two candidate times.",
+    "optionCap": "A poll can have at most 12 candidate times."
+  },
+  "list": {
+    "heading": "Polls",
+    "involved": "Your polls",
+    "discoverable": "Discover",
+    "emptyInvolved": "You have no active polls.",
+    "emptyDiscoverable": "No open polls to discover right now.",
+    "loadMore": "Load more",
+    "optionCount": "{{count}} option",
+    "optionCount_other": "{{count}} options"
+  },
+  "status": {
+    "pollingUntil": "Polling · closes {{deadline}}",
+    "awaitingSelection": "Closed · awaiting selection",
+    "closed": "Closed",
+    "finalized": "Finalized",
+    "expired": "Expired",
+    "canceled": "Canceled"
+  },
+  "detail": {
+    "options": "Options",
+    "roster": "Voters",
+    "anonymous": "Anonymous User",
+    "removed": "Removed",
+    "deadline": "Voting closes {{deadline}}.",
+    "awaitingSelectionNotice": "Voting has closed. The organizer is choosing a time.",
+    "finalizedNotice": "This poll was finalized.",
+    "viewSession": "View the session",
+    "expiredNotice": "This poll expired without a selection.",
+    "canceledNotice": "This poll was canceled.",
+    "tallyAvailable": "{{count}} available",
+    "tallyMaybe": "{{count}} maybe",
+    "tallyUnavailable": "{{count}} unavailable",
+    "tallyNone": "No votes yet.",
+    "yourVote": "Your vote: {{value}}",
+    "noVoteYet": "You have not voted on this option yet."
+  },
+  "vote": {
+    "available": "Available",
+    "maybe": "Maybe",
+    "unavailable": "Unavailable"
+  },
+  "dirty": {
+    "title": "Discard unsaved changes?",
+    "body": "You have unsaved changes. If you leave now, they will be lost.",
+    "stay": "Cancel",
+    "discard": "Discard"
+  },
+  "errors": {
+    "generic": "Something went wrong.",
+    "codes": {
+      "poll_not_found": "That poll could not be found.",
+      "poll_validation": "Check the highlighted fields and try again.",
+      "poll_option_cap": "A poll can have at most 12 candidate times.",
+      "poll_option_not_found": "That option could not be found.",
+      "poll_voting_closed": "Voting has closed for this poll.",
+      "poll_terminal": "This poll can no longer be changed.",
+      "poll_invalid_transition": "That change is no longer possible.",
+      "poll_participant_removed": "You no longer have access to this poll.",
+      "poll_conflict": "This poll changed elsewhere. Please try again.",
+      "poll_guest_not_found": "That guest could not be found.",
+      "poll_selection_window_closed": "The selection window for this poll has closed.",
+      "poll_zero_options": "This poll has no remaining options.",
+      "invalid_scope": "That poll list is not valid.",
+      "invalid_cursor": "That page of results is no longer valid.",
+      "rate_limited": "Too many attempts. Try again later."
+    }
+  },
+  "a11y": {
+    "rosterLabel": "Poll voters",
+    "validationSummary": "There were problems with your submission",
+    "dialogLabel": "Confirmation dialog"
+  }
+}

@@ -66,5 +66,11 @@ public static class AuditedRoutes
         new AuditedRoute("session-edit", "/sessions/{sessionId}/edit"),
         new AuditedRoute("session-invite", "/sessions/{sessionId}/invite"),
         new AuditedRoute("guest-session", "/guest/{guestLinkId}", RequiresGuestLink: true),
+        // Phase 6 S5 (PHASE6_DESIGN.md §5/§6, ticket-P6-S5): create + list (both
+        // bands) + read-only detail. Voting grid/suggest/guest voting routes stay
+        // out until S6.
+        new AuditedRoute("polls-new", "/polls/new"),
+        new AuditedRoute("polls", "/polls"),
+        new AuditedRoute("poll-detail", "/polls/{pollId}"),
     ];
 }

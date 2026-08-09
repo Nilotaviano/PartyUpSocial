@@ -1,0 +1,120 @@
+{
+  "nav": {
+    "polls": "Encuestas"
+  },
+  "create": {
+    "heading": "Nueva encuesta",
+    "title": "Título",
+    "options": "Horarios candidatos",
+    "optionsHelp": "Agrega al menos dos horarios candidatos. Agregar el mismo horario dos veces lo fusiona en una sola opción.",
+    "addOption": "Agregar horario",
+    "removeOption": "Quitar",
+    "optionMerged": "Ese horario ya se había agregado.",
+    "deadline": "Plazo de votación",
+    "deadlineChoice": {
+      "hours6": "6 horas",
+      "hours12": "12 horas",
+      "hours24": "24 horas",
+      "hours48": "48 horas"
+    },
+    "duration": "Duración",
+    "platform": "Plataforma",
+    "game": "Juego",
+    "gameCatalog": "Elegir de Steam",
+    "gameFreeText": "Escribir el nombre del juego",
+    "notes": "Notas",
+    "min": "Asistencia mínima",
+    "max": "Capacidad máxima",
+    "unlimited": "Capacidad ilimitada",
+    "private": "Encuesta privada",
+    "invitees": "Invitar amigos",
+    "guestLinks": "Enlaces de invitado",
+    "defaults": "Valores predeterminados: mínimo 4, máximo 4, 2 horas, plazo de 24 horas, sin plataforma, no privada.",
+    "submit": "Crear encuesta",
+    "platformOther": "Otra",
+    "steamAppId": "ID de app de Steam"
+  },
+  "validation": {
+    "required": "Este campo es obligatorio.",
+    "range": "Ingresa un valor dentro del rango permitido.",
+    "increment": "Elige un horario en incrementos de 15 minutos.",
+    "minMax": "La asistencia mínima no puede superar la capacidad máxima.",
+    "invitedFriend": "Una encuesta no privada necesita al menos un amigo invitado.",
+    "tooManyInvitees": "Puedes invitar hasta 50 amigos.",
+    "tooManyGuestLinks": "Puedes crear hasta 20 enlaces de invitado.",
+    "optionMinimum": "Agrega al menos dos horarios candidatos.",
+    "optionCap": "Una encuesta puede tener como máximo 12 horarios candidatos."
+  },
+  "list": {
+    "heading": "Encuestas",
+    "involved": "Tus encuestas",
+    "discoverable": "Descubrir",
+    "emptyInvolved": "No tienes encuestas activas.",
+    "emptyDiscoverable": "No hay encuestas abiertas para descubrir por ahora.",
+    "loadMore": "Cargar más",
+    "optionCount": "{{count}} opción",
+    "optionCount_other": "{{count}} opciones"
+  },
+  "status": {
+    "pollingUntil": "Votando · cierra {{deadline}}",
+    "awaitingSelection": "Cerrada · en espera de selección",
+    "closed": "Cerrada",
+    "finalized": "Finalizada",
+    "expired": "Vencida",
+    "canceled": "Cancelada"
+  },
+  "detail": {
+    "options": "Opciones",
+    "roster": "Votantes",
+    "anonymous": "Usuario anónimo",
+    "removed": "Eliminado",
+    "deadline": "La votación cierra {{deadline}}.",
+    "awaitingSelectionNotice": "La votación cerró. El organizador está eligiendo un horario.",
+    "finalizedNotice": "Esta encuesta fue finalizada.",
+    "viewSession": "Ver la sesión",
+    "expiredNotice": "Esta encuesta venció sin una selección.",
+    "canceledNotice": "Esta encuesta fue cancelada.",
+    "tallyAvailable": "{{count}} disponible",
+    "tallyMaybe": "{{count}} tal vez",
+    "tallyUnavailable": "{{count}} no disponible",
+    "tallyNone": "Aún no hay votos.",
+    "yourVote": "Tu voto: {{value}}",
+    "noVoteYet": "Aún no has votado en esta opción."
+  },
+  "vote": {
+    "available": "Disponible",
+    "maybe": "Tal vez",
+    "unavailable": "No disponible"
+  },
+  "dirty": {
+    "title": "¿Descartar los cambios sin guardar?",
+    "body": "Tienes cambios sin guardar. Si sales ahora, se perderán.",
+    "stay": "Cancelar",
+    "discard": "Descartar"
+  },
+  "errors": {
+    "generic": "Algo salió mal.",
+    "codes": {
+      "poll_not_found": "No se pudo encontrar esa encuesta.",
+      "poll_validation": "Revisa los campos resaltados e inténtalo de nuevo.",
+      "poll_option_cap": "Una encuesta puede tener como máximo 12 horarios candidatos.",
+      "poll_option_not_found": "No se pudo encontrar esa opción.",
+      "poll_voting_closed": "La votación cerró para esta encuesta.",
+      "poll_terminal": "Esta encuesta ya no se puede modificar.",
+      "poll_invalid_transition": "Ese cambio ya no es posible.",
+      "poll_participant_removed": "Ya no tienes acceso a esta encuesta.",
+      "poll_conflict": "Esta encuesta cambió en otro lugar. Inténtalo de nuevo.",
+      "poll_guest_not_found": "No se pudo encontrar a ese invitado.",
+      "poll_selection_window_closed": "La ventana de selección de esta encuesta cerró.",
+      "poll_zero_options": "Esta encuesta no tiene opciones restantes.",
+      "invalid_scope": "Esa lista de encuestas no es válida.",
+      "invalid_cursor": "Esa página de resultados ya no es válida.",
+      "rate_limited": "Demasiados intentos. Inténtalo de nuevo más tarde."
+    }
+  },
+  "a11y": {
+    "rosterLabel": "Votantes de la encuesta",
+    "validationSummary": "Hubo problemas con tu envío",
+    "dialogLabel": "Cuadro de confirmación"
+  }
+}

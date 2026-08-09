@@ -1,0 +1,120 @@
+{
+  "nav": {
+    "polls": "Enquetes"
+  },
+  "create": {
+    "heading": "Nova enquete",
+    "title": "Título",
+    "options": "Horários candidatos",
+    "optionsHelp": "Adicione pelo menos dois horários candidatos. Adicionar o mesmo horário duas vezes o mescla em uma única opção.",
+    "addOption": "Adicionar horário",
+    "removeOption": "Remover",
+    "optionMerged": "Esse horário já havia sido adicionado.",
+    "deadline": "Prazo de votação",
+    "deadlineChoice": {
+      "hours6": "6 horas",
+      "hours12": "12 horas",
+      "hours24": "24 horas",
+      "hours48": "48 horas"
+    },
+    "duration": "Duração",
+    "platform": "Plataforma",
+    "game": "Jogo",
+    "gameCatalog": "Escolher da Steam",
+    "gameFreeText": "Digitar o nome do jogo",
+    "notes": "Notas",
+    "min": "Presença mínima",
+    "max": "Capacidade máxima",
+    "unlimited": "Capacidade ilimitada",
+    "private": "Enquete privada",
+    "invitees": "Convidar amigos",
+    "guestLinks": "Links de convidado",
+    "defaults": "Padrões: mínimo 4, máximo 4, 2 horas, prazo de 24 horas, sem plataforma, não privada.",
+    "submit": "Criar enquete",
+    "platformOther": "Outra",
+    "steamAppId": "ID do app na Steam"
+  },
+  "validation": {
+    "required": "Este campo é obrigatório.",
+    "range": "Informe um valor dentro do intervalo permitido.",
+    "increment": "Escolha um horário em incrementos de 15 minutos.",
+    "minMax": "A presença mínima não pode exceder a capacidade máxima.",
+    "invitedFriend": "Uma enquete não privada precisa de pelo menos um amigo convidado.",
+    "tooManyInvitees": "Você pode convidar até 50 amigos.",
+    "tooManyGuestLinks": "Você pode criar até 20 links de convidado.",
+    "optionMinimum": "Adicione pelo menos dois horários candidatos.",
+    "optionCap": "Uma enquete pode ter no máximo 12 horários candidatos."
+  },
+  "list": {
+    "heading": "Enquetes",
+    "involved": "Suas enquetes",
+    "discoverable": "Descobrir",
+    "emptyInvolved": "Você não tem enquetes ativas.",
+    "emptyDiscoverable": "Nenhuma enquete aberta para descobrir no momento.",
+    "loadMore": "Carregar mais",
+    "optionCount": "{{count}} opção",
+    "optionCount_other": "{{count}} opções"
+  },
+  "status": {
+    "pollingUntil": "Votação · encerra {{deadline}}",
+    "awaitingSelection": "Encerrada · aguardando seleção",
+    "closed": "Encerrada",
+    "finalized": "Finalizada",
+    "expired": "Expirada",
+    "canceled": "Cancelada"
+  },
+  "detail": {
+    "options": "Opções",
+    "roster": "Votantes",
+    "anonymous": "Usuário anônimo",
+    "removed": "Removido",
+    "deadline": "A votação encerra {{deadline}}.",
+    "awaitingSelectionNotice": "A votação encerrou. O organizador está escolhendo um horário.",
+    "finalizedNotice": "Esta enquete foi finalizada.",
+    "viewSession": "Ver a sessão",
+    "expiredNotice": "Esta enquete expirou sem uma seleção.",
+    "canceledNotice": "Esta enquete foi cancelada.",
+    "tallyAvailable": "{{count}} disponível",
+    "tallyMaybe": "{{count}} talvez",
+    "tallyUnavailable": "{{count}} indisponível",
+    "tallyNone": "Ainda não há votos.",
+    "yourVote": "Seu voto: {{value}}",
+    "noVoteYet": "Você ainda não votou nesta opção."
+  },
+  "vote": {
+    "available": "Disponível",
+    "maybe": "Talvez",
+    "unavailable": "Indisponível"
+  },
+  "dirty": {
+    "title": "Descartar alterações não salvas?",
+    "body": "Você tem alterações não salvas. Se sair agora, elas serão perdidas.",
+    "stay": "Cancelar",
+    "discard": "Descartar"
+  },
+  "errors": {
+    "generic": "Algo deu errado.",
+    "codes": {
+      "poll_not_found": "Essa enquete não pôde ser encontrada.",
+      "poll_validation": "Verifique os campos destacados e tente novamente.",
+      "poll_option_cap": "Uma enquete pode ter no máximo 12 horários candidatos.",
+      "poll_option_not_found": "Essa opção não pôde ser encontrada.",
+      "poll_voting_closed": "A votação encerrou para esta enquete.",
+      "poll_terminal": "Esta enquete não pode mais ser alterada.",
+      "poll_invalid_transition": "Essa alteração não é mais possível.",
+      "poll_participant_removed": "Você não tem mais acesso a esta enquete.",
+      "poll_conflict": "Esta enquete mudou em outro lugar. Tente novamente.",
+      "poll_guest_not_found": "Esse convidado não pôde ser encontrado.",
+      "poll_selection_window_closed": "A janela de seleção desta enquete encerrou.",
+      "poll_zero_options": "Esta enquete não tem opções restantes.",
+      "invalid_scope": "Essa lista de enquetes não é válida.",
+      "invalid_cursor": "Essa página de resultados não é mais válida.",
+      "rate_limited": "Muitas tentativas. Tente novamente mais tarde."
+    }
+  },
+  "a11y": {
+    "rosterLabel": "Votantes da enquete",
+    "validationSummary": "Houve problemas com seu envio",
+    "dialogLabel": "Caixa de confirmação"
+  }
+}

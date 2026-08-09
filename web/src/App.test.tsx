@@ -211,6 +211,8 @@ describe('AppNavigationTests', () => {
     ['/calendar/agenda', 'screen-calendar'],
     ['/find-a-time', 'screen-find-a-time'],
     ['/discover', 'screen-discover'],
+    ['/polls', 'screen-polls'],
+    ['/polls/new', 'screen-poll-create'],
   ])(
     'AuthenticatedEntries_ReachFriendsAndBlockedRoutes_D127: %s',
     async (path, testId) => {
@@ -308,6 +310,14 @@ describe('AppNavigationTests', () => {
 
     fireEvent.click(screen.getByRole('link', { name: 'Discover' }))
     expect(await screen.findByTestId('screen-discover')).toBeInTheDocument()
+  })
+
+  it('clicked Polls entry renders the guarded poll list page_P6S5', async () => {
+    setSession(session({ authenticated: true, state: 'active' }))
+    renderRoute('/app')
+
+    fireEvent.click(screen.getByRole('link', { name: 'Polls' }))
+    expect(await screen.findByTestId('screen-polls')).toBeInTheDocument()
   })
 })
 

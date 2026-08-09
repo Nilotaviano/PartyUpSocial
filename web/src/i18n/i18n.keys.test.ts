@@ -15,6 +15,30 @@ const namespaces = [
   'sessions',
   'availability',
   'home',
+  'polls',
+] as const
+
+// Closed problem-code inventory (PHASE6_DESIGN.md §4.2/§7): the poll HTTP
+// surface's own codes, held in polls.json the same way sessions.json holds
+// its own set. `invalid_scope`/`invalid_cursor`/`rate_limited` are shared
+// wording with sessions.json, duplicated here rather than cross-namespace
+// referenced (each namespace stays self-contained per the shipped pattern).
+const pollProblemCodes = [
+  'poll_not_found',
+  'poll_validation',
+  'poll_option_cap',
+  'poll_option_not_found',
+  'poll_voting_closed',
+  'poll_terminal',
+  'poll_invalid_transition',
+  'poll_participant_removed',
+  'poll_conflict',
+  'poll_guest_not_found',
+  'poll_selection_window_closed',
+  'poll_zero_options',
+  'invalid_scope',
+  'invalid_cursor',
+  'rate_limited',
 ] as const
 
 // Closed problem-code inventory (PHASE5_DESIGN.md §8/§10.2): the five new
@@ -147,6 +171,43 @@ describe('sessions problem-code coverage D-060/D-146', () => {
         }
       ).errors.codes
       for (const code of problemCodes) {
+        expect(typeof codes[code]).toBe('string')
+        expect(codes[code].length).toBeGreaterThan(0)
+      }
+    })
+  }
+})
+
+describe('polls namespace parity and rendering D-060 (PHASE6_DESIGN.md §4.2)', () => {
+  for (const locale of locales) {
+    it(locale + ' renders polls.create.heading', async () => {
+      await i18n.changeLanguage(locale)
+      expect(i18n.t('create.heading', { ns: 'polls' })).toBe(
+        (resources[locale].polls as { create: { heading: string } }).create
+          .heading,
+      )
+    })
+  }
+
+  it('errors.codes contains exactly the closed poll problem-code inventory', () => {
+    const codes = Object.keys(
+      (
+        registeredResources.en.polls as {
+          errors: { codes: Record<string, string> }
+        }
+      ).errors.codes,
+    ).sort()
+    expect(codes).toEqual([...pollProblemCodes].sort())
+  })
+
+  for (const locale of locales) {
+    it(locale + ' has one message per documented poll problem code', () => {
+      const codes = (
+        registeredResources[locale].polls as {
+          errors: { codes: Record<string, string> }
+        }
+      ).errors.codes
+      for (const code of pollProblemCodes) {
         expect(typeof codes[code]).toBe('string')
         expect(codes[code].length).toBeGreaterThan(0)
       }

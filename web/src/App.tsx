@@ -26,6 +26,9 @@ import { HomePage } from './features/home/HomePage'
 import { OnboardingWizard } from './features/onboarding/OnboardingWizard'
 import { PublicDeletionConfirmPage } from './features/deletion/PublicDeletionConfirmPage'
 import { PublicDeletionRequestPage } from './features/deletion/PublicDeletionRequestPage'
+import { PollCreatePage } from './features/polls/PollCreatePage'
+import { PollDetailPage } from './features/polls/PollDetailPage'
+import { PollListPage } from './features/polls/PollListPage'
 import { ProfileSettingsPage } from './features/profile/ProfileSettingsPage'
 import { AccountSettingsPage } from './features/settings/AccountSettingsPage'
 import { BlockedUsersPage } from './features/settings/BlockedUsersPage'
@@ -37,7 +40,7 @@ import { SessionInvitePage } from './features/sessions/SessionInvitePage'
 import { SessionListPage } from './features/sessions/SessionListPage'
 
 function AuthenticatedShell() {
-  const { t } = useTranslation(['common', 'sessions', 'availability', 'home'])
+  const { t } = useTranslation(['common', 'sessions', 'availability', 'home', 'polls'])
 
   return (
     <div className="min-h-screen bg-page text-ink">
@@ -78,6 +81,18 @@ function AuthenticatedShell() {
               to="/sessions/upcoming"
             >
               {t('nav.sessions', { ns: 'sessions' })}
+            </NavLink>
+            <NavLink
+              className={({ isActive }) =>
+                `inline-flex min-h-11 flex-none items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+                  isActive
+                    ? 'bg-primary font-semibold text-primary-ink'
+                    : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
+                }`
+              }
+              to="/polls"
+            >
+              {t('nav.polls', { ns: 'polls' })}
             </NavLink>
             <NavLink
               className={({ isActive }) =>
@@ -214,6 +229,9 @@ function App() {
               path="/sessions/:sessionId/invite"
               element={<SessionInvitePage />}
             />
+            <Route path="/polls/new" element={<PollCreatePage />} />
+            <Route path="/polls" element={<PollListPage />} />
+            <Route path="/polls/:pollId" element={<PollDetailPage />} />
           </Route>
         </Route>
       </Route>
