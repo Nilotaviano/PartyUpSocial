@@ -710,3 +710,29 @@ Every constraint is proven by an actual DB-boundary violation (23505/23503) and 
 `IPushSender`, templates, and every HTTP surface — S3/S4 own those; `push_subscriptions.channel` stays a
 repository-written constant (`WebPush(0)`) until a native channel needs it, since `PushSubscription`
 ships with no `Channel` member and Domain is out of this slice's write set.
+
+## Phase 7 slice S2 (notification read projection) test citations
+
+| Decision | Slice S2 citations |
+|---|---|
+| D-092 | `NotificationReadUseCasesTests.Actor_TombstonedRendersAnonymous_D092` |
+| D-076 | `NotificationReadUseCasesTests.Actor_BlockedPairRendersAnonymous_D076`; `...UnreachableSubject_BlockedPair_RendersMinimalForm_D076` |
+| D-060 | `NotificationReadUseCasesTests.RecipientZoneAndLocale_RenderFromProfile_D060`; `...RecipientWithNoProfile_FallsBackToEnUtc_D060` |
+
+S2 adds `NotificationReadUseCases` + `NotificationReadModels` (`src/PartyUp.Application/Notifications/`,
+PHASE7_DESIGN.md §2): the per-row projection consumes the shipped `IdentityMasking.ForUser` — all three
+`MaskingReason` outcomes are reachable through it, including the `ProfileIncomplete` third outcome
+(`Actor_ProfileIncompleteRendersAnonymous`, no D-number — it is the shipped enum member's fail-closed
+onboarding case, not a numbered decision) — and re-resolves each row's subject through the same
+`ISessionRepository`/`IPollRepository` + `VisibilityEngine.ResolveSession`/`ResolvePoll` path
+`SessionReadUseCases`/`PollReadUseCases` already drive, reusing their `BuildViewerAsync` idiom rather than
+adding a port. Fail-closed is proven over both minimal-form fixtures: a blocked pair
+(`UnreachableSubject_BlockedPair_RendersMinimalForm_D076`) and a viewer whose inherited access lapsed with
+no block record at all (`UnreachableSubject_LapsedInheritedAccess_RendersMinimalForm`) — both land on the
+identical minimal shape (`ReachableSubject_RendersTitleAndId` is the positive control). `OptionStartTime`
+is asserted present only for `PollOptionSuggested`/`PollOptionSelected` (types 14/19) and filtered for
+every other type even when the underlying `NotificationSubject` happens to carry one
+(`OptionStartTime_AbsentForOtherTypes_EvenWhenSubjectCarriesOne`). No new Application port and no
+Infrastructure touch — every read goes through ports `SessionReadUseCases`/`PollReadUseCases` already use.
+**Not in this slice:** the HTTP list, dispatch-time `Skipped` marking, and the payload renderer — S3/S4
+own those; `IsSubjectReachableAsync` only exposes the same per-row answer for S3 to call.
