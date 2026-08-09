@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -497,6 +497,127 @@ describe('PollDetailPage', () => {
       expect(screen.queryByText('Guest links')).not.toBeInTheDocument()
     })
 
+  })
+
+  describe('selection/finalize (S7, design §5/§6.1)', () => {
+    function awaitingSelectionPoll(overrides: Partial<Record<string, unknown>> = {}) {
+      return pollDetail({
+        organizerId: 'viewer-1',
+        status: 'closed',
+        deadline: new Date(Date.now() - 60_000).toISOString(),
+        selectionWindowEndsAt: new Date(Date.now() + 47 * 60 * 60_000).toISOString(),
+        ...overrides,
+      })
+    }
+
+    function previewResponse() {
+      return {
+        options: [
+          {
+            optionId: 'option-1',
+            startTime: '2099-01-01T10:00:00Z',
+            meetsMinimum: true,
+            roster: [
+              {
+                userId: 'organizer-1',
+                guestIdentityId: null,
+                displayName: 'Organizer One',
+                status: 'going',
+                isWaitlisted: false,
+              },
+              {
+                userId: 'voter-2',
+                guestIdentityId: null,
+                displayName: 'Voter Two',
+                status: 'going',
+                isWaitlisted: true,
+              },
+            ],
+          },
+        ],
+      }
+    }
+
+    it('fetches the finalization preview and renders the exact preview-guarantee copy, never a stronger claim', async () => {
+      api.get.mockImplementation((path: string) =>
+        Promise.resolve({
+          data: path.includes('finalization-preview') ? previewResponse() : awaitingSelectionPoll(),
+        }),
+      )
+      renderPage()
+
+      expect(
+        await screen.findByText(
+          "This preview and finalizing use the same rule — the same inputs always produce the same result. If something changes in between (an option is removed, or someone's access changes), the outcome may differ from what's shown here.",
+        ),
+      ).toBeInTheDocument()
+      expect(await screen.findByTestId('finalize-option-option-1')).toBeInTheDocument()
+      expect(screen.getByText('Going: Organizer One')).toBeInTheDocument()
+      expect(screen.getByText('Waitlisted: Voter Two')).toBeInTheDocument()
+    })
+
+    it('finalizes the selected option and navigates to the created session_D160', async () => {
+      api.get.mockImplementation((path: string) =>
+        Promise.resolve({
+          data: path.includes('finalization-preview') ? previewResponse() : awaitingSelectionPoll(),
+        }),
+      )
+      api.post.mockResolvedValue({
+        data: { sessionId: 'session-42', poll: awaitingSelectionPoll({ status: 'finalized' }) },
+      })
+      renderPage()
+
+      const finalizeOption = await screen.findByTestId('finalize-option-option-1')
+      fireEvent.click(within(finalizeOption).getByRole('radio'))
+      fireEvent.click(await screen.findByTestId('finalize-trigger'))
+      fireEvent.click(screen.getByTestId('finalize-confirm'))
+
+      await waitFor(() =>
+        expect(api.post).toHaveBeenCalledWith(
+          '/api/v1/polls/{pollId}/finalize',
+          expect.objectContaining({
+            params: expect.objectContaining({ path: { pollId: 'poll-1' } }),
+            body: { optionId: 'option-1' },
+          }),
+        ),
+      )
+    })
+
+    it('renders the honest 409/422 taxonomy on a premature preview fetch, never fabricating options', async () => {
+      const PrematureError = class extends Error {
+        status = 422
+        code = 'poll_invalid_transition'
+      }
+      api.get.mockImplementation((path: string) =>
+        path.includes('finalization-preview')
+          ? Promise.reject(new PrematureError())
+          : Promise.resolve({ data: awaitingSelectionPoll() }),
+      )
+      renderPage()
+
+      expect(await screen.findByText('That change is no longer possible.')).toBeInTheDocument()
+      expect(screen.queryByTestId('finalize-option-option-1')).not.toBeInTheDocument()
+    })
+
+    it('shows no selection controls in expiredPending, only the S5 notice', async () => {
+      api.get.mockResolvedValue({
+        data: pollDetail({
+          organizerId: 'viewer-1',
+          status: 'polling',
+          deadline: new Date(Date.now() - 50 * 60 * 60_000).toISOString(),
+          selectionWindowEndsAt: new Date(Date.now() - 60_000).toISOString(),
+        }),
+      })
+      renderPage()
+
+      expect(
+        await screen.findByText("This poll's selection window has closed."),
+      ).toBeInTheDocument()
+      expect(screen.queryByText('Choose a time')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('organizer guest panel continued (S6, D-044)', () => {
     it('hides the mint control in awaitingSelection_F4b', async () => {
       api.get.mockResolvedValue({
         data: pollDetail({

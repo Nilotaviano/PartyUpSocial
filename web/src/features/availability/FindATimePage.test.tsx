@@ -250,4 +250,55 @@ describe('FindATimePage', () => {
       '/sessions/new?startTime=2030-09-01T18%3A00%3A00Z&durationMinutes=120&overDurationMinutes=0',
     )
   })
+
+  it('accumulates selected windows into a repeated startTimes poll-arm url_D102', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/availability/overlaps') {
+        return Promise.resolve({
+          data: {
+            windows: [
+              {
+                start: '2030-09-01T18:00:00Z',
+                end: '2030-09-01T20:00:00Z',
+                available: [{ ordinal: 0, displayName: 'A' }],
+                maybe: [],
+              },
+              {
+                start: '2030-09-02T18:00:00Z',
+                end: '2030-09-02T20:00:00Z',
+                available: [{ ordinal: 0, displayName: 'A' }],
+                maybe: [],
+              },
+            ],
+            range: { start: '', end: '' },
+            selectionSource: 'allFriends',
+            consideredFriends: [],
+          },
+        })
+      }
+      return defaultGetHandler(path)
+    })
+    renderPage()
+
+    // Nothing selected yet: no poll-arm CTA at all — the arm never appears empty.
+    expect(screen.queryByText(/Create poll with selected times/)).not.toBeInTheDocument()
+
+    const addToPollBoxes = await screen.findAllByLabelText('Add to poll')
+    fireEvent.click(addToPollBoxes[0])
+    fireEvent.click(addToPollBoxes[1])
+
+    expect(await screen.findByText('2 times selected for a poll')).toBeInTheDocument()
+    const pollLink = screen.getByRole('link', { name: 'Create poll with selected times' })
+    expect(pollLink).toHaveAttribute(
+      'href',
+      '/polls/new?startTimes=2030-09-01T18%3A00%3A00Z&startTimes=2030-09-02T18%3A00%3A00Z',
+    )
+
+    // Deselecting one window removes it from the accumulated set, never the other.
+    fireEvent.click(addToPollBoxes[0])
+    expect(await screen.findByText('1 time selected for a poll')).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Create poll with selected times' }),
+    ).toHaveAttribute('href', '/polls/new?startTimes=2030-09-02T18%3A00%3A00Z')
+  })
 })

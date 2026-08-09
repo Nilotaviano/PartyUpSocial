@@ -9,6 +9,7 @@ import {
   availabilityKeys,
   getHomeSuggestions,
 } from '../availability/availabilityQueries'
+import { getPollList, pollKeys, pollWindowState } from '../polls/pollQueries'
 import {
   approveJoinRequest,
   getSessionList,
@@ -21,9 +22,17 @@ import { getActionableInbox, getDiscoverSessions, homeKeys } from './homeQueries
 
 const SUGGESTION_LIMIT = 5
 const UPCOMING_PREVIEW_LIMIT = 5
+const POLLS_PREVIEW_LIMIT = 5
 
 export function HomePage() {
-  const { t, i18n } = useTranslation(['home', 'sessions', 'availability', 'errors', 'common'])
+  const { t, i18n } = useTranslation([
+    'home',
+    'sessions',
+    'availability',
+    'polls',
+    'errors',
+    'common',
+  ])
   const queryClient = useQueryClient()
   const heading = useRef<HTMLHeadingElement>(null)
 
@@ -54,6 +63,16 @@ export function HomePage() {
   const discover = useQuery({
     queryKey: homeKeys.discover(),
     queryFn: () => getDiscoverSessions(),
+  })
+
+  // D-103 region 2 (Phase 6 S7 fill, PRODUCT_SPEC:434 region 2): the involved band's first
+  // page, previewed here. `PollSummaryResponse` carries no per-option own-vote data (only
+  // `optionCount`) — the honest predicate this wire shape supports is "still accepting votes"
+  // (`pollWindowState === 'polling'`), not the stronger "has specifically unvoted options",
+  // which would need a per-poll detail fetch this band idiom doesn't make.
+  const polls = useQuery({
+    queryKey: pollKeys.list('involved'),
+    queryFn: () => getPollList('involved'),
   })
 
   async function afterActionableMutation() {
@@ -109,6 +128,7 @@ export function HomePage() {
     upcoming.error ??
     suggestions.error ??
     discover.error ??
+    polls.error ??
     respond.error ??
     approve.error ??
     reject.error
@@ -127,6 +147,9 @@ export function HomePage() {
     actionable.data?.hasMoreInvitations || actionable.data?.hasMoreJoinRequests,
   )
 
+  const pollItems = (polls.data?.items ?? [])
+    .filter((poll) => pollWindowState(poll) === 'polling')
+    .slice(0, POLLS_PREVIEW_LIMIT)
   const upcomingItems = (upcoming.data?.items ?? []).slice(0, UPCOMING_PREVIEW_LIMIT)
   const suggestionItems = (suggestions.data?.suggestions ?? []).slice(0, SUGGESTION_LIMIT)
   const discoverItems = discover.data?.items ?? []
@@ -277,7 +300,7 @@ export function HomePage() {
         )}
       </section>
 
-      {/* D-103 region 2 — Phase 6 seam: declared and empty, no contract. */}
+      {/* D-103 region 2 (Phase 6 S7 fill): the involved band's still-polling polls. */}
       <section
         aria-labelledby="home-polls-heading"
         data-testid="home-region-polls"
@@ -285,7 +308,42 @@ export function HomePage() {
         <h2 id="home-polls-heading" className="text-h2 font-display font-semibold text-ink">
           {t('home.polls.heading')}
         </h2>
-        <p className="text-ink-soft">{t('home.polls.empty')}</p>
+        {polls.isPending && (
+          <p role="status" className="motion-safe:animate-pulse text-ink-soft">
+            {t('common.loading', { ns: 'common' })}
+          </p>
+        )}
+        {!polls.isPending && pollItems.length === 0 && (
+          <p className="text-ink-soft">{t('home.polls.empty')}</p>
+        )}
+        {pollItems.length > 0 && (
+          <ul className="mt-2 space-y-2" data-testid="home-polls-list">
+            {pollItems.map((poll) => (
+              <li key={poll.id}>
+                <Link
+                  className="block rounded-card border-2 border-ink bg-card p-3 shadow-offset-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                  to={`/polls/${poll.id}`}
+                >
+                  <p className="font-medium text-ink">{poll.title}</p>
+                  <p className="text-ink-soft">
+                    {t('status.pollingUntil', {
+                      ns: 'polls',
+                      deadline: timeFormat.format(new Date(poll.deadline)),
+                    })}
+                  </p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        {pollItems.length > 0 && (
+          <Link
+            className="mt-3 inline-flex min-h-11 items-center font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            to="/polls"
+          >
+            {t('home.polls.seeAll')}
+          </Link>
+        )}
       </section>
 
       {/* D-103 region 3 */}

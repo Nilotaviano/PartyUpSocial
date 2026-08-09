@@ -234,6 +234,57 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     private string BuiltApiOutputDirectory =>
         Path.Combine(_repoRoot, "src", "PartyUp.Api", "bin", "Debug", "net10.0");
 
+    /// <summary>
+    /// A same-DB-instance, real-server-clock backdoor for tests that need to prove a real
+    /// time-gated transition (e.g. a poll's minimum 6-hour deadline) without waiting hours for one
+    /// in a browser lane. Runs <paramref name="sql"/> via <c>psql</c> against whichever Postgres
+    /// this fixture's own API process is already pointed at — never a second connection this
+    /// fixture doesn't otherwise own — so the API's very next read sees the write. No new package
+    /// reference: the built topology already carries <c>Testcontainers.PostgreSql</c>'s own
+    /// <c>ExecScriptAsync</c> (a <c>docker exec psql</c> wrapper); the local topology shells out to
+    /// the same <c>docker compose</c> Postgres this repo's local dev setup already requires
+    /// (CLAUDE.md's <c>deploy/compose.dev.yml</c>), matching its documented default credentials.
+    /// </summary>
+    public async Task RunSqlBackdoorAsync(string sql)
+    {
+        if (IsBuiltTopology)
+        {
+            Testcontainers.PostgreSql.PostgreSqlContainer container = _postgresContainer
+                ?? throw new InvalidOperationException("Built topology must have started its Postgres container.");
+            var result = await container.ExecScriptAsync(sql);
+            if (result.ExitCode != 0)
+            {
+                throw new InvalidOperationException(
+                    $"SQL backdoor failed (exit {result.ExitCode}): {result.Stderr}");
+            }
+            return;
+        }
+
+        var info = new ProcessStartInfo(
+            "docker",
+            "compose -f deploy/compose.dev.yml exec -T postgres psql -U partyup -d partyup -v ON_ERROR_STOP=1")
+        {
+            WorkingDirectory = _repoRoot,
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+        };
+        using var process = Process.Start(info)
+            ?? throw new InvalidOperationException("Failed to start the local-topology SQL backdoor process.");
+        await process.StandardInput.WriteAsync(sql);
+        process.StandardInput.Close();
+        string stdout = await process.StandardOutput.ReadToEndAsync();
+        string stderr = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"SQL backdoor failed (exit {process.ExitCode}): {stderr}{stdout}");
+        }
+    }
+
     public async Task DisposeAsync()
     {
         // F3: export every still-live traced context's trace BEFORE closing the browser (closing

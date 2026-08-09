@@ -21,6 +21,7 @@ import {
   WeekGrid,
   type GridFriendRange,
   type GridOccurrence,
+  type GridPollOptionEntry,
   type GridRange,
   type GridSessionEntry,
 } from './WeekGrid'
@@ -44,6 +45,7 @@ function renderGrid(props: {
   merged?: GridRange[]
   friendRanges?: GridFriendRange[]
   sessionEntries?: GridSessionEntry[]
+  pollOptionEntries?: GridPollOptionEntry[]
   onCreateBlock?: ReturnType<typeof vi.fn<(range: GridRange) => void>>
   onEditOccurrence?: ReturnType<typeof vi.fn<(id: string) => void>>
   startHour?: number
@@ -58,6 +60,7 @@ function renderGrid(props: {
       friendRanges={props.friendRanges ?? []}
       merged={props.merged ?? []}
       occurrences={props.occurrences ?? []}
+      pollOptionEntries={props.pollOptionEntries ?? []}
       sessionEntries={props.sessionEntries ?? []}
       startHour={props.startHour ?? 9}
       timeLabelFormatter={timeLabelFormatter}
@@ -223,6 +226,28 @@ describe('WeekGrid keyboard flow', () => {
     expect(inheritedLabel).toHaveTextContent('Open lobby (Discoverable)')
   })
 
+  it('paints the pollOptions layer as a point marker with the own-vote value in the accessible name_D111', () => {
+    const pollOptionEntries: GridPollOptionEntry[] = [
+      { id: 'option-1', pollId: 'poll-1', pollTitle: 'Raid night poll', start: localDate(9, 0), ownVote: 'available' },
+      { id: 'option-2', pollId: 'poll-2', pollTitle: 'Board game poll', start: localDate(10, 0), ownVote: null },
+    ]
+    renderGrid({ pollOptionEntries })
+
+    // Adds no gridcell of its own — still 56 cells, one tab stop.
+    expect(screen.getAllByRole('gridcell')).toHaveLength(56)
+
+    const votedCell = screen.getByRole('gridcell', {
+      name: '9:00 – Raid night poll poll option, your vote available',
+    })
+    expect(votedCell.querySelector('[data-layer="poll-option"]')).toHaveTextContent(
+      'Raid night poll',
+    )
+
+    expect(
+      screen.getByRole('gridcell', { name: '10:00 – Board game poll poll option' }),
+    ).toBeInTheDocument()
+  })
+
   it('renders a friend-count summary label when more than one friend overlaps a cell', () => {
     const friendRanges: GridFriendRange[] = [
       { ownerLabel: 'Ana', start: localDate(9, 0), end: localDate(9, 15) },
@@ -236,7 +261,7 @@ describe('WeekGrid keyboard flow', () => {
 
 function calendarResponse(
   occurrenceIso: { start: string; end: string },
-  overrides: { friendAvailability?: unknown[]; sessions?: unknown[] } = {},
+  overrides: { friendAvailability?: unknown[]; sessions?: unknown[]; pollOptions?: unknown[] } = {},
 ) {
   return {
     myAvailability: {
@@ -257,7 +282,7 @@ function calendarResponse(
     },
     friendAvailability: overrides.friendAvailability ?? [],
     sessions: overrides.sessions ?? [],
-    pollOptions: [],
+    pollOptions: overrides.pollOptions ?? [],
   }
 }
 
@@ -559,5 +584,51 @@ describe('WeekGridPage occurrence editing', () => {
 
     fireEvent.click(screen.getByLabelText('Sessions'))
     expect(screen.queryByRole('gridcell', { name: /Raid night/ })).not.toBeInTheDocument()
+  })
+
+  it('binds the pollOptions layer to CalendarPollOptionView data, on the grid and in the layer legend, toggle-controlled_D111', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve({ data: profileResponse() })
+      if (path === '/api/v1/calendar') {
+        return Promise.resolve({
+          data: calendarResponse(
+            { start: '2026-08-10T13:00:00.000Z', end: '2026-08-10T13:30:00.000Z' },
+            {
+              pollOptions: [
+                {
+                  pollId: 'poll-1',
+                  title: 'Raid night poll',
+                  options: [
+                    {
+                      optionId: 'option-1',
+                      startTime: '2026-08-10T16:00:00.000Z',
+                      ownVote: 'available',
+                    },
+                  ],
+                },
+              ],
+            },
+          ),
+        })
+      }
+      throw new Error(`Unexpected GET ${path}`)
+    })
+
+    renderPage()
+
+    await screen.findAllByRole('gridcell', { name: /Busy/ }, { timeout: 5000 })
+    expect(
+      screen.getByRole('gridcell', { name: /Raid night poll poll option, your vote available/ }),
+    ).toBeInTheDocument()
+    // The pollOptions legend swatch now has real data behind it — the poll
+    // title appears once as a legend item too, from the same `GET /calendar`
+    // response, never a second fetch.
+    expect(screen.getByRole('listitem')).toHaveTextContent('Raid night poll')
+
+    fireEvent.click(screen.getByLabelText('Poll options'))
+    expect(
+      screen.queryByRole('gridcell', { name: /Raid night poll/ }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('Raid night poll')).not.toBeInTheDocument()
   })
 })

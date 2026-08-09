@@ -55,7 +55,13 @@
     "empty": "No overlapping windows in this range.",
     "suggestionsHeading": "Top 5 suggestions",
     "seeAll": "See all",
-    "scheduleCta": "Schedule this time"
+    "scheduleCta": "Schedule this time",
+    "pollArm": {
+      "addToPoll": "Add to poll",
+      "selectedCount": "{{count}} time selected for a poll",
+      "selectedCount_other": "{{count}} times selected for a poll",
+      "createPollCta": "Create poll with selected times"
+    }
   },
   "a11y": {
     "gridLabel": "Weekly availability",
@@ -69,7 +75,14 @@
     "friendsAvailable": "{{count}} friends available",
     "sessionLabel": "{{title}}",
     "sessionInherited": "{{title}} (discoverable)",
-    "inherited": "Discoverable"
+    "inherited": "Discoverable",
+    "pollOption": "{{title}} poll option",
+    "pollOptionWithVote": "{{title}} poll option, your vote {{vote}}",
+    "pollVote": {
+      "available": "available",
+      "maybe": "maybe",
+      "unavailable": "unavailable"
+    }
   },
   "errors": {
     "codes": {

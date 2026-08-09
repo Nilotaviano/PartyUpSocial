@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
@@ -15,6 +15,43 @@ import { createPoll, type CreatePollRequest } from './pollQueries'
 // — checked client-side too, purely for the inline UX; the server re-checks.
 const MAX_OPTIONS = 12
 const MIN_OPTIONS = 2
+
+// D-130's minimum lead, mirrored client-side (`RecommendationPrefill.MinimumLead`
+// server-side, matching `SessionCreatePage`'s own constant): a prefilled option instant
+// is raised to at least now + 15 min, never lowered.
+const MINIMUM_LEAD_MS = 15 * 60_000
+
+/**
+ * A-083's poll-arm consumption half (design §5): reads the repeated `startTimes` query
+ * param FindATimePage writes, clamping each instant the same way
+ * `RecommendationPrefill.ForPollOption` does server-side (never lowering, never widening) and
+ * deduping (D-080's merge, not a validation error) up to the 12-option ceiling (§12-11's
+ * server-side re-validated cap — this is client UX only). The clamp is re-applied here, not just
+ * trusted from the URL, because time may have passed between the link being minted and this page
+ * loading. Returns the deduped ISO instants plus whether any one of them was clamped, surfaced
+ * once rather than per-option (clamp surfaced not silent, never silent).
+ */
+function readPollPrefill(params: URLSearchParams): { options: string[]; anyClamped: boolean } {
+  const raw = params.getAll('startTimes')
+  if (raw.length === 0) return { options: [], anyClamped: false }
+
+  const earliest = Date.now() + MINIMUM_LEAD_MS
+  const options: string[] = []
+  let anyClamped = false
+
+  for (const value of raw) {
+    const requested = new Date(value)
+    if (Number.isNaN(requested.getTime())) continue
+    const clamped = requested.getTime() < earliest
+    if (clamped) anyClamped = true
+    const iso = new Date(clamped ? earliest : requested.getTime()).toISOString()
+    if (!options.includes(iso) && options.length < MAX_OPTIONS) {
+      options.push(iso)
+    }
+  }
+
+  return { options: options.sort(), anyClamped }
+}
 
 type DiscardDialogProps = {
   open: boolean
@@ -117,13 +154,17 @@ const emptyForm = {
 }
 
 export function PollCreatePage() {
-  const { t } = useTranslation(['polls', 'errors'])
+  const { t } = useTranslation(['polls', 'errors', 'availability'])
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const heading = useRef<HTMLHeadingElement>(null)
   const summaryRef = useRef<HTMLDivElement>(null)
   const cancelTrigger = useRef<HTMLButtonElement>(null)
-  const [form, setForm] = useState(() => emptyForm)
+  const [searchParams] = useSearchParams()
+  const [prefill] = useState(() => readPollPrefill(searchParams))
+  const [form, setForm] = useState(() =>
+    prefill.options.length > 0 ? { ...emptyForm, options: prefill.options } : emptyForm,
+  )
   const [dirty, setDirty] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [optionNotice, setOptionNotice] = useState<string | null>(null)
@@ -301,6 +342,12 @@ export function PollCreatePage() {
         {t('create.heading')}
       </h1>
       <p className="text-ink-soft">{t('create.defaults')}</p>
+
+      {prefill.anyClamped && (
+        <p aria-live="polite" role="status">
+          {t('prefill.clamped', { ns: 'availability' })}
+        </p>
+      )}
 
       {Object.keys(fieldErrors).length > 0 && (
         <div

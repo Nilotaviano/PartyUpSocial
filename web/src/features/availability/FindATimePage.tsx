@@ -55,12 +55,30 @@ function buildPrefillUrl(
   return `/sessions/new?${params.toString()}`
 }
 
+/**
+ * A-083's poll-arm producer half (design §5): each selected window contributes exactly one
+ * option instant — never a duration, which is not an option property (spec §7.3-1) — accumulated
+ * into `/polls/new?startTimes=...` as a repeated query param (route query only, never a server
+ * draft, D-152/D-162). The clamp (`RecommendationPrefill.ForPollOption`'s `WouldClamp`) is
+ * computed here so the poll-create page can surface it rather than silently absorbing it.
+ */
+function buildPollPrefillUrl(starts: string[]): string {
+  const params = new URLSearchParams()
+  for (const start of starts) {
+    params.append('startTimes', start)
+  }
+  return `/polls/new?${params.toString()}`
+}
+
 export function FindATimePage() {
   const { t, i18n } = useTranslation(['availability', 'sessions', 'errors', 'common'])
   const heading = useRef<HTMLHeadingElement>(null)
   const [selectedFriends, setSelectedFriends] = useState<string[]>([])
   const [rangeDays, setRangeDays] = useState(DEFAULT_RANGE_DAYS)
   const [durationMinutes, setDurationMinutes] = useState(String(DEFAULT_DURATION_MINUTES))
+  // A-083 poll arm (design §5): windows the viewer has picked as poll option candidates,
+  // keyed by `window.start` — accumulated across the results list, never a single-window pick.
+  const [pollWindowStarts, setPollWindowStarts] = useState<string[]>([])
 
   useEffect(() => {
     heading.current?.focus()
@@ -104,6 +122,12 @@ export function FindATimePage() {
   }
 
   const anyError = friends.error ?? myAvailability.error ?? overlaps.error
+
+  function togglePollWindow(start: string, checked: boolean) {
+    setPollWindowStarts((current) =>
+      checked ? [...current, start] : current.filter((value) => value !== start),
+    )
+  }
   const plannedDuration = Number(durationMinutes) || 0
   // D-035/D-052: windows render exactly as the server ranked them — Available
   // count first, Maybe count as tie-breaker — no client re-sort.
@@ -279,10 +303,32 @@ export function FindATimePage() {
                   >
                     {t('findATime.scheduleCta')}
                   </Link>
+                  <label className="mt-3 flex min-h-11 items-center gap-2 text-sm text-ink">
+                    <input
+                      checked={pollWindowStarts.includes(window.start)}
+                      type="checkbox"
+                      onChange={(event) => togglePollWindow(window.start, event.target.checked)}
+                    />
+                    {t('findATime.pollArm.addToPoll')}
+                  </label>
                 </li>
               )
             })}
           </ul>
+        )}
+
+        {pollWindowStarts.length > 0 && (
+          <div className="mt-3 rounded-card border-2 border-ink bg-card p-3 shadow-offset-card">
+            <p className="text-ink">
+              {t('findATime.pollArm.selectedCount', { count: pollWindowStarts.length })}
+            </p>
+            <Link
+              className={`mt-2 inline-flex items-center px-4 py-2 text-primary-ink bg-primary ${raisedInteractiveClasses}`}
+              to={buildPollPrefillUrl(pollWindowStarts)}
+            >
+              {t('findATime.pollArm.createPollCta')}
+            </Link>
+          </div>
         )}
       </section>
     </main>

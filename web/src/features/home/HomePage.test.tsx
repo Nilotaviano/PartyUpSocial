@@ -81,6 +81,7 @@ function defaultGetHandler(path: string) {
   if (path === '/api/v1/sessions') return Promise.resolve({ data: { items: [], nextCursor: null } })
   if (path === '/api/v1/availability/suggestions')
     return Promise.resolve({ data: { suggestions: [], hasMore: false } })
+  if (path === '/api/v1/polls') return Promise.resolve({ data: { items: [], nextCursor: null } })
   throw new Error(`Unexpected GET ${path}`)
 }
 
@@ -217,5 +218,75 @@ describe('HomePage', () => {
     expect(
       within(discoverRegion).getByRole('link', { name: /Come join us/ }),
     ).toHaveAttribute('href', '/sessions/session-discover')
+  })
+
+  describe('region 2 — polls needing the viewer\'s vote (D-103, S7 fill)', () => {
+    function pollSummary(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'poll-1',
+        organizerId: 'organizer-1',
+        title: 'Raid night poll',
+        status: 'polling',
+        isPrivate: false,
+        deadline: new Date(Date.now() + 60 * 60_000).toISOString(),
+        selectionWindowEndsAt: new Date(Date.now() + 48 * 60 * 60_000).toISOString(),
+        createdAt: '2030-01-01T00:00:00Z',
+        optionCount: 3,
+        ...overrides,
+      }
+    }
+
+    it('renders a still-polling involved poll with a link to its detail page', async () => {
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/polls') {
+          return Promise.resolve({ data: { items: [pollSummary()], nextCursor: null } })
+        }
+        return defaultGetHandler(path)
+      })
+      renderPage()
+
+      const pollsRegion = await screen.findByTestId('home-region-polls')
+      expect(await within(pollsRegion).findByText('Raid night poll')).toBeInTheDocument()
+      expect(
+        within(pollsRegion).getByRole('link', { name: /Raid night poll/ }),
+      ).toHaveAttribute('href', '/polls/poll-1')
+    })
+
+    it('excludes an involved poll whose window has already closed, honestly disclosing the polling-only predicate', async () => {
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/polls') {
+          return Promise.resolve({
+            data: {
+              items: [
+                pollSummary({
+                  id: 'poll-closed',
+                  title: 'Already closed',
+                  status: 'closed',
+                  deadline: new Date(Date.now() - 60_000).toISOString(),
+                }),
+              ],
+              nextCursor: null,
+            },
+          })
+        }
+        return defaultGetHandler(path)
+      })
+      renderPage()
+
+      const pollsRegion = await screen.findByTestId('home-region-polls')
+      expect(
+        await within(pollsRegion).findByText('No polls need your vote right now.'),
+      ).toBeInTheDocument()
+      expect(screen.queryByText('Already closed')).not.toBeInTheDocument()
+    })
+
+    it('renders the empty state with no involved polls', async () => {
+      renderPage()
+
+      const pollsRegion = await screen.findByTestId('home-region-polls')
+      expect(
+        await within(pollsRegion).findByText('No polls need your vote right now.'),
+      ).toBeInTheDocument()
+    })
   })
 })

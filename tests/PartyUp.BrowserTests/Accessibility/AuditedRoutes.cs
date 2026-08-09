@@ -90,5 +90,9 @@ public static class AuditedRoutes
         // (the entry above), and the guest pollView branch on the shared
         // `/guest/{guestLinkId}` route resolves against a poll-typed link.
         new AuditedRoute("guest-poll", "/guest/{guestLinkId}", RequiresGuestLink: true, GuestLinkKind: GuestLinkKind.Poll),
+        // Phase 6 S7 (PHASE6_DESIGN.md §5/§6.1, ticket-P6-S7): the organizer's awaitingSelection
+        // selection controls + finalization preview only render past the poll's deadline — a
+        // second, backdated poll fixture reaches that state (the S5 poll above never does).
+        new AuditedRoute("poll-detail-awaiting-selection", "/polls/{pollAwaitingSelectionId}"),
     ];
 }

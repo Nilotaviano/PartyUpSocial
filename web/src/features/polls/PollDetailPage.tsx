@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, Navigate, useParams } from 'react-router'
+import { Link, Navigate, useNavigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { useSession } from '../../auth/useSession'
 import { Button } from '../../components/ui/button'
@@ -9,13 +9,16 @@ import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
 import {
   createPollGuestLinks,
+  finalizePoll,
   getPollDetail,
+  getPollFinalizationPreview,
   pollKeys,
   pollWindowState,
   removePollGuest,
   revokePollGuestLink,
   suggestPollOption,
   voteOnPollOption,
+  type FinalizationPreviewOption,
   type GuestLinkInvitation,
   type PollDetail,
 } from './pollQueries'
@@ -236,6 +239,212 @@ function GuestPanel({ pollId, roster, canMint, onError, clearError }: GuestPanel
   )
 }
 
+type FinalizeDialogProps = {
+  option: FinalizationPreviewOption
+  locale: string
+  pending: boolean
+  onConfirm: () => void
+}
+
+/**
+ * design §5 (kit confirm Dialog): finalize is a destructive, irreversible transition — one option
+ * is selected and confirmed behind the shipped Dialog idiom before the mutation fires.
+ */
+function FinalizeDialog({ option, locale, pending, onConfirm }: FinalizeDialogProps) {
+  const { t } = useTranslation('polls')
+  const [open, setOpen] = useState(false)
+  const cancelButton = useRef<HTMLButtonElement>(null)
+  const optionText = new Intl.DateTimeFormat(locale, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(option.startTime))
+
+  return (
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger asChild>
+        <Button
+          aria-busy={pending}
+          data-testid="finalize-trigger"
+          disabled={pending}
+          variant="primary"
+        >
+          {t('finalize.action')}
+        </Button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-scrim" />
+        <Dialog.Content
+          aria-describedby="poll-finalize-description"
+          aria-label={t('a11y.dialogLabel')}
+          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-card border-2 border-ink bg-card p-6 shadow-offset-dialog focus:outline-none"
+          onOpenAutoFocus={(event) => {
+            event.preventDefault()
+            cancelButton.current?.focus()
+          }}
+        >
+          <Dialog.Title className="text-h2 font-display font-semibold text-ink">
+            {t('finalize.confirmTitle')}
+          </Dialog.Title>
+          <Dialog.Description id="poll-finalize-description" className="mt-2 text-ink-soft">
+            {t('finalize.confirmBody', { time: optionText })}
+          </Dialog.Description>
+          <div className="mt-6 flex flex-wrap justify-end gap-2">
+            <Dialog.Close asChild>
+              <button
+                ref={cancelButton}
+                className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+                type="button"
+              >
+                {t('dirty.stay')}
+              </button>
+            </Dialog.Close>
+            <Button
+              data-testid="finalize-confirm"
+              type="button"
+              variant="primary"
+              onClick={() => {
+                setOpen(false)
+                onConfirm()
+              }}
+            >
+              {t('finalize.action')}
+            </Button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  )
+}
+
+type FinalizeSectionProps = {
+  pollId: string
+  locale: string
+  onError: (error: unknown) => void
+}
+
+/**
+ * design §5/§6.1 awaitingSelection organizer controls — a per-option preview from
+ * `GET /{id}/finalization-preview` (mapped roster, waitlist split, D-119 order preserved exactly
+ * as the server returns it, never client-resorted), finalize behind a confirm Dialog, and the
+ * exact preview-guarantee copy: preview and finalization share one mapping/allocation function —
+ * identical inputs give identical outputs; a shown preview can still differ from the outcome when
+ * inputs legitimately change in between. No stronger claim is made anywhere in this UI.
+ */
+function FinalizeSection({ pollId, locale, onError }: FinalizeSectionProps) {
+  const { t } = useTranslation('polls')
+  const navigate = useNavigate()
+  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null)
+
+  const preview = useQuery({
+    queryKey: pollKeys.finalizationPreview(pollId),
+    queryFn: () => getPollFinalizationPreview(pollId),
+    retry: false,
+  })
+
+  const finalize = useMutation({
+    mutationFn: (optionId: string) => finalizePoll(pollId, optionId),
+    onSuccess: (response) => navigate(`/sessions/${response.sessionId}`),
+    onError,
+  })
+
+  const options = preview.data?.options ?? []
+  const selected = options.find((option) => option.optionId === selectedOptionId) ?? null
+
+  if (preview.isError) {
+    return (
+      <section aria-labelledby="poll-finalize-heading">
+        <h2 id="poll-finalize-heading" className="text-h2 font-display font-semibold text-ink">
+          {t('finalize.heading')}
+        </h2>
+        <p role="alert">
+          {t(
+            isApiError(preview.error)
+              ? `errors.codes.${preview.error.code}`
+              : 'errors.generic',
+            { defaultValue: t('errors.generic') },
+          )}
+        </p>
+      </section>
+    )
+  }
+
+  return (
+    <section aria-labelledby="poll-finalize-heading">
+      <h2 id="poll-finalize-heading" className="text-h2 font-display font-semibold text-ink">
+        {t('finalize.heading')}
+      </h2>
+      <p className="text-ink-soft">{t('finalize.previewGuarantee')}</p>
+
+      {preview.isPending && <p role="status">{t('common.loading', { ns: 'common' })}</p>}
+
+      {options.length > 0 && (
+        <fieldset className="mt-3 space-y-3">
+          <legend className="sr-only">{t('finalize.chooseOption')}</legend>
+          {options.map((option) => {
+            const optionText = new Intl.DateTimeFormat(locale, {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            }).format(new Date(option.startTime))
+            const going = option.roster.filter((entry) => !entry.isWaitlisted)
+            const waitlisted = option.roster.filter((entry) => entry.isWaitlisted)
+            return (
+              <label
+                key={option.optionId}
+                className="block rounded-card border-2 border-ink bg-card p-3 shadow-offset-card"
+                data-testid={`finalize-option-${option.optionId}`}
+              >
+                <span className="flex items-center gap-2 font-display font-semibold text-ink">
+                  <input
+                    checked={selectedOptionId === option.optionId}
+                    name="finalize-option"
+                    type="radio"
+                    value={option.optionId}
+                    onChange={() => setSelectedOptionId(option.optionId)}
+                  />
+                  {optionText}
+                  {!option.meetsMinimum && (
+                    <span className="text-danger">{t('finalize.belowMinimum')}</span>
+                  )}
+                </span>
+                {/* D-119 order: the server's own ordering, never re-sorted client-side. */}
+                {going.length > 0 && (
+                  <p className="mt-1 text-ink-soft">
+                    {t('finalize.going', {
+                      names: going
+                        .map((entry) => entry.displayName ?? t('detail.anonymous'))
+                        .join(', '),
+                    })}
+                  </p>
+                )}
+                {waitlisted.length > 0 && (
+                  <p className="text-ink-soft">
+                    {t('finalize.waitlisted', {
+                      names: waitlisted
+                        .map((entry) => entry.displayName ?? t('detail.anonymous'))
+                        .join(', '),
+                    })}
+                  </p>
+                )}
+              </label>
+            )
+          })}
+        </fieldset>
+      )}
+
+      {selected && (
+        <div className="mt-3">
+          <FinalizeDialog
+            locale={locale}
+            option={selected}
+            pending={finalize.isPending}
+            onConfirm={() => finalize.mutate(selected.optionId)}
+          />
+        </div>
+      )}
+    </section>
+  )
+}
+
 /**
  * Poll detail (S6 scope): the live voting grid, suggest-option affordance and the organizer's
  * guest-management panel join S5's read-only shell (design §5/§6).
@@ -252,6 +461,7 @@ export function PollDetailPage() {
   const [suggestError, setSuggestError] = useState<string | null>(null)
   const [suggestNotice, setSuggestNotice] = useState<string | null>(null)
   const [guestPanelError, setGuestPanelError] = useState<unknown>(null)
+  const [finalizeError, setFinalizeError] = useState<unknown>(null)
 
   const detail = useQuery({
     queryKey: pollKeys.detail(pollId),
@@ -326,7 +536,10 @@ export function PollDetailPage() {
   }
 
   const mutationError =
-    vote.error ?? (suggest.error && !suggestError ? suggest.error : null) ?? guestPanelError
+    vote.error ??
+    (suggest.error && !suggestError ? suggest.error : null) ??
+    guestPanelError ??
+    finalizeError
 
   return (
     <main
@@ -479,6 +692,14 @@ export function PollDetailPage() {
               ))}
             </ul>
           </section>
+
+          {isOrganizer && windowState === 'awaitingSelection' && (
+            <FinalizeSection
+              locale={i18n.language}
+              pollId={pollId}
+              onError={setFinalizeError}
+            />
+          )}
 
           {isOrganizer && (windowState === 'polling' || windowState === 'awaitingSelection') && (
             <GuestPanel

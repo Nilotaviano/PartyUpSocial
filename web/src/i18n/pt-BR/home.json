@@ -14,7 +14,8 @@
     },
     "polls": {
       "heading": "Enquetes",
-      "empty": "Ainda não há enquetes."
+      "empty": "Nenhuma enquete precisa do seu voto agora.",
+      "seeAll": "Ver todas"
     },
     "upcoming": {
       "heading": "Próximas",

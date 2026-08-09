@@ -203,4 +203,50 @@ public sealed class PollVotingFlowTests(PlaywrightFixture fixture)
         await guestPage.GetByText("Your vote was saved.").WaitForAsync();
         Assert.DoesNotContain("token", guestPage.Url, StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// PHASE6_DESIGN.md §6 S7 row's named gate: create→vote→finalize→session, end to end. The
+    /// poll's deadline is a fixed 6/12/24/48h choice (`PollDeadlineChoice`) — no organizer action
+    /// closes voting early — so a real browser run cannot wait out even the shortest choice.
+    /// <see cref="PlaywrightFixture.RunSqlBackdoorAsync"/> backdates the just-created poll's own
+    /// `deadline` row to a minute in the past on the same Postgres the running API reads from; the
+    /// server's own real clock is what evaluates Finalize's guard from that point on — nothing about
+    /// the finalize call itself is mocked or short-circuited.
+    /// </summary>
+    [Fact]
+    public async Task Organizer_CreatesVotesFinalizesAndReachesTheSession_EndToEnd()
+    {
+        RegisteredUser organizer = await GetOrganizerAsync();
+        string title = "Finalize proof " + Guid.NewGuid().ToString("N")[..6];
+        string pollId = await CreatePrivatePollAsync(organizer.Page, title, DateTime.UtcNow.AddDays(2));
+
+        // Vote first, while the poll is still open — the created poll's own two options.
+        ILocator firstOptionCard = organizer.Page.Locator("[data-testid^='poll-option-']").First;
+        await firstOptionCard.Locator("[data-testid^='vote-available-']").ClickAsync();
+        await organizer.Page.GetByText("Your vote was saved.").WaitForAsync();
+
+        await fixture.RunSqlBackdoorAsync(
+            $"UPDATE polls SET deadline = now() - interval '1 minute' WHERE id = '{pollId}';");
+
+        await organizer.Page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/polls/" + pollId);
+        await organizer.Page.GetByText("Closed · awaiting selection").WaitForAsync();
+        await organizer.Page.GetByText(
+            "This preview and finalizing use the same rule").First.WaitForAsync();
+
+        ILocator finalizeOption = organizer.Page.Locator("[data-testid^='finalize-option-']").First;
+        await finalizeOption.Locator("input[type=radio]").CheckAsync();
+
+        await organizer.Page.GetByTestId("finalize-trigger").ClickAsync();
+        IResponse response = await organizer.Page.RunAndWaitForResponseAsync(
+            () => organizer.Page.GetByTestId("finalize-confirm").ClickAsync(),
+            candidate => candidate.Url.Contains("/finalize", StringComparison.Ordinal) &&
+                candidate.Request.Method == "POST");
+        Assert.Equal(200, response.Status);
+        System.Text.Json.JsonElement body = (await response.JsonAsync())!.Value;
+        string sessionId = body.GetProperty("sessionId").GetString()!;
+
+        await organizer.Page.WaitForURLAsync(
+            PlaywrightFixture.WebBaseUrl + "/sessions/" + sessionId);
+        await organizer.Page.GetByTestId("screen-session-detail").WaitForAsync();
+    }
 }

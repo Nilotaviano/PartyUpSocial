@@ -14,7 +14,8 @@
     },
     "polls": {
       "heading": "Polls",
-      "empty": "No polls yet."
+      "empty": "No polls need your vote right now.",
+      "seeAll": "See all"
     },
     "upcoming": {
       "heading": "Upcoming",

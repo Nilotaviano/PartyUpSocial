@@ -35,6 +35,18 @@ export type GridSessionEntry = {
   viewerRelation: GridViewerRelation
 }
 
+/** The `pollOptions` layer (D-111/A-080, §5's calendar bullet) — one instant per option,
+ * painted onto the single 15-min slot it starts in (an option carries no duration, spec
+ * §7.3-1). `ownVote` renders through the same value glyphs the voting grid uses (never
+ * color-alone), so a slot's own-vote state is legible without opening the poll. */
+export type GridPollOptionEntry = {
+  id: string
+  pollId: string
+  pollTitle: string
+  start: Date
+  ownVote: 'available' | 'maybe' | 'unavailable' | null
+}
+
 export type WeekGridProps = {
   /** The grid's first visible day at local midnight — already in the
    * viewer's profile zone (D-046); WeekGrid itself never converts zones. */
@@ -53,6 +65,9 @@ export type WeekGridProps = {
    * inherited row (D-149's discoverable sessions) renders with a distinct,
    * non-color-only label, never a second gridcell. */
   sessionEntries?: GridSessionEntry[]
+  /** The `pollOptions` layer (D-111/A-080) — instants only, painted into the one slot each
+   * starts in; never a second gridcell or tab stop (§10.3's ARIA audit). */
+  pollOptionEntries?: GridPollOptionEntry[]
   onCreateBlock: (range: GridRange) => void
   onEditOccurrence: (occurrenceId: string) => void
   dayLabels: string[]
@@ -96,6 +111,7 @@ export function WeekGrid({
   merged,
   friendRanges = [],
   sessionEntries = [],
+  pollOptionEntries = [],
   onCreateBlock,
   onEditOccurrence,
   dayLabels,
@@ -160,6 +176,12 @@ export function WeekGrid({
     const start = cellTime(weekStart, day, slot, startHour)
     const end = cellTime(weekStart, day, slot + 1, startHour)
     return sessionEntries.filter((session) => overlaps(session.start, session.end, start, end))
+  }
+
+  function pollOptionsAt(day: number, slot: number) {
+    const start = cellTime(weekStart, day, slot, startHour)
+    const end = cellTime(weekStart, day, slot + 1, startHour)
+    return pollOptionEntries.filter((option) => option.start >= start && option.start < end)
   }
 
   function announceExtent(day: number, anchorSlot: number, endSlot: number) {
@@ -437,6 +459,7 @@ export function WeekGrid({
               const busy = mergedAt(day, slot)
               const cellFriends = friendsAt(day, slot)
               const cellSessions = sessionsAt(day, slot)
+              const cellPollOptions = pollOptionsAt(day, slot)
               const inSelection =
                 selection &&
                 selection.day === day &&
@@ -476,6 +499,16 @@ export function WeekGrid({
                   session.viewerRelation === 'inherited'
                     ? t('a11y.sessionInherited', { title: session.title })
                     : t('a11y.sessionLabel', { title: session.title }),
+                )
+              }
+              for (const option of cellPollOptions) {
+                labelParts.push(
+                  option.ownVote
+                    ? t('a11y.pollOptionWithVote', {
+                        title: option.pollTitle,
+                        vote: t(`a11y.pollVote.${option.ownVote}`),
+                      })
+                    : t('a11y.pollOption', { title: option.pollTitle }),
                 )
               }
 
@@ -545,6 +578,16 @@ export function WeekGrid({
                       {session.viewerRelation === 'inherited'
                         ? `${session.title} (${t('a11y.inherited')})`
                         : session.title}
+                    </span>
+                  ))}
+                  {cellPollOptions.map((option) => (
+                    <span
+                      key={option.id}
+                      aria-hidden="true"
+                      className="block truncate text-[10px] font-semibold leading-tight text-maybe-ink"
+                      data-layer="poll-option"
+                    >
+                      {option.pollTitle}
                     </span>
                   ))}
                 </div>

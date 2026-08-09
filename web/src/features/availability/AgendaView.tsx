@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 
 export type AgendaEntry = {
   id: string
-  kind: 'availability' | 'session'
+  kind: 'availability' | 'session' | 'pollOption'
   start: Date
   end: Date
   title: string

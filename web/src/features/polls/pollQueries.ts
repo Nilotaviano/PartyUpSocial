@@ -10,12 +10,17 @@ export type CreatePollResponse = components['schemas']['CreatePollResponse']
 export type PollBand = 'involved' | 'discoverable'
 export type GuestLinkInvitation = components['schemas']['GuestLinkInvitationResponse']
 export type VoteChoiceWire = 'available' | 'maybe' | 'unavailable'
+export type FinalizationPreview = components['schemas']['PollFinalizationPreviewResponse']
+export type FinalizationPreviewOption =
+  components['schemas']['PollFinalizationPreviewOptionResponse']
+export type FinalizePollResponse = components['schemas']['FinalizePollResponse']
 
 export const pollKeys = {
   list: (band: PollBand, cursor?: string) =>
     ['polls', band, cursor ?? null] as const,
   listFamily: (band: PollBand) => ['polls', band] as const,
   detail: (pollId: string) => ['poll', pollId] as const,
+  finalizationPreview: (pollId: string) => ['poll', pollId, 'finalization-preview'] as const,
 }
 
 const csrf = { 'X-CSRF-TOKEN': '' }
@@ -89,6 +94,27 @@ export async function removePollGuest(pollId: string, guestIdentityId: string) {
   await client.POST('/api/v1/polls/{pollId}/guests/{guestIdentityId}/remove', {
     params: { header: csrf, path: { pollId, guestIdentityId } },
   })
+}
+
+// design §5/§4: same clock-inclusive gate as Finalize (never materialized `Closed`
+// alone) — the server can 409/422 with poll_invalid_transition (premature),
+// poll_selection_window_closed, or poll_zero_options; the page renders those honestly
+// rather than assuming the preview is always available in awaitingSelection.
+export async function getPollFinalizationPreview(pollId: string) {
+  const { data } = await client.GET('/api/v1/polls/{pollId}/finalization-preview', {
+    params: { path: { pollId } },
+  })
+  if (!data) throw new Error('Finalization preview response was empty.')
+  return data
+}
+
+export async function finalizePoll(pollId: string, optionId: string) {
+  const { data } = await client.POST('/api/v1/polls/{pollId}/finalize', {
+    params: { header: csrf, path: { pollId } },
+    body: { optionId },
+  })
+  if (!data) throw new Error('Finalize response was empty.')
+  return data
 }
 
 export type PollWindow = Pick<

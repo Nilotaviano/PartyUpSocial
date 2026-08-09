@@ -55,7 +55,13 @@
     "empty": "No hay horarios en común en este rango.",
     "suggestionsHeading": "5 mejores sugerencias",
     "seeAll": "Ver todas",
-    "scheduleCta": "Programar este horario"
+    "scheduleCta": "Programar este horario",
+    "pollArm": {
+      "addToPoll": "Agregar a la encuesta",
+      "selectedCount": "{{count}} horario seleccionado para una encuesta",
+      "selectedCount_other": "{{count}} horarios seleccionados para una encuesta",
+      "createPollCta": "Crear encuesta con los horarios seleccionados"
+    }
   },
   "a11y": {
     "gridLabel": "Disponibilidad semanal",
@@ -69,7 +75,14 @@
     "friendsAvailable": "{{count}} amistades disponibles",
     "sessionLabel": "{{title}}",
     "sessionInherited": "{{title}} (descubrible)",
-    "inherited": "Descubrible"
+    "inherited": "Descubrible",
+    "pollOption": "Opción de la encuesta {{title}}",
+    "pollOptionWithVote": "Opción de la encuesta {{title}}, tu voto {{vote}}",
+    "pollVote": {
+      "available": "disponible",
+      "maybe": "tal vez",
+      "unavailable": "no disponible"
+    }
   },
   "errors": {
     "codes": {

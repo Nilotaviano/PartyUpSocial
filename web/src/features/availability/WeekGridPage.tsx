@@ -16,6 +16,7 @@ import {
   WeekGrid,
   type GridFriendRange,
   type GridOccurrence,
+  type GridPollOptionEntry,
   type GridRange,
   type GridSessionEntry,
   type GridViewerRelation,
@@ -229,6 +230,7 @@ export function WeekGridPage() {
   // nothing is hidden before that first report lands.
   const showMyAvailability = layers?.myAvailability ?? true
   const showSessions = layers?.sessions ?? true
+  const showPollOptions = layers?.pollOptions ?? true
 
   const occurrences: GridOccurrence[] = showMyAvailability
     ? (calendar.data?.myAvailability.occurrences ?? []).map((occurrence) => ({
@@ -294,6 +296,20 @@ export function WeekGridPage() {
       }))
     : []
 
+  // D-111/A-080 pollOptions layer (design §5, Phase 6 S4c fill): one instant per option, no
+  // duration (spec §7.3-1) — start and end are the same fake-local instant, painted as a point.
+  const pollOptionEntries: GridPollOptionEntry[] = showPollOptions
+    ? (calendar.data?.pollOptions ?? []).flatMap((poll) =>
+        poll.options.map((option) => ({
+          id: option.optionId,
+          pollId: poll.pollId,
+          pollTitle: poll.title,
+          start: instantToFakeLocal(option.startTime, timeZone),
+          ownVote: (option.ownVote as GridPollOptionEntry['ownVote']) ?? null,
+        })),
+      )
+    : []
+
   const agendaEntries: AgendaEntry[] = [
     ...(showMyAvailability
       ? (calendar.data?.myAvailability.occurrences ?? []).map((occurrence, index) => ({
@@ -313,6 +329,13 @@ export function WeekGridPage() {
         session.viewerRelation === 'inherited'
           ? `${session.title} (${t('a11y.inherited')})`
           : session.title,
+    })),
+    ...pollOptionEntries.map((option) => ({
+      id: `poll-option-${option.id}`,
+      kind: 'pollOption' as const,
+      start: option.start,
+      end: option.start,
+      title: option.pollTitle,
     })),
   ]
 
@@ -514,7 +537,14 @@ export function WeekGridPage() {
         </button>
       </div>
 
-      <CalendarLayers friends={friends} onChange={setLayers} />
+      <CalendarLayers
+        friends={friends}
+        pollItems={(calendar.data?.pollOptions ?? []).map((poll) => ({
+          pollId: poll.pollId,
+          title: poll.title,
+        }))}
+        onChange={setLayers}
+      />
 
       {isAgenda ? (
         <AgendaView
@@ -528,6 +558,7 @@ export function WeekGridPage() {
           friendRanges={friendRanges}
           merged={merged}
           occurrences={occurrences}
+          pollOptionEntries={pollOptionEntries}
           sessionEntries={sessionEntries}
           timeLabelFormatter={timeLabelFormatter}
           weekStart={weekStart}

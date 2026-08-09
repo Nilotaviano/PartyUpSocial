@@ -20,12 +20,12 @@ vi.mock('react-router', async () => {
 import '../../i18n'
 import { PollCreatePage } from './PollCreatePage'
 
-function renderPage() {
+function renderPage(initialEntry = '/polls/new') {
   return render(
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <PollCreatePage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -169,5 +169,46 @@ describe('PollCreatePage', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(navigateSpy).toHaveBeenCalledWith('/polls')
+  })
+
+  describe('prefill poll arm (S7, D-102/D-163, A-083)', () => {
+    it('reads repeated startTimes into the option editor, deduped and sorted_D102', async () => {
+      api.get.mockResolvedValue({ data: { items: [] } })
+      renderPage(
+        '/polls/new?startTimes=2099-03-02T10%3A00%3A00Z&startTimes=2099-03-01T10%3A00%3A00Z&startTimes=2099-03-01T10%3A00%3A00Z',
+      )
+
+      const list = await screen.findByRole('group', { name: 'Candidate times' })
+      const items = within(list).getAllByRole('listitem')
+      // Deduped (the repeated instant collapses to one) and sorted, never the URL's own order.
+      expect(items).toHaveLength(2)
+      expect(items[0]).toHaveTextContent('Mar 1, 2099')
+      expect(items[1]).toHaveTextContent('Mar 2, 2099')
+    })
+
+    it('clamps a past-lead startTime up to now + 15 min and surfaces the clamp, never silently_D102', async () => {
+      api.get.mockResolvedValue({ data: { items: [] } })
+      renderPage(`/polls/new?startTimes=${encodeURIComponent(new Date(0).toISOString())}`)
+
+      expect(
+        await screen.findByText(
+          'The start time was moved to the earliest time allowed (15 minutes from now).',
+        ),
+      ).toBeInTheDocument()
+      const list = screen.getByRole('group', { name: 'Candidate times' })
+      expect(within(list).getAllByRole('listitem')).toHaveLength(1)
+    })
+
+    it('never surfaces a clamp notice with no prefill at all', async () => {
+      api.get.mockResolvedValue({ data: { items: [] } })
+      renderPage()
+
+      await screen.findByLabelText('Title')
+      expect(
+        screen.queryByText(
+          'The start time was moved to the earliest time allowed (15 minutes from now).',
+        ),
+      ).not.toBeInTheDocument()
+    })
   })
 })

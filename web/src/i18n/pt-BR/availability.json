@@ -55,7 +55,13 @@
     "empty": "Nenhum horário em comum neste período.",
     "suggestionsHeading": "5 principais sugestões",
     "seeAll": "Ver todos",
-    "scheduleCta": "Agendar este horário"
+    "scheduleCta": "Agendar este horário",
+    "pollArm": {
+      "addToPoll": "Adicionar à enquete",
+      "selectedCount": "{{count}} horário selecionado para uma enquete",
+      "selectedCount_other": "{{count}} horários selecionados para uma enquete",
+      "createPollCta": "Criar enquete com os horários selecionados"
+    }
   },
   "a11y": {
     "gridLabel": "Disponibilidade semanal",
@@ -69,7 +75,14 @@
     "friendsAvailable": "{{count}} amigos disponíveis",
     "sessionLabel": "{{title}}",
     "sessionInherited": "{{title}} (descobrível)",
-    "inherited": "Descobrível"
+    "inherited": "Descobrível",
+    "pollOption": "Opção da enquete {{title}}",
+    "pollOptionWithVote": "Opção da enquete {{title}}, seu voto {{vote}}",
+    "pollVote": {
+      "available": "disponível",
+      "maybe": "talvez",
+      "unavailable": "indisponível"
+    }
   },
   "errors": {
     "codes": {

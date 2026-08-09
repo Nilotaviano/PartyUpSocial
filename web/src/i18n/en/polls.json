@@ -97,6 +97,17 @@
     "added": "Your suggestion was added.",
     "optionCap": "This poll already has 12 candidate times — the most it can hold."
   },
+  "finalize": {
+    "heading": "Choose a time",
+    "previewGuarantee": "This preview and finalizing use the same rule — the same inputs always produce the same result. If something changes in between (an option is removed, or someone's access changes), the outcome may differ from what's shown here.",
+    "chooseOption": "Choose the time to finalize",
+    "belowMinimum": "Below minimum attendance",
+    "going": "Going: {{names}}",
+    "waitlisted": "Waitlisted: {{names}}",
+    "action": "Finalize",
+    "confirmTitle": "Finalize this poll?",
+    "confirmBody": "This creates a session at {{time}} and cannot be undone."
+  },
   "guests": {
     "heading": "Guest links",
     "mint": "Create link",

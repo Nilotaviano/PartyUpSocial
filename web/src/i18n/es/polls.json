@@ -97,6 +97,17 @@
     "added": "Tu sugerencia se agregó.",
     "optionCap": "Esta encuesta ya tiene 12 horarios candidatos, el máximo que puede tener."
   },
+  "finalize": {
+    "heading": "Elegir un horario",
+    "previewGuarantee": "Esta vista previa y la finalización usan la misma regla: las mismas entradas siempre producen el mismo resultado. Si algo cambia mientras tanto (se elimina una opción o cambia el acceso de alguien), el resultado puede diferir de lo mostrado aquí.",
+    "chooseOption": "Elige el horario para finalizar",
+    "belowMinimum": "Por debajo de la asistencia mínima",
+    "going": "Confirmados: {{names}}",
+    "waitlisted": "En lista de espera: {{names}}",
+    "action": "Finalizar",
+    "confirmTitle": "¿Finalizar esta encuesta?",
+    "confirmBody": "Esto crea una sesión a las {{time}} y no se puede deshacer."
+  },
   "guests": {
     "heading": "Enlaces de invitado",
     "mint": "Crear enlace",

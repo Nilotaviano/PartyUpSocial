@@ -52,6 +52,7 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
         string OwnFriendCode,
         string PollId,
         string PollGuestLinkUrl,
+        string PollAwaitingSelectionId,
         IReadOnlyDictionary<(string Step, AuditedTheme Theme), AxeResultItem[]> OnboardingFindings);
 
     /// <summary>
@@ -156,8 +157,27 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
             // route below.
             string pollGuestLinkUrl = await MintPollGuestLinkFixtureAsync(organizer.Page, pollId);
 
+            // Phase 6 S7 (PHASE6_DESIGN.md §5/§6.1, ticket-P6-S7): a second poll, voted then
+            // backdated past its deadline via `PlaywrightFixture.RunSqlBackdoorAsync` (the poll's
+            // fixed 6/12/24/48h deadline choice makes a real wait infeasible in this lane) — reaches
+            // the awaitingSelection UI (organizer selection controls + finalization preview) the S5
+            // poll above never renders.
+            string pollAwaitingSelectionId = await CreatePollFixtureAsync(organizer.Page, "Axe audit poll (awaiting selection)");
+            ILocator firstVoteControl = organizer.Page.Locator("[data-testid^='vote-available-']").First;
+            await firstVoteControl.ClickAsync();
+            await organizer.Page.GetByText("Your vote was saved.").WaitForAsync();
+            await fixture.RunSqlBackdoorAsync(
+                $"UPDATE polls SET deadline = now() - interval '1 minute' WHERE id = '{pollAwaitingSelectionId}';");
+
             _context = new AuditContext(
-                organizer, sessionId, guestLinkUrl, ownFriendCode, pollId, pollGuestLinkUrl, onboardingFindings);
+                organizer,
+                sessionId,
+                guestLinkUrl,
+                ownFriendCode,
+                pollId,
+                pollGuestLinkUrl,
+                pollAwaitingSelectionId,
+                onboardingFindings);
             return _context;
         }
         finally
@@ -216,10 +236,10 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
     /// (D-131's minimum), a guest link (D-125's private-guest-only arm, `guestLinkCount: 1`) and
     /// no invited friend, mirroring the session fixture's own private-session choice above.
     /// </summary>
-    private static async Task<string> CreatePollFixtureAsync(IPage page)
+    private static async Task<string> CreatePollFixtureAsync(IPage page, string title = "Axe audit poll")
     {
         await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/polls/new");
-        await page.Locator("#field-title").FillAsync("Axe audit poll");
+        await page.Locator("#field-title").FillAsync(title);
 
         string optionOne = DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
         string optionTwo = DateTime.UtcNow.AddDays(2).ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
@@ -344,7 +364,11 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
                     .Replace("{sessionId}", context.SessionId, StringComparison.Ordinal)
                     .Replace("{username}", context.Organizer.Username, StringComparison.Ordinal)
                     .Replace("{code}", context.OwnFriendCode, StringComparison.Ordinal)
-                    .Replace("{pollId}", context.PollId, StringComparison.Ordinal);
+                    .Replace("{pollId}", context.PollId, StringComparison.Ordinal)
+                    .Replace(
+                        "{pollAwaitingSelectionId}",
+                        context.PollAwaitingSelectionId,
+                        StringComparison.Ordinal);
                 // A fresh tab on the organizer's own authenticated context (never the organizer's
                 // persistent page) — shares its cookies so the route still renders signed-in, but
                 // never navigated before, so the theme seed below is guaranteed to land before this

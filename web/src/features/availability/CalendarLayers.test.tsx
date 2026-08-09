@@ -43,15 +43,38 @@ describe('CalendarLayers', () => {
     expect(screen.queryByLabelText('Ana')).not.toBeInTheDocument()
   })
 
-  it('declares a poll options layer with no poll items to render_D111', () => {
+  it('renders each in-range poll as a legend item under the poll options toggle_D111', () => {
     const onChange = vi.fn<(state: CalendarLayerState) => void>()
-    render(<CalendarLayers friends={[]} onChange={onChange} />)
+    render(
+      <CalendarLayers
+        friends={[]}
+        pollItems={[
+          { pollId: 'poll-1', title: 'Raid night poll' },
+          { pollId: 'poll-2', title: 'Board game poll' },
+        ]}
+        onChange={onChange}
+      />,
+    )
 
     const toggle = screen.getByLabelText('Poll options')
     expect(toggle).toBeChecked()
     expect(onChange.mock.calls.at(-1)![0].pollOptions).toBe(true)
-    // The component accepts no poll-item prop at all — there is structurally
-    // nothing it could render as a poll option (Phase 6 seam, A-080).
+
+    const items = screen.getAllByRole('listitem')
+    expect(items).toHaveLength(2)
+    expect(items[0]).toHaveTextContent('Raid night poll')
+    expect(items[1]).toHaveTextContent('Board game poll')
+
+    // Toggling the layer off hides the poll legend items too — one toggle, one data source.
+    fireEvent.click(toggle)
+    expect(screen.queryByRole('listitem')).not.toBeInTheDocument()
+  })
+
+  it('renders no poll legend items with an empty poll list, the Phase 6 seam default', () => {
+    const onChange = vi.fn<(state: CalendarLayerState) => void>()
+    render(<CalendarLayers friends={[]} onChange={onChange} />)
+
+    expect(screen.getByLabelText('Poll options')).toBeChecked()
     expect(screen.queryByRole('listitem')).not.toBeInTheDocument()
   })
 

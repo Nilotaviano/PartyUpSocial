@@ -13,10 +13,19 @@ export type CalendarLayerState = {
   shownFriendOrdinals: Set<number>
 }
 
+export type CalendarPollItemSummary = {
+  pollId: string
+  title: string
+}
+
 type CalendarLayersProps = {
   /** The owners present in the current `friendAvailability` response
    * (§8.1 `MaskedParticipant` — ordinal only, never an id). */
   friends: MaskedParticipant[]
+  /** Phase 6 S7 fill (design §5/§6.3): the polls whose options are in range, the same
+   * `CalendarPollOptionView` list the grid/agenda paint from — a summary list here, never a
+   * second fetch. Defaults to empty so every S5/S6 caller keeps compiling untouched. */
+  pollItems?: CalendarPollItemSummary[]
   onChange: (state: CalendarLayerState) => void
 }
 
@@ -27,7 +36,7 @@ type CalendarLayersProps = {
  * no `localStorage`, and no URL default (design §5.1/A-080) — proven by
  * `CalendarLayers.test.tsx`'s no-write assertion.
  */
-export function CalendarLayers({ friends, onChange }: CalendarLayersProps) {
+export function CalendarLayers({ friends, pollItems = [], onChange }: CalendarLayersProps) {
   const { t } = useTranslation('availability')
   const [myAvailability, setMyAvailability] = useState(true)
   const [friendAvailability, setFriendAvailability] = useState(true)
@@ -108,6 +117,14 @@ export function CalendarLayers({ friends, onChange }: CalendarLayersProps) {
         <span aria-hidden="true" className="h-3 w-3 rounded-full border border-ink/40 bg-maybe" />
         {t('calendar.layers.pollOptions')}
       </label>
+
+      {pollOptions && pollItems.length > 0 && (
+        <ul className="ml-6 space-y-1 border-l border-ink/25 pl-4 text-sm text-ink-soft">
+          {pollItems.map((poll) => (
+            <li key={poll.pollId}>{poll.title}</li>
+          ))}
+        </ul>
+      )}
 
       {friendAvailability && friends.length > 0 && (
         <fieldset className="ml-6 space-y-1 border-l border-ink/25 pl-4">
