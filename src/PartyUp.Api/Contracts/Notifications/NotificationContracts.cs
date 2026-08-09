@@ -102,8 +102,3 @@ public static class NotificationWireFormat
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 }
-
-// ---- PHASE7_DESIGN.md §4: mute ---------------------------------------------------------------------
-
-[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record MuteStateResponse(bool Muted);

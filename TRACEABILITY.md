@@ -811,11 +811,12 @@ preferences and `PlaywrightFixture` wiring — S5/S6 own those.
 
 | Decision | Slice S4 citations |
 |---|---|
-| D-082 | `NotificationPushHttpTests.SetReminderDefault_ReplansFutureHandoffsAgainstTheNewOffset_D082` |
-| D-090/D-113 | `NotificationPushHttpTests.MuteSession_InvisibleTarget_Is404_AndMuteUnmuteAreIdempotent` |
+| D-082 | `NotificationPushHttpTests.SetReminderDefault_ReplansFutureHandoffsAgainstTheNewOffset_D082`; `SetReminderDefaultUseCaseTests.Execute_PagesUntilAShortPageEndsIt_AndReplansEachRealSessionAgainstTheNewOffset` (page-loop call pattern, lock order, `ReplansWithDefault`) |
+| D-090/D-113 | `NotificationPushHttpTests.MuteSession_InvisibleTarget_Is404_AndMuteUnmuteAreIdempotent_D090_D113`; `MutePoll_InvisibleTarget_Is404_D090`; `UnmutePoll_OnALivePoll_RemovesThePollKeyedRowDirectly_D090` |
 | D-113 | `NotificationPushHttpTests.MutePoll_TerminalPoll_Refused_UnmutePoll_OnFinalizedRemovesReparentedRow_D113` |
-| D-076/D-086 | `NotificationPushHttpTests.NotificationWireShape_BlockedPairActorOmitsBothActorFields` |
-| D-112 | `NotificationPushHttpTests.CreatePushSubscription_RePostWithRotatedKeys_ReturnsSameIdAndStoresNewKeys_S1Carry` (the S1 verification carry) |
+| D-076/D-086 | `NotificationPushHttpTests.NotificationWireShape_BlockedPairActorOmitsBothActorFields_D076_D086` |
+| D-112 | `NotificationPushHttpTests.CreatePushSubscription_RePostWithRotatedKeys_ReturnsSameIdAndStoresNewKeys_S1Carry_D112` (the S1 verification carry) |
+| D-147 | `NotificationPushHttpTests.MyProfile_PushPromptEligible_FalseUntilAQualifyingAction_ThenTrue_D147` |
 
 S4 ships PHASE7_DESIGN.md §4 whole: the eleven-operation HTTP surface — `GetPushConfig`,
 `CreatePushSubscription`/`DeletePushSubscription` (`src/PartyUp.Api/Endpoints/NotificationEndpoints.cs`),
@@ -834,7 +835,7 @@ projects through the shipped S2 `NotificationReadUseCases` — this slice adds n
 **The S1 carry (verification finding):** `PushSubscription.RotateKeys` (the one Domain edit this slice
 authorizes) + `PushSubscriptionRepository.UpsertActiveAsync` now overwrite `PublicKey`/`AuthSecret` on
 a re-POST of the same (user, channel, endpoint) rather than returning the existing row unchanged —
-`NotificationPushHttpTests.CreatePushSubscription_RePostWithRotatedKeys_ReturnsSameIdAndStoresNewKeys_S1Carry`
+`NotificationPushHttpTests.CreatePushSubscription_RePostWithRotatedKeys_ReturnsSameIdAndStoresNewKeys_S1Carry_D112`
 proves same id, new stored keys, against a real Postgres row. Channel validation
 (`push_channel_unsupported`) and the §8 configuration gate (`push_not_configured`) are proven by
 `CreatePushSubscription_UnsupportedChannel_Is400`/`CreatePushSubscription_VapidNotConfigured_Is409`.
@@ -847,13 +848,21 @@ proves same id, new stored keys, against a real Postgres row. Channel validation
 (`ux_notification_mutes_session_user`/`ux_notification_mutes_poll_user`), reached only through
 `INSERT ... ON CONFLICT DO NOTHING` (ARCHITECTURE §3). Visibility-gated fail-closed
 (`session_not_found`/`poll_not_found`, unchanged codes), idempotent both directions
-(`MuteSession_InvisibleTarget_Is404_AndMuteUnmuteAreIdempotent`). `MutePoll` on a terminal poll is
+(`MuteSession_InvisibleTarget_Is404_AndMuteUnmuteAreIdempotent_D090_D113`,
+`MutePoll_InvisibleTarget_Is404_D090`). `MutePoll` on a terminal poll is
 refused with the shipped `poll_invalid_transition`; `UnmutePoll` on a `Finalized` poll is not refused
 and removes the re-parented row through `Poll.CreatedSessionId` (`Session.OriginPollId`'s linkage from
 the other side), so `muted` reads false on the poll afterwards
-(`MutePoll_TerminalPoll_Refused_UnmutePoll_OnFinalizedRemovesReparentedRow_D113`). `PollDetailResponse.muted`
+(`MutePoll_TerminalPoll_Refused_UnmutePoll_OnFinalizedRemovesReparentedRow_D113`); `UnmutePoll` on a
+still-live (`Polling`) poll instead removes the poll-keyed row directly through
+`RemoveForTargetAsync`'s poll branch (`UnmutePoll_OnALivePoll_RemovesThePollKeyedRowDirectly_D090`).
+`PollDetailResponse.muted`
 and `PollDetail.Muted` (`PollReadUseCases`) read through the same `CreatedSessionId` resolution on every
-`GET /polls/{id}`.
+`GET /polls/{id}`. **N1 fix wave (ticket-P7-S4-notes):** `SessionDetailResponse` gains the same `muted`
+field on the registered-viewer session detail read (`SessionReadUseCases.GetSessionDetailAsync`, mirroring
+`PollDetailResponse.muted`'s `ExistsForTargetAsync` read) — the S6 session mute toggle would otherwise be
+write-only — proven by
+`NotificationPushHttpTests.GetSessionDetail_MutedReadsTrueAfterPutMute_FalseAfterDeleteMute_D090_N1`.
 
 **Reminder-default replan (closes the live D-082 gap):** `SetReminderDefaultUseCase` now pages
 `ISessionRepository.ListFutureSessionsWithEligibleParticipationAsync` (future, non-terminal, an
@@ -865,18 +874,31 @@ uses the explicit value when supplied, never re-reading the (still-unsaved-in-tr
 the same read-ordering hazard `FinalizePollUseCase.cs:106-109` already documents.
 `NotificationPushHttpTests.SetReminderDefault_ReplansFutureHandoffsAgainstTheNewOffset_D082` proves a
 1h → 24h change moves an existing future handoff's `DueAt` to the new offset end-to-end over HTTP.
+**N3 fix wave:** `SetReminderDefaultUseCaseTests.Execute_PagesUntilAShortPageEndsIt_AndReplansEachRealSessionAgainstTheNewOffset`
+proves the page loop's continuation/exhaustion via a recording decorator's call pattern (a 100-long
+first page, a short second page that ends it) rather than seeding an excessive real fixture, reads the
+previously-unread `RecordingReminderHandoffWriter.ReplansWithDefault` recorder to confirm every replan
+carries the new offset through the explicit parameter, and asserts the shipped
+`LockUsersAsync`-then-`LockSessionsAsync` order per candidate.
 
 **`MyProfileResponse.pushPromptEligible`** (`GetMyProfileUseCase` + new `IPushPromptEligibilityRepository`):
 a per-request `EXISTS` over the caller's own `session_participations`/`poll_participants`/`join_requests`
-rows, no cache, no stored flag.
+rows, no cache, no stored flag —
+`NotificationPushHttpTests.MyProfile_PushPromptEligible_FalseUntilAQualifyingAction_ThenTrue_D147` proves a
+brand-new onboarded user reads false and reads true immediately after creating a session.
 
 **Inventory extensions (disclosed-extension precedent):** the antiforgery equality inventory
 (`AntiforgeryTests.cs`) gains the eight unsafe S4 routes; the rate-limit dimension map goes 30 → 33
 (`notification-read`/`notification-write`/`push-subscribe`, `RateLimitTests.EveryDimensionCoversItsDocumentedRoutes`);
 the closed problem-code inventory (`PartyUpOpenApiTransformer.ProblemCodes`) gains
-`notification_not_found`/`push_subscription_not_found`/`push_not_configured`/`push_channel_unsupported`;
+`notification_not_found`/`push_subscription_not_found`/`push_not_configured`/`push_channel_unsupported`,
+closed by `NotificationPushHttpTests.EveryDocumentedPhase7ProblemCodeIsExercisedOrAcceptedAsAResidual`
+(N2 fix wave — the Phase 4/6 equality-closure precedent extended over the S4 section, so a spurious
+fifth code fails the assertion until it lands in the covered set);
 the op-id set grows by exactly the eleven ids named above
 (`AvailabilityOpenApiTests.OperationIdsAreGloballyUniqueAndEveryProblemCodeMaps_A071`,
 `GameSessionEndpointTests.InventoryHasExactOperationIdsAndSchemas`,
-`NotificationPushHttpTests.OperationIds_S4Surface_AddsExactlyElevenIds`). **Not in this slice:** the web
+`NotificationPushHttpTests.OperationIds_S4Surface_AddsExactlyElevenIds` — N6 fix wave: now a real
+closure pinning the live total op-id count (130) alongside the eleven names, not only their mutual
+distinctness). **Not in this slice:** the web
 notification center, enable flow, preferences and mute UX — S5/S6 own those.

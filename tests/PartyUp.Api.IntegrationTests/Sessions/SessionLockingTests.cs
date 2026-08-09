@@ -644,7 +644,8 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
             readScope.ServiceProvider.GetRequiredService<ISessionRepository>(),
             readScope.ServiceProvider.GetRequiredService<ISessionReadRepository>(),
             readScope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
-            readScope.ServiceProvider.GetRequiredService<IBlockRepository>());
+            readScope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+            readScope.ServiceProvider.GetRequiredService<INotificationMuteRepository>());
 
         // A GET must take no row locks: this must complete promptly even though another transaction
         // holds FOR UPDATE on the very block row this read's viewer-facts query touches.

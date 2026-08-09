@@ -84,7 +84,8 @@ public sealed record SessionDetail(
     SessionStatus Status,
     Instant CreatedAt,
     IReadOnlyList<RosterEntry> Roster,
-    uint ConcurrencyToken);
+    uint ConcurrencyToken,
+    bool Muted = false);
 
 public sealed record JoinRequestSummary(
     JoinRequestId Id,

@@ -4,6 +4,7 @@ using PartyUp.Application.Sessions;
 using PartyUp.Application.Tests.Friends;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users;
 using PartyUp.Domain.Visibility;
@@ -269,6 +270,41 @@ internal sealed class FakeBlockRepository : IBlockRepository
     public void Remove(Block block) => Items.Remove(block);
 }
 
+internal sealed class FakeNotificationMuteRepository : INotificationMuteRepository
+{
+    internal List<NotificationMute> Items { get; } = [];
+
+    public Task DeleteForUserAsync(UserId userId, CancellationToken cancellationToken)
+    {
+        Items.RemoveAll(mute => mute.UserId == userId);
+        return Task.CompletedTask;
+    }
+
+    public Task AddAsync(NotificationMute mute, CancellationToken cancellationToken)
+    {
+        if (!Items.Any(existing =>
+            existing.UserId == mute.UserId && existing.SessionId == mute.SessionId && existing.PollId == mute.PollId))
+        {
+            Items.Add(mute);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveForTargetAsync(
+        UserId userId, SessionId? sessionId, PollId? pollId, CancellationToken cancellationToken)
+    {
+        Items.RemoveAll(mute =>
+            mute.UserId == userId && mute.SessionId == sessionId && mute.PollId == pollId);
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> ExistsForTargetAsync(
+        UserId userId, SessionId? sessionId, PollId? pollId, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.Any(mute =>
+            mute.UserId == userId && mute.SessionId == sessionId && mute.PollId == pollId));
+}
+
 internal sealed class RollbackAwareUnitOfWork(FakeSessionRepository sessions) : IUnitOfWork
 {
     internal int Executions { get; private set; }
@@ -316,6 +352,7 @@ internal sealed class SessionTestFixture
         Reminders = new RecordingReminderHandoffWriter();
         UnitOfWork = new RollbackAwareUnitOfWork(Sessions);
         Reads = new FakeSessionReadRepository(Sessions);
+        Mutes = new FakeNotificationMuteRepository();
 
         (OrganizerId, InviteeId) = Friendships.MakeAccepted(Clock);
     }
@@ -341,6 +378,8 @@ internal sealed class SessionTestFixture
     internal RollbackAwareUnitOfWork UnitOfWork { get; }
 
     internal FakeSessionReadRepository Reads { get; }
+
+    internal FakeNotificationMuteRepository Mutes { get; }
 
     internal FakeSessionVersionStamp VersionStamp { get; } = new();
 
@@ -399,7 +438,7 @@ internal sealed class SessionTestFixture
         new(Sessions, Locks, Reminders, UnitOfWork, Clock);
 
     internal SessionReadUseCases ReadUseCases() =>
-        new(Sessions, Reads, Friendships, Blocks);
+        new(Sessions, Reads, Friendships, Blocks, Mutes);
 
     /// <summary>Creates and returns a session directly on the repository, bypassing the use case.</summary>
     internal Session SeedSession(

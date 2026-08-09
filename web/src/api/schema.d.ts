@@ -2633,6 +2633,7 @@ export interface components {
             createdAt: string;
             roster: components["schemas"]["RosterEntryResponse"][];
             version: string;
+            muted: boolean;
         };
         SessionPageResponseOfJoinRequestViewResponse: {
             items: components["schemas"]["JoinRequestViewResponse"][];

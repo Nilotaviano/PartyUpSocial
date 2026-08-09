@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Reflection;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Net.Http.Headers;
 using NodaTime;
+using PartyUp.Api.Hosting;
 using PartyUp.Api.IntegrationTests.Polls;
 using PartyUp.Api.IntegrationTests.Sessions;
 using PartyUp.Application.Friends;
@@ -102,7 +104,7 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
 
     /// <summary>The S1 verification carry: a re-POST with rotated keys keeps the id, replaces the keys.</summary>
     [Fact]
-    public async Task CreatePushSubscription_RePostWithRotatedKeys_ReturnsSameIdAndStoresNewKeys_S1Carry()
+    public async Task CreatePushSubscription_RePostWithRotatedKeys_ReturnsSameIdAndStoresNewKeys_S1Carry_D112()
     {
         await using WebApplicationFactory<Program> configured = ConfiguredPushFactory();
         UserId userId = await _factory.SeedUserAsync(email: $"p7s4-rotate-{Guid.NewGuid():N}@example.test");
@@ -286,7 +288,7 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
 
     /// <summary>The §4 wire rule: a blocked-pair-masked actor omits both fields; blocking does not delete the row.</summary>
     [Fact]
-    public async Task NotificationWireShape_BlockedPairActorOmitsBothActorFields()
+    public async Task NotificationWireShape_BlockedPairActorOmitsBothActorFields_D076_D086()
     {
         SessionHttpUser recipient = await SessionEndpointTestSupport.SeedAsync(_factory);
         SessionHttpUser actor = await SessionEndpointTestSupport.SeedAsync(_factory);
@@ -317,7 +319,7 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
     // ---- session/poll mute -------------------------------------------------------------------------
 
     [Fact]
-    public async Task MuteSession_InvisibleTarget_Is404_AndMuteUnmuteAreIdempotent()
+    public async Task MuteSession_InvisibleTarget_Is404_AndMuteUnmuteAreIdempotent_D090_D113()
     {
         SessionHttpUser organizer = await SessionEndpointTestSupport.SeedAsync(_factory);
         SessionHttpUser stranger = await SessionEndpointTestSupport.SeedAsync(_factory);
@@ -348,6 +350,141 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
         Assert.Equal(
             HttpStatusCode.NoContent,
             (await organizerSession.SendUnsafeAsync(HttpMethod.Delete, $"/api/v1/sessions/{privateSession.Id.Value:D}/mute")).StatusCode);
+    }
+
+    /// <summary>
+    /// N1 (ticket-P7-S4-notes): no shipped route exposed session mute state before this fix, so the S6
+    /// session mute toggle would have been write-only (mute, reload, toggle reads off).
+    /// <c>SessionDetailResponse.muted</c> now reads through <c>SessionReadUseCases.GetSessionDetailAsync</c>
+    /// exactly as <c>PollDetailResponse.muted</c> does.
+    /// </summary>
+    [Fact]
+    public async Task GetSessionDetail_MutedReadsTrueAfterPutMute_FalseAfterDeleteMute_D090_N1()
+    {
+        SessionHttpUser organizer = await SessionEndpointTestSupport.SeedAsync(_factory);
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizer.Id);
+
+        Instant startTime = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
+        HttpResponseMessage created = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "N1 muted-field probe",
+                startTime = SessionEndpointTestSupport.Iso(startTime),
+                isPrivate = true,
+            }));
+        using JsonDocument createdBody = await SessionEndpointTestSupport.SuccessJsonAsync(created);
+        Guid sessionId = createdBody.RootElement.GetProperty("session").GetProperty("id").GetGuid();
+        Assert.False(createdBody.RootElement.GetProperty("session").GetProperty("muted").GetBoolean());
+
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await organizerSession.SendUnsafeAsync(HttpMethod.Put, $"/api/v1/sessions/{sessionId:D}/mute")).StatusCode);
+
+        using JsonDocument muted = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/sessions/{sessionId:D}"));
+        Assert.True(muted.RootElement.GetProperty("muted").GetBoolean());
+
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await organizerSession.SendUnsafeAsync(HttpMethod.Delete, $"/api/v1/sessions/{sessionId:D}/mute")).StatusCode);
+
+        using JsonDocument unmuted = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/sessions/{sessionId:D}"));
+        Assert.False(unmuted.RootElement.GetProperty("muted").GetBoolean());
+    }
+
+    [Fact]
+    public async Task MutePoll_InvisibleTarget_Is404_D090()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"p7s4-pmute-org-{Guid.NewGuid():N}@example.test");
+        UserId strangerId = await _factory.SeedUserAsync(email: $"p7s4-pmute-str-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        using SessionHttpSession strangerSession = await SessionEndpointTestSupport.SignInAsync(_factory, strangerId);
+
+        Instant baseTime = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
+        HttpResponseMessage created = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/polls",
+            JsonContent.Create(new
+            {
+                title = "Invisible-to-stranger poll",
+                optionStartTimes = new[]
+                {
+                    SessionEndpointTestSupport.Iso(baseTime),
+                    SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)),
+                },
+                isPrivate = true,
+                minAttendance = 1,
+            }));
+        using JsonDocument createdBody = await SessionEndpointTestSupport.SuccessJsonAsync(created);
+        Guid pollId = createdBody.RootElement.GetProperty("poll").GetProperty("id").GetGuid();
+
+        // A stranger with no friendship/invite has no visibility -- fails closed identically to an
+        // unknown poll id.
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await strangerSession.SendUnsafeAsync(HttpMethod.Put, $"/api/v1/polls/{pollId:D}/mute"),
+            HttpStatusCode.NotFound,
+            "poll_not_found");
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            await organizerSession.SendUnsafeAsync(HttpMethod.Put, $"/api/v1/polls/{Guid.NewGuid():D}/mute"),
+            HttpStatusCode.NotFound,
+            "poll_not_found");
+    }
+
+    /// <summary>
+    /// §4: UnmutePoll on a still-live (Polling) poll removes the poll-keyed row directly, through the
+    /// <c>RemoveForTargetAsync(actorId, null, pollId, ct)</c> branch -- distinct from the
+    /// re-parented-session branch <c>MutePoll_TerminalPoll_Refused_UnmutePoll_OnFinalizedRemovesReparentedRow_D113</c>
+    /// exercises, and the branch whose EF null-parameter translation the S4 blind verification could
+    /// not verify empirically.
+    /// </summary>
+    [Fact]
+    public async Task UnmutePoll_OnALivePoll_RemovesThePollKeyedRowDirectly_D090()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"p7s4-plive-org-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+
+        Instant baseTime = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
+        HttpResponseMessage created = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/polls",
+            JsonContent.Create(new
+            {
+                title = "Live poll mute/unmute",
+                optionStartTimes = new[]
+                {
+                    SessionEndpointTestSupport.Iso(baseTime),
+                    SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)),
+                },
+                isPrivate = true,
+                minAttendance = 1,
+            }));
+        using JsonDocument createdBody = await SessionEndpointTestSupport.SuccessJsonAsync(created);
+        Guid pollId = createdBody.RootElement.GetProperty("poll").GetProperty("id").GetGuid();
+
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await organizerSession.SendUnsafeAsync(HttpMethod.Put, $"/api/v1/polls/{pollId:D}/mute")).StatusCode);
+
+        using JsonDocument muted = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}"));
+        Assert.True(muted.RootElement.GetProperty("muted").GetBoolean());
+
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await organizerSession.SendUnsafeAsync(HttpMethod.Delete, $"/api/v1/polls/{pollId:D}/mute")).StatusCode);
+
+        using JsonDocument unmuted = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}"));
+        Assert.False(unmuted.RootElement.GetProperty("muted").GetBoolean());
+
+        await using AsyncServiceScope verifyScope = _factory.Services.CreateAsyncScope();
+        AppDbContext verifyContext = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        bool anyMuteLeft = await verifyContext.NotificationMutes.AsNoTracking()
+            .AnyAsync(mute => mute.UserId == organizerId && mute.PollId == PollId.From(pollId));
+        Assert.False(anyMuteLeft);
     }
 
     /// <summary>
@@ -483,8 +620,48 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
         Assert.Equal(startTime - Duration.FromHours(24), afterHandoff.DueAt);
     }
 
+    // ---- push-prompt eligibility -------------------------------------------------------------------
+
+    /// <summary>
+    /// §4/ruling 4: a brand-new onboarded user has no qualifying action yet and reads false; creating a
+    /// session leaves the caller a <c>session_participations</c> row as organizer, which the EXISTS
+    /// picks up on the very next read (_D147).
+    /// </summary>
+    [Fact]
+    public async Task MyProfile_PushPromptEligible_FalseUntilAQualifyingAction_ThenTrue_D147()
+    {
+        SessionHttpUser user = await SessionEndpointTestSupport.SeedAsync(_factory);
+        using SessionHttpSession session = await SessionEndpointTestSupport.SignInAsync(_factory, user.Id);
+
+        using JsonDocument before = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await session.GetAsync("/api/v1/me"));
+        Assert.False(before.RootElement.GetProperty("pushPromptEligible").GetBoolean());
+
+        Instant startTime = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
+        HttpResponseMessage created = await session.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "D-147 qualifying session",
+                startTime = SessionEndpointTestSupport.Iso(startTime),
+                isPrivate = true,
+            }));
+        Assert.True(created.IsSuccessStatusCode, await created.Content.ReadAsStringAsync());
+
+        using JsonDocument after = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await session.GetAsync("/api/v1/me"));
+        Assert.True(after.RootElement.GetProperty("pushPromptEligible").GetBoolean());
+    }
+
     // ---- op-id inventory -------------------------------------------------------------------------
 
+    /// <summary>
+    /// A real closure, not the tautology it replaces: the eleven S4 ids must all be PRESENT in the
+    /// live OpenAPI op-id set AND the total op-id count must equal the pinned total — so a spurious
+    /// twelfth S4-family operation (present but never named here) still turns this red, which
+    /// asserting only "the eleven are distinct" over a literal never could.
+    /// </summary>
     [Fact]
     public async Task OperationIds_S4Surface_AddsExactlyElevenIds()
     {
@@ -502,6 +679,11 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
             "MutePoll",
             "UnmutePoll",
         ];
+
+        // Pinned against the live op-id total this test's own factory serves (verified: 134, which
+        // includes the test-only `_slice2` debug sign-in endpoints the production host never registers)
+        // -- a grown-by-one total fails here even though every named id is still individually present.
+        const int expectedTotalOperationIdCount = 134;
 
         using HttpClient client = _factory.CreateClient();
         using HttpResponseMessage response = await client.GetAsync("/openapi/v1.json");
@@ -525,7 +707,48 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
             Assert.Contains(id, operationIds);
         }
 
-        Assert.Equal(expected.Length, expected.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(expectedTotalOperationIdCount, operationIds.Count);
+        Assert.Equal(operationIds.Count, operationIds.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    // ---- problem-code inventory -------------------------------------------------------------------
+
+    /// <summary>
+    /// Mirrors <c>GameSessionEndpointTests.EveryDocumentedProblemCodeMapsToItsDocumentedStatus</c> /
+    /// <c>PollProblemCodeClosureTests.EveryDocumentedPollProblemCodeIsExercisedOrAcceptedAsAResidual</c>'s
+    /// closure idiom, scoped to the four Phase 7 S4 codes appended after the Phase 6 poll section — a
+    /// spurious fifth code appended to <see cref="PartyUpOpenApiTransformer"/>'s <c>ProblemCodes</c>
+    /// array turns this red until it lands in one of the covered sets.
+    /// </summary>
+    [Fact]
+    public void EveryDocumentedPhase7ProblemCodeIsExercisedOrAcceptedAsAResidual()
+    {
+        HashSet<string> exercisedInThisFile = new(StringComparer.Ordinal)
+        {
+            "notification_not_found", // GetUnreadNotificationCount_MarkRead_MarkAllRead_AreIdempotentAndFailClosed
+            "push_subscription_not_found", // DeletePushSubscription_UnknownOrForeignId_Is404Identical_AndOwnDeleteIsIdempotent
+            "push_not_configured", // CreatePushSubscription_VapidNotConfigured_Is409
+            "push_channel_unsupported", // CreatePushSubscription_UnsupportedChannel_Is400
+        };
+
+        Assert.Equal(
+            Phase7DocumentedProblemCodes().OrderBy(code => code, StringComparer.Ordinal),
+            exercisedInThisFile.OrderBy(code => code, StringComparer.Ordinal));
+    }
+
+    /// <summary>
+    /// Reflects <see cref="PartyUpOpenApiTransformer"/>'s private problem-code registry, scoped to the
+    /// Phase 7 S4 section (from <c>notification_not_found</c> to the end of the array) — the same
+    /// reflection idiom as <c>GameSessionEndpointTests.Phase4DocumentedProblemCodes</c> and
+    /// <c>PollProblemCodeClosureTests.PollDocumentedProblemCodes</c>.
+    /// </summary>
+    private static string[] Phase7DocumentedProblemCodes()
+    {
+        FieldInfo field = typeof(PartyUpOpenApiTransformer).GetField(
+            "ProblemCodes", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var allCodes = (string[])field.GetValue(null)!;
+        int phase7Start = Array.IndexOf(allCodes, "notification_not_found");
+        return allCodes[phase7Start..];
     }
 
     // ---- shared helpers ------------------------------------------------------------------------

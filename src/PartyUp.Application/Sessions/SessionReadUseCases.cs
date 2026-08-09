@@ -17,7 +17,8 @@ public sealed class SessionReadUseCases(
     ISessionRepository sessions,
     ISessionReadRepository reads,
     IFriendshipRepository friendships,
-    IBlockRepository blocks)
+    IBlockRepository blocks,
+    INotificationMuteRepository mutes)
 {
     public async Task<SessionDetail?> GetSessionDetailAsync(
         SessionId sessionId,
@@ -38,7 +39,13 @@ public sealed class SessionReadUseCases(
         }
 
         SessionDetail? detail = await reads.FindDetailAsync(sessionId, cancellationToken);
-        return detail is null ? null : MaskBlockedPairRoster(detail, viewer);
+        if (detail is null)
+        {
+            return null;
+        }
+
+        bool muted = await mutes.ExistsForTargetAsync(viewerId, sessionId, null, cancellationToken);
+        return MaskBlockedPairRoster(detail, viewer) with { Muted = muted };
     }
 
     /// <summary>

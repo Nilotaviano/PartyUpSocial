@@ -286,7 +286,8 @@ public sealed record SessionDetailResponse(
     string Status,
     string CreatedAt,
     IReadOnlyList<RosterEntryResponse> Roster,
-    string Version)
+    string Version,
+    bool Muted)
 {
     public static SessionDetailResponse From(SessionDetail detail, string version) =>
         new(
@@ -304,7 +305,8 @@ public sealed record SessionDetailResponse(
             SessionWireFormat.Status(detail.Status),
             SessionWireFormat.Format(detail.CreatedAt),
             detail.Roster.Select(RosterEntryResponse.From).ToArray(),
-            version);
+            version,
+            detail.Muted);
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

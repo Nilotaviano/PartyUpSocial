@@ -15,6 +15,10 @@ public sealed class PushPromptEligibilityRepository(AppDbContext context) : IPus
     public async Task<bool> IsEligibleAsync(UserId userId, CancellationToken cancellationToken)
     {
         Guid user = userId.Value;
+        // EF Core's SqlQuery<T> scalar overload requires the projected column to be named "Value"
+        // (case-sensitive) -- Postgres's own EXISTS(...) column is named "exists", which the missing
+        // alias below left unmatched (42703, never exercised until ticket-P7-S4-notes N3's first
+        // real HTTP probe of GetMyProfile).
         return await context.Database.SqlQuery<bool>($"""
             SELECT EXISTS (
                 SELECT 1 FROM session_participations WHERE user_id = {user}
@@ -22,7 +26,7 @@ public sealed class PushPromptEligibilityRepository(AppDbContext context) : IPus
                 SELECT 1 FROM poll_participants WHERE user_id = {user}
                 UNION ALL
                 SELECT 1 FROM join_requests WHERE requester_user_id = {user}
-            )
+            ) AS "Value"
             """).SingleAsync(cancellationToken);
     }
 }
