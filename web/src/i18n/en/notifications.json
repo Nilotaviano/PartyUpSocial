@@ -4,7 +4,8 @@
   },
   "bell": {
     "label": "Notifications",
-    "labelUnread": "Notifications, {{count}} unread",
+    "labelUnread_one": "Notifications, {{count}} unread",
+    "labelUnread_other": "Notifications, {{count}} unread",
     "badgeOverflow": "99+",
     "announcement_one": "{{count}} unread notification",
     "announcement_other": "{{count}} unread notifications"

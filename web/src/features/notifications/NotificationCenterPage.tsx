@@ -1,11 +1,13 @@
-import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import {
+  FRIEND_TYPES,
   getNotificationList,
+  getUnreadNotificationCount,
   invalidateNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -15,7 +17,8 @@ import {
   type NotificationScope,
 } from './notificationQueries'
 
-const FRIEND_TYPES = new Set(['friendRequestReceived', 'steamImportMatch'])
+// Design §2: `OptionStartTime` is projected for these two types only.
+const OPTION_TIME_TYPES = new Set(['pollOptionSuggested', 'pollOptionSelected'])
 
 /**
  * Design §5: two independently-cursored A-072 scopes, mirroring
@@ -83,6 +86,16 @@ function NotificationRow({
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(notification.createdAt))
+  // Design §2: the option instant renders in the recipient's own locale
+  // (D-060) for types 14/19 only, and only when present — no placeholder
+  // when it is absent.
+  const optionTime =
+    OPTION_TIME_TYPES.has(notification.type) && notification.optionStartTime
+      ? new Intl.DateTimeFormat(i18n.language, {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }).format(new Date(notification.optionStartTime))
+      : null
 
   // PHASE5_1_DESIGN.md §3 `:53`: state identity is never color-alone — the
   // dot glyph and bold weight together carry "unread"; the accessible name
@@ -116,6 +129,11 @@ function NotificationRow({
               titleContent
             )}
             {detail && <p className="text-ink-soft">{detail}</p>}
+            {optionTime && (
+              <p className="text-ink-soft" data-testid="option-start-time">
+                {optionTime}
+              </p>
+            )}
             <p className="text-ink-soft">{timestamp}</p>
           </div>
         </div>
@@ -160,7 +178,14 @@ export function NotificationCenterPage() {
     onSuccess: () => invalidateNotifications(queryClient),
   })
 
-  const hasUnread = items.some((item) => item.unread)
+  // Gated on the unread-count query, not the loaded page (F2): a user whose
+  // unread rows are all beyond page 1 must still see an enabled control —
+  // `items.some(unread)` only reflects what happened to be paged in.
+  const unreadCountQuery = useQuery({
+    queryKey: notificationKeys.unreadCount,
+    queryFn: getUnreadNotificationCount,
+  })
+  const hasUnread = (unreadCountQuery.data ?? 0) > 0
 
   return (
     <main

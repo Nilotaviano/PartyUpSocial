@@ -32,7 +32,7 @@ afterEach(() => {
 })
 
 describe('NotificationBell — ruling 1 exact count and 99+ ceiling', () => {
-  it('renders the exact unread count in the badge and the live region_D060', async () => {
+  it('renders the exact unread count in the badge and the live region', async () => {
     api.get.mockResolvedValue({ data: { count: 5 } })
 
     renderBell()
@@ -43,7 +43,7 @@ describe('NotificationBell — ruling 1 exact count and 99+ ceiling', () => {
     )
   })
 
-  it('renders 99+ once the count exceeds 99_D060', async () => {
+  it('renders 99+ once the count exceeds 99', async () => {
     api.get.mockResolvedValue({ data: { count: 140 } })
 
     renderBell()

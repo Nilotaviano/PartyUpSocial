@@ -12,6 +12,7 @@ vi.mock('../../api/client', () => ({
 
 import '../../i18n'
 import { NotificationCenterPage } from './NotificationCenterPage'
+import { notificationKeys } from './notificationQueries'
 
 function notification(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -24,17 +25,41 @@ function notification(overrides: Partial<Record<string, unknown>> = {}) {
   }
 }
 
-function renderPage() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+// The page now fetches both the scoped list (`GET /api/v1/notifications`)
+// and the unread-count query (F2) on every render, so the mock must answer
+// each endpoint distinctly rather than one blanket `mockResolvedValue` —
+// otherwise the count query reads the list payload's shape and silently
+// resolves to `NaN`.
+function mockNotifications({
+  items,
+  nextCursor = null,
+  unreadCount,
+}: {
+  items: Array<Record<string, unknown>>
+  nextCursor?: string | null
+  unreadCount?: number
+}) {
+  const count =
+    unreadCount ?? items.filter((item) => item.unread === true).length
+  api.get.mockImplementation((path: string) => {
+    if (path === '/api/v1/notifications/unread-count') {
+      return Promise.resolve({ data: { count } })
+    }
+    return Promise.resolve({ data: { items, nextCursor } })
   })
-  return render(
+}
+
+function renderPage(
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
+  const utils = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
         <NotificationCenterPage />
       </MemoryRouter>
     </QueryClientProvider>,
   )
+  return { queryClient, ...utils }
 }
 
 afterEach(() => {
@@ -43,10 +68,8 @@ afterEach(() => {
 })
 
 describe('NotificationCenterPage — ruling 1 (opening marks nothing)', () => {
-  it('never calls the mark-read or mark-all-read endpoints on mount_D060', async () => {
-    api.get.mockResolvedValue({
-      data: { items: [notification()], nextCursor: null },
-    })
+  it('never calls the mark-read or mark-all-read endpoints on mount', async () => {
+    mockNotifications({ items: [notification()] })
 
     renderPage()
 
@@ -59,21 +82,18 @@ describe('NotificationCenterPage — ruling 1 (opening marks nothing)', () => {
 })
 
 describe('NotificationCenterPage — unread semantics (PHASE5_1_DESIGN.md §3 :53, never color-alone)', () => {
-  it('marks an unread row with a dot glyph, bold title and an accessible name stating "unread"_D060', async () => {
-    api.get.mockResolvedValue({
-      data: {
-        items: [
-          notification({
-            id: 'unread-1',
-            type: 'pollClosed',
-            subjectId: 'poll-1',
-            subjectKind: 'poll',
-            subjectTitle: 'Raid night',
-            unread: true,
-          }),
-        ],
-        nextCursor: null,
-      },
+  it('marks an unread row with a dot glyph, bold title and an accessible name stating "unread"', async () => {
+    mockNotifications({
+      items: [
+        notification({
+          id: 'unread-1',
+          type: 'pollClosed',
+          subjectId: 'poll-1',
+          subjectKind: 'poll',
+          subjectTitle: 'Raid night',
+          unread: true,
+        }),
+      ],
     })
 
     renderPage()
@@ -84,21 +104,18 @@ describe('NotificationCenterPage — unread semantics (PHASE5_1_DESIGN.md §3 :5
   })
 
   it('does not mark a read row with the dot glyph or bold weight', async () => {
-    api.get.mockResolvedValue({
-      data: {
-        items: [
-          notification({
-            id: 'read-1',
-            type: 'pollClosed',
-            subjectId: 'poll-1',
-            subjectKind: 'poll',
-            subjectTitle: 'Raid night',
-            unread: false,
-            readAt: '2099-01-02T00:00:00Z',
-          }),
-        ],
-        nextCursor: null,
-      },
+    mockNotifications({
+      items: [
+        notification({
+          id: 'read-1',
+          type: 'pollClosed',
+          subjectId: 'poll-1',
+          subjectKind: 'poll',
+          subjectTitle: 'Raid night',
+          unread: false,
+          readAt: '2099-01-02T00:00:00Z',
+        }),
+      ],
     })
 
     renderPage()
@@ -110,19 +127,16 @@ describe('NotificationCenterPage — unread semantics (PHASE5_1_DESIGN.md §3 :5
 
 describe('NotificationCenterPage — masked-actor wire shapes (PHASE7_DESIGN.md §4)', () => {
   it('renders the named actor when both actor fields are present_D060', async () => {
-    api.get.mockResolvedValue({
-      data: {
-        items: [
-          notification({
-            id: 'friend-named',
-            type: 'friendRequestReceived',
-            actorUserId: 'user-1',
-            actorDisplayName: 'Jamie',
-            unread: false,
-          }),
-        ],
-        nextCursor: null,
-      },
+    mockNotifications({
+      items: [
+        notification({
+          id: 'friend-named',
+          type: 'friendRequestReceived',
+          actorUserId: 'user-1',
+          actorDisplayName: 'Jamie',
+          unread: false,
+        }),
+      ],
     })
 
     renderPage()
@@ -131,18 +145,15 @@ describe('NotificationCenterPage — masked-actor wire shapes (PHASE7_DESIGN.md 
   })
 
   it('renders Anonymous User when actorUserId is present but actorDisplayName is absent (tombstoned/profile-incomplete)_D076', async () => {
-    api.get.mockResolvedValue({
-      data: {
-        items: [
-          notification({
-            id: 'friend-tombstoned',
-            type: 'friendRequestReceived',
-            actorUserId: 'user-2',
-            unread: false,
-          }),
-        ],
-        nextCursor: null,
-      },
+    mockNotifications({
+      items: [
+        notification({
+          id: 'friend-tombstoned',
+          type: 'friendRequestReceived',
+          actorUserId: 'user-2',
+          unread: false,
+        }),
+      ],
     })
 
     renderPage()
@@ -151,17 +162,14 @@ describe('NotificationCenterPage — masked-actor wire shapes (PHASE7_DESIGN.md 
   })
 
   it('renders Anonymous User when both actor fields are absent (blocked pair)_D076_D086', async () => {
-    api.get.mockResolvedValue({
-      data: {
-        items: [
-          notification({
-            id: 'friend-blocked',
-            type: 'steamImportMatch',
-            unread: false,
-          }),
-        ],
-        nextCursor: null,
-      },
+    mockNotifications({
+      items: [
+        notification({
+          id: 'friend-blocked',
+          type: 'steamImportMatch',
+          unread: false,
+        }),
+      ],
     })
 
     renderPage()
@@ -172,17 +180,14 @@ describe('NotificationCenterPage — masked-actor wire shapes (PHASE7_DESIGN.md 
 
 describe('NotificationCenterPage — §2 minimal-form row renders unlinked', () => {
   it('renders no anchor and no navigating control for a subject-less row_D060', async () => {
-    api.get.mockResolvedValue({
-      data: {
-        items: [
-          notification({
-            id: 'minimal-1',
-            type: 'sessionCanceled',
-            unread: true,
-          }),
-        ],
-        nextCursor: null,
-      },
+    mockNotifications({
+      items: [
+        notification({
+          id: 'minimal-1',
+          type: 'sessionCanceled',
+          unread: true,
+        }),
+      ],
     })
 
     renderPage()
@@ -192,35 +197,100 @@ describe('NotificationCenterPage — §2 minimal-form row renders unlinked', () 
   })
 })
 
+describe('NotificationCenterPage — option start time (PHASE7_DESIGN.md §2, recipient-locale instant)', () => {
+  const fixedInstant = '2099-03-04T18:30:00Z'
+  const expectedFormatted = new Intl.DateTimeFormat('en', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(fixedInstant))
+
+  it('renders optionStartTime formatted in the recipient locale for a pollOptionSuggested row_D060', async () => {
+    mockNotifications({
+      items: [
+        notification({
+          id: 'opt-suggested',
+          type: 'pollOptionSuggested',
+          subjectId: 'poll-1',
+          subjectKind: 'poll',
+          subjectTitle: 'Raid night',
+          optionStartTime: fixedInstant,
+          unread: false,
+        }),
+      ],
+    })
+
+    renderPage()
+
+    await screen.findByText('New time suggested')
+    expect(screen.getByTestId('option-start-time')).toHaveTextContent(expectedFormatted)
+  })
+
+  it('renders optionStartTime formatted in the recipient locale for a pollOptionSelected row_D060', async () => {
+    mockNotifications({
+      items: [
+        notification({
+          id: 'opt-selected',
+          type: 'pollOptionSelected',
+          subjectId: 'poll-1',
+          subjectKind: 'poll',
+          subjectTitle: 'Raid night',
+          optionStartTime: fixedInstant,
+          unread: false,
+        }),
+      ],
+    })
+
+    renderPage()
+
+    await screen.findByText('Time selected')
+    expect(screen.getByTestId('option-start-time')).toHaveTextContent(expectedFormatted)
+  })
+
+  it('renders no option-time placeholder when optionStartTime is absent', async () => {
+    mockNotifications({
+      items: [
+        notification({
+          id: 'opt-absent',
+          type: 'pollOptionSuggested',
+          subjectId: 'poll-1',
+          subjectKind: 'poll',
+          subjectTitle: 'Raid night',
+          optionStartTime: null,
+          unread: false,
+        }),
+      ],
+    })
+
+    renderPage()
+
+    await screen.findByText('New time suggested')
+    expect(screen.queryByTestId('option-start-time')).not.toBeInTheDocument()
+  })
+})
+
 describe('NotificationCenterPage — D-105 emitted-type inventory + unknown-type safety', () => {
   it('renders both emitted friend types (request-received, Steam-match) and no others_D105', async () => {
-    api.get.mockResolvedValue({
-      data: {
-        items: [
-          notification({ id: 'f1', type: 'friendRequestReceived', actorDisplayName: 'Alex', unread: false }),
-          notification({ id: 'f2', type: 'steamImportMatch', actorDisplayName: 'Sam', unread: false }),
-        ],
-        nextCursor: null,
-      },
+    mockNotifications({
+      items: [
+        notification({ id: 'f1', type: 'friendRequestReceived', actorDisplayName: 'Alex', unread: false }),
+        notification({ id: 'f2', type: 'steamImportMatch', actorDisplayName: 'Sam', unread: false }),
+      ],
     })
 
     renderPage()
 
     expect(await screen.findByText('New friend request')).toBeInTheDocument()
     expect(await screen.findByText('Friend found on Steam')).toBeInTheDocument()
-    // No such rows are ever emitted by the backend (D-105) — proving the
-    // absence of acceptance/removal/blocking copy in the same inventory.
-    expect(screen.queryByText(/friend request accepted/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/removed/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/blocked/i)).not.toBeInTheDocument()
+    // The absence of acceptance/removal/blocking copy is proven by the closed
+    // 25-type + unknown-fallback inventory (`i18n.keys.test.ts`'s "has exactly
+    // one title per NotificationType wire value plus the unknown fallback") —
+    // that test enumerates every wire type the backend ever emits, so no type
+    // for acceptance/removal/blocking exists to feed through this renderer.
   })
 
   it('degrades an unrecognized type safely instead of erroring_D105', async () => {
-    api.get.mockResolvedValue({
-      data: {
-        items: [notification({ id: 'future-type', type: 'someFutureType', unread: false })],
-        nextCursor: null,
-      },
+    mockNotifications({
+      items: [notification({ id: 'future-type', type: 'someFutureType', unread: false })],
     })
 
     renderPage()
@@ -231,12 +301,11 @@ describe('NotificationCenterPage — D-105 emitted-type inventory + unknown-type
 
 describe('NotificationCenterPage — mark read / mark all read', () => {
   it('marks a single row read and invalidates the notifications and unread-count queries', async () => {
-    api.get.mockResolvedValue({
-      data: { items: [notification({ id: 'n1', unread: true })], nextCursor: null },
-    })
+    mockNotifications({ items: [notification({ id: 'n1', unread: true })] })
     api.post.mockResolvedValue({ data: undefined })
 
-    renderPage()
+    const { queryClient } = renderPage()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
 
     const button = await screen.findByRole('button', { name: /mark read/i })
     fireEvent.click(button)
@@ -247,15 +316,26 @@ describe('NotificationCenterPage — mark read / mark all read', () => {
         expect.objectContaining({ params: expect.objectContaining({ path: { notificationId: 'n1' } }) }),
       ),
     )
+
+    // Asserts the invalidation itself happens — a query-key typo in
+    // `invalidateNotifications` would leave `api.post` green while the
+    // badge never drops (the finding this test closes).
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: ['notifications'] }),
+      ),
+    )
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: notificationKeys.unreadCount }),
+    )
   })
 
-  it('marks all read via the header control', async () => {
-    api.get.mockResolvedValue({
-      data: { items: [notification({ id: 'n1', unread: true })], nextCursor: null },
-    })
+  it('marks all read via the header control and invalidates the notifications and unread-count queries', async () => {
+    mockNotifications({ items: [notification({ id: 'n1', unread: true })] })
     api.post.mockResolvedValue({ data: undefined })
 
-    renderPage()
+    const { queryClient } = renderPage()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
 
     await screen.findByText('Session invite')
     const button = await screen.findByRole('button', { name: 'Mark all read' })
@@ -268,11 +348,20 @@ describe('NotificationCenterPage — mark read / mark all read', () => {
         expect.anything(),
       ),
     )
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: ['notifications'] }),
+      ),
+    )
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: notificationKeys.unreadCount }),
+    )
   })
 
   it('disables Mark all read when nothing is unread', async () => {
-    api.get.mockResolvedValue({
-      data: { items: [notification({ id: 'n1', unread: false, readAt: '2099-01-01T00:00:00Z' })], nextCursor: null },
+    mockNotifications({
+      items: [notification({ id: 'n1', unread: false, readAt: '2099-01-01T00:00:00Z' })],
     })
 
     renderPage()
@@ -281,11 +370,26 @@ describe('NotificationCenterPage — mark read / mark all read', () => {
     const button = await screen.findByRole('button', { name: 'Mark all read' })
     expect(button).toBeDisabled()
   })
+
+  it('enables Mark all read from the unread-count query even when the loaded page has zero unread items', async () => {
+    // F2 pin: unread rows can sit entirely beyond page 1 — the loaded page
+    // shows a fully-read item, but the badge-backing count query says 5.
+    mockNotifications({
+      items: [notification({ id: 'n1', unread: false, readAt: '2099-01-01T00:00:00Z' })],
+      unreadCount: 5,
+    })
+
+    renderPage()
+
+    await screen.findByText('Session invite')
+    const button = await screen.findByRole('button', { name: 'Mark all read' })
+    await waitFor(() => expect(button).not.toBeDisabled())
+  })
 })
 
 describe('NotificationCenterPage — empty states and scope toggle', () => {
   it('renders the empty-all copy when the list has no items', async () => {
-    api.get.mockResolvedValue({ data: { items: [], nextCursor: null } })
+    mockNotifications({ items: [] })
 
     renderPage()
 
@@ -293,7 +397,7 @@ describe('NotificationCenterPage — empty states and scope toggle', () => {
   })
 
   it('switches to the unread scope and refetches under the unread query param', async () => {
-    api.get.mockResolvedValue({ data: { items: [], nextCursor: null } })
+    mockNotifications({ items: [] })
 
     renderPage()
 

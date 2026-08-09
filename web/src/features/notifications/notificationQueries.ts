@@ -53,7 +53,10 @@ export async function invalidateNotifications(queryClient: QueryClient) {
   ])
 }
 
-const FRIEND_TYPES = new Set(['friendRequestReceived', 'steamImportMatch'])
+// Design §5/§4: friend-graph rows (D-105) — the single-sourced set, also
+// consumed by `NotificationCenterPage` for detail-line rendering, so the
+// wire-type list never drifts between the two call sites.
+export const FRIEND_TYPES = new Set(['friendRequestReceived', 'steamImportMatch'])
 
 /**
  * Design §5/§4: friend-graph rows (D-105) never carry a session/poll ref by
