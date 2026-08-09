@@ -1,0 +1,69 @@
+{
+  "nav": {
+    "label": "Notificações"
+  },
+  "bell": {
+    "label": "Notificações",
+    "labelUnread": "Notificações, {{count}} não lidas",
+    "badgeOverflow": "99+",
+    "announcement_one": "{{count}} notificação não lida",
+    "announcement_other": "{{count}} notificações não lidas"
+  },
+  "list": {
+    "heading": "Notificações",
+    "scope": {
+      "all": "Todas",
+      "unread": "Não lidas"
+    },
+    "empty": {
+      "all": "Nenhuma notificação ainda.",
+      "unread": "Você está em dia."
+    },
+    "loadMore": "Carregar mais"
+  },
+  "actions": {
+    "markRead": "Marcar como lida",
+    "markReadFor": "Marcar como lida: {{title}}",
+    "markAllRead": "Marcar todas como lidas"
+  },
+  "item": {
+    "unreadPrefix": "Não lida",
+    "anonymous": "Usuário anônimo",
+    "types": {
+      "sessionInvitation": "Convite de sessão",
+      "sessionConfirmed": "Sessão confirmada",
+      "sessionUnconfirmed": "Sessão não confirmada",
+      "sessionRescheduled": "Sessão remarcada",
+      "sessionCanceled": "Sessão cancelada",
+      "sessionJoinRequestReceived": "Novo pedido para participar",
+      "sessionJoinRequestAccepted": "Pedido aceito",
+      "sessionJoinRequestRejected": "Pedido recusado",
+      "waitlistAdded": "Adicionado à lista de espera",
+      "waitlistPromoted": "Você entrou!",
+      "waitlistRejected": "Vaga de espera indisponível",
+      "waitlistVacancy": "Uma vaga abriu",
+      "sessionReminder": "Começando em breve",
+      "pollInvitation": "Convite de enquete",
+      "pollOptionSuggested": "Novo horário sugerido",
+      "pollJoinRequestReceived": "Novo pedido para participar",
+      "pollJoinRequestAccepted": "Pedido aceito",
+      "pollJoinRequestRejected": "Pedido recusado",
+      "pollDeadlineApproaching": "Enquete fechando em breve",
+      "pollClosed": "Enquete fechada",
+      "pollOptionSelected": "Horário selecionado",
+      "pollExpired": "Enquete expirada",
+      "pollCanceled": "Enquete cancelada",
+      "friendRequestReceived": "Novo pedido de amizade",
+      "steamImportMatch": "Amigo encontrado na Steam",
+      "unknown": "Nova notificação"
+    }
+  },
+  "errors": {
+    "generic": "Algo deu errado.",
+    "codes": {
+      "invalid_cursor": "Não foi possível carregar essa lista de notificações. Tente novamente.",
+      "notification_not_found": "Essa notificação não foi encontrada.",
+      "rate_limited": "Muitas tentativas. Tente novamente mais tarde."
+    }
+  }
+}

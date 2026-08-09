@@ -1,0 +1,69 @@
+{
+  "nav": {
+    "label": "Notifications"
+  },
+  "bell": {
+    "label": "Notifications",
+    "labelUnread": "Notifications, {{count}} unread",
+    "badgeOverflow": "99+",
+    "announcement_one": "{{count}} unread notification",
+    "announcement_other": "{{count}} unread notifications"
+  },
+  "list": {
+    "heading": "Notifications",
+    "scope": {
+      "all": "All",
+      "unread": "Unread"
+    },
+    "empty": {
+      "all": "No notifications yet.",
+      "unread": "You're all caught up."
+    },
+    "loadMore": "Load more"
+  },
+  "actions": {
+    "markRead": "Mark read",
+    "markReadFor": "Mark read: {{title}}",
+    "markAllRead": "Mark all read"
+  },
+  "item": {
+    "unreadPrefix": "Unread",
+    "anonymous": "Anonymous User",
+    "types": {
+      "sessionInvitation": "Session invite",
+      "sessionConfirmed": "Session confirmed",
+      "sessionUnconfirmed": "Session unconfirmed",
+      "sessionRescheduled": "Session rescheduled",
+      "sessionCanceled": "Session canceled",
+      "sessionJoinRequestReceived": "New join request",
+      "sessionJoinRequestAccepted": "Join request accepted",
+      "sessionJoinRequestRejected": "Join request declined",
+      "waitlistAdded": "Added to waitlist",
+      "waitlistPromoted": "You're in!",
+      "waitlistRejected": "Waitlist spot unavailable",
+      "waitlistVacancy": "A spot opened up",
+      "sessionReminder": "Starting soon",
+      "pollInvitation": "Poll invite",
+      "pollOptionSuggested": "New time suggested",
+      "pollJoinRequestReceived": "New join request",
+      "pollJoinRequestAccepted": "Join request accepted",
+      "pollJoinRequestRejected": "Join request declined",
+      "pollDeadlineApproaching": "Poll closing soon",
+      "pollClosed": "Poll closed",
+      "pollOptionSelected": "Time selected",
+      "pollExpired": "Poll expired",
+      "pollCanceled": "Poll canceled",
+      "friendRequestReceived": "New friend request",
+      "steamImportMatch": "Friend found on Steam",
+      "unknown": "New notification"
+    }
+  },
+  "errors": {
+    "generic": "Something went wrong.",
+    "codes": {
+      "invalid_cursor": "That notification list could not be loaded. Try again.",
+      "notification_not_found": "That notification could not be found.",
+      "rate_limited": "Too many attempts. Try again later."
+    }
+  }
+}

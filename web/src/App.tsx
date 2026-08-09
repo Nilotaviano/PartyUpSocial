@@ -23,6 +23,8 @@ import { FriendsPage } from './features/friends/FriendsPage'
 import { ProfilePage } from './features/friends/ProfilePage'
 import { SteamImportPage } from './features/friends/SteamImportPage'
 import { HomePage } from './features/home/HomePage'
+import { NotificationBell } from './features/notifications/NotificationBell'
+import { NotificationCenterPage } from './features/notifications/NotificationCenterPage'
 import { OnboardingWizard } from './features/onboarding/OnboardingWizard'
 import { PublicDeletionConfirmPage } from './features/deletion/PublicDeletionConfirmPage'
 import { PublicDeletionRequestPage } from './features/deletion/PublicDeletionRequestPage'
@@ -118,6 +120,7 @@ function AuthenticatedShell() {
             >
               {t('nav.discover', { ns: 'home' })}
             </NavLink>
+            <NotificationBell />
             <NavLink
               className={({ isActive }) =>
                 `inline-flex min-h-11 flex-none items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
@@ -211,6 +214,7 @@ function App() {
             <Route path="/settings/profile" element={<ProfileSettingsPage />} />
             <Route path="/settings/account" element={<AccountSettingsPage />} />
             <Route path="/settings/blocked" element={<BlockedUsersPage />} />
+            <Route path="/notifications" element={<NotificationCenterPage />} />
             <Route path="/sessions/new" element={<SessionCreatePage />} />
             <Route
               path="/sessions/upcoming"

@@ -902,3 +902,37 @@ the op-id set grows by exactly the eleven ids named above
 closure pinning the live total op-id count (130) alongside the eleven names, not only their mutual
 distinctness). **Not in this slice:** the web
 notification center, enable flow, preferences and mute UX — S5/S6 own those.
+
+## Phase 7 slice S5 (Web: notification center + unread badge) test citations
+
+| Decision | Slice S5 citations |
+|---|---|
+| D-105 | `NotificationCenterPage.test.tsx`: `renders both emitted friend types (request-received, Steam-match) and no others_D105`; `degrades an unrecognized type safely instead of erroring_D105`; `notificationQueries.test.ts`: `routes friend-graph types to /friends by type, never by subjectKind_D105` (closes `TRACEABILITY.md:132`'s center/transport arm — the web surface now renders the D-105 recipient rules the Phase 4 domain layer proved) |
+| D-076/D-086 | `NotificationCenterPage.test.tsx`: `renders Anonymous User when actorUserId is present but actorDisplayName is absent (tombstoned/profile-incomplete)_D076`; `renders Anonymous User when both actor fields are absent (blocked pair)_D076_D086`; `notificationQueries.test.ts`: `returns null for a §2 minimal-form row (no subjectKind/subjectId)_D076` |
+| D-060 | `NotificationCenterPage.test.tsx`: `never calls the mark-read or mark-all-read endpoints on mount_D060` (ruling 1 fidelity); `marks an unread row with a dot glyph, bold title and an accessible name stating "unread"_D060`; `NotificationBell.test.tsx`: `renders the exact unread count in the badge and the live region_D060`; `renders 99+ once the count exceeds 99_D060`; `i18n.keys.test.ts`'s `notifications namespace parity and rendering` block (en/pt-BR/es key-parity gate) |
+
+S5 ships PHASE7_DESIGN.md §5's center+badge bullet whole: `NotificationCenterPage`
+(`web/src/features/notifications/NotificationCenterPage.tsx`) at `/notifications`, and
+`NotificationBell` (`NotificationBell.tsx`) mounted in `AuthenticatedShell`'s chrome (`App.tsx`).
+`notificationQueries.ts` consumes only the generated `ListNotifications`/`GetUnreadNotificationCount`/
+`MarkNotificationRead`/`MarkAllNotificationsRead` operations (S4's eleven-op surface) — no hand-written
+API types. The list is flat and reverse-chronological (ruling 2: no client-side grouping), cursor-paged
+per A-072's two distinct scopes (`usePollBand`'s cursor-chain idiom carried over as
+`useNotificationScope`, resetting the chain on scope switch via React's render-time "adjusting state"
+pattern, not an effect). Each row links to its subject deep link by `type`+`subjectKind` —
+`notificationHref` routes the two friend-graph types (`friendRequestReceived`/`steamImportMatch`) to
+`/friends` by `type` alone (the wire never emits `subjectKind: "friend"` — `NeedsActorRef`'s shape rule
+means those types never carry a session/poll ref), `session`/`poll` kinds to
+`/sessions/{id}`/`/polls/{id}`, and a §2 minimal-form row (no `subjectKind`/`subjectId` at all) to `null`,
+rendered as plain unlinked content — no anchor, no button pretending to navigate. Unread rows carry an
+`aria-hidden` dot glyph **and** `font-bold` weight (PHASE5_1_DESIGN.md §3 `:53`'s never-color-alone
+precedent) plus an `sr-only` "Unread" prefix inside the link's accessible name. Per-row **Mark read**
+renders only while unread; header **Mark all read** is disabled with no unread rows present. Both
+mutations call `invalidateNotifications`, which invalidates `['notifications']` (every scoped list page)
+and `['notifications','unread-count']` (the bell) against the one `QueryClient` instance shared by the
+center page and the chrome bell. The bell shows the exact count and `99+` above 99 (ruling 1), an
+`aria-live="polite"` status region announcing the pluralized unread count, and refetches via the default
+`QueryClient`'s `refetchOnWindowFocus` (proven in jsdom via `focusManager.setFocused`) plus the same
+mark-read/mark-all invalidation. `/notifications` joins `AuditedRoutes.cs` for the S5/S6 WSL browser
+lane sync. **Not in this slice:** the enable flow, `sw.js`, `/settings/notifications`, and the
+session/poll mute toggles — S6 owns those (no push-subscription UI, no service worker landed here).

@@ -16,6 +16,17 @@ const namespaces = [
   'availability',
   'home',
   'polls',
+  'notifications',
+] as const
+
+// Closed problem-code inventory for the S5-owned surface (PHASE7_DESIGN.md
+// §4/§9 ruling 1): the notification center only ever surfaces these three —
+// list-scope/cursor validation, an unknown/foreign mark-read id, and the
+// shared rate-limit code. Subscription/mute/reminder codes stay S6-owned.
+const notificationProblemCodes = [
+  'invalid_cursor',
+  'notification_not_found',
+  'rate_limited',
 ] as const
 
 // Closed problem-code inventory (PHASE6_DESIGN.md §4.2/§7): the poll HTTP
@@ -213,6 +224,79 @@ describe('polls namespace parity and rendering D-060 (PHASE6_DESIGN.md §4.2)', 
         }
       ).errors.codes
       for (const code of pollProblemCodes) {
+        expect(typeof codes[code]).toBe('string')
+        expect(codes[code].length).toBeGreaterThan(0)
+      }
+    })
+  }
+})
+
+describe('notifications namespace parity and rendering D-060 (PHASE7_DESIGN.md §5)', () => {
+  for (const locale of locales) {
+    it(locale + ' renders notifications.list.heading', async () => {
+      await i18n.changeLanguage(locale)
+      expect(i18n.t('list.heading', { ns: 'notifications' })).toBe(
+        (resources[locale].notifications as { list: { heading: string } })
+          .list.heading,
+      )
+    })
+  }
+
+  it('has exactly one title per NotificationType wire value plus the unknown fallback', () => {
+    const wireTypes = [
+      'sessionInvitation',
+      'sessionConfirmed',
+      'sessionUnconfirmed',
+      'sessionRescheduled',
+      'sessionCanceled',
+      'sessionJoinRequestReceived',
+      'sessionJoinRequestAccepted',
+      'sessionJoinRequestRejected',
+      'waitlistAdded',
+      'waitlistPromoted',
+      'waitlistRejected',
+      'waitlistVacancy',
+      'sessionReminder',
+      'pollInvitation',
+      'pollOptionSuggested',
+      'pollJoinRequestReceived',
+      'pollJoinRequestAccepted',
+      'pollJoinRequestRejected',
+      'pollDeadlineApproaching',
+      'pollClosed',
+      'pollOptionSelected',
+      'pollExpired',
+      'pollCanceled',
+      'friendRequestReceived',
+      'steamImportMatch',
+      'unknown',
+    ].sort()
+    const types = Object.keys(
+      (registeredResources.en.notifications as { item: { types: Record<string, string> } })
+        .item.types,
+    ).sort()
+    expect(types).toEqual(wireTypes)
+  })
+
+  it('errors.codes contains exactly the closed S5 notification problem-code inventory', () => {
+    const codes = Object.keys(
+      (
+        registeredResources.en.notifications as {
+          errors: { codes: Record<string, string> }
+        }
+      ).errors.codes,
+    ).sort()
+    expect(codes).toEqual([...notificationProblemCodes].sort())
+  })
+
+  for (const locale of locales) {
+    it(locale + ' has one message per documented notification problem code', () => {
+      const codes = (
+        registeredResources[locale].notifications as {
+          errors: { codes: Record<string, string> }
+        }
+      ).errors.codes
+      for (const code of notificationProblemCodes) {
         expect(typeof codes[code]).toBe('string')
         expect(codes[code].length).toBeGreaterThan(0)
       }

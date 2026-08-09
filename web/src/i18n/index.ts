@@ -8,6 +8,7 @@ import enCommon from './en/common.json'
 import enErrors from './en/errors.json'
 import enFriends from './en/friends.json'
 import enHome from './en/home.json'
+import enNotifications from './en/notifications.json'
 import enOnboarding from './en/onboarding.json'
 import enPolls from './en/polls.json'
 import enProfile from './en/profile.json'
@@ -19,6 +20,7 @@ import esCommon from './es/common.json'
 import esErrors from './es/errors.json'
 import esFriends from './es/friends.json'
 import esHome from './es/home.json'
+import esNotifications from './es/notifications.json'
 import esOnboarding from './es/onboarding.json'
 import esPolls from './es/polls.json'
 import esProfile from './es/profile.json'
@@ -30,6 +32,7 @@ import ptBRCommon from './pt-BR/common.json'
 import ptBRErrors from './pt-BR/errors.json'
 import ptBRFriends from './pt-BR/friends.json'
 import ptBRHome from './pt-BR/home.json'
+import ptBRNotifications from './pt-BR/notifications.json'
 import ptBROnboarding from './pt-BR/onboarding.json'
 import ptBRPolls from './pt-BR/polls.json'
 import ptBRProfile from './pt-BR/profile.json'
@@ -50,6 +53,7 @@ export const resources = {
     availability: enAvailability,
     home: enHome,
     polls: enPolls,
+    notifications: enNotifications,
   },
   'pt-BR': {
     common: ptBRCommon,
@@ -63,6 +67,7 @@ export const resources = {
     availability: ptBRAvailability,
     home: ptBRHome,
     polls: ptBRPolls,
+    notifications: ptBRNotifications,
   },
   es: {
     common: esCommon,
@@ -76,6 +81,7 @@ export const resources = {
     availability: esAvailability,
     home: esHome,
     polls: esPolls,
+    notifications: esNotifications,
   },
 }
 
@@ -98,6 +104,7 @@ void i18n
       'availability',
       'home',
       'polls',
+      'notifications',
     ],
     resources,
     interpolation: {

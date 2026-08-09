@@ -94,5 +94,7 @@ public static class AuditedRoutes
         // selection controls + finalization preview only render past the poll's deadline — a
         // second, backdated poll fixture reaches that state (the S5 poll above never does).
         new AuditedRoute("poll-detail-awaiting-selection", "/polls/{pollAwaitingSelectionId}"),
+        // Phase 7 S5 (PHASE7_DESIGN.md §5/§6, ticket-P7-S5): the notification center.
+        new AuditedRoute("notifications", "/notifications"),
     ];
 }
