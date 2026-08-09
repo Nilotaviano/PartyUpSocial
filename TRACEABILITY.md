@@ -689,7 +689,7 @@ arm, D-111, or D-181 — those remain S7-owned.
 
 | Decision | Slice S1 citations |
 |---|---|
-| D-112 | `PushTransportMigrationTests.Migrate_CreatesPushTransportTablesConstraintsAndIndexes_D112`; `...DuplicateActivePushSubscriptionForSameEndpointIsRejected_D112`; `...DanglingPushSubscriptionUserIdIsRejected_D112`; `...DuplicateNotificationPushSendClaimIsRejected_D112`; `...DanglingNotificationPushSendNotificationIdIsRejected_D112`; `...DanglingNotificationPushSendSubscriptionIdIsRejected_D112`; `...Migrate_BackfillsEveryPreExistingNotificationToSkipped_D112`; `...UpsertActiveAsync_RoundTripsASubscriptionAndWritesTheShadowHash_D112`; `...ClaimAsync_ADuplicateClaimReturnsNoRowAndExactlyOnePersists_D112` |
+| D-112 | `PushTransportMigrationTests.Migrate_CreatesPushTransportTablesConstraintsAndIndexes_D112`; `...DuplicateActivePushSubscriptionForSameEndpointIsRejected_D112`; `...DanglingPushSubscriptionUserIdIsRejected_D112`; `...DuplicateNotificationPushSendClaimIsRejected_D112`; `...DanglingNotificationPushSendNotificationIdIsRejected_D112`; `...DanglingNotificationPushSendSubscriptionIdIsRejected_D112`; `...Migrate_BackfillsEveryPreExistingNotificationToSkipped_D112`; `...UpsertActiveAsync_RoundTripsASubscriptionAndWritesTheShadowHash_D112`; `...ClaimAsync_ADuplicateClaimReturnsNoRowAndExactlyOnePersists_D112`; `...FreshNotificationRowDefaultsToPending_D112` |
 | D-113 | `PushTransportMigrationTests.DuplicatePollMuteForSameUserIsRejected_D113` |
 | D-092 | `PushTransportDeletionPurgeTests.ExpiryPurgesSubscriptionsSendLogAndMutesAheadOfTheNotificationsPurge_D092` |
 

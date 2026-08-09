@@ -70,6 +70,35 @@ public sealed class PushTransportMigrationTests : IAsyncLifetime
         await AssertIndexFilterAsync(context, "ix_notifications_unread", "read_at IS NULL");
         await AssertIndexFilterAsync(context, "ux_notification_mutes_poll_user", "poll_id IS NOT NULL");
         await AssertIndexFilterAsync(context, "ix_sessions_origin_poll_id", "origin_poll_id IS NOT NULL");
+
+        // The DESC halves of the unread keyset index are as load-bearing as its WHERE half -- a
+        // flipped direction silently degrades the S2 keyset page -- so the full column list is pinned,
+        // not only the filter.
+        Assert.Contains(
+            "(recipient_user_id, created_at DESC, id DESC)",
+            await IndexDefinitionAsync(context, "ix_notifications_unread"));
+    }
+
+    /// <summary>
+    /// §1: dispatch_state defaults to Pending(0). S3's dispatch page reaches new rows only through
+    /// this default -- were it ever wrong, ix_notifications_dispatch_pending would silently find
+    /// nothing and push would never fire -- so a notification created through the production path
+    /// (Notification.Create + SaveChanges) must read Pending.
+    /// </summary>
+    [Fact]
+    public async Task FreshNotificationRowDefaultsToPending_D112()
+    {
+        await using AppDbContext context = CreateContext();
+        await context.Database.MigrateAsync();
+        UserId userId = await SeedUserAsync(context);
+        Guid notificationId = await SeedNotificationAsync(context, userId, userId);
+
+        short dispatchState = await context.Notifications
+            .AsNoTracking()
+            .Where(notification => notification.Id == NotificationId.From(notificationId))
+            .Select(notification => EF.Property<short>(notification, "DispatchState"))
+            .SingleAsync();
+        Assert.Equal(0, dispatchState);
     }
 
     [Fact]
@@ -393,6 +422,13 @@ public sealed class PushTransportMigrationTests : IAsyncLifetime
 
     private static async Task AssertIndexFilterAsync(AppDbContext context, string index, string filterFragment)
     {
+        string definition = await IndexDefinitionAsync(context, index);
+        Assert.Contains("WHERE", definition);
+        Assert.Contains(filterFragment, definition);
+    }
+
+    private static async Task<string> IndexDefinitionAsync(AppDbContext context, string index)
+    {
         DbConnection connection = context.Database.GetDbConnection();
         await EnsureOpenAsync(connection);
         await using DbCommand command = connection.CreateCommand();
@@ -402,9 +438,7 @@ public sealed class PushTransportMigrationTests : IAsyncLifetime
         parameter.Value = index;
         command.Parameters.Add(parameter);
 
-        string definition = Assert.IsType<string>(await command.ExecuteScalarAsync());
-        Assert.Contains("WHERE", definition);
-        Assert.Contains(filterFragment, definition);
+        return Assert.IsType<string>(await command.ExecuteScalarAsync());
     }
 
     private static async Task<string?> ColumnTypeAsync(AppDbContext context, string table, string column)
