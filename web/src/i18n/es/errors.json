@@ -3,7 +3,8 @@
   "auth": {
     "lastMethod": "Necesitas al menos un método de inicio de sesión.",
     "methodNotRemovable": "Este método de inicio de sesión no se puede eliminar.",
-    "reauthRequired": "Confirma que eres tú antes de continuar."
+    "reauthRequired": "Confirma que eres tú antes de continuar.",
+    "emailRequired": "Confirma tu dirección de correo antes de establecer una contraseña."
   },
   "username": {
     "taken": "Ese nombre de usuario no está disponible.",

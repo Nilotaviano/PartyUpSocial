@@ -20,7 +20,17 @@
   "password": {
     "title": "Password",
     "enabled": "Password sign-in is enabled.",
-    "notSet": "No password is set for this account."
+    "notSet": "No password is set for this account.",
+    "currentLabel": "Your current password",
+    "newLabel": "New password",
+    "hint": "Use at least 12 characters.",
+    "tooShort": "Password must be at least 12 characters.",
+    "currentIncorrect": "That current password is incorrect.",
+    "changeSubmit": "Change password",
+    "changeSuccess": "Your password has been changed.",
+    "setStart": "Set a password",
+    "setSubmit": "Set password",
+    "setSuccess": "Your password has been set."
   },
   "authMethods": {
     "title": "Sign-in methods",

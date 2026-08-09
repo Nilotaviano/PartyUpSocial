@@ -3,7 +3,8 @@
   "auth": {
     "lastMethod": "Você precisa de pelo menos uma forma de entrada.",
     "methodNotRemovable": "Este método de entrada não pode ser removido.",
-    "reauthRequired": "Confirme que é você antes de continuar."
+    "reauthRequired": "Confirme que é você antes de continuar.",
+    "emailRequired": "Confirme seu endereço de e-mail antes de definir uma senha."
   },
   "username": {
     "taken": "Este nome de usuário não está disponível.",

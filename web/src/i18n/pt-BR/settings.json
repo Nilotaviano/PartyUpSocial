@@ -20,7 +20,17 @@
   "password": {
     "title": "Senha",
     "enabled": "O acesso com senha está ativado.",
-    "notSet": "Nenhuma senha está definida para esta conta."
+    "notSet": "Nenhuma senha está definida para esta conta.",
+    "currentLabel": "Sua senha atual",
+    "newLabel": "Nova senha",
+    "hint": "Use pelo menos 12 caracteres.",
+    "tooShort": "A senha deve ter pelo menos 12 caracteres.",
+    "currentIncorrect": "Essa senha atual está incorreta.",
+    "changeSubmit": "Alterar senha",
+    "changeSuccess": "Sua senha foi alterada.",
+    "setStart": "Definir uma senha",
+    "setSubmit": "Definir senha",
+    "setSuccess": "Sua senha foi definida."
   },
   "authMethods": {
     "title": "Métodos de entrada",

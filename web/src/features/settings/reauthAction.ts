@@ -3,6 +3,7 @@ export type ReauthAction =
   | { kind: 'linkAuthMethod'; provider: string }
   | { kind: 'unlinkAuthMethod'; method: string }
   | { kind: 'unlinkPlatform'; id: string }
+  | { kind: 'setPassword' }
 
 const pendingActionStorageKey = 'partyup.pending-reauth-action'
 
@@ -13,7 +14,8 @@ function isReauthAction(value: unknown): value is ReauthAction {
     action.kind === 'deleteAccount' ||
     (action.kind === 'linkAuthMethod' && typeof action.provider === 'string') ||
     (action.kind === 'unlinkAuthMethod' && typeof action.method === 'string') ||
-    (action.kind === 'unlinkPlatform' && typeof action.id === 'string')
+    (action.kind === 'unlinkPlatform' && typeof action.id === 'string') ||
+    action.kind === 'setPassword'
   )
 }
 

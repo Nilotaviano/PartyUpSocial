@@ -20,7 +20,17 @@
   "password": {
     "title": "Contraseña",
     "enabled": "El acceso con contraseña está activado.",
-    "notSet": "No hay una contraseña configurada para esta cuenta."
+    "notSet": "No hay una contraseña configurada para esta cuenta.",
+    "currentLabel": "Tu contraseña actual",
+    "newLabel": "Nueva contraseña",
+    "hint": "Usa al menos 12 caracteres.",
+    "tooShort": "La contraseña debe tener al menos 12 caracteres.",
+    "currentIncorrect": "Esa contraseña actual es incorrecta.",
+    "changeSubmit": "Cambiar contraseña",
+    "changeSuccess": "Tu contraseña ha sido cambiada.",
+    "setStart": "Establecer una contraseña",
+    "setSubmit": "Establecer contraseña",
+    "setSuccess": "Tu contraseña ha sido establecida."
   },
   "authMethods": {
     "title": "Métodos de inicio de sesión",

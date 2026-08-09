@@ -3,7 +3,8 @@
   "auth": {
     "lastMethod": "You need at least one sign-in method.",
     "methodNotRemovable": "This sign-in method cannot be removed.",
-    "reauthRequired": "Please confirm it is you before continuing."
+    "reauthRequired": "Please confirm it is you before continuing.",
+    "emailRequired": "Confirm your email address before setting a password."
   },
   "username": {
     "taken": "That username is unavailable.",

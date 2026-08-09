@@ -32,10 +32,14 @@ function errorKey(error: unknown) {
       return 'auth.methodNotRemovable'
     case 'reauth_required':
       return 'auth.reauthRequired'
+    case 'email_required':
+      return 'auth.emailRequired'
     default:
       return error.code
   }
 }
+
+type PasswordProof = { currentPassword?: string; reauthToken?: string }
 
 export function AccountSettingsPage() {
   const { t, i18n } = useTranslation(['settings', 'errors'])
@@ -52,6 +56,17 @@ export function AccountSettingsPage() {
   const [saved, setSaved] = useState(false)
   const [graceEndsAt, setGraceEndsAt] = useState<string | null>(null)
   const [returnFocusTo, setReturnFocusTo] = useState<HTMLElement | null>(null)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [changeNewPassword, setChangeNewPassword] = useState('')
+  const [changeTooShort, setChangeTooShort] = useState(false)
+  const [changeWrongCurrent, setChangeWrongCurrent] = useState(false)
+  const [changeError, setChangeError] = useState<unknown>()
+  const [changeSuccess, setChangeSuccess] = useState(false)
+  const [setPasswordValue, setSetPasswordValue] = useState('')
+  const [setPasswordTooShort, setSetPasswordTooShort] = useState(false)
+  const [setPasswordError, setSetPasswordError] = useState<unknown>()
+  const [setPasswordSuccess, setSetPasswordSuccess] = useState(false)
+  const [setPasswordProof, setSetPasswordProof] = useState<PasswordProof | null>(null)
 
   useEffect(() => {
     const accountLocale = session?.profile?.locale
@@ -130,6 +145,66 @@ export function AccountSettingsPage() {
     if (action?.kind === 'linkAuthMethod') {
       await linkProvider(action.provider, proof)
     }
+    if (action?.kind === 'setPassword') {
+      setSetPasswordProof({ currentPassword: proof.currentPassword, reauthToken: proof.reauthToken })
+      clearPendingSettingsAction()
+    }
+  }
+
+  async function submitChangePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setChangeTooShort(false)
+    setChangeWrongCurrent(false)
+    setChangeError(undefined)
+    setChangeSuccess(false)
+    try {
+      await client.POST('/api/v1/auth/password/change', {
+        params: { header: { 'X-CSRF-TOKEN': '' } },
+        body: { currentPassword, newPassword: changeNewPassword },
+      })
+      setCurrentPassword('')
+      setChangeNewPassword('')
+      setChangeSuccess(true)
+      await queryClient.invalidateQueries({ queryKey: methodsQueryKey })
+      await queryClient.invalidateQueries({ queryKey: sessionQueryKey })
+    } catch (caught) {
+      if (isApiError(caught) && caught.code === 'auth_validation') {
+        setChangeTooShort(true)
+      } else if (isApiError(caught) && caught.code === 'reauth_required') {
+        setChangeWrongCurrent(true)
+      } else {
+        setChangeError(caught)
+      }
+    }
+  }
+
+  async function submitSetPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!setPasswordProof) return
+    setSetPasswordTooShort(false)
+    setSetPasswordError(undefined)
+    setSetPasswordSuccess(false)
+    try {
+      await client.POST('/api/v1/auth/password/set', {
+        params: { header: { 'X-CSRF-TOKEN': '' } },
+        body: {
+          newPassword: setPasswordValue,
+          currentPassword: setPasswordProof.currentPassword ?? null,
+          reauthToken: setPasswordProof.reauthToken ?? null,
+        },
+      })
+      setSetPasswordValue('')
+      setSetPasswordProof(null)
+      setSetPasswordSuccess(true)
+      await queryClient.invalidateQueries({ queryKey: methodsQueryKey })
+      await queryClient.invalidateQueries({ queryKey: sessionQueryKey })
+    } catch (caught) {
+      if (isApiError(caught) && caught.code === 'auth_validation') {
+        setSetPasswordTooShort(true)
+      } else {
+        setSetPasswordError(caught)
+      }
+    }
   }
 
   async function linkProvider(provider: string, proof: { currentPassword?: string; reauthToken?: string }) {
@@ -156,11 +231,24 @@ export function AccountSettingsPage() {
     )
   }
 
+  const hasPassword = methods.some((method) => method.kind.toLowerCase() === 'password')
   const emailMethod = methods.find((method) => method.kind.toLowerCase().includes('magic'))
   const configuredProviders = (session?.providers ?? []).filter((provider) => ['google', 'steam'].includes(provider.toLowerCase()))
   const unlinkedProviders = configuredProviders.filter((provider) => !methods.some((method) => method.linked && method.kind.toLowerCase() === provider.toLowerCase()))
   const errorMessage = error
     ? t(errorKey(error), {
+        ns: 'errors',
+        defaultValue: t('generic', { ns: 'errors' }),
+      })
+    : null
+  const changeErrorMessage = changeError
+    ? t(errorKey(changeError), {
+        ns: 'errors',
+        defaultValue: t('generic', { ns: 'errors' }),
+      })
+    : null
+  const setPasswordErrorMessage = setPasswordError
+    ? t(errorKey(setPasswordError), {
         ns: 'errors',
         defaultValue: t('generic', { ns: 'errors' }),
       })
@@ -175,9 +263,65 @@ export function AccountSettingsPage() {
         <h2 className="font-display text-h2 font-semibold text-ink" id="account-email-heading">{t('email.title')}</h2>
         <p className="text-ink-soft">{emailMethod?.detail ?? t('email.unavailable')}</p>
       </section>
-      <section aria-labelledby="account-password-heading" className="space-y-1">
+      <section aria-labelledby="account-password-heading" className="space-y-2">
         <h2 className="font-display text-h2 font-semibold text-ink" id="account-password-heading">{t('password.title')}</h2>
-        <p className="text-ink-soft">{methods.some((method) => method.kind.toLowerCase() === 'password') ? t('password.enabled') : t('password.notSet')}</p>
+        <p className="text-ink-soft">{hasPassword ? t('password.enabled') : t('password.notSet')}</p>
+        {hasPassword ? (
+          <form className="space-y-2" onSubmit={(event) => void submitChangePassword(event)}>
+            <Label htmlFor="password-current">{t('password.currentLabel')}</Label>
+            <Input
+              id="password-current"
+              type="password"
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+              required
+            />
+            <Label htmlFor="password-change-new">{t('password.newLabel')}</Label>
+            <Input
+              id="password-change-new"
+              type="password"
+              value={changeNewPassword}
+              onChange={(event) => setChangeNewPassword(event.target.value)}
+              minLength={12}
+              aria-describedby="password-change-new-hint"
+              required
+            />
+            <p className="text-body-sm text-ink-soft" id="password-change-new-hint">{t('password.hint')}</p>
+            <Button type="submit" variant="primary">{t('password.changeSubmit')}</Button>
+            {changeTooShort && <p role="alert">{t('password.tooShort')}</p>}
+            {changeWrongCurrent && <p role="alert">{t('password.currentIncorrect')}</p>}
+            {changeErrorMessage && <p role="alert">{changeErrorMessage}</p>}
+            {changeSuccess && <p className="text-ink" role="status">{t('password.changeSuccess')}</p>}
+          </form>
+        ) : setPasswordProof ? (
+          <form className="space-y-2" onSubmit={(event) => void submitSetPassword(event)}>
+            <Label htmlFor="password-set-new">{t('password.newLabel')}</Label>
+            <Input
+              id="password-set-new"
+              type="password"
+              value={setPasswordValue}
+              onChange={(event) => setSetPasswordValue(event.target.value)}
+              minLength={12}
+              aria-describedby="password-set-new-hint"
+              required
+            />
+            <p className="text-body-sm text-ink-soft" id="password-set-new-hint">{t('password.hint')}</p>
+            <Button type="submit" variant="primary">{t('password.setSubmit')}</Button>
+            {setPasswordTooShort && <p role="alert">{t('password.tooShort')}</p>}
+            {setPasswordErrorMessage && <p role="alert">{setPasswordErrorMessage}</p>}
+          </form>
+        ) : (
+          <Button
+            variant="neutral"
+            onClick={(event) => {
+              setReturnFocusTo(event.currentTarget)
+              setAction({ kind: 'setPassword' })
+            }}
+          >
+            {t('password.setStart')}
+          </Button>
+        )}
+        {setPasswordSuccess && <p className="text-ink" role="status">{t('password.setSuccess')}</p>}
       </section>
       <section aria-labelledby="auth-methods-heading" className="space-y-3">
         <h2 className="font-display text-h2 font-semibold text-ink" id="auth-methods-heading">{t('authMethods.title')}</h2>
