@@ -41,46 +41,18 @@ public sealed class NotificationReadUseCases(
 
         bool hasSubjectRef = notification.SessionId is not null || notification.PollId is not null;
 
-        Session? session = null;
-        Poll? poll = null;
-        NotificationSubjectKind kind = NotificationSubjectKind.None;
-
-        // PollOptionSelected (19) carries both refs (§6.4-8): the session finalization minted is the
-        // live, reachable target after finalization, so a session ref wins when both are present.
-        if (notification.SessionId is { } sessionId)
-        {
-            session = await sessions.FindAsync(sessionId, cancellationToken);
-            kind = NotificationSubjectKind.Session;
-        }
-        else if (notification.PollId is { } pollId)
-        {
-            poll = await polls.FindNoTrackingAsync(pollId, cancellationToken);
-            kind = NotificationSubjectKind.Poll;
-        }
+        // Both refs load unconditionally (PollOptionSelected (19) carries both, §6.4-8) so the poll
+        // fallback below has what it needs without a second round trip.
+        Session? session = notification.SessionId is { } sessionId
+            ? await sessions.FindAsync(sessionId, cancellationToken)
+            : null;
+        Poll? poll = notification.PollId is { } pollId
+            ? await polls.FindNoTrackingAsync(pollId, cancellationToken)
+            : null;
 
         HashSet<UserId> counterparts = [];
-        if (session is not null)
-        {
-            counterparts.Add(session.OrganizerId);
-            foreach (Participation participation in session.Participations)
-            {
-                if (participation.UserId is { } userId)
-                {
-                    counterparts.Add(userId);
-                }
-            }
-        }
-        else if (poll is not null)
-        {
-            counterparts.Add(poll.OrganizerId);
-            foreach (PollParticipant participant in poll.Participants)
-            {
-                if (participant.UserId is { } userId)
-                {
-                    counterparts.Add(userId);
-                }
-            }
-        }
+        AddRosterCounterparts(counterparts, session);
+        AddRosterCounterparts(counterparts, poll);
 
         if (notification.ActorUserId is { } actorRefId)
         {
@@ -91,17 +63,35 @@ public sealed class NotificationReadUseCases(
 
         Viewer viewer = await BuildViewerAsync(recipientId, counterparts, cancellationToken);
 
-        // Fail closed: a subject ref with no aggregate found (neither session nor poll loaded) is
-        // unreachable, same as one the visibility engine explicitly refuses.
-        bool reachable = !hasSubjectRef
-            || (session is not null && VisibilityEngine.ResolveSession(session, viewer).IsVisible)
-            || (poll is not null && VisibilityEngine.ResolvePoll(poll, viewer).IsVisible);
+        // The session ref is the primary target; a both-ref row falls back to the poll only when the
+        // session is unreachable — e.g. a voter who is Unavailable on the winning option is dropped
+        // from the finalized session's roster (§6.4-3) but remains a deliberate poll recipient
+        // (RecipientComputer's PollAudience) as long as they still hold poll access. Fail closed: a
+        // subject ref with no aggregate found is unreachable, same as one the engine refuses outright.
+        bool sessionReachable = session is not null && VisibilityEngine.ResolveSession(session, viewer).IsVisible;
+        bool pollReachable = poll is not null && VisibilityEngine.ResolvePoll(poll, viewer).IsVisible;
+
+        NotificationSubjectKind kind = notification.SessionId is not null && sessionReachable
+            ? NotificationSubjectKind.Session
+            : notification.PollId is not null && pollReachable
+                ? NotificationSubjectKind.Poll
+                : NotificationSubjectKind.None;
+
+        bool reachable = !hasSubjectRef || kind != NotificationSubjectKind.None;
 
         MaskedIdentity? actor = null;
+        Guid? actorUserId = null;
         if (reachable && notification.ActorUserId is { } actorId)
         {
             User? actorUser = await users.FindAsync(actorId, cancellationToken);
-            actor = actorUser is not null ? IdentityMasking.ForUser(actorUser, viewer) : null;
+            if (actorUser is not null)
+            {
+                actor = IdentityMasking.ForUser(actorUser, viewer);
+
+                // PHASE7_DESIGN.md §4 wire rule: a blocked-pair-masked actor omits actorUserId too;
+                // named, tombstoned and profile-incomplete all keep it.
+                actorUserId = actor.Value.Reason == MaskingReason.Blocked ? null : actorId.Value;
+            }
         }
 
         if (!reachable)
@@ -134,7 +124,8 @@ public sealed class NotificationReadUseCases(
             notification.CreatedAt,
             notification.ReadAt,
             actor,
-            hasSubjectRef ? kind : NotificationSubjectKind.None,
+            actorUserId,
+            kind,
             subjectId,
             subjectTitle,
             optionStartTime,
@@ -179,12 +170,47 @@ public sealed class NotificationReadUseCases(
             notification.CreatedAt,
             notification.ReadAt,
             null,
+            null,
             NotificationSubjectKind.None,
             null,
             null,
             null,
             locale,
             zone);
+
+    private static void AddRosterCounterparts(HashSet<UserId> counterparts, Session? session)
+    {
+        if (session is null)
+        {
+            return;
+        }
+
+        counterparts.Add(session.OrganizerId);
+        foreach (Participation participation in session.Participations)
+        {
+            if (participation.UserId is { } userId)
+            {
+                counterparts.Add(userId);
+            }
+        }
+    }
+
+    private static void AddRosterCounterparts(HashSet<UserId> counterparts, Poll? poll)
+    {
+        if (poll is null)
+        {
+            return;
+        }
+
+        counterparts.Add(poll.OrganizerId);
+        foreach (PollParticipant participant in poll.Participants)
+        {
+            if (participant.UserId is { } userId)
+            {
+                counterparts.Add(userId);
+            }
+        }
+    }
 
     /// <summary>D-060/spec §8.5: instants render in the recipient's own zone; a user with neither set falls back to en/UTC.</summary>
     private static (string Locale, DateTimeZone Zone) ResolveRecipientRendering(User? recipient)

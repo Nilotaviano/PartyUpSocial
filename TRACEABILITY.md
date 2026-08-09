@@ -716,8 +716,8 @@ ships with no `Channel` member and Domain is out of this slice's write set.
 | Decision | Slice S2 citations |
 |---|---|
 | D-092 | `NotificationReadUseCasesTests.Actor_TombstonedRendersAnonymous_D092` |
-| D-076 | `NotificationReadUseCasesTests.Actor_BlockedPairRendersAnonymous_D076`; `...UnreachableSubject_BlockedPair_RendersMinimalForm_D076` |
-| D-060 | `NotificationReadUseCasesTests.RecipientZoneAndLocale_RenderFromProfile_D060`; `...RecipientWithNoProfile_FallsBackToEnUtc_D060` |
+| D-076 | `NotificationReadUseCasesTests.Actor_BlockedPairRendersAnonymous_D076`; `...UnreachableSubject_BlockedPair_MasksDespiteLiveParticipation_D076` |
+| D-060 | `NotificationReadUseCasesTests.RecipientZoneAndLocale_RenderFromProfile_D060`; `...RecipientWithNoProfile_FallsBackToEnUtc_D060`; `...RecipientWithNullLocaleAndZone_FallsBackToEnUtc_D060` |
 
 S2 adds `NotificationReadUseCases` + `NotificationReadModels` (`src/PartyUp.Application/Notifications/`,
 PHASE7_DESIGN.md §2): the per-row projection consumes the shipped `IdentityMasking.ForUser` — all three
@@ -726,12 +726,23 @@ PHASE7_DESIGN.md §2): the per-row projection consumes the shipped `IdentityMask
 onboarding case, not a numbered decision) — and re-resolves each row's subject through the same
 `ISessionRepository`/`IPollRepository` + `VisibilityEngine.ResolveSession`/`ResolvePoll` path
 `SessionReadUseCases`/`PollReadUseCases` already drive, reusing their `BuildViewerAsync` idiom rather than
-adding a port. Fail-closed is proven over both minimal-form fixtures: a blocked pair
-(`UnreachableSubject_BlockedPair_RendersMinimalForm_D076`) and a viewer whose inherited access lapsed with
-no block record at all (`UnreachableSubject_LapsedInheritedAccess_RendersMinimalForm`) — both land on the
-identical minimal shape (`ReachableSubject_RendersTitleAndId` is the positive control). `OptionStartTime`
-is asserted present only for `PollOptionSuggested`/`PollOptionSelected` (types 14/19) and filtered for
-every other type even when the underlying `NotificationSubject` happens to carry one
+adding a port. A both-ref row (`PollOptionSelected (19)`) keeps the session ref as primary and falls back
+to resolving the poll only when the session is unreachable — e.g. a voter dropped from the finalized
+session's roster after voting Unavailable throughout (§6.4-3) but still holding poll access
+(`BothRefRow_SessionUnreachablePollReachable_FallsBackToPollSubject`); minimal form is reached only when
+every carried ref is unreachable (`BothRefRow_BothRefsUnreachable_RendersMinimalForm`). Fail-closed is
+proven over two discriminating minimal-form fixtures, each asserting the reachable arm before the masked
+one so deleting the masking cause turns the test red rather than passing on an already-inert setup: a
+viewer who holds a live, directly-invited participation and is then blocked by the organizer
+(`UnreachableSubject_BlockedPair_MasksDespiteLiveParticipation_D076`), and a viewer whose participation is
+proven live and then explicitly marked `Removed` (`UnreachableSubject_RemovedParticipation_RendersMinimalForm`)
+— both land on the identical minimal shape (`ReachableSubject_RendersTitleAndId` is the positive control).
+`NotificationReadModel.ActorUserId` carries the exact `actorUserId` the PHASE7_DESIGN.md §4 wire rule may
+show: set for a reachable row whose actor masks Named, Tombstoned or ProfileIncomplete, null for a
+blocked-pair-masked actor and for the minimal form (pinned alongside each `Actor_*` test and the two
+minimal-form fixtures above). `OptionStartTime` is asserted present only for
+`PollOptionSuggested`/`PollOptionSelected` (types 14/19) and filtered for every other type even when the
+underlying `NotificationSubject` happens to carry one
 (`OptionStartTime_AbsentForOtherTypes_EvenWhenSubjectCarriesOne`). No new Application port and no
 Infrastructure touch — every read goes through ports `SessionReadUseCases`/`PollReadUseCases` already use.
 **Not in this slice:** the HTTP list, dispatch-time `Skipped` marking, and the payload renderer — S3/S4

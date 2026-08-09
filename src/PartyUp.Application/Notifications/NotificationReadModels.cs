@@ -20,7 +20,10 @@ public enum NotificationSubjectKind
 /// <see cref="Actor"/>, and a row whose subject the recipient cannot reach carries
 /// <see cref="SubjectKind"/> = <see cref="NotificationSubjectKind.None"/> with every other subject
 /// field null. The row itself — id, type, timestamps — is always present and always
-/// unread-countable; masking is render-time presentation on top of a real record (D-086).
+/// unread-countable; masking is render-time presentation on top of a real record (D-086). The
+/// minimal form's absent actor is the §4 wire rule's "Anonymous actor" shape — both
+/// <see cref="Actor"/> and <see cref="ActorUserId"/> absent, the client renders Anonymous — not merely
+/// the no-actor-ref case.
 /// </summary>
 public sealed record NotificationReadModel(
     NotificationId Id,
@@ -28,6 +31,7 @@ public sealed record NotificationReadModel(
     Instant CreatedAt,
     Instant? ReadAt,
     MaskedIdentity? Actor,
+    Guid? ActorUserId,
     NotificationSubjectKind SubjectKind,
     Guid? SubjectId,
     SessionTitle? SubjectTitle,

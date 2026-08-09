@@ -40,6 +40,7 @@ public sealed class NotificationReadUseCasesTests
         Assert.NotNull(row.Actor);
         Assert.True(row.Actor!.Value.IsAnonymous);
         Assert.Equal(MaskingReason.Tombstoned, row.Actor.Value.Reason);
+        Assert.Equal(actor.Id.Value, row.ActorUserId); // §4 wire rule: tombstoned keeps actorUserId
     }
 
     [Fact]
@@ -59,6 +60,7 @@ public sealed class NotificationReadUseCasesTests
         Assert.NotNull(row.Actor);
         Assert.True(row.Actor!.Value.IsAnonymous);
         Assert.Equal(MaskingReason.Blocked, row.Actor.Value.Reason);
+        Assert.Null(row.ActorUserId); // §4 wire rule: blocked-pair masking omits actorUserId too
     }
 
     [Fact]
@@ -78,6 +80,7 @@ public sealed class NotificationReadUseCasesTests
         Assert.NotNull(row.Actor);
         Assert.True(row.Actor!.Value.IsAnonymous);
         Assert.Equal(MaskingReason.ProfileIncomplete, row.Actor.Value.Reason);
+        Assert.Equal(actor.Id.Value, row.ActorUserId); // §4 wire rule: profile-incomplete keeps actorUserId
     }
 
     [Fact]
@@ -96,57 +99,72 @@ public sealed class NotificationReadUseCasesTests
         Assert.NotNull(row.Actor);
         Assert.False(row.Actor!.Value.IsAnonymous);
         Assert.Equal("Named Actor", row.Actor.Value.DisplayName!.Value.Value);
+        Assert.Equal(actor.Id.Value, row.ActorUserId); // §4 wire rule: a named actor keeps actorUserId
     }
 
-    // ---- unreachable subject -> minimal form, over both fixtures ----
+    // ---- unreachable subject -> minimal form, over both fixtures (F2: each arm must be
+    // discriminating — reachable without the masking cause, minimal with it) ----
 
     [Fact]
-    public async Task UnreachableSubject_BlockedPair_RendersMinimalForm_D076()
+    public async Task UnreachableSubject_BlockedPair_MasksDespiteLiveParticipation_D076()
     {
         NotificationFixture fixture = new();
         UserId recipientId = fixture.MakeRecipient();
         UserId organizerId = UserId.New();
-        UserId unrelatedInvitee = UserId.New();
+        // The recipient holds a live, direct invited participation (§7 rule 1) — without the block
+        // below the session is reachable on that alone, so the block arm is what a deleted
+        // `blocks.FindPairsAmongAsync` call would fail to catch.
+        Session session = fixture.CreateSession(organizerId, invitees: [recipientId]);
+        fixture.Sessions.Add(session);
+
+        Notification notification = Notification.Create(
+            recipientId, NotificationType.SessionCanceled, NotificationSubject.ForSession(session.Id), fixture.Clock);
+
+        NotificationReadModel reachableRow = await fixture.UseCases().ProjectAsync(notification, recipientId, default);
+        Assert.True(reachableRow.HasSubject);
+        Assert.Equal(session.Id.Value, reachableRow.SubjectId);
+
         fixture.Blocks.Items.Add(Block.Create(recipientId, organizerId, Username.Create("blocked-organizer"), fixture.Clock));
 
-        Session session = fixture.CreateSession(organizerId, invitees: [unrelatedInvitee]);
-        fixture.Sessions.Add(session);
+        NotificationReadModel maskedRow = await fixture.UseCases().ProjectAsync(notification, recipientId, default);
 
-        Notification notification = Notification.Create(
-            recipientId, NotificationType.SessionCanceled, NotificationSubject.ForSession(session.Id), fixture.Clock);
-
-        NotificationReadModel row = await fixture.UseCases().ProjectAsync(notification, recipientId, default);
-
-        Assert.False(row.HasSubject);
-        Assert.Equal(NotificationSubjectKind.None, row.SubjectKind);
-        Assert.Null(row.SubjectId);
-        Assert.Null(row.SubjectTitle);
-        Assert.Null(row.Actor);
-        Assert.False(row.IsUnread == false); // row stays present and unread-countable
-        Assert.True(row.IsUnread);
+        Assert.False(maskedRow.HasSubject);
+        Assert.Equal(NotificationSubjectKind.None, maskedRow.SubjectKind);
+        Assert.Null(maskedRow.SubjectId);
+        Assert.Null(maskedRow.SubjectTitle);
+        Assert.Null(maskedRow.Actor);
+        Assert.Null(maskedRow.ActorUserId);
+        Assert.True(maskedRow.IsUnread); // row stays present and unread-countable
     }
 
     [Fact]
-    public async Task UnreachableSubject_LapsedInheritedAccess_RendersMinimalForm()
+    public async Task UnreachableSubject_RemovedParticipation_RendersMinimalForm()
     {
         NotificationFixture fixture = new();
         UserId recipientId = fixture.MakeRecipient();
         UserId organizerId = UserId.New();
-        UserId unrelatedInvitee = UserId.New();
-        // No friendship, no block, no participation: access simply never (or no longer) extends.
-        Session session = fixture.CreateSession(organizerId, invitees: [unrelatedInvitee]);
+        // A real `Removed` participation row (§5.2: terminal, keeps nothing) — proven reachable while
+        // live, then unreachable once removed, no block or friendship involved either arm.
+        Session session = fixture.CreateSession(organizerId, invitees: [recipientId]);
         fixture.Sessions.Add(session);
 
         Notification notification = Notification.Create(
             recipientId, NotificationType.SessionCanceled, NotificationSubject.ForSession(session.Id), fixture.Clock);
 
-        NotificationReadModel row = await fixture.UseCases().ProjectAsync(notification, recipientId, default);
+        NotificationReadModel liveRow = await fixture.UseCases().ProjectAsync(notification, recipientId, default);
+        Assert.True(liveRow.HasSubject);
+        Assert.Equal(session.Id.Value, liveRow.SubjectId);
 
-        Assert.False(row.HasSubject);
-        Assert.Null(row.SubjectId);
-        Assert.Null(row.SubjectTitle);
-        Assert.Null(row.Actor);
-        Assert.True(row.IsUnread);
+        session.RemoveParticipation(ParticipantRef.ForUser(recipientId), fixture.Clock);
+
+        NotificationReadModel departedRow = await fixture.UseCases().ProjectAsync(notification, recipientId, default);
+
+        Assert.False(departedRow.HasSubject);
+        Assert.Null(departedRow.SubjectId);
+        Assert.Null(departedRow.SubjectTitle);
+        Assert.Null(departedRow.Actor);
+        Assert.Null(departedRow.ActorUserId);
+        Assert.True(departedRow.IsUnread);
     }
 
     [Fact]
@@ -168,6 +186,64 @@ public sealed class NotificationReadUseCasesTests
         Assert.Equal(NotificationSubjectKind.Session, row.SubjectKind);
         Assert.Equal(session.Id.Value, row.SubjectId);
         Assert.Equal(session.Title.Value, row.SubjectTitle!.Value.Value);
+    }
+
+    // ---- both-ref row: session unreachable falls back to the poll (F1) ----
+
+    [Fact]
+    public async Task BothRefRow_SessionUnreachablePollReachable_FallsBackToPollSubject()
+    {
+        NotificationFixture fixture = new();
+        UserId recipientId = fixture.MakeRecipient();
+        UserId organizerId = UserId.New();
+
+        // The recipient keeps direct poll access (§7 rule 1 — Active, independent of their vote) but
+        // was not carried onto the finalized session's roster — e.g. Unavailable throughout on the
+        // winning option (§6.4-3) — so the session ref alone is unreachable for them.
+        Poll poll = fixture.CreatePoll(organizerId, invitees: [recipientId]);
+        fixture.Polls.Add(poll);
+        Session session = fixture.CreateSession(organizerId, isPrivate: true);
+        fixture.Sessions.Add(session);
+
+        Instant selected = fixture.Clock.GetCurrentInstant() + Duration.FromHours(11);
+        Notification notification = Notification.Create(
+            recipientId, NotificationType.PollOptionSelected,
+            NotificationSubject.ForSelectedOption(poll.Id, session.Id, selected), fixture.Clock);
+
+        NotificationReadModel row = await fixture.UseCases().ProjectAsync(notification, recipientId, default);
+
+        Assert.True(row.HasSubject);
+        Assert.Equal(NotificationSubjectKind.Poll, row.SubjectKind);
+        Assert.Equal(poll.Id.Value, row.SubjectId);
+        Assert.Equal(poll.Title.Value, row.SubjectTitle!.Value.Value);
+        Assert.Equal(selected, row.OptionStartTime);
+    }
+
+    [Fact]
+    public async Task BothRefRow_BothRefsUnreachable_RendersMinimalForm()
+    {
+        NotificationFixture fixture = new();
+        UserId recipientId = fixture.MakeRecipient();
+        UserId organizerId = UserId.New();
+
+        // Neither the poll nor the session carries the recipient: minimal form only when every
+        // carried ref is unreachable.
+        Poll poll = fixture.CreatePoll(organizerId);
+        fixture.Polls.Add(poll);
+        Session session = fixture.CreateSession(organizerId, isPrivate: true);
+        fixture.Sessions.Add(session);
+
+        Instant selected = fixture.Clock.GetCurrentInstant() + Duration.FromHours(11);
+        Notification notification = Notification.Create(
+            recipientId, NotificationType.PollOptionSelected,
+            NotificationSubject.ForSelectedOption(poll.Id, session.Id, selected), fixture.Clock);
+
+        NotificationReadModel row = await fixture.UseCases().ProjectAsync(notification, recipientId, default);
+
+        Assert.False(row.HasSubject);
+        Assert.Equal(NotificationSubjectKind.None, row.SubjectKind);
+        Assert.Null(row.SubjectId);
+        Assert.Null(row.SubjectTitle);
     }
 
     // ---- recipient-zone rendering + fallback (D-060) ----
@@ -200,6 +276,26 @@ public sealed class NotificationReadUseCasesTests
             NotificationSubject.ForActor(fixture.MakeRecipient()), fixture.Clock);
 
         NotificationReadModel row = await fixture.UseCases().ProjectAsync(notification, recipientId, default);
+
+        Assert.Equal("en", row.RecipientLocale);
+        Assert.Equal(DateTimeZone.Utc, row.RecipientZone);
+    }
+
+    [Fact]
+    public async Task RecipientWithNullLocaleAndZone_FallsBackToEnUtc_D060()
+    {
+        NotificationFixture fixture = new();
+        // A real, registered User row (unlike the missing-row arm above) whose Locale and TimeZone
+        // are both still null — an Onboarding account that never completed profile setup.
+        User recipient = User.BeginOnboarding(
+            UserId.New(), FriendCode.Create("34567890AB"), AgeGateSource.SelfAttested, fixture.Clock);
+        fixture.Users.Users[recipient.Id] = recipient;
+
+        Notification notification = Notification.Create(
+            recipient.Id, NotificationType.FriendRequestReceived,
+            NotificationSubject.ForActor(fixture.MakeRecipient()), fixture.Clock);
+
+        NotificationReadModel row = await fixture.UseCases().ProjectAsync(notification, recipient.Id, default);
 
         Assert.Equal("en", row.RecipientLocale);
         Assert.Equal(DateTimeZone.Utc, row.RecipientZone);
