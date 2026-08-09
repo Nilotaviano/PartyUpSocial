@@ -63,6 +63,9 @@ public sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
             .UsePropertyAccessMode(PropertyAccessMode.Field);
         builder.HasIndex(session => new { session.OrganizerId, session.Status, session.StartTime }).HasDatabaseName("ix_sessions_organizer_status_start");
         builder.HasIndex(session => new { session.Status, session.StartTime, session.Id }).HasDatabaseName("ix_sessions_status_start_id");
+        // PHASE7_DESIGN.md §1: what makes §3's mute join survive finalization (mute.session_id IN
+        // (SELECT id FROM sessions WHERE origin_poll_id = n.poll_id)) an index lookup, not a scan.
+        builder.HasIndex(session => session.OriginPollId).HasFilter("origin_poll_id IS NOT NULL").HasDatabaseName("ix_sessions_origin_poll_id");
         builder.HasOne<User>().WithMany().HasForeignKey(session => session.OrganizerId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Poll>().WithMany().HasForeignKey(session => session.OriginPollId).OnDelete(DeleteBehavior.Restrict);
         builder.Property<uint>("xmin").IsRowVersion();

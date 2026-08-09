@@ -23,6 +23,13 @@ namespace PartyUp.Infrastructure.Friends;
 /// (round-1 finding F7): an optional default made a silent purge-skip reachable from any direct
 /// construction site that forgot to supply them, which is exactly the "accounting stays honest" failure
 /// mode this class exists to prevent. Production resolution supplies both through DI.
+///
+/// <para>
+/// PHASE7_DESIGN.md §1 extends the same tail: <see cref="UserDataScope.PushSubscriptions"/> and
+/// <see cref="UserDataScope.NotificationMutes"/> are purged here too, ahead of the shared helper's
+/// <see cref="UserDataScope.Notifications"/> purge -- send-log rows follow their subscription's
+/// cascade FK, so no separate send-log delete is needed.
+/// </para>
 /// </summary>
 public sealed class DeletionResultApplier(
     IFriendshipRepository friendships,
@@ -30,13 +37,25 @@ public sealed class DeletionResultApplier(
     INotificationRepository notifications,
     IReminderScheduleWriter reminderSchedule,
     IDeletionScopeProvider scopeProvider,
-    IAvailabilityRepository availability) : IDeletionResultApplier
+    IAvailabilityRepository availability,
+    IPushSubscriptionRepository pushSubscriptions,
+    INotificationMuteRepository notificationMutes) : IDeletionResultApplier
 {
     public async Task ApplyAsync(
         DeletionExecutionResult result,
         UserId subject,
         CancellationToken cancellationToken)
     {
+        if (result.PurgedData.Contains(UserDataScope.PushSubscriptions))
+        {
+            await pushSubscriptions.DeleteForUserAsync(subject, cancellationToken);
+        }
+
+        if (result.PurgedData.Contains(UserDataScope.NotificationMutes))
+        {
+            await notificationMutes.DeleteForUserAsync(subject, cancellationToken);
+        }
+
         await DeletionResultApplication.ApplyAsync(
             result,
             subject,

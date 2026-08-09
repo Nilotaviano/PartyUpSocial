@@ -63,6 +63,9 @@ public static class DependencyInjection
         services.AddScoped<IFriendshipRepository, FriendshipRepository>();
         services.AddScoped<IBlockRepository, BlockRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IPushSubscriptionRepository, PushSubscriptionRepository>();
+        services.AddScoped<INotificationPushSendRepository, NotificationPushSendRepository>();
+        services.AddScoped<INotificationMuteRepository, NotificationMuteRepository>();
         services.AddScoped<IFriendPairLocker, FriendPairLocker>();
         services.AddScoped<IUserGraphResolver, UserGraphResolver>();
         services.AddScoped<IFriendCodeGenerator, FriendCodeGenerator>();

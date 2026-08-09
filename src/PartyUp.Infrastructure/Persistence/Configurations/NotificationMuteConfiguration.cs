@@ -21,6 +21,9 @@ public sealed class NotificationMuteConfiguration : IEntityTypeConfiguration<Not
         builder.Ignore(mute => mute.TargetsSession);
         builder.Ignore(mute => mute.TargetsPoll);
         builder.HasIndex(mute => new { mute.SessionId, mute.UserId }).IsUnique().HasFilter("session_id IS NOT NULL").HasDatabaseName("ux_notification_mutes_session_user");
+        // The poll-side twin (PHASE7_DESIGN.md §1): completes the xor target's logical uniqueness in
+        // the DB the same way the session-side unique above already does.
+        builder.HasIndex(mute => new { mute.PollId, mute.UserId }).IsUnique().HasFilter("poll_id IS NOT NULL").HasDatabaseName("ux_notification_mutes_poll_user");
         builder.HasOne<User>().WithMany().HasForeignKey(mute => mute.UserId).OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -68,7 +68,11 @@ public sealed class FriendGraphMigrationTests : IAsyncLifetime
             "index:ix_friendships_hi_status",
             "index:ix_friendships_lo_status",
             "index:ix_friendships_pending_requested_by",
+            // PHASE7_DESIGN.md §1 (S1): dispatch_state's partial index and the unread keyset index --
+            // both land on notifications, so this closed inventory gains exactly these two entries.
+            "index:ix_notifications_dispatch_pending",
             "index:ix_notifications_recipient_created",
+            "index:ix_notifications_unread",
             "index:pk_blocks",
             "index:pk_friendships",
             "index:pk_notifications",

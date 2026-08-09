@@ -52,6 +52,13 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
             .HasColumnType("timestamp with time zone");
         builder.Property<Guid?>("ReminderHandoffId")
             .HasColumnName("reminder_handoff_id");
+        // Same no-Domain-footprint shadow precedent as ReminderHandoffId above: dispatch tracking is
+        // Infrastructure's concern (PHASE7_DESIGN.md §1), not a Notification member (§9 -- structured
+        // refs only). Pending(0) is the default so every pre-Phase-7 row would read Pending were it not
+        // for the migration's backfill to Skipped(2).
+        builder.Property<short>("DispatchState")
+            .HasColumnName("dispatch_state")
+            .HasDefaultValue((short)0);
 
         builder.Ignore(notification => notification.IsRead);
         builder.Ignore(notification => notification.Subject);
@@ -64,6 +71,28 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
             })
             .IsDescending(false, true, true)
             .HasDatabaseName("ix_notifications_recipient_created");
+        // A distinct name must be passed into HasIndex itself: EF's index diffing matches on
+        // property list when unnamed at call time, and a second HasIndex over the identical
+        // (RecipientUserId, CreatedAt, Id) list would otherwise be treated as reconfiguring the
+        // recipient-created index above instead of creating this second one.
+        builder.HasIndex(
+                notification => new
+                {
+                    notification.RecipientUserId,
+                    notification.CreatedAt,
+                    notification.Id,
+                },
+                "ix_notifications_unread")
+            .IsDescending(false, true, true)
+            .HasFilter("read_at IS NULL")
+            .HasDatabaseName("ix_notifications_unread");
+        builder.HasIndex(notification => new
+            {
+                notification.CreatedAt,
+                notification.Id,
+            })
+            .HasFilter("dispatch_state = 0")
+            .HasDatabaseName("ix_notifications_dispatch_pending");
         builder.HasIndex(notification => new
             {
                 notification.RecipientUserId,

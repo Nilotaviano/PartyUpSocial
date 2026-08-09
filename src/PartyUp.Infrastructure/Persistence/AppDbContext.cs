@@ -10,6 +10,7 @@ using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Auth;
 using PartyUp.Infrastructure.Identity;
 using PartyUp.Infrastructure.Deletion;
+using PartyUp.Infrastructure.Notifications;
 using PartyUp.Infrastructure.Persistence.Configurations;
 using PartyUp.Infrastructure.Steam;
 
@@ -49,6 +50,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<GuestLink> GuestLinks => Set<GuestLink>();
 
     public DbSet<NotificationMute> NotificationMutes => Set<NotificationMute>();
+
+    public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
+
+    public DbSet<NotificationPushSend> NotificationPushSends => Set<NotificationPushSend>();
 
     public DbSet<SessionReminderHandoff> SessionReminderHandoffs => Set<SessionReminderHandoff>();
 
@@ -119,6 +124,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.ApplyConfiguration(new GuestIdentityConfiguration());
         builder.ApplyConfiguration(new GuestLinkConfiguration());
         builder.ApplyConfiguration(new NotificationMuteConfiguration());
+        builder.ApplyConfiguration(new PushSubscriptionConfiguration());
+        builder.ApplyConfiguration(new NotificationPushSendConfiguration());
         builder.ApplyConfiguration(new SessionReminderHandoffConfiguration());
         builder.ApplyConfiguration(new AvailabilityBlockConfiguration());
         builder.ApplyConfiguration(new AvailabilitySeriesConfiguration());

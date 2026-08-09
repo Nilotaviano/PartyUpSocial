@@ -406,6 +406,12 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<short>("DispatchState")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasDefaultValue((short)0)
+                        .HasColumnName("dispatch_state");
+
                     b.Property<Instant?>("OptionStartTime")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("option_start_time");
@@ -442,6 +448,10 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasDatabaseName("ux_notifications_session_reminder_once")
                         .HasFilter("type = 12");
 
+                    b.HasIndex("CreatedAt", "Id")
+                        .HasDatabaseName("ix_notifications_dispatch_pending")
+                        .HasFilter("dispatch_state = 0");
+
                     b.HasIndex("PollId", "RecipientUserId")
                         .IsUnique()
                         .HasDatabaseName("ux_notifications_poll_deadline_once")
@@ -455,6 +465,11 @@ namespace PartyUp.Infrastructure.Migrations
                     b.HasIndex("RecipientUserId", "CreatedAt", "Id")
                         .IsDescending(false, true, true)
                         .HasDatabaseName("ix_notifications_recipient_created");
+
+                    b.HasIndex(new[] { "RecipientUserId", "CreatedAt", "Id" }, "ix_notifications_unread")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_notifications_unread")
+                        .HasFilter("read_at IS NULL");
 
                     b.ToTable("notifications", null, t =>
                         {
@@ -489,6 +504,11 @@ namespace PartyUp.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_notification_mutes");
 
+                    b.HasIndex("PollId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_notification_mutes_poll_user")
+                        .HasFilter("poll_id IS NOT NULL");
+
                     b.HasIndex("SessionId", "UserId")
                         .IsUnique()
                         .HasDatabaseName("ux_notification_mutes_session_user")
@@ -498,6 +518,65 @@ namespace PartyUp.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("ck_notification_mutes_target", "(session_id IS NOT NULL) <> (poll_id IS NOT NULL)");
                         });
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Notifications.PushSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AuthSecret")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("auth_secret");
+
+                    b.Property<short>("Channel")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasDefaultValue((short)0)
+                        .HasColumnName("channel");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Endpoint")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("endpoint");
+
+                    b.Property<string>("EndpointHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("endpoint_hash");
+
+                    b.Property<string>("PublicKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("public_key");
+
+                    b.Property<Instant?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_push_subscriptions");
+
+                    b.HasIndex("UserId", "Channel", "EndpointHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_push_subscriptions_active_endpoint")
+                        .HasFilter("revoked_at IS NULL");
+
+                    b.ToTable("push_subscriptions", (string)null);
                 });
 
             modelBuilder.Entity("PartyUp.Domain.Polls.Poll", b =>
@@ -1004,6 +1083,10 @@ namespace PartyUp.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_sessions");
 
+                    b.HasIndex("OriginPollId")
+                        .HasDatabaseName("ix_sessions_origin_poll_id")
+                        .HasFilter("origin_poll_id IS NOT NULL");
+
                     b.HasIndex("OrganizerId", "Status", "StartTime")
                         .HasDatabaseName("ix_sessions_organizer_status_start");
 
@@ -1392,6 +1475,38 @@ namespace PartyUp.Infrastructure.Migrations
                     b.ToTable("auth_users", (string)null);
                 });
 
+            modelBuilder.Entity("PartyUp.Infrastructure.Notifications.NotificationPushSend", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant>("ClaimedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_at");
+
+                    b.Property<Guid>("NotificationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("notification_id");
+
+                    b.Property<short>("Outcome")
+                        .HasColumnType("smallint")
+                        .HasColumnName("outcome");
+
+                    b.Property<Guid>("PushSubscriptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("push_subscription_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notification_push_sends");
+
+                    b.HasIndex("NotificationId", "PushSubscriptionId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_notification_push_sends_once");
+
+                    b.ToTable("notification_push_sends", (string)null);
+                });
+
             modelBuilder.Entity("PartyUp.Infrastructure.Persistence.AdminSeedRefusal", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -1677,6 +1792,16 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasConstraintName("fk_notification_mutes_users_user_id");
                 });
 
+            modelBuilder.Entity("PartyUp.Domain.Notifications.PushSubscription", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_push_subscriptions_users_user_id");
+                });
+
             modelBuilder.Entity("PartyUp.Domain.Polls.Poll", b =>
                 {
                     b.HasOne("PartyUp.Domain.Sessions.Session", null)
@@ -1936,6 +2061,23 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("fk_auth_tokens_users_user_id");
+                });
+
+            modelBuilder.Entity("PartyUp.Infrastructure.Notifications.NotificationPushSend", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Notifications.Notification", null)
+                        .WithMany()
+                        .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_push_sends_notifications_notification_id");
+
+                    b.HasOne("PartyUp.Domain.Notifications.PushSubscription", null)
+                        .WithMany()
+                        .HasForeignKey("PushSubscriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_push_sends_push_subscriptions_push_subscriptio");
                 });
 
             modelBuilder.Entity("PartyUp.Infrastructure.Persistence.AdminSeedRefusal", b =>
