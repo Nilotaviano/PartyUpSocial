@@ -71,6 +71,34 @@ internal sealed class FakeSessionRepository : ISessionRepository
     internal Dictionary<SessionId, Session> Snapshot() => new(_sessions);
 
     internal void Restore(Dictionary<SessionId, Session> snapshot) => _sessions = new(snapshot);
+
+    public Task<IReadOnlyList<FutureEligibleSession>> ListFutureSessionsWithEligibleParticipationAsync(
+        UserId userId,
+        Instant now,
+        (Instant StartTime, Guid Id)? afterCursor,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        IEnumerable<FutureEligibleSession> query = _sessions.Values
+            .Where(session => !session.IsTerminal && session.StartTime > now)
+            .Where(session =>
+            {
+                Participation? row = session.Find(ParticipantRef.ForUser(userId));
+                return row is not null && !row.IsRemoved && row.Status != ParticipationStatus.Declined;
+            })
+            .Select(session => new FutureEligibleSession(session.Id, session.StartTime))
+            .OrderBy(candidate => candidate.StartTime.ToUnixTimeTicks())
+            .ThenBy(candidate => candidate.Id.Value);
+
+        if (afterCursor is { } after)
+        {
+            query = query.Where(candidate =>
+                candidate.StartTime > after.StartTime ||
+                (candidate.StartTime == after.StartTime && candidate.Id.Value.CompareTo(after.Id) > 0));
+        }
+
+        return Task.FromResult<IReadOnlyList<FutureEligibleSession>>([.. query.Take(limit)]);
+    }
 }
 
 internal sealed class FakeSessionLockRepository : ISessionLockRepository
@@ -124,11 +152,18 @@ internal sealed class RecordingReminderHandoffWriter : ISessionReminderHandoffWr
 {
     internal List<(SessionId SessionId, UserId UserId)> Replans { get; } = [];
 
+    internal List<(SessionId SessionId, UserId UserId, ReminderOffset? AccountDefault)> ReplansWithDefault { get; } = [];
+
     internal List<(SessionId SessionId, UserId UserId)> Cancels { get; } = [];
 
-    public Task ReplanAsync(Session session, UserId recipientUserId, CancellationToken cancellationToken)
+    public Task ReplanAsync(
+        Session session,
+        UserId recipientUserId,
+        CancellationToken cancellationToken,
+        ReminderOffset? accountDefault = null)
     {
         Replans.Add((session.Id, recipientUserId));
+        ReplansWithDefault.Add((session.Id, recipientUserId, accountDefault));
         return Task.CompletedTask;
     }
 

@@ -80,6 +80,12 @@ public sealed class PartyUpOpenApiTransformer :
         // resolution already forecloses both before the command ever runs (a missing link surfaces as
         // poll_not_found, an inactive one as guest_link_terminal), so they are not documented.
         "guest_link_not_claimed",
+
+        // PHASE7_DESIGN.md §4: the S4 HTTP surface's four new codes.
+        "notification_not_found",
+        "push_subscription_not_found",
+        "push_not_configured",
+        "push_channel_unsupported",
     ];
 
     private static readonly HashSet<string> FriendOperationIds =

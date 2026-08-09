@@ -36,6 +36,9 @@ public sealed class PushSubscriptionRepository(AppDbContext context) : IPushSubs
 
         if (existing is not null)
         {
+            // S4 carry (S1 verification finding): rotated keys replace the stale ones on the active
+            // row rather than being silently dropped.
+            existing.RotateKeys(publicKey, authSecret);
             return existing.Id;
         }
 

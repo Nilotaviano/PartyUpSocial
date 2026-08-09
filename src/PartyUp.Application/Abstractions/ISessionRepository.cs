@@ -1,8 +1,15 @@
+using NodaTime;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
 
 namespace PartyUp.Application.Abstractions;
+
+/// <summary>
+/// PHASE7_DESIGN.md §4's reminder-default replan page: one future, non-terminal session the user
+/// holds an eligible participation on.
+/// </summary>
+public sealed record FutureEligibleSession(SessionId Id, Instant StartTime);
 
 /// <summary>
 /// The Session aggregate's own persistence port (PHASE4_DESIGN.md §4.2/§5.1). Every invariant-touching
@@ -38,4 +45,18 @@ public interface ISessionRepository
     /// This is the sole entry point invariant-touching commands use.
     /// </summary>
     Task<SessionForUpdate?> LoadForUpdateAsync(SessionId id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// PHASE7_DESIGN.md §4's reminder-default replan page: future (<c>start_time &gt;</c>
+    /// <paramref name="now"/>), non-terminal sessions where <paramref name="userId"/> holds an
+    /// eligible participation (not <c>Removed</c>, not <c>Declined</c>) — the same eligibility
+    /// <c>SetSessionReminderUseCase</c> requires. Ordered <c>(start_time, id)</c> ascending, keyset
+    /// paged by <paramref name="afterCursor"/>, up to <paramref name="limit"/> rows.
+    /// </summary>
+    Task<IReadOnlyList<FutureEligibleSession>> ListFutureSessionsWithEligibleParticipationAsync(
+        UserId userId,
+        Instant now,
+        (Instant StartTime, Guid Id)? afterCursor,
+        int limit,
+        CancellationToken cancellationToken);
 }

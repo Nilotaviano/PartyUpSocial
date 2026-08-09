@@ -82,6 +82,17 @@ public sealed class PushSubscription
         RevokedAt ??= clock.GetCurrentInstant();
     }
 
+    /// <summary>
+    /// PHASE7_DESIGN.md §4's <c>CreatePushSubscription</c> upsert carry (S1 verification finding): a
+    /// re-POST of the same (user, channel, endpoint) with rotated keys must replace them on the active
+    /// row rather than silently keeping the stale ones, or every subsequent send fails permanently.
+    /// </summary>
+    public void RotateKeys(string publicKey, string authSecret)
+    {
+        PublicKey = RequireText(publicKey, MaximumKeyLength, "public key");
+        AuthSecret = RequireText(authSecret, MaximumKeyLength, "auth secret");
+    }
+
     private static string RequireText(string value, int maximumLength, string what)
     {
         if (string.IsNullOrWhiteSpace(value))

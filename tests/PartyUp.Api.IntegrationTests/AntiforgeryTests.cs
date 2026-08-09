@@ -243,6 +243,21 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 JsonContent.Create(new { startTime = "2027-01-01T00:00:00Z" })),
             ["PUT /api/v1/guest/{guestLinkId:guid}/poll/display-name"] = Public(() =>
                 JsonContent.Create(new { displayName = "Probe Guest" })),
+            // PHASE7_DESIGN.md §4 (ticket-P7-S4): the S4 HTTP surface's eight unsafe routes.
+            ["POST /api/v1/push/subscriptions"] = Onboarded(() => JsonContent.Create(new
+            {
+                channel = "webpush",
+                endpoint = "https://push.example.test/probe",
+                publicKey = "probe-public-key",
+                authSecret = "probe-auth-secret",
+            })),
+            ["DELETE /api/v1/push/subscriptions/{subscriptionId:guid}"] = Onboarded(() => null),
+            ["POST /api/v1/notifications/{notificationId:guid}/read"] = Onboarded(() => null),
+            ["POST /api/v1/notifications/read-all"] = Onboarded(() => null),
+            ["PUT /api/v1/sessions/{sessionId:guid}/mute"] = Onboarded(() => null),
+            ["DELETE /api/v1/sessions/{sessionId:guid}/mute"] = Onboarded(() => null),
+            ["PUT /api/v1/polls/{pollId:guid}/mute"] = Onboarded(() => null),
+            ["DELETE /api/v1/polls/{pollId:guid}/mute"] = Onboarded(() => null),
         };
 
     private readonly PartyUpApiFactory _factory = new();
@@ -506,7 +521,9 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             .Replace("{requestId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
             .Replace("{pollId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
             .Replace("{optionId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
-            .Replace("{guestIdentityId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal);
+            .Replace("{guestIdentityId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
+            .Replace("{subscriptionId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
+            .Replace("{notificationId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal);
 
     private static HttpMethod MethodFromKey(string key) =>
         new(key[..key.IndexOf(' ')]);

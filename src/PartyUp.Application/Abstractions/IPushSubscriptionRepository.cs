@@ -14,8 +14,9 @@ public interface IPushSubscriptionRepository
 {
     /// <summary>
     /// Idempotent upsert on (user, channel, endpoint hash): an existing active row for the same
-    /// endpoint is returned unchanged; otherwise a new subscription is created. Returns the row's id
-    /// either way.
+    /// endpoint has its <c>publicKey</c>/<c>authSecret</c> rotated to the values just posted (S4's S1
+    /// verification carry — a stale key pair would fail every subsequent send permanently); otherwise
+    /// a new subscription is created. Returns the row's id either way.
     /// </summary>
     Task<PushSubscriptionId> UpsertActiveAsync(
         UserId userId,

@@ -4,6 +4,7 @@ using PartyUp.Api.Contracts.Polls;
 using PartyUp.Api.Contracts.Sessions;
 using PartyUp.Api.ErrorHandling;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Notifications;
 using PartyUp.Application.Polls;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Kernel;
@@ -136,7 +137,67 @@ public static class PollEndpoints
             .ProducesPartyUpProblem(StatusCodes.Status404NotFound)
             .ProducesPartyUpProblem(StatusCodes.Status409Conflict);
 
+        // PHASE7_DESIGN.md §4: MutePoll/UnmutePoll. A terminal poll refuses MutePoll with the
+        // shipped poll_invalid_transition code; UnmutePoll on Finalized is not refused (removes the
+        // re-parented row via CreatedSessionId), on Expired/Canceled it removes the poll-keyed row.
+        Unsafe(polls.MapPut("/polls/{pollId:guid}/mute", MutePollAsync)
+                .WithName(ApiOperationIds.MutePoll)
+                .Produces(StatusCodes.Status204NoContent))
+            .ProducesPartyUpProblem(StatusCodes.Status404NotFound)
+            .ProducesPartyUpProblem(StatusCodes.Status409Conflict);
+
+        Unsafe(polls.MapDelete("/polls/{pollId:guid}/mute", UnmutePollAsync)
+                .WithName(ApiOperationIds.UnmutePoll)
+                .Produces(StatusCodes.Status204NoContent))
+            .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
+
         return api;
+    }
+
+    private static async Task<IResult> MutePollAsync(
+        Guid pollId,
+        ICurrentUserAccessor currentUser,
+        SetNotificationMuteUseCase useCase,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Problem(context, StatusCodes.Status401Unauthorized, "unauthorized");
+        }
+
+        MuteResult result = await useCase.MutePollAsync(
+            PollId.From(pollId), actorId.Value, cancellationToken);
+        if (result.Succeeded)
+        {
+            return Results.NoContent();
+        }
+
+        int status = result.Code == "poll_invalid_transition"
+            ? StatusCodes.Status409Conflict
+            : StatusCodes.Status404NotFound;
+        return Problem(context, status, result.Code!);
+    }
+
+    private static async Task<IResult> UnmutePollAsync(
+        Guid pollId,
+        ICurrentUserAccessor currentUser,
+        SetNotificationMuteUseCase useCase,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Problem(context, StatusCodes.Status401Unauthorized, "unauthorized");
+        }
+
+        MuteResult result = await useCase.UnmutePollAsync(
+            PollId.From(pollId), actorId.Value, cancellationToken);
+        return result.Succeeded
+            ? Results.NoContent()
+            : Problem(context, StatusCodes.Status404NotFound, result.Code!);
     }
 
     // ---- handlers ---------------------------------------------------------------------------

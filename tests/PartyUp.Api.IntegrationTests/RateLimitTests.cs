@@ -137,6 +137,18 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
             ],
             ["poll-vote"] = ["VoteOnPollOption", "SuggestPollOption"],
             ["poll-list-read"] = ["ListPolls", "GetPollFinalizationPreview"],
+            // PHASE7_DESIGN.md §4 (ticket-P7-S4): three new User-partitioned dimensions, 30 -> 33.
+            ["notification-read"] = ["ListNotifications", "GetUnreadNotificationCount", "GetPushConfig"],
+            ["notification-write"] =
+            [
+                "MarkNotificationRead",
+                "MarkAllNotificationsRead",
+                "MuteSession",
+                "UnmuteSession",
+                "MutePoll",
+                "UnmutePoll",
+            ],
+            ["push-subscribe"] = ["CreatePushSubscription", "DeletePushSubscription"],
             ["default"] = [],
         };
 
@@ -151,7 +163,7 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
     [Fact]
     public void EveryDimensionCoversItsDocumentedRoutes()
     {
-        Assert.Equal(30, RateLimitPolicies.Dimensions.Count);
+        Assert.Equal(33, RateLimitPolicies.Dimensions.Count);
         Assert.Equal(ExpectedRoutes.Keys, RateLimitPolicies.Dimensions.Select(value => value.Name));
         foreach (RateLimitDimension dimension in RateLimitPolicies.Dimensions)
         {

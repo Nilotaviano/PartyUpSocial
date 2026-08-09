@@ -107,6 +107,17 @@ internal sealed class ConstraintViolatingNotificationRepository(
     public Task<Notification?> FindAsync(NotificationId id, CancellationToken cancellationToken) =>
         _inner.FindAsync(id, cancellationToken);
 
+    public Task<Notification?> FindOwnedAsync(
+        NotificationId id,
+        UserId recipientId,
+        CancellationToken cancellationToken) =>
+        _inner.FindOwnedAsync(id, recipientId, cancellationToken);
+
+    public Task<IReadOnlyList<Notification>> ListUnreadForUpdateAsync(
+        UserId recipientId,
+        CancellationToken cancellationToken) =>
+        _inner.ListUnreadForUpdateAsync(recipientId, cancellationToken);
+
     public Task AddSteamMatchIfAbsentAsync(
         Notification notification,
         CancellationToken cancellationToken) =>

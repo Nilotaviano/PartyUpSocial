@@ -16,7 +16,8 @@ public sealed class PollReadUseCases(
     IPollRepository polls,
     IPollReadRepository reads,
     IFriendshipRepository friendships,
-    IBlockRepository blocks)
+    IBlockRepository blocks,
+    INotificationMuteRepository mutes)
 {
     public async Task<PollDetail?> GetPollDetailAsync(
         PollId pollId,
@@ -116,6 +117,10 @@ public sealed class PollReadUseCases(
                 available, maybe, unavailable, ownVote));
         }
 
+        bool muted = poll.Status == PollStatus.Finalized && poll.CreatedSessionId is { } createdSessionId
+            ? await mutes.ExistsForTargetAsync(viewerId, createdSessionId, null, cancellationToken)
+            : await mutes.ExistsForTargetAsync(viewerId, null, poll.Id, cancellationToken);
+
         return new PollDetail(
             poll.Id,
             poll.OrganizerId,
@@ -135,7 +140,8 @@ public sealed class PollReadUseCases(
             poll.SelectedOptionId,
             poll.CreatedSessionId,
             options,
-            roster);
+            roster,
+            muted);
     }
 
     /// <summary>Mirrors <c>SessionReadUseCases.BuildViewerAsync</c>'s poll analogue: no row lock, a GET.</summary>

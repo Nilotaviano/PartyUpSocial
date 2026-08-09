@@ -16,7 +16,20 @@ public interface ISessionReminderHandoffWriter
     /// from <paramref name="session"/>'s start, or cancels it when no reminder is currently due
     /// (§7.1: <c>Off</c>, <c>Removed</c>, <c>Declined</c>, a terminal session, or a non-future instant).
     /// </summary>
-    Task ReplanAsync(Session session, UserId recipientUserId, CancellationToken cancellationToken);
+    /// <param name="accountDefault">
+    /// PHASE7_DESIGN.md §4's reminder-default replan: when supplied, this is the account default to
+    /// plan against, in place of a fresh read of the user's stored value. <c>SetReminderDefaultUseCase</c>
+    /// mutates the user aggregate but does not flush before calling this (the delegate is still
+    /// unsaved inside <c>IUnitOfWork.ExecuteAsync</c>), so a re-read here would recompute against the
+    /// stale, pre-mutation default — the same read-ordering hazard <c>FinalizePollUseCase.cs:106-109</c>
+    /// already documents. An explicit parameter is ordering-independent; a flush-before-replan is not.
+    /// Trailing and optional so the seven shipped call sites are untouched.
+    /// </param>
+    Task ReplanAsync(
+        Session session,
+        UserId recipientUserId,
+        CancellationToken cancellationToken,
+        ReminderOffset? accountDefault = null);
 
     /// <summary>Cancels any live handoff for this (session, recipient) pair, incrementing its version.</summary>
     Task CancelAsync(SessionId sessionId, UserId recipientUserId, CancellationToken cancellationToken);

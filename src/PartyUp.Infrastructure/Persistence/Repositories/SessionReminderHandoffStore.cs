@@ -33,17 +33,33 @@ namespace PartyUp.Infrastructure.Persistence.Repositories;
 /// </remarks>
 public sealed class SessionReminderHandoffStore(AppDbContext context, IClock clock) : ISessionReminderHandoffWriter
 {
-    public async Task ReplanAsync(Session session, UserId recipientUserId, CancellationToken cancellationToken)
+    public async Task ReplanAsync(
+        Session session,
+        UserId recipientUserId,
+        CancellationToken cancellationToken,
+        ReminderOffset? accountDefault = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
-        ReminderOffset? storedDefault = await context.DomainUsers
-            .Where(user => user.Id == recipientUserId)
-            .Select(user => (ReminderOffset?)user.ReminderDefault)
-            .FirstOrDefaultAsync(cancellationToken);
+        ReminderOffset resolvedDefault;
+        if (accountDefault is { } explicitDefault)
+        {
+            // S4's explicit-offset carry: the caller (SetReminderDefaultUseCase) is replanning
+            // against a user mutation not yet flushed in this transaction, so a re-read here would
+            // see the stale, pre-mutation default.
+            resolvedDefault = explicitDefault;
+        }
+        else
+        {
+            ReminderOffset? storedDefault = await context.DomainUsers
+                .Where(user => user.Id == recipientUserId)
+                .Select(user => (ReminderOffset?)user.ReminderDefault)
+                .FirstOrDefaultAsync(cancellationToken);
 
-        ReminderOffset accountDefault = storedDefault ?? ReminderOffsetExtensions.Default;
-        ReminderPlan? plan = ReminderRules.Plan(session, recipientUserId, accountDefault, clock);
+            resolvedDefault = storedDefault ?? ReminderOffsetExtensions.Default;
+        }
+
+        ReminderPlan? plan = ReminderRules.Plan(session, recipientUserId, resolvedDefault, clock);
 
         SessionReminderHandoff? handoff = await FindAsync(session.Id, recipientUserId, cancellationToken);
 

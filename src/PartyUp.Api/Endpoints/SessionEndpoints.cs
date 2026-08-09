@@ -6,6 +6,7 @@ using PartyUp.Api.Contracts.Availability;
 using PartyUp.Api.Contracts.Sessions;
 using PartyUp.Api.ErrorHandling;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Notifications;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
@@ -150,7 +151,59 @@ public static class SessionEndpoints
             .ProducesPartyUpProblem(StatusCodes.Status404NotFound)
             .ProducesPartyUpProblem(StatusCodes.Status422UnprocessableEntity);
 
+        // PHASE7_DESIGN.md §4: MuteSession/UnmuteSession (D-090/D-113). Who may mute = anyone the
+        // visibility engine grants access to; no access ⇒ 404, the shipped session_not_found code.
+        Unsafe(sessions.MapPut("/sessions/{sessionId:guid}/mute", MuteSessionAsync)
+                .WithName(ApiOperationIds.MuteSession)
+                .Produces(StatusCodes.Status204NoContent))
+            .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
+
+        Unsafe(sessions.MapDelete("/sessions/{sessionId:guid}/mute", UnmuteSessionAsync)
+                .WithName(ApiOperationIds.UnmuteSession)
+                .Produces(StatusCodes.Status204NoContent))
+            .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
+
         return api;
+    }
+
+    private static async Task<IResult> MuteSessionAsync(
+        Guid sessionId,
+        ICurrentUserAccessor currentUser,
+        SetNotificationMuteUseCase useCase,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Problem(context, StatusCodes.Status401Unauthorized, "unauthorized");
+        }
+
+        MuteResult result = await useCase.MuteSessionAsync(
+            SessionId.From(sessionId), actorId.Value, cancellationToken);
+        return result.Succeeded
+            ? Results.NoContent()
+            : Problem(context, StatusCodes.Status404NotFound, result.Code!);
+    }
+
+    private static async Task<IResult> UnmuteSessionAsync(
+        Guid sessionId,
+        ICurrentUserAccessor currentUser,
+        SetNotificationMuteUseCase useCase,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Problem(context, StatusCodes.Status401Unauthorized, "unauthorized");
+        }
+
+        MuteResult result = await useCase.UnmuteSessionAsync(
+            SessionId.From(sessionId), actorId.Value, cancellationToken);
+        return result.Succeeded
+            ? Results.NoContent()
+            : Problem(context, StatusCodes.Status404NotFound, result.Code!);
     }
 
     // ---- handlers ---------------------------------------------------------------------------

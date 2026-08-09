@@ -56,6 +56,16 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         ApiOperationIds.ListPolls, ApiOperationIds.GetPollFinalizationPreview,
     ];
 
+    /// <summary>PHASE7_DESIGN.md §4 (ticket-P7-S4): the eleven operation ids the S4 HTTP surface added.</summary>
+    private static readonly string[] NewPushNotificationOperationIds =
+    [
+        ApiOperationIds.GetPushConfig, ApiOperationIds.CreatePushSubscription,
+        ApiOperationIds.DeletePushSubscription, ApiOperationIds.ListNotifications,
+        ApiOperationIds.GetUnreadNotificationCount, ApiOperationIds.MarkNotificationRead,
+        ApiOperationIds.MarkAllNotificationsRead, ApiOperationIds.MuteSession,
+        ApiOperationIds.UnmuteSession, ApiOperationIds.MutePoll, ApiOperationIds.UnmutePoll,
+    ];
+
     /// <summary>
     /// S8 hardening (closes the round-1/round-2 "swap-hole": a bare count anchor passes even when one
     /// operation is silently swapped for another, so nothing short of the full set closes it).
@@ -144,7 +154,7 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         string[] expectedOperationIds =
         [
             .. PreExistingOperationIds, .. NewPhase5OperationIds, .. NewPollOperationIds,
-            .. NewGuestPollOperationIds, .. NewPollListOperationIds,
+            .. NewGuestPollOperationIds, .. NewPollListOperationIds, .. NewPushNotificationOperationIds,
         ];
         Assert.Equal(
             expectedOperationIds.OrderBy(id => id, StringComparer.Ordinal).ToArray(),

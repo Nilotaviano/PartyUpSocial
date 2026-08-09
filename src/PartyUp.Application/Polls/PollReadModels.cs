@@ -67,7 +67,11 @@ public sealed record PollDetail(
     PollOptionId? SelectedOptionId,
     SessionId? CreatedSessionId,
     IReadOnlyList<PollOptionGridEntry> Options,
-    IReadOnlyList<PollRosterEntry> Roster);
+    IReadOnlyList<PollRosterEntry> Roster,
+    // PHASE7_DESIGN.md §4: on a Finalized poll this reads through the re-parented row, resolved by
+    // CreatedSessionId (Session.OriginPollId's linkage from the other side) — never a second, inert
+    // poll-keyed row.
+    bool Muted);
 
 // ---- PHASE6_DESIGN.md §4.1 "GET /polls": the two-band list read ---------------------------------
 

@@ -386,6 +386,14 @@ internal sealed class FakeSessionRepository : ISessionRepository
         Task.FromResult(_sessions.TryGetValue(id, out Session? session)
             ? new SessionForUpdate(session, [], [])
             : null);
+
+    public Task<IReadOnlyList<FutureEligibleSession>> ListFutureSessionsWithEligibleParticipationAsync(
+        UserId userId,
+        Instant now,
+        (Instant StartTime, Guid Id)? afterCursor,
+        int limit,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This test double never exercises the reminder-default replan page.");
 }
 
 internal sealed class FakePollRepository : IPollRepository

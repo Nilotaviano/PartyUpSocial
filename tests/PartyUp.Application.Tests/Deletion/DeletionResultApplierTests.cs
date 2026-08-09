@@ -179,6 +179,18 @@ public sealed class DeletionResultApplierTests
         public Task<Notification?> FindAsync(NotificationId id, CancellationToken cancellationToken) =>
             Task.FromResult(Rows.Find(row => row.Id == id));
 
+        public Task<Notification?> FindOwnedAsync(
+            NotificationId id,
+            UserId recipientId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(Rows.Find(row => row.Id == id && row.RecipientUserId == recipientId));
+
+        public Task<IReadOnlyList<Notification>> ListUnreadForUpdateAsync(
+            UserId recipientId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Notification>>(
+                [.. Rows.Where(row => row.RecipientUserId == recipientId && row.ReadAt is null)]);
+
         public Task AddSteamMatchIfAbsentAsync(
             Notification notification,
             CancellationToken cancellationToken) => throw new NotSupportedException();

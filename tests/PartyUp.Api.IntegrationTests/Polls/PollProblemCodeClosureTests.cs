@@ -347,7 +347,11 @@ public sealed class PollProblemCodeClosureTests : IAsyncLifetime, IDisposable
             "ProblemCodes", BindingFlags.NonPublic | BindingFlags.Static)!;
         var allCodes = (string[])field.GetValue(null)!;
         int phase6Start = Array.IndexOf(allCodes, "poll_not_found");
-        return allCodes[phase6Start..];
+        // PHASE7_DESIGN.md §4 (ticket-P7-S4): the S4 codes appended after the poll section are not
+        // poll codes -- stop the slice there so this closure stays scoped to §4 the Phase 6 poll
+        // surface, not swept up by a later phase's own appended codes.
+        int phase7Start = Array.IndexOf(allCodes, "notification_not_found");
+        return allCodes[phase6Start..phase7Start];
     }
 
     [Fact]

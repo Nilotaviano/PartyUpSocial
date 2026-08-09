@@ -935,7 +935,10 @@ public sealed record MyProfileResponse(
     string? FriendCode,
     string ReminderDefault,
     IReadOnlyList<PlatformLinkResponse> PlatformLinks,
-    IReadOnlyList<AuthMethodResponse> AuthMethods)
+    IReadOnlyList<AuthMethodResponse> AuthMethods,
+    // PHASE7_DESIGN.md §4/ruling 4: the server-derived half of the push-prompt split — an account
+    // fact, so a second device does not restart the D-147 qualification.
+    bool PushPromptEligible)
 {
     public static MyProfileResponse From(MyProfileResult profile)
     {
@@ -956,6 +959,7 @@ public sealed record MyProfileResponse(
                 method.Kind,
                 method.Linked,
                 method.Removable,
-                method.Detail)).ToArray());
+                method.Detail)).ToArray(),
+            profile.PushPromptEligible);
     }
 }

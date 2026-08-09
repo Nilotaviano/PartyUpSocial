@@ -123,7 +123,9 @@ public sealed class GuestPollReadUseCases(IPollRepository polls, IPollReadReposi
             poll.SelectedOptionId,
             poll.CreatedSessionId,
             options,
-            roster);
+            roster,
+            // D-167: a guest credential holds no channel at any layer, so this surface never mutes.
+            Muted: false);
 
         return new GuestPollDetail(detail, claimedIdentityId, ownDisplayName);
     }

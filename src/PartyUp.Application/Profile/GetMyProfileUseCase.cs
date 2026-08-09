@@ -7,7 +7,8 @@ namespace PartyUp.Application.Profile;
 
 public sealed class GetMyProfileUseCase(
     IUserRepository users,
-    ListAuthMethodsUseCase authMethods)
+    ListAuthMethodsUseCase authMethods,
+    IPushPromptEligibilityRepository pushPromptEligibility)
 {
     public async Task<MyProfileResult?> ExecuteAsync(
         UserId userId,
@@ -20,8 +21,9 @@ public sealed class GetMyProfileUseCase(
         }
 
         AuthMethodsResult methods = await authMethods.ExecuteAsync(userId, cancellationToken);
-        return new MyProfileResult(user, methods.Methods);
+        bool pushPromptEligible = await pushPromptEligibility.IsEligibleAsync(userId, cancellationToken);
+        return new MyProfileResult(user, methods.Methods, pushPromptEligible);
     }
 }
 
-public sealed record MyProfileResult(User User, IReadOnlyList<AuthMethod> AuthMethods);
+public sealed record MyProfileResult(User User, IReadOnlyList<AuthMethod> AuthMethods, bool PushPromptEligible);

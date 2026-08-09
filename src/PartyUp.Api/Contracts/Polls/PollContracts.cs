@@ -181,7 +181,8 @@ public sealed record PollDetailResponse(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? SelectedOptionId,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? CreatedSessionId,
     IReadOnlyList<PollOptionResponse> Options,
-    IReadOnlyList<PollRosterEntryResponse> Roster)
+    IReadOnlyList<PollRosterEntryResponse> Roster,
+    bool Muted)
 {
     public static PollDetailResponse From(PollDetail detail) =>
         new(
@@ -203,7 +204,8 @@ public sealed record PollDetailResponse(
             detail.SelectedOptionId?.Value,
             detail.CreatedSessionId?.Value,
             detail.Options.Select(PollOptionResponse.From).ToArray(),
-            detail.Roster.Select(PollRosterEntryResponse.From).ToArray());
+            detail.Roster.Select(PollRosterEntryResponse.From).ToArray(),
+            detail.Muted);
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

@@ -12,6 +12,21 @@ public sealed class NotificationRepository(AppDbContext context) : INotification
     public Task<Notification?> FindAsync(NotificationId id, CancellationToken cancellationToken) =>
         context.Notifications.AsNoTracking().FirstOrDefaultAsync(notification => notification.Id == id, cancellationToken);
 
+    public Task<Notification?> FindOwnedAsync(
+        NotificationId id,
+        UserId recipientId,
+        CancellationToken cancellationToken) =>
+        context.Notifications.FirstOrDefaultAsync(
+            notification => notification.Id == id && notification.RecipientUserId == recipientId,
+            cancellationToken);
+
+    public async Task<IReadOnlyList<Notification>> ListUnreadForUpdateAsync(
+        UserId recipientId,
+        CancellationToken cancellationToken) =>
+        await context.Notifications
+            .Where(notification => notification.RecipientUserId == recipientId && notification.ReadAt == null)
+            .ToListAsync(cancellationToken);
+
     public async Task AddSteamMatchIfAbsentAsync(
         Notification notification,
         CancellationToken cancellationToken)

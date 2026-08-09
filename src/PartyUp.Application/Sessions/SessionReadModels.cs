@@ -160,6 +160,16 @@ public enum SessionListScope
 
     /// <summary>PHASE6_DESIGN.md §4.1: <c>GET /polls</c>'s discoverable band (§7 rule 2, the D-118 entry point).</summary>
     PollsDiscoverable = 7,
+
+    /// <summary>
+    /// PHASE7_DESIGN.md §4: <c>GET /notifications?scope=all</c> — named <c>notifications-all</c> on
+    /// the wire per A-072's two-distinct-scope-names requirement, reusing this shared cursor
+    /// mechanism exactly like <see cref="PollJoinRequests"/> above despite the "Session" name.
+    /// </summary>
+    NotificationsAll = 8,
+
+    /// <summary>PHASE7_DESIGN.md §4: <c>GET /notifications?scope=unread</c> — <c>notifications-unread</c> on the wire.</summary>
+    NotificationsUnread = 9,
 }
 
 /// <summary>The A-072 keyset cursor: the list's sort-key instant, the tie-breaking id, and the

@@ -119,4 +119,17 @@ public static class ApiOperationIds
     public const string VoteOnPollAsGuest = "VoteOnPollAsGuest";
     public const string SuggestPollOptionAsGuest = "SuggestPollOptionAsGuest";
     public const string RenameGuestPollIdentity = "RenameGuestPollIdentity";
+
+    // PHASE7_DESIGN.md §4: the S4 HTTP surface -- eleven ids exactly, registered-user only (D-167).
+    public const string GetPushConfig = "GetPushConfig";
+    public const string CreatePushSubscription = "CreatePushSubscription";
+    public const string DeletePushSubscription = "DeletePushSubscription";
+    public const string ListNotifications = "ListNotifications";
+    public const string GetUnreadNotificationCount = "GetUnreadNotificationCount";
+    public const string MarkNotificationRead = "MarkNotificationRead";
+    public const string MarkAllNotificationsRead = "MarkAllNotificationsRead";
+    public const string MuteSession = "MuteSession";
+    public const string UnmuteSession = "UnmuteSession";
+    public const string MutePoll = "MutePoll";
+    public const string UnmutePoll = "UnmutePoll";
 }

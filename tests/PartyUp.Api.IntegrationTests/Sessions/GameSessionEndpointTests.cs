@@ -117,6 +117,12 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
             {
                 ["put"] = ApiOperationIds.SetSessionReminder,
             },
+            // PHASE7_DESIGN.md §4 (ticket-P7-S4): MuteSession/UnmuteSession.
+            ["/api/v1/sessions/{sessionId}/mute"] = new()
+            {
+                ["put"] = ApiOperationIds.MuteSession,
+                ["delete"] = ApiOperationIds.UnmuteSession,
+            },
             ["/api/v1/guest/{guestLinkId}/session"] = new()
             {
                 ["get"] = ApiOperationIds.GetGuestSession,

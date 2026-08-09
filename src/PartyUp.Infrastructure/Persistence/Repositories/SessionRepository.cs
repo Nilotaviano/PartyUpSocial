@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Kernel;
@@ -61,6 +62,47 @@ public sealed class SessionRepository(AppDbContext context) : ISessionRepository
 
         return new SessionForUpdate(session, mutes, handoffs);
     }
+
+    public async Task<IReadOnlyList<FutureEligibleSession>> ListFutureSessionsWithEligibleParticipationAsync(
+        UserId userId,
+        Instant now,
+        (Instant StartTime, Guid Id)? afterCursor,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        Guid user = userId.Value;
+        short unconfirmed = (short)SessionStatus.Unconfirmed;
+        short confirmed = (short)SessionStatus.Confirmed;
+        short declined = (short)ParticipationStatus.Declined;
+        short removed = (short)ParticipationStatus.Removed;
+
+        List<FutureEligibleSessionRow> rows = afterCursor is { } after
+            ? await context.Database.SqlQuery<FutureEligibleSessionRow>($"""
+                SELECT s.id, s.start_time
+                FROM sessions s
+                JOIN session_participations sp ON sp.session_id = s.id AND sp.user_id = {user}
+                WHERE s.status IN ({unconfirmed}, {confirmed})
+                  AND sp.status NOT IN ({declined}, {removed})
+                  AND s.start_time > {now}
+                  AND (s.start_time, s.id) > ({after.StartTime}, {after.Id})
+                ORDER BY s.start_time, s.id
+                LIMIT {limit}
+                """).ToListAsync(cancellationToken)
+            : await context.Database.SqlQuery<FutureEligibleSessionRow>($"""
+                SELECT s.id, s.start_time
+                FROM sessions s
+                JOIN session_participations sp ON sp.session_id = s.id AND sp.user_id = {user}
+                WHERE s.status IN ({unconfirmed}, {confirmed})
+                  AND sp.status NOT IN ({declined}, {removed})
+                  AND s.start_time > {now}
+                ORDER BY s.start_time, s.id
+                LIMIT {limit}
+                """).ToListAsync(cancellationToken);
+
+        return [.. rows.Select(row => new FutureEligibleSession(SessionId.From(row.Id), row.StartTime))];
+    }
+
+    private sealed record FutureEligibleSessionRow(Guid Id, Instant StartTime);
 
     private static IQueryable<Session> LoadWithChildren(IQueryable<Session> query) =>
         query

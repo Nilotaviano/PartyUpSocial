@@ -342,6 +342,35 @@ public static class RateLimitPolicies
             TimeSpan.FromMinutes(1),
             RateLimitPartitionKind.User,
             Operations(ApiOperationIds.ListPolls, ApiOperationIds.GetPollFinalizationPreview)),
+        // PHASE7_DESIGN.md §4: three new User-partitioned dimensions, 30 -> 33 (disclosed-extension
+        // precedent).
+        new(
+            "notification-read",
+            120,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.User,
+            Operations(
+                ApiOperationIds.ListNotifications,
+                ApiOperationIds.GetUnreadNotificationCount,
+                ApiOperationIds.GetPushConfig)),
+        new(
+            "notification-write",
+            60,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.User,
+            Operations(
+                ApiOperationIds.MarkNotificationRead,
+                ApiOperationIds.MarkAllNotificationsRead,
+                ApiOperationIds.MuteSession,
+                ApiOperationIds.UnmuteSession,
+                ApiOperationIds.MutePoll,
+                ApiOperationIds.UnmutePoll)),
+        new(
+            "push-subscribe",
+            30,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.User,
+            Operations(ApiOperationIds.CreatePushSubscription, ApiOperationIds.DeletePushSubscription)),
         new(
             "default",
             300,

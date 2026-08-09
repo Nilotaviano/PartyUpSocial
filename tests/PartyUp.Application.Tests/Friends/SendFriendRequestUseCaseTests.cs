@@ -336,6 +336,18 @@ internal sealed class CommandNotificationRepository(List<string> calls) : INotif
     public Task<Notification?> FindAsync(NotificationId id, CancellationToken cancellationToken) =>
         Task.FromResult(Added.Find(notification => notification.Id == id));
 
+    public Task<Notification?> FindOwnedAsync(
+        NotificationId id,
+        UserId recipientId,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(Added.Find(notification => notification.Id == id && notification.RecipientUserId == recipientId));
+
+    public Task<IReadOnlyList<Notification>> ListUnreadForUpdateAsync(
+        UserId recipientId,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Notification>>(
+            [.. Added.Where(notification => notification.RecipientUserId == recipientId && notification.ReadAt is null)]);
+
     public Task AddSteamMatchIfAbsentAsync(
         Notification notification,
         CancellationToken cancellationToken) => Task.CompletedTask;

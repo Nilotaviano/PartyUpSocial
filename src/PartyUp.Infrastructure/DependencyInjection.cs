@@ -71,6 +71,15 @@ public static class DependencyInjection
         services.AddScoped<INotificationMuteRepository, NotificationMuteRepository>();
         services.AddScoped<INotificationDispatchRepository, NotificationDispatchRepository>();
         services.AddScoped<NotificationReadUseCases>();
+        // PHASE7_DESIGN.md §4 (S4): HTTP-surface use cases + their read repositories.
+        services.AddScoped<INotificationReadRepository, NotificationReadRepository>();
+        services.AddScoped<IPushPromptEligibilityRepository, PushPromptEligibilityRepository>();
+        services.AddScoped<ListNotificationsUseCase>();
+        services.AddScoped<MarkNotificationReadUseCase>();
+        services.AddScoped<MarkAllNotificationsReadUseCase>();
+        services.AddScoped<SetNotificationMuteUseCase>();
+        services.AddScoped<CreatePushSubscriptionUseCase>();
+        services.AddScoped<DeletePushSubscriptionUseCase>();
         services.AddScoped<IFriendPairLocker, FriendPairLocker>();
         services.AddScoped<IUserGraphResolver, UserGraphResolver>();
         services.AddScoped<IFriendCodeGenerator, FriendCodeGenerator>();
