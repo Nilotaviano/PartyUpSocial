@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
 using PartyUp.Application.Abstractions;
@@ -10,6 +11,7 @@ using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Jobs;
 using PartyUp.Infrastructure.Persistence;
+using PartyUp.Infrastructure.Push;
 
 namespace PartyUp.Api.IntegrationTests.Notifications;
 
@@ -49,6 +51,33 @@ public sealed class PushDispatchJobTests : IAsyncLifetime, IDisposable
         Assert.Equal(0, sender.SendCount);
     }
 
+    /// <summary>
+    /// F2/§8: absent VAPID configuration must leave every Pending row untouched -- not skipped, not
+    /// claimed -- so a Production container the owner has not yet provisioned never burns rows.
+    /// <see cref="WebPushSender"/> is the real Production default (root <c>appsettings.json</c>); an
+    /// empty configuration leaves <c>IsConfigured</c> false, the same gate <c>ExecuteAsync</c> checks
+    /// before paging at all.
+    /// </summary>
+    [Fact]
+    public async Task UnconfiguredWebPushSender_LeavesThePendingRowUntouched_F2()
+    {
+        UserId recipientId = await _factory.SeedUserAsync(email: "unconfigured-vapid@example.test");
+        Session session = await SeedSessionWithOrganizerAsync(recipientId);
+        Guid notificationId = await SeedNotificationAsync(recipientId, NotificationType.SessionConfirmed, session.Id);
+        await SeedSubscriptionAsync(recipientId, "unconfigured-vapid-sub");
+
+        IConfiguration emptyConfiguration = new ConfigurationBuilder().Build();
+        var sender = new WebPushSender(emptyConfiguration);
+        Assert.False(sender.IsConfigured);
+
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        PushDispatchJob job = BuildJobWithSender(scope.ServiceProvider, sender);
+        await job.ExecuteAsync(default);
+
+        Assert.Equal(0, await ReadDispatchStateAsync(notificationId));
+        Assert.Equal(0, await CountSendLogRowsAsync(notificationId));
+    }
+
     [Fact]
     public async Task StalePendingRow_PastTheLatenessCeiling_IsSkipped_Ruling6()
     {
@@ -84,18 +113,24 @@ public sealed class PushDispatchJobTests : IAsyncLifetime, IDisposable
         Assert.Equal(0, sender.SendCount);
     }
 
+    /// <summary>
+    /// §3's re-check: write-time mute (§9) cannot cover a mute created after the record, so the row's
+    /// own creation must precede the mute here for the test to prove dispatch-time re-evaluation rather
+    /// than the write-time suppression the record path already covers.
+    /// </summary>
     [Fact]
-    public async Task WriteTimeMuteSuppressesThePush_WhileTheReminderStillDispatches_D090_D113_D082()
+    public async Task PostRecordMuteSuppressesThePush_WhileTheReminderStillDispatches_D090_D113_D082()
     {
         UserId recipientId = await _factory.SeedUserAsync(email: "muted@example.test");
         Session session = await SeedSessionWithOrganizerAsync(recipientId);
-        await SeedSessionMuteAsync(recipientId, session.Id);
         await SeedSubscriptionAsync(recipientId, "muted-sub");
 
         Guid mutedNotificationId =
             await SeedNotificationAsync(recipientId, NotificationType.SessionCanceled, session.Id);
         Guid reminderNotificationId =
             await SeedNotificationAsync(recipientId, NotificationType.SessionReminder, session.Id);
+
+        await SeedSessionMuteAsync(recipientId, session.Id);
 
         var sender = new FakePushSender();
         await RunJobAsync(sender);
@@ -294,6 +329,52 @@ public sealed class PushDispatchJobTests : IAsyncLifetime, IDisposable
         _ = session;
     }
 
+    /// <summary>
+    /// F1: a poison row (a null option-start reaching a template that requires it) must not abort the
+    /// tick and block every row paged behind it -- the poison row is seeded first so it heads the
+    /// <c>ORDER BY created_at, id</c> page, and the healthy row still has to dispatch in the same tick.
+    /// </summary>
+    [Fact]
+    public async Task PoisonRowIsContained_AndDoesNotBlockAHealthyRowBehindIt_F1()
+    {
+        UserId poisonRecipientId = await _factory.SeedUserAsync(email: "poison@example.test");
+        Guid pollId = await SeedPollAsync(poisonRecipientId);
+        await SeedSubscriptionAsync(poisonRecipientId, "poison-sub");
+        Guid poisonNotificationId = await SeedPollOptionSuggestedWithNullStartAsync(poisonRecipientId, pollId);
+
+        _factory.Clock.Advance(Duration.FromMilliseconds(1));
+
+        UserId healthyRecipientId = await _factory.SeedUserAsync(email: "healthy@example.test");
+        Session session = await SeedSessionWithOrganizerAsync(healthyRecipientId);
+        await SeedSubscriptionAsync(healthyRecipientId, "healthy-sub");
+        Guid healthyNotificationId =
+            await SeedNotificationAsync(healthyRecipientId, NotificationType.SessionConfirmed, session.Id);
+
+        var sender = new FakePushSender();
+        await RunJobAsync(sender);
+
+        Assert.Equal(1, sender.SendCount);
+        Assert.Equal(1, await ReadDispatchStateAsync(healthyNotificationId));
+        Assert.Equal(1, await CountSendLogRowsAsync(healthyNotificationId));
+
+        Assert.Equal(0, await ReadDispatchStateAsync(poisonNotificationId));
+        Assert.Equal(0, await CountSendLogRowsAsync(poisonNotificationId));
+    }
+
+    private async Task<Guid> SeedPollOptionSuggestedWithNullStartAsync(UserId recipientId, Guid pollId)
+    {
+        Notification notification = Notification.Create(
+            recipientId,
+            NotificationType.PollOptionSuggested,
+            NotificationSubject.ForPollOption(PollId.From(pollId), optionStartTime: null),
+            _factory.Clock);
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        context.Notifications.Add(notification);
+        await context.SaveChangesAsync();
+        return notification.Id.Value;
+    }
+
     private async Task RunJobAsync(FakePushSender sender)
     {
         await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
@@ -302,6 +383,9 @@ public sealed class PushDispatchJobTests : IAsyncLifetime, IDisposable
     }
 
     private static PushDispatchJob BuildJob(IServiceProvider services, FakePushSender sender) =>
+        BuildJobWithSender(services, sender);
+
+    private static PushDispatchJob BuildJobWithSender(IServiceProvider services, IPushSender sender) =>
         new(
             services.GetRequiredService<INotificationDispatchRepository>(),
             services.GetRequiredService<INotificationRepository>(),

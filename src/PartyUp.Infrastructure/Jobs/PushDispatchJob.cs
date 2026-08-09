@@ -48,7 +48,18 @@ public sealed partial class PushDispatchJob(
 
         foreach (NotificationId id in page)
         {
-            await ProcessAsync(id, now, cancellationToken);
+            try
+            {
+                await ProcessAsync(id, now, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // A poison row (e.g. a null-subject payload the template renderer rejects, or a
+                // claim racing the deletion purge) must not block every row behind it in paging
+                // order -- contain per row, leave this one Pending, bounded by the lateness ceiling.
+                // Never log the exception's message verbatim (LogSendFailedUnexpectedly discipline).
+                LogRowFailedUnexpectedly(logger, id.Value, exception.GetType().Name);
+            }
         }
     }
 
@@ -80,8 +91,9 @@ public sealed partial class PushDispatchJob(
             }
         }
 
-        bool reachable = await notificationReads.IsSubjectReachableAsync(
+        NotificationReadModel row = await notificationReads.ProjectAsync(
             notification, notification.RecipientUserId, cancellationToken);
+        bool reachable = row.HasSubject || (notification.SessionId is null && notification.PollId is null);
         if (!reachable)
         {
             await dispatch.TryMarkSkippedAsync(id, cancellationToken);
@@ -93,8 +105,6 @@ public sealed partial class PushDispatchJob(
 
         if (targets.Count > 0)
         {
-            NotificationReadModel row = await notificationReads.ProjectAsync(
-                notification, notification.RecipientUserId, cancellationToken);
             PushPayload payload = payloadFactory.Build(row);
 
             foreach (PushSubscriptionTarget target in targets)
@@ -154,5 +164,13 @@ public sealed partial class PushDispatchJob(
     private static partial void LogSendFailedUnexpectedly(
         ILogger logger,
         Guid subscriptionId,
+        string exceptionType);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Push dispatch of notification {NotificationId} failed unexpectedly ({ExceptionType})")]
+    private static partial void LogRowFailedUnexpectedly(
+        ILogger logger,
+        Guid notificationId,
         string exceptionType);
 }
