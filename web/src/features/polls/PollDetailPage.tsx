@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, Navigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
-import { getPollDetail, isPollAwaitingSelection, pollKeys, type PollOption } from './pollQueries'
+import { getPollDetail, pollKeys, pollWindowState, type PollOption } from './pollQueries'
 import { PollStatusChip } from './PollStatusChip'
 
 const voteLabelKeys: Record<string, string> = {
@@ -52,7 +52,7 @@ export function PollDetailPage() {
   }
 
   const data = detail.data
-  const awaitingSelection = data ? isPollAwaitingSelection(data) : false
+  const windowState = data ? pollWindowState(data) : null
   const deadlineText = data
     ? new Intl.DateTimeFormat(i18n.language, {
         dateStyle: 'medium',
@@ -91,12 +91,16 @@ export function PollDetailPage() {
 
           {data.notes && <p className="text-ink">{data.notes}</p>}
 
-          {data.status === 'polling' && !awaitingSelection && (
+          {windowState === 'polling' && (
             <p className="text-ink-soft">{t('detail.deadline', { deadline: deadlineText })}</p>
           )}
 
-          {awaitingSelection && (
+          {windowState === 'awaitingSelection' && (
             <p role="status">{t('detail.awaitingSelectionNotice')}</p>
+          )}
+
+          {windowState === 'expiredPending' && (
+            <p role="status">{t('detail.expiredPendingNotice')}</p>
           )}
 
           {data.status === 'finalized' && (
@@ -153,7 +157,7 @@ export function PollDetailPage() {
             </ul>
           </section>
 
-          <section aria-label={t('a11y.rosterLabel')} aria-labelledby="poll-roster-heading">
+          <section aria-labelledby="poll-roster-heading">
             <h2
               id="poll-roster-heading"
               className="text-h2 font-display font-semibold text-ink"

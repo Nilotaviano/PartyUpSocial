@@ -58,6 +58,7 @@
   "status": {
     "pollingUntil": "Polling · closes {{deadline}}",
     "awaitingSelection": "Closed · awaiting selection",
+    "expiredPending": "Closed · selection window ended",
     "closed": "Closed",
     "finalized": "Finalized",
     "expired": "Expired",
@@ -70,6 +71,7 @@
     "removed": "Removed",
     "deadline": "Voting closes {{deadline}}.",
     "awaitingSelectionNotice": "Voting has closed. The organizer is choosing a time.",
+    "expiredPendingNotice": "This poll's selection window has closed.",
     "finalizedNotice": "This poll was finalized.",
     "viewSession": "View the session",
     "expiredNotice": "This poll expired without a selection.",
@@ -107,13 +109,13 @@
       "poll_guest_not_found": "That guest could not be found.",
       "poll_selection_window_closed": "The selection window for this poll has closed.",
       "poll_zero_options": "This poll has no remaining options.",
+      "user_not_found": "That user could not be found.",
       "invalid_scope": "That poll list is not valid.",
       "invalid_cursor": "That page of results is no longer valid.",
       "rate_limited": "Too many attempts. Try again later."
     }
   },
   "a11y": {
-    "rosterLabel": "Poll voters",
     "validationSummary": "There were problems with your submission",
     "dialogLabel": "Confirmation dialog"
   }

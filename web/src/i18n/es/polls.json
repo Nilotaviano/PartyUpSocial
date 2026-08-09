@@ -58,6 +58,7 @@
   "status": {
     "pollingUntil": "Votando · cierra {{deadline}}",
     "awaitingSelection": "Cerrada · en espera de selección",
+    "expiredPending": "Cerrada · ventana de selección vencida",
     "closed": "Cerrada",
     "finalized": "Finalizada",
     "expired": "Vencida",
@@ -70,6 +71,7 @@
     "removed": "Eliminado",
     "deadline": "La votación cierra {{deadline}}.",
     "awaitingSelectionNotice": "La votación cerró. El organizador está eligiendo un horario.",
+    "expiredPendingNotice": "La ventana de selección de esta encuesta ha vencido.",
     "finalizedNotice": "Esta encuesta fue finalizada.",
     "viewSession": "Ver la sesión",
     "expiredNotice": "Esta encuesta venció sin una selección.",
@@ -107,13 +109,13 @@
       "poll_guest_not_found": "No se pudo encontrar a ese invitado.",
       "poll_selection_window_closed": "La ventana de selección de esta encuesta cerró.",
       "poll_zero_options": "Esta encuesta no tiene opciones restantes.",
+      "user_not_found": "No se pudo encontrar a ese usuario.",
       "invalid_scope": "Esa lista de encuestas no es válida.",
       "invalid_cursor": "Esa página de resultados ya no es válida.",
       "rate_limited": "Demasiados intentos. Inténtalo de nuevo más tarde."
     }
   },
   "a11y": {
-    "rosterLabel": "Votantes de la encuesta",
     "validationSummary": "Hubo problemas con tu envío",
     "dialogLabel": "Cuadro de confirmación"
   }

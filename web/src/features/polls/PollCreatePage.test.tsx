@@ -159,4 +159,15 @@ describe('PollCreatePage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Discard' }))
     expect(navigateSpy).toHaveBeenCalledWith('/polls')
   })
+
+  it('cancels straight through with no discard dialog when the form is clean_D162', async () => {
+    api.get.mockResolvedValue({ data: { items: [] } })
+    renderPage()
+
+    await screen.findByLabelText('Title')
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(navigateSpy).toHaveBeenCalledWith('/polls')
+  })
 })

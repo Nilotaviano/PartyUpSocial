@@ -58,6 +58,7 @@
   "status": {
     "pollingUntil": "Votação · encerra {{deadline}}",
     "awaitingSelection": "Encerrada · aguardando seleção",
+    "expiredPending": "Encerrada · janela de seleção vencida",
     "closed": "Encerrada",
     "finalized": "Finalizada",
     "expired": "Expirada",
@@ -70,6 +71,7 @@
     "removed": "Removido",
     "deadline": "A votação encerra {{deadline}}.",
     "awaitingSelectionNotice": "A votação encerrou. O organizador está escolhendo um horário.",
+    "expiredPendingNotice": "A janela de seleção desta enquete já encerrou.",
     "finalizedNotice": "Esta enquete foi finalizada.",
     "viewSession": "Ver a sessão",
     "expiredNotice": "Esta enquete expirou sem uma seleção.",
@@ -107,13 +109,13 @@
       "poll_guest_not_found": "Esse convidado não pôde ser encontrado.",
       "poll_selection_window_closed": "A janela de seleção desta enquete encerrou.",
       "poll_zero_options": "Esta enquete não tem opções restantes.",
+      "user_not_found": "Esse usuário não pôde ser encontrado.",
       "invalid_scope": "Essa lista de enquetes não é válida.",
       "invalid_cursor": "Essa página de resultados não é mais válida.",
       "rate_limited": "Muitas tentativas. Tente novamente mais tarde."
     }
   },
   "a11y": {
-    "rosterLabel": "Votantes da enquete",
     "validationSummary": "Houve problemas com seu envio",
     "dialogLabel": "Caixa de confirmação"
   }

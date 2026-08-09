@@ -36,6 +36,7 @@ const pollProblemCodes = [
   'poll_guest_not_found',
   'poll_selection_window_closed',
   'poll_zero_options',
+  'user_not_found',
   'invalid_scope',
   'invalid_cursor',
   'rate_limited',
