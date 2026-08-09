@@ -36,7 +36,7 @@ vi.mock('../../api/client', () => {
 
 import '../../i18n'
 import { ApiError } from '../../api/client'
-import { AgeGate, MagicLink, VerifyEmail } from './AuthScreens'
+import { AgeGate, Login, MagicLink, ResetPassword, VerifyEmail } from './AuthScreens'
 
 function Location() {
   const location = useLocation()
@@ -191,7 +191,7 @@ describe('authentication email links', () => {
     expect(api.post).toHaveBeenCalledTimes(2)
   })
 
-  it('shows the 12-character hint and blocks a too-short password client-side', () => {
+  it('shows the 12-character hint, marks the password input for length validation, and wires it via aria-describedby', () => {
     sessionStorage.setItem('partyup.age-gate-attested', 'true')
     window.history.replaceState(
       {},
@@ -201,9 +201,23 @@ describe('authentication email links', () => {
 
     renderLink(<VerifyEmail />, '/auth/verify-email')
 
-    expect(screen.getByText('Use at least 12 characters.')).toBeInTheDocument()
+    const hint = screen.getByText('Use at least 12 characters.')
+    expect(hint).toBeInTheDocument()
     const input = screen.getByLabelText('Password') as HTMLInputElement
     expect(input).toHaveAttribute('minlength', '12')
+    expect(input).toHaveAttribute('aria-describedby', hint.id)
+  })
+
+  it('shows the 12-character hint on the reset-password arm too', () => {
+    window.history.replaceState({}, '', '/auth/reset#token=reset-token')
+
+    renderLink(<ResetPassword />, '/auth/reset')
+
+    const hint = screen.getByText('Use at least 12 characters.')
+    expect(hint).toBeInTheDocument()
+    const input = screen.getByLabelText('Password') as HTMLInputElement
+    expect(input).toHaveAttribute('minlength', '12')
+    expect(input).toHaveAttribute('aria-describedby', hint.id)
   })
 
   it('renders the specific auth_validation copy for a mocked short-password rejection, not the generic message', async () => {
@@ -227,5 +241,35 @@ describe('authentication email links', () => {
       await screen.findByText('Password must be at least 12 characters.'),
     ).toBeInTheDocument()
     expect(screen.queryByText('Something went wrong.')).not.toBeInTheDocument()
+  })
+
+  it('gates an invalid email client-side before requesting a magic link', () => {
+    renderLink(<Login />, '/login')
+
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'not-an-email' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Email me a link' }))
+
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('renders neutral copy for a magic-link validation rejection, not the password message', async () => {
+    api.post.mockRejectedValue(new ApiError(400, 'auth_validation'))
+    renderLink(<Login />, '/login')
+
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'user@example.test' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Email me a link' }))
+
+    expect(
+      await screen.findByText(
+        'Some of the information you entered is invalid.',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText('Password must be at least 12 characters.'),
+    ).not.toBeInTheDocument()
   })
 })

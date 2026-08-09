@@ -26,6 +26,6 @@
   "friend_request_not_pending": "Esta solicitação não está mais pendente.",
   "steam_not_linked": "Vincule a Steam antes de importar amigos.",
   "rate_limited": "Muitas tentativas. Tente novamente mais tarde.",
-  "auth_validation": "A senha deve ter pelo menos 12 caracteres.",
+  "auth_validation": "Algumas informações que você digitou são inválidas.",
   "validation_failed": "Verifique os campos destacados e tente novamente."
 }

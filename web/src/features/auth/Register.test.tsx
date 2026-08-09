@@ -137,4 +137,86 @@ describe('Register', () => {
       }),
     )
   })
+
+  it('fires exactly one POST for a failed resume and none on a later remount_D083', async () => {
+    api.post.mockRejectedValue(new Error('boom'))
+    const { unmount } = render(
+      <MemoryRouter initialEntries={['/register']}>
+        <Routes>
+          <Route path="/register" element={<Register />} />
+          <Route path="/age-gate" element={<AgeGate />} />
+        </Routes>
+        <Location />
+      </MemoryRouter>,
+    )
+
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'flaky@example.test' },
+    })
+    fireEvent.submit(
+      screen.getByRole('button', { name: 'Create account' }).closest('form')!,
+    )
+
+    await screen.findByTestId('screen-age-gate')
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1))
+    unmount()
+
+    render(
+      <MemoryRouter initialEntries={['/register']}>
+        <Register />
+        <Location />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByLabelText('Email address')).toHaveValue('')
+    expect(api.post).toHaveBeenCalledTimes(1)
+  })
+
+  it('prefers the current location continuation over a stashed one on resume_D031', async () => {
+    api.post.mockResolvedValue({})
+    const { unmount } = renderRegister('/register?next=%2Fu%2Fstale.user')
+
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'newlink@example.test' },
+    })
+    fireEvent.submit(
+      screen.getByRole('button', { name: 'Create account' }).closest('form')!,
+    )
+
+    expect(api.post).not.toHaveBeenCalled()
+    unmount()
+
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/register',
+            search: '?next=%2Fu%2Ffresh.user',
+            state: { justAttested: true },
+          },
+        ]}
+      >
+        <Register />
+        <Location />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByLabelText('Email address')).toHaveValue(
+      'newlink@example.test',
+    )
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/api/v1/auth/register', {
+        params: { header: { 'X-CSRF-TOKEN': '' } },
+        body: {
+          email: 'newlink@example.test',
+          ageGateAttested: true,
+          locale: 'en',
+          continuation: '/u/fresh.user',
+        },
+      }),
+    )
+  })
 })

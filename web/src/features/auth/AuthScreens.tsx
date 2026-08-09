@@ -272,7 +272,7 @@ export function AgeGate() {
     }
 
     sessionStorage.setItem(ageGateStorageKey, 'true')
-    navigate(returnTo, { replace: true })
+    navigate(returnTo, { replace: true, state: { justAttested: true } })
   }
 
   return (
@@ -332,6 +332,13 @@ export function Login() {
 
   async function magic() {
     setError(undefined)
+    const emailField = document.getElementById(
+      'login-email',
+    ) as HTMLInputElement | null
+    if (emailField && !emailField.checkValidity()) {
+      emailField.reportValidity()
+      return
+    }
     try {
       await client.POST('/api/v1/auth/magic-link', {
         params: { header: { 'X-CSRF-TOKEN': '' } },
@@ -439,6 +446,9 @@ export function Register() {
   const navigate = useNavigate()
   const location = useLocation()
   const continuation = readFriendContinuation(location.search)
+  const justAttested = Boolean(
+    (location.state as { justAttested?: boolean } | null)?.justAttested,
+  )
   const [resuming] = useState(() => pendingRegistration)
   const [email, setEmail] = useState(() => resuming?.email ?? '')
   const [sent, setSent] = useState(false)
@@ -459,7 +469,6 @@ export function Register() {
           continuation: targetContinuation ?? null,
         },
       })
-      pendingRegistration = null
       setSent(true)
     } catch (caught) {
       setError(caught)
@@ -480,13 +489,20 @@ export function Register() {
   }
 
   useEffect(() => {
+    // One-shot: consume the stash immediately so a StrictMode replay or a
+    // later mount can never resubmit it. Auto-submit only when this exact
+    // navigation returned from the age gate (justAttested) — a stash left
+    // over from an abandoned attempt, met by attestation from an unrelated
+    // flow, prefills the email field but does not auto-POST. The current
+    // location's continuation wins over the stashed one, so a freshly
+    // clicked invite link isn't overridden by a stale stash.
+    const stash = pendingRegistration
+    pendingRegistration = null
     void (async () => {
-      if (resuming && attested()) {
-        await register(resuming.email, resuming.continuation)
+      if (stash && justAttested) {
+        await register(stash.email, continuation ?? stash.continuation)
       }
     })()
-    // Resume-once effect: only the initial mount after an age-gate return
-    // should auto-submit the stashed registration.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -683,11 +699,13 @@ function TokenForm({
   )
   const [value, setValue] = useState('')
   const [error, setError] = useState<unknown>()
+  const [passwordTooShort, setPasswordTooShort] = useState(false)
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     if (!authData.token) return
     setError(undefined)
+    setPasswordTooShort(false)
 
     try {
       let nextDestination = '/'
@@ -734,6 +752,12 @@ function TokenForm({
             ),
           },
         })
+      } else if (
+        password &&
+        isApiError(caught) &&
+        caught.code === 'auth_validation'
+      ) {
+        setPasswordTooShort(true)
       } else {
         setError(caught)
       }
@@ -761,9 +785,13 @@ function TokenForm({
                 value={value}
                 onChange={(event) => setValue(event.target.value)}
                 minLength={passwordMinLength}
+                aria-describedby={page + '-password-hint'}
                 required
               />
-              <p className="text-body-sm text-ink-soft">
+              <p
+                id={page + '-password-hint'}
+                className="text-body-sm text-ink-soft"
+              >
                 {t('fields.passwordHint')}
               </p>
             </div>
@@ -773,6 +801,7 @@ function TokenForm({
           </Button>
         </form>
       )}
+      {passwordTooShort && <p role="alert">{t('fields.passwordTooShort')}</p>}
       <ErrorAlert error={error} />
     </main>
   )

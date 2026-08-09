@@ -26,6 +26,6 @@
   "friend_request_not_pending": "That request is no longer pending.",
   "steam_not_linked": "Link Steam before importing friends.",
   "rate_limited": "Too many attempts. Try again later.",
-  "auth_validation": "Password must be at least 12 characters.",
+  "auth_validation": "Some of the information you entered is invalid.",
   "validation_failed": "Please check the highlighted fields and try again."
 }
