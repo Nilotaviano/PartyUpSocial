@@ -190,11 +190,18 @@ describe('PushEnableCard — card visibility matrix (D-147/D-159, ruling 4)', ()
     ).toBeInTheDocument()
     expect(screen.queryByTestId('push-enable-card')).not.toBeInTheDocument()
     expect(api.post).not.toHaveBeenCalled()
+    // The user's own click prompted exactly once — the fallback notice does not itself re-prompt.
+    expect(requestPermission).toHaveBeenCalledTimes(1)
   })
 
   it('an absent PushManager shows the D-175 fallback notice without ever prompting_D175', async () => {
     mockProfile(true)
     removePushSupport()
+    const requestPermission = vi.fn().mockResolvedValue('granted')
+    Object.defineProperty(window, 'Notification', {
+      value: { permission: 'default', requestPermission },
+      configurable: true,
+    })
 
     renderCard()
 
@@ -205,5 +212,6 @@ describe('PushEnableCard — card visibility matrix (D-147/D-159, ruling 4)', ()
     ).toBeInTheDocument()
     expect(screen.queryByTestId('push-enable-card')).not.toBeInTheDocument()
     expect(localStorage.getItem(ASKED_KEY)).toBe('1')
+    expect(requestPermission).not.toHaveBeenCalled()
   })
 })

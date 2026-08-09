@@ -7,10 +7,14 @@ using PartyUp.Application.Email;
 namespace PartyUp.Api.IntegrationTests;
 
 /// <summary>
-/// ticket-HOTFIX-auth500: every auth route whose use case can throw
-/// <c>DomainError.ValidationFailed</c> (via <c>AccountInput.RequirePassword</c>/<c>AccountInput.Email</c>)
-/// must map to 400 <c>auth_validation</c> instead of leaking a 500 through
-/// <see cref="PartyUp.Api.ErrorHandling.DomainExceptionMapper"/>'s generic fallback.
+/// Every auth route whose use case can throw <c>DomainError.ValidationFailed</c> (via
+/// <c>AccountInput.RequirePassword</c>/<c>AccountInput.Email</c>) must map to 400
+/// <c>auth_validation</c> with detail via <see cref="PartyUp.Api.Endpoints.AuthEndpoints"/>'s
+/// <c>/auth</c> group filter. Without that filter, the global
+/// <see cref="PartyUp.Api.ErrorHandling.DomainExceptionMapper"/> fallback still answers 400
+/// (generic <c>validation_failed</c>, no route-specific detail) — but the escaping exception logs
+/// a spurious error-level 500 in Serilog's request-logging middleware, ahead of where the mapper
+/// actually resolves the response.
 /// </summary>
 [Trait("Category", "Integration")]
 public sealed class AuthValidationProblemTests : IAsyncLifetime, IDisposable

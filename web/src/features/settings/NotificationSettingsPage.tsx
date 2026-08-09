@@ -34,12 +34,36 @@ const reminderOptions: { value: ReminderDefaultValue; key: string }[] = [
   { value: 'Hours24', key: 'reminderDefault.hours24' },
 ]
 
+// The `/me/reminder-default` route speaks the `ReminderOffset` enum's member names on the wire
+// (`Min15`/`Min30`, not `Minutes15`/`Minutes30`) — unlike the per-session reminder route, which
+// SessionContracts translates to `Minutes15`/`Minutes30`. This page's option values stay the
+// friendlier `Minutes15`/`Minutes30` for the i18n keys above; these maps convert at the boundary.
+const toWireValue: Record<ReminderDefaultValue, string> = {
+  Off: 'Off',
+  Minutes15: 'Min15',
+  Minutes30: 'Min30',
+  Hours1: 'Hours1',
+  Hours3: 'Hours3',
+  Hours12: 'Hours12',
+  Hours24: 'Hours24',
+}
+
+const fromWireValue: Record<string, ReminderDefaultValue> = {
+  Off: 'Off',
+  Min15: 'Minutes15',
+  Min30: 'Minutes30',
+  Hours1: 'Hours1',
+  Hours3: 'Hours3',
+  Hours12: 'Hours12',
+  Hours24: 'Hours24',
+}
+
 const csrf = { 'X-CSRF-TOKEN': '' }
 
-async function changeReminderDefault(reminderDefault: string) {
+async function changeReminderDefault(reminderDefault: ReminderDefaultValue) {
   await client.PUT('/api/v1/me/reminder-default', {
     params: { header: csrf },
-    body: { reminderDefault },
+    body: { reminderDefault: toWireValue[reminderDefault] },
   })
 }
 
@@ -141,10 +165,13 @@ export function NotificationSettingsPage() {
           className="mt-1 min-h-11 rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           disabled={profile.isPending}
           id="reminder-default-select"
-          value={(profile.data?.reminderDefault as ReminderDefaultValue) ?? 'Off'}
+          value={
+            (profile.data?.reminderDefault && fromWireValue[profile.data.reminderDefault]) ??
+            'Off'
+          }
           onChange={(event) => {
             setReminderSaved(false)
-            reminderDefault.mutate(event.target.value)
+            reminderDefault.mutate(event.target.value as ReminderDefaultValue)
           }}
         >
           {reminderOptions.map((option) => (

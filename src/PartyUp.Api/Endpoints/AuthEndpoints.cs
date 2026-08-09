@@ -22,12 +22,12 @@ public static class AuthEndpoints
     {
         RouteGroupBuilder auth = api.MapGroup("/auth");
 
-        // ticket-HOTFIX-auth500: AccountInput.RequirePassword/Email throw DomainException
-        // (ValidationFailed) straight out of the use-case layer for register, login, magic-link,
-        // forgot/reset/change/set password, change-email, and verify-email, with no per-route
-        // handling below -- one filter on the whole /auth group closes every one of those call sites
-        // at once instead of nine near-duplicate try/catches. Narrow to ValidationFailed only; every
-        // other DomainError keeps falling through to DomainExceptionMapper's existing behavior.
+        // AccountInput.RequirePassword/Email throw DomainException (ValidationFailed) straight
+        // out of the use-case layer for register, login, magic-link, forgot/reset/change/set
+        // password, change-email, and verify-email, with no per-route handling below -- one
+        // filter on the whole /auth group closes every one of those call sites at once instead of
+        // nine near-duplicate try/catches. Narrow to ValidationFailed only; every other
+        // DomainError keeps falling through to DomainExceptionMapper's existing behavior.
         auth.AddEndpointFilter(async (invocationContext, next) =>
         {
             try

@@ -252,7 +252,7 @@ describe('SessionDetailPage', () => {
     await waitFor(() => expect(select.value).toBe('Hours1'))
   })
 
-  it('mutes an unmuted session via PUT and shows the D-090 suppression copy_D090', async () => {
+  it('mutes an unmuted session via PUT, shows the D-090 suppression copy, and announces the muted state_D090', async () => {
     renderPage()
 
     const toggle = await screen.findByRole('button', { name: 'Mute' })
@@ -267,9 +267,10 @@ describe('SessionDetailPage', () => {
         }),
       ),
     )
+    expect(await screen.findByText('Session muted.')).toBeInTheDocument()
   })
 
-  it('unmutes a muted session via DELETE_D090', async () => {
+  it('unmutes a muted session via DELETE and announces the unmuted state (not the muted copy)_D090', async () => {
     api.get.mockImplementation((path: string) => {
       if (path === '/api/v1/sessions/{sessionId}') {
         const data = detail()
@@ -293,6 +294,8 @@ describe('SessionDetailPage', () => {
         }),
       ),
     )
+    expect(await screen.findByText('Session unmuted.')).toBeInTheDocument()
+    expect(screen.queryByText('Session muted.')).not.toBeInTheDocument()
   })
 
   it('renders the session start time in the viewer profile time zone rather than the browser zone_D038_D046', async () => {

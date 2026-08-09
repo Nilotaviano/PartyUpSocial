@@ -58,13 +58,31 @@ public sealed class PushEnableFlowTests(PlaywrightFixture fixture)
 
     private const string DeletePushManagerInitScript = "delete window.PushManager;";
 
+    /// <summary>
+    /// Wraps <c>Notification.requestPermission</c> with a call counter, read back via
+    /// <c>window.__requestPermissionCalls</c> — proves the D-175 absent-<c>PushManager</c> arm
+    /// never invokes it, rather than merely asserting the fallback UI appeared.
+    /// </summary>
+    private const string CountRequestPermissionInitScript = """
+        (() => {
+            window.__requestPermissionCalls = 0;
+            if (window.Notification && window.Notification.requestPermission) {
+                const original = window.Notification.requestPermission.bind(window.Notification);
+                window.Notification.requestPermission = (...args) => {
+                    window.__requestPermissionCalls++;
+                    return original(...args);
+                };
+            }
+        })();
+        """;
+
     private static readonly string[] ExpectedDropFilePropertyNames =
         [.. new[] { "subscriptionId", "title", "body", "url", "tag" }.OrderBy(name => name, StringComparer.Ordinal)];
 
     /// <summary>
     /// A retrying wrapper around <see cref="PlaywrightFixture.BefriendAsync"/>: this lane's
-    /// spawned-process trigger seam (`Push:DispatchIntervalSeconds=2`, this ticket's own addition)
-    /// adds constant background DB traffic for the whole run, which has been observed to make the
+    /// spawned-process trigger seam (`Push:DispatchIntervalSeconds=2`) adds constant background
+    /// DB traffic for the whole run, which has been observed to make the
     /// friend-request accept call race `FriendPairLocker`'s row lock and 500 once in this
     /// collection — a transport-level flake, never a UI assertion failure, so this only re-clicks
     /// Accept (never re-sends the request, which would 409 `friend_request_already_exists` on a
@@ -278,6 +296,7 @@ public sealed class PushEnableFlowTests(PlaywrightFixture fixture)
         // straight to the fallback notice; `Notification.requestPermission` is never invoked at
         // all (no context permission grant here — a real prompt would hang this test if the code
         // under test ever tried to invoke it).
+        await user.Page.AddInitScriptAsync(CountRequestPermissionInitScript);
         await user.Page.AddInitScriptAsync(DeletePushManagerInitScript);
         await user.Page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/app");
 
@@ -285,6 +304,7 @@ public sealed class PushEnableFlowTests(PlaywrightFixture fixture)
             .GetByText("This browser can't show push notifications.", new() { Exact = false })
             .WaitForAsync();
         Assert.Equal(0, await user.Page.GetByTestId("push-enable-card").CountAsync());
+        Assert.Equal(0, await user.Page.EvaluateAsync<int>("window.__requestPermissionCalls"));
 
         // The notification center itself remains reachable — D-175's "center + badge are the
         // whole channel" for a browser this flow cannot subscribe.

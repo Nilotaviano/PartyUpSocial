@@ -506,9 +506,17 @@ export function PollDetailPage() {
   })
 
   const mute = useMutation({
-    mutationFn: () => (detail.data?.muted ? unmutePoll(pollId) : mutePoll(pollId)),
-    onSuccess: () => {
-      setStatus(t('mute.on'))
+    mutationFn: async () => {
+      const wasMuted = detail.data?.muted ?? false
+      if (wasMuted) {
+        await unmutePoll(pollId)
+      } else {
+        await mutePoll(pollId)
+      }
+      return !wasMuted
+    },
+    onSuccess: (nowMuted) => {
+      setStatus(nowMuted ? t('mute.mutedAnnouncement') : t('mute.unmutedAnnouncement'))
       return queryClient.invalidateQueries({ queryKey: pollKeys.detail(pollId) })
     },
   })

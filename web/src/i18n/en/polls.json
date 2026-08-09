@@ -104,6 +104,8 @@
     "on": "Mute",
     "off": "Unmute",
     "copy": "Muting suppresses everything about this poll except your reminder while you're Going or Maybe. Unmuting does not backfill — nothing missed while muted is queued to deliver later.",
+    "mutedAnnouncement": "Poll muted.",
+    "unmutedAnnouncement": "Poll unmuted.",
     "disabledTerminal": "Muting is not available once a poll is finalized, expired, or canceled. For a finalized poll, mute the session it created instead."
   },
   "finalize": {

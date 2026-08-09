@@ -281,9 +281,17 @@ export function SessionDetailPage() {
   })
 
   const mute = useMutation({
-    mutationFn: () =>
-      detail.data?.muted ? unmuteSession(sessionId) : muteSession(sessionId),
-    onSuccess: () => afterMutation(t('mute.on')),
+    mutationFn: async () => {
+      const wasMuted = detail.data?.muted ?? false
+      if (wasMuted) {
+        await unmuteSession(sessionId)
+      } else {
+        await muteSession(sessionId)
+      }
+      return !wasMuted
+    },
+    onSuccess: (nowMuted) =>
+      afterMutation(nowMuted ? t('mute.mutedAnnouncement') : t('mute.unmutedAnnouncement')),
   })
 
   if (detail.isError && isApiError(detail.error) && detail.error.status === 404) {

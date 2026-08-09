@@ -141,22 +141,56 @@ describe('NotificationSettingsPage — the three ruling-3 controls', () => {
     expect(localStorage.getItem('partyup:push-subscription-id')).toBeNull()
   })
 
-  it('changing the account default reminder PUTs the new choice and confirms it saved_D082', async () => {
-    mockProfile('Off')
-    installPushSupport()
+  it.each([
+    ['Off', 'Off'],
+    ['Minutes15', 'Min15'],
+    ['Minutes30', 'Min30'],
+    ['Hours1', 'Hours1'],
+    ['Hours3', 'Hours3'],
+    ['Hours12', 'Hours12'],
+    ['Hours24', 'Hours24'],
+  ])(
+    'changing the account default reminder to %s PUTs the wire value %s and confirms it saved_D082',
+    async (optionValue, wireValue) => {
+      mockProfile('Off')
+      installPushSupport()
 
-    renderPage()
-    const select = await screen.findByLabelText('Remind me before a session starts')
-    fireEvent.change(select, { target: { value: 'Hours24' } })
+      renderPage()
+      const select = await screen.findByLabelText('Remind me before a session starts')
+      fireEvent.change(select, { target: { value: optionValue } })
 
-    await waitFor(() =>
-      expect(api.put).toHaveBeenCalledWith(
-        '/api/v1/me/reminder-default',
-        expect.objectContaining({ body: { reminderDefault: 'Hours24' } }),
-      ),
-    )
-    expect(await screen.findByText('Default reminder saved.')).toBeInTheDocument()
-  })
+      await waitFor(() =>
+        expect(api.put).toHaveBeenCalledWith(
+          '/api/v1/me/reminder-default',
+          expect.objectContaining({ body: { reminderDefault: wireValue } }),
+        ),
+      )
+      expect(await screen.findByText('Default reminder saved.')).toBeInTheDocument()
+    },
+  )
+
+  it.each([
+    ['Off', 'Off'],
+    ['Min15', 'Minutes15'],
+    ['Min30', 'Minutes30'],
+    ['Hours1', 'Hours1'],
+    ['Hours3', 'Hours3'],
+    ['Hours12', 'Hours12'],
+    ['Hours24', 'Hours24'],
+  ])(
+    'the server wire value %s selects the %s option on load_D082',
+    async (wireValue, optionValue) => {
+      mockProfile(wireValue)
+      installPushSupport()
+
+      renderPage()
+      const select = (await screen.findByLabelText(
+        'Remind me before a session starts',
+      )) as HTMLSelectElement
+
+      await waitFor(() => expect(select.value).toBe(optionValue))
+    },
+  )
 
   it('links out to per-session/poll muting rather than duplicating it here (ruling 3)', async () => {
     mockProfile()

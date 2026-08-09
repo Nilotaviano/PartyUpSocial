@@ -118,7 +118,9 @@
   "mute": {
     "on": "Silenciar",
     "off": "Dejar de silenciar",
-    "copy": "Silenciar suprime todo sobre esta sesión excepto tu recordatorio mientras estés en Voy o Tal vez. Dejar de silenciar no recupera nada — lo que se perdió mientras estaba silenciado no se pondrá en cola para entregarse después."
+    "copy": "Silenciar suprime todo sobre esta sesión excepto tu recordatorio mientras estés en Voy o Tal vez. Dejar de silenciar no recupera nada — lo que se perdió mientras estaba silenciado no se pondrá en cola para entregarse después.",
+    "mutedAnnouncement": "Sesión silenciada.",
+    "unmutedAnnouncement": "Se dejó de silenciar la sesión."
   },
   "list": {
     "upcoming": "Próximas sesiones",

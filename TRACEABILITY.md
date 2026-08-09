@@ -943,8 +943,8 @@ session/poll mute toggles — S6 owns those (no push-subscription UI, no service
 |---|---|
 | D-147/D-159 | `PushEnableCard.test.tsx`: `renders the card when eligible and this browser has not been asked`, `an explicit grant registers the worker, subscribes and POSTs — then never re-nags`; `PushEnableFlowTests.cs`: `EnableFlow_SubscribesAndDeliversOneDropFileWithNoCredential_D147_D159` (real browser, spawned-process trigger seam, drop-file `tag`/`url`/no-credential proof) |
 | D-175 | `PushEnableCard.test.tsx`: `a denied permission shows the D-175 fallback notice instead of the card_D175`, `an absent PushManager shows the D-175 fallback notice without ever prompting_D175`; `PushEnableFlowTests.cs`: `EnableFlow_AbsentPushManagerShowsTheD175FallbackNotice_AndNeverPrompts_D175` |
-| D-082 | `NotificationSettingsPage.test.tsx`: `changing the account default reminder PUTs the new choice and confirms it saved_D082` |
-| D-090/D-113 | `SessionDetailPage.test.tsx`: `mutes an unmuted session via PUT and shows the D-090 suppression copy_D090`, `unmutes a muted session via DELETE_D090`; `PollDetailPage.test.tsx`: `mutes an unmuted, non-terminal poll via PUT_D090`, `unmutes a muted poll via DELETE_D090`, `disables the mute toggle on a terminal (%s) poll_D113` (finalized/expired/canceled) |
+| D-082 | `NotificationSettingsPage.test.tsx`: `changing the account default reminder to %s PUTs the wire value %s and confirms it saved_D082` (all 7 D-082 choices, both directions — see also `the server wire value %s selects the %s option on load_D082`) |
+| D-090/D-113 | `SessionDetailPage.test.tsx`: `mutes an unmuted session via PUT, shows the D-090 suppression copy, and announces the muted state_D090`, `unmutes a muted session via DELETE and announces the unmuted state (not the muted copy)_D090`; `PollDetailPage.test.tsx`: `mutes an unmuted, non-terminal poll via PUT_D090`, `unmutes a muted poll via DELETE_D090`, `disables the mute toggle on a terminal (%s) poll_D113` (finalized/expired/canceled) |
 
 S6 ships PHASE7_DESIGN.md §5's remaining three bullets whole, plus §6's browser lane:
 
