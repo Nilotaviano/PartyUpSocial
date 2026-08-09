@@ -86,7 +86,36 @@
   "vote": {
     "available": "Disponível",
     "maybe": "Talvez",
-    "unavailable": "Indisponível"
+    "unavailable": "Indisponível",
+    "legend": "Vote para {{time}}",
+    "controlLabel": "{{time}}, {{value}}",
+    "updated": "Seu voto foi salvo."
+  },
+  "suggest": {
+    "heading": "Sugerir um horário",
+    "add": "Sugerir",
+    "added": "Sua sugestão foi adicionada.",
+    "optionCap": "Esta enquete já tem 12 horários candidatos, o máximo que ela pode ter."
+  },
+  "guests": {
+    "heading": "Links de convidado",
+    "mint": "Criar link",
+    "copyLink": "Copiar link",
+    "revoke": "Revogar",
+    "remove": "Remover convidado",
+    "removeConfirm": "Isso remove os votos dele e revoga o link. Esta ação não pode ser desfeita."
+  },
+  "guestPoll": {
+    "claimHeading": "Entrar nesta enquete",
+    "displayName": "Seu nome",
+    "join": "Entrar e votar",
+    "live": "Esta enquete está aberta.",
+    "canceled": "Esta enquete foi cancelada.",
+    "revoked": "Este link de convite foi revogado.",
+    "ended": "Este convite terminou.",
+    "expired": "A janela de seleção desta enquete encerrou.",
+    "finalized": "Esta enquete foi finalizada. Reabra seu link de convite para a sessão.",
+    "invalid": "Este link de convite não é válido."
   },
   "dirty": {
     "title": "Descartar alterações não salvas?",
@@ -109,6 +138,10 @@
       "poll_guest_not_found": "Esse convidado não pôde ser encontrado.",
       "poll_selection_window_closed": "A janela de seleção desta enquete encerrou.",
       "poll_zero_options": "Esta enquete não tem opções restantes.",
+      "poll_guest_link_not_found": "Esse link de convite não pôde ser encontrado.",
+      "poll_guest_link_inactive": "Esse link de convite não está mais ativo.",
+      "guest_link_not_claimed": "Entre nesta enquete com seu nome antes de votar.",
+      "guest_link_terminal": "Esse link de convite não está mais ativo.",
       "user_not_found": "Esse usuário não pôde ser encontrado.",
       "invalid_scope": "Essa lista de enquetes não é válida.",
       "invalid_cursor": "Essa página de resultados não é mais válida.",
@@ -117,6 +150,7 @@
   },
   "a11y": {
     "validationSummary": "Houve problemas com seu envio",
-    "dialogLabel": "Caixa de confirmação"
+    "dialogLabel": "Caixa de confirmação",
+    "copyLink": "Copiar link de convite"
   }
 }

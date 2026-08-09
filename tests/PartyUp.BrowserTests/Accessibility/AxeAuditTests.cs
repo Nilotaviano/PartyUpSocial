@@ -51,6 +51,7 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
         string GuestLinkUrl,
         string OwnFriendCode,
         string PollId,
+        string PollGuestLinkUrl,
         IReadOnlyDictionary<(string Step, AuditedTheme Theme), AxeResultItem[]> OnboardingFindings);
 
     /// <summary>
@@ -148,7 +149,15 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
             // invited friend), on the organizer's already-open, already-authenticated context.
             string pollId = await CreatePollFixtureAsync(organizer.Page);
 
-            _context = new AuditContext(organizer, sessionId, guestLinkUrl, ownFriendCode, pollId, onboardingFindings);
+            // Phase 6 S6 (PHASE6_DESIGN.md §5, ticket-P6-S6): a poll-typed guest link, minted
+            // through the organizer's guest-management panel this slice ships on poll-detail —
+            // the only place a poll guest link's URL is ever shown (create-time only sets a
+            // count, never surfaces the minted link itself). Resolves the `guest-poll` audit
+            // route below.
+            string pollGuestLinkUrl = await MintPollGuestLinkFixtureAsync(organizer.Page, pollId);
+
+            _context = new AuditContext(
+                organizer, sessionId, guestLinkUrl, ownFriendCode, pollId, pollGuestLinkUrl, onboardingFindings);
             return _context;
         }
         finally
@@ -226,6 +235,18 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
         await page.GetByRole(AriaRole.Button, new() { Name = "Create poll" }).ClickAsync();
         await page.WaitForURLAsync(url => Regex.IsMatch(url, @"/polls/[0-9a-fA-F-]{36}$"));
         return new Uri(page.Url).Segments[^1];
+    }
+
+    /// <summary>
+    /// Drives the real organizer guest-management panel on poll-detail (`PollDetailPage.tsx`,
+    /// ticket-P6-S6) to mint one poll-typed guest link and read its plaintext-shown-once URL.
+    /// </summary>
+    private static async Task<string> MintPollGuestLinkFixtureAsync(IPage page, string pollId)
+    {
+        await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/polls/" + pollId);
+        await page.Locator("#poll-guest-link-count").FillAsync("1");
+        await page.GetByRole(AriaRole.Button, new() { Name = "Create link" }).ClickAsync();
+        return await page.Locator("span.font-mono").First.InnerTextAsync();
     }
 
     private static async Task<AxeResultItem[]> RunAxeAsync(IPage page)
@@ -312,7 +333,10 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
                 guestContext = await fixture.NewContextAsync();
                 page = await guestContext.NewPageAsync();
                 await SeedThemeBeforeFirstNavigationAsync(page, theme);
-                await page.GotoAsync(context.GuestLinkUrl);
+                string guestLinkUrl = route.GuestLinkKind == GuestLinkKind.Poll
+                    ? context.PollGuestLinkUrl
+                    : context.GuestLinkUrl;
+                await page.GotoAsync(guestLinkUrl);
             }
             else
             {

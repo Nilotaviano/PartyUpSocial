@@ -8,6 +8,8 @@ export type PollRosterEntry = components['schemas']['PollRosterEntryResponse']
 export type CreatePollRequest = components['schemas']['CreatePollRequest']
 export type CreatePollResponse = components['schemas']['CreatePollResponse']
 export type PollBand = 'involved' | 'discoverable'
+export type GuestLinkInvitation = components['schemas']['GuestLinkInvitationResponse']
+export type VoteChoiceWire = 'available' | 'maybe' | 'unavailable'
 
 export const pollKeys = {
   list: (band: PollBand, cursor?: string) =>
@@ -41,6 +43,52 @@ export async function createPoll(body: CreatePollRequest) {
   })
   if (!data) throw new Error('Create poll response was empty.')
   return data
+}
+
+// design §7 note 1: vote submission is per option, not per ballot.
+export async function voteOnPollOption(
+  pollId: string,
+  optionId: string,
+  choice: VoteChoiceWire,
+) {
+  const { data } = await client.PUT('/api/v1/polls/{pollId}/options/{optionId}/vote', {
+    params: { header: csrf, path: { pollId, optionId } },
+    body: { choice },
+  })
+  if (!data) throw new Error('Vote response was empty.')
+  return data
+}
+
+export async function suggestPollOption(pollId: string, startTime: string) {
+  const { data } = await client.POST('/api/v1/polls/{pollId}/options', {
+    params: { header: csrf, path: { pollId } },
+    body: { startTime },
+  })
+  if (!data) throw new Error('Suggest option response was empty.')
+  return data
+}
+
+export async function createPollGuestLinks(pollId: string, count: number) {
+  const { data } = await client.POST('/api/v1/polls/{pollId}/guest-links', {
+    params: { header: csrf, path: { pollId } },
+    body: { count },
+  })
+  if (!data) throw new Error('Create poll guest links response was empty.')
+  return data
+}
+
+export async function revokePollGuestLink(pollId: string, guestLinkId: string) {
+  await client.DELETE('/api/v1/polls/{pollId}/guest-links/{guestLinkId}', {
+    params: { header: csrf, path: { pollId, guestLinkId } },
+  })
+}
+
+// D-044: removing a claimed guest voter is the only detach available to the organizer —
+// renaming stays with the guest on their own page.
+export async function removePollGuest(pollId: string, guestIdentityId: string) {
+  await client.POST('/api/v1/polls/{pollId}/guests/{guestIdentityId}/remove', {
+    params: { header: csrf, path: { pollId, guestIdentityId } },
+  })
 }
 
 export type PollWindow = Pick<

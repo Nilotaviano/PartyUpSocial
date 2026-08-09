@@ -1,6 +1,18 @@
 namespace PartyUp.BrowserTests.Accessibility;
 
 /// <summary>
+/// Which of the fixture's two guest links a <see cref="AuditedRoute.RequiresGuestLink"/> route
+/// resolves against — session-typed and poll-typed guest links share one route shape
+/// (<c>/guest/{guestLinkId}</c>) but structurally different credentials (PHASE6_DESIGN.md §4), so
+/// S6 adds this discriminator rather than a second boolean.
+/// </summary>
+public enum GuestLinkKind
+{
+    Session,
+    Poll,
+}
+
+/// <summary>
 /// One entry per audited route. <paramref name="PathTemplate"/> carries `{sessionId}`,
 /// `{username}` or `{code}` placeholders where the route needs a live entity id;
 /// <see cref="Accessibility.AxeAuditTests"/> resolves them against a shared fixture context before
@@ -16,7 +28,8 @@ public sealed record AuditedRoute(
     string Name,
     string PathTemplate,
     bool RequiresGuestLink = false,
-    string? OnboardingStepKey = null);
+    string? OnboardingStepKey = null,
+    GuestLinkKind GuestLinkKind = GuestLinkKind.Session);
 
 /// <summary>
 /// Checked-in route inventory for the S1 axe lane (A-082, PHASE5_DESIGN.md §9, §11 "Browser lane
@@ -72,5 +85,10 @@ public static class AuditedRoutes
         new AuditedRoute("polls-new", "/polls/new"),
         new AuditedRoute("polls", "/polls"),
         new AuditedRoute("poll-detail", "/polls/{pollId}"),
+        // Phase 6 S6 (PHASE6_DESIGN.md §5, ticket-P6-S6): the voting grid, suggest
+        // affordance and guest-management panel now render live on poll-detail
+        // (the entry above), and the guest pollView branch on the shared
+        // `/guest/{guestLinkId}` route resolves against a poll-typed link.
+        new AuditedRoute("guest-poll", "/guest/{guestLinkId}", RequiresGuestLink: true, GuestLinkKind: GuestLinkKind.Poll),
     ];
 }

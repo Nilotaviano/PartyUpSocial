@@ -179,3 +179,160 @@ describe('GuestSessionPage', () => {
     ).toBeInTheDocument()
   })
 })
+
+// S6 (design §5.4/§4): a poll-typed guest link resolves via the SAME route — the session
+// GET structurally 404s first (session_not_found), which falls back to the poll GET.
+const SessionNotFound = class extends Error {
+  status = 404
+  code = 'session_not_found'
+}
+
+function livePollUnclaimed() {
+  return {
+    state: 'live',
+    pollId: 'poll-1',
+    sessionId: null,
+    title: 'Raid night poll',
+    durationMinutes: 120,
+    platform: 'steam',
+    game: null,
+    notes: null,
+    deadline: '2099-01-02T00:00:00Z',
+    selectionWindowEndsAt: '2099-01-04T00:00:00Z',
+    status: 'polling',
+    guestIdentityId: null,
+    displayName: null,
+    options: [
+      {
+        id: 'option-1',
+        startTime: '2099-01-01T10:00:00Z',
+        suggestedByUserId: null,
+        suggestedByGuestIdentityId: null,
+        availableCount: 0,
+        maybeCount: 0,
+        unavailableCount: 0,
+        viewerVote: null,
+      },
+    ],
+    roster: [],
+  }
+}
+
+function livePollClaimed() {
+  return {
+    ...livePollUnclaimed(),
+    guestIdentityId: 'guest-1',
+    displayName: 'Dana',
+  }
+}
+
+describe('GuestSessionPage — poll branch (S6, PHASE6_DESIGN.md §5.4)', () => {
+  it('falls back to the poll view when the session credential 404s, and shows the claim form_D017', async () => {
+    api.get.mockImplementation((path: string) =>
+      path === '/api/v1/guest/{guestLinkId}/session'
+        ? Promise.reject(new SessionNotFound())
+        : Promise.resolve({ data: livePollUnclaimed() }),
+    )
+    renderPage(`/guest/${linkId}`)
+
+    expect(await screen.findByTestId('screen-guest-poll')).toBeInTheDocument()
+    expect(screen.getByLabelText('Your name')).toBeInTheDocument()
+    expect(screen.getByTestId('vote-available-option-1')).toBeDisabled()
+  })
+
+  it('claims with a display name, then votes on the shared voting grid_D017', async () => {
+    let claimed = false
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/guest/{guestLinkId}/session') {
+        return Promise.reject(new SessionNotFound())
+      }
+      return Promise.resolve({ data: claimed ? livePollClaimed() : livePollUnclaimed() })
+    })
+    api.post.mockImplementation(() => {
+      claimed = true
+      return Promise.resolve({ data: livePollClaimed() })
+    })
+    renderPage(`/guest/${linkId}`)
+
+    fireEvent.change(await screen.findByLabelText('Your name'), {
+      target: { value: 'Dana' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Join and vote' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/guest/{guestLinkId}/poll/claim',
+        expect.objectContaining({ body: { displayName: 'Dana' } }),
+      ),
+    )
+
+    api.put.mockResolvedValue({ data: livePollClaimed() })
+    await waitFor(() =>
+      expect(screen.getByTestId('vote-available-option-1')).not.toBeDisabled(),
+    )
+    fireEvent.click(screen.getByTestId('vote-available-option-1'))
+
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith(
+        '/api/v1/guest/{guestLinkId}/poll/options/{optionId}/vote',
+        expect.objectContaining({ body: { choice: 'available' } }),
+      ),
+    )
+  })
+
+  it('a claimed guest renames themselves (D-044 guest arm)', async () => {
+    api.get.mockImplementation((path: string) =>
+      path === '/api/v1/guest/{guestLinkId}/session'
+        ? Promise.reject(new SessionNotFound())
+        : Promise.resolve({ data: livePollClaimed() }),
+    )
+    api.put.mockResolvedValue({ data: { ...livePollClaimed(), displayName: 'Dana R' } })
+    renderPage(`/guest/${linkId}`)
+
+    const renameField = await screen.findByLabelText('Your name')
+    fireEvent.change(renameField, { target: { value: 'Dana R' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Join and vote' }))
+
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith(
+        '/api/v1/guest/{guestLinkId}/poll/display-name',
+        expect.objectContaining({ body: { displayName: 'Dana R' } }),
+      ),
+    )
+  })
+
+  it.each([
+    ['canceled', 'This poll was canceled.'],
+    ['revoked', 'This invitation link was revoked.'],
+    ['pollExpired', "This poll's selection window has closed."],
+  ])('renders the %s poll terminal notice_D126', async (state, text) => {
+    api.get.mockImplementation((path: string) =>
+      path === '/api/v1/guest/{guestLinkId}/session'
+        ? Promise.reject(new SessionNotFound())
+        : Promise.resolve({
+            data: { state, pollId: 'poll-1', sessionId: null, title: null, durationMinutes: null, platform: null, game: null, notes: null, deadline: null, selectionWindowEndsAt: null, status: null, guestIdentityId: null, displayName: null, options: null, roster: null },
+          }),
+    )
+    renderPage(`/guest/${linkId}`)
+
+    expect(await screen.findByTestId('screen-guest-terminal')).toBeInTheDocument()
+    expect(screen.getByText(text)).toBeInTheDocument()
+  })
+
+  it('renders the "re-open your invitation link" copy for a finalized poll — no re-exchange URL field', async () => {
+    api.get.mockImplementation((path: string) =>
+      path === '/api/v1/guest/{guestLinkId}/session'
+        ? Promise.reject(new SessionNotFound())
+        : Promise.resolve({
+            data: { state: 'finalized', pollId: 'poll-1', sessionId: 'session-9', title: null, durationMinutes: null, platform: null, game: null, notes: null, deadline: null, selectionWindowEndsAt: null, status: null, guestIdentityId: null, displayName: null, options: null, roster: null },
+          }),
+    )
+    renderPage(`/guest/${linkId}`)
+
+    expect(
+      await screen.findByText(
+        'This poll was finalized. Re-open your invitation link for the session.',
+      ),
+    ).toBeInTheDocument()
+  })
+})

@@ -86,7 +86,36 @@
   "vote": {
     "available": "Disponible",
     "maybe": "Tal vez",
-    "unavailable": "No disponible"
+    "unavailable": "No disponible",
+    "legend": "Vota para {{time}}",
+    "controlLabel": "{{time}}, {{value}}",
+    "updated": "Tu voto se guardó."
+  },
+  "suggest": {
+    "heading": "Sugerir un horario",
+    "add": "Sugerir",
+    "added": "Tu sugerencia se agregó.",
+    "optionCap": "Esta encuesta ya tiene 12 horarios candidatos, el máximo que puede tener."
+  },
+  "guests": {
+    "heading": "Enlaces de invitado",
+    "mint": "Crear enlace",
+    "copyLink": "Copiar enlace",
+    "revoke": "Revocar",
+    "remove": "Quitar invitado",
+    "removeConfirm": "Esto elimina sus votos y revoca su enlace. Esta acción no se puede deshacer."
+  },
+  "guestPoll": {
+    "claimHeading": "Unirte a esta encuesta",
+    "displayName": "Tu nombre",
+    "join": "Unirme y votar",
+    "live": "Esta encuesta está abierta.",
+    "canceled": "Esta encuesta fue cancelada.",
+    "revoked": "Este enlace de invitación fue revocado.",
+    "ended": "Esta invitación ha terminado.",
+    "expired": "La ventana de selección de esta encuesta cerró.",
+    "finalized": "Esta encuesta fue finalizada. Vuelve a abrir tu enlace de invitación para la sesión.",
+    "invalid": "Este enlace de invitación no es válido."
   },
   "dirty": {
     "title": "¿Descartar los cambios sin guardar?",
@@ -109,6 +138,10 @@
       "poll_guest_not_found": "No se pudo encontrar a ese invitado.",
       "poll_selection_window_closed": "La ventana de selección de esta encuesta cerró.",
       "poll_zero_options": "Esta encuesta no tiene opciones restantes.",
+      "poll_guest_link_not_found": "No se pudo encontrar ese enlace de invitación.",
+      "poll_guest_link_inactive": "Ese enlace de invitación ya no está activo.",
+      "guest_link_not_claimed": "Únete a esta encuesta con tu nombre antes de votar.",
+      "guest_link_terminal": "Ese enlace de invitación ya no está activo.",
       "user_not_found": "No se pudo encontrar a ese usuario.",
       "invalid_scope": "Esa lista de encuestas no es válida.",
       "invalid_cursor": "Esa página de resultados ya no es válida.",
@@ -117,6 +150,7 @@
   },
   "a11y": {
     "validationSummary": "Hubo problemas con tu envío",
-    "dialogLabel": "Cuadro de confirmación"
+    "dialogLabel": "Cuadro de confirmación",
+    "copyLink": "Copiar enlace de invitación"
   }
 }

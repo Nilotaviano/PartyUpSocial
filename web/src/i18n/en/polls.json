@@ -86,7 +86,36 @@
   "vote": {
     "available": "Available",
     "maybe": "Maybe",
-    "unavailable": "Unavailable"
+    "unavailable": "Unavailable",
+    "legend": "Vote for {{time}}",
+    "controlLabel": "{{time}}, {{value}}",
+    "updated": "Your vote was saved."
+  },
+  "suggest": {
+    "heading": "Suggest a time",
+    "add": "Suggest",
+    "added": "Your suggestion was added.",
+    "optionCap": "This poll already has 12 candidate times — the most it can hold."
+  },
+  "guests": {
+    "heading": "Guest links",
+    "mint": "Create link",
+    "copyLink": "Copy link",
+    "revoke": "Revoke",
+    "remove": "Remove guest",
+    "removeConfirm": "This removes their votes and revokes their link. This cannot be undone."
+  },
+  "guestPoll": {
+    "claimHeading": "Join this poll",
+    "displayName": "Your name",
+    "join": "Join and vote",
+    "live": "This poll is open.",
+    "canceled": "This poll was canceled.",
+    "revoked": "This invitation link was revoked.",
+    "ended": "This invitation has ended.",
+    "expired": "This poll's selection window has closed.",
+    "finalized": "This poll was finalized. Re-open your invitation link for the session.",
+    "invalid": "This invitation link isn't valid."
   },
   "dirty": {
     "title": "Discard unsaved changes?",
@@ -109,6 +138,10 @@
       "poll_guest_not_found": "That guest could not be found.",
       "poll_selection_window_closed": "The selection window for this poll has closed.",
       "poll_zero_options": "This poll has no remaining options.",
+      "poll_guest_link_not_found": "That invitation link could not be found.",
+      "poll_guest_link_inactive": "That invitation link is no longer active.",
+      "guest_link_not_claimed": "Join this poll with your name before voting.",
+      "guest_link_terminal": "This invitation link is no longer active.",
       "user_not_found": "That user could not be found.",
       "invalid_scope": "That poll list is not valid.",
       "invalid_cursor": "That page of results is no longer valid.",
@@ -117,6 +150,7 @@
   },
   "a11y": {
     "validationSummary": "There were problems with your submission",
-    "dialogLabel": "Confirmation dialog"
+    "dialogLabel": "Confirmation dialog",
+    "copyLink": "Copy invitation link"
   }
 }
