@@ -12,11 +12,13 @@ import {
   finalizePoll,
   getPollDetail,
   getPollFinalizationPreview,
+  mutePoll,
   pollKeys,
   pollWindowState,
   removePollGuest,
   revokePollGuestLink,
   suggestPollOption,
+  unmutePoll,
   voteOnPollOption,
   type FinalizationPreviewOption,
   type GuestLinkInvitation,
@@ -503,6 +505,14 @@ export function PollDetailPage() {
     },
   })
 
+  const mute = useMutation({
+    mutationFn: () => (detail.data?.muted ? unmutePoll(pollId) : mutePoll(pollId)),
+    onSuccess: () => {
+      setStatus(t('mute.on'))
+      return queryClient.invalidateQueries({ queryKey: pollKeys.detail(pollId) })
+    },
+  })
+
   if (detail.isError && isApiError(detail.error) && detail.error.status === 404) {
     return <Navigate replace to="/polls" />
   }
@@ -535,11 +545,15 @@ export function PollDetailPage() {
     suggest.mutate(asInstant.toISOString())
   }
 
+  const isTerminal =
+    data?.status === 'finalized' || data?.status === 'expired' || data?.status === 'canceled'
+
   const mutationError =
     vote.error ??
     (suggest.error && !suggestError ? suggest.error : null) ??
     guestPanelError ??
-    finalizeError
+    finalizeError ??
+    mute.error
 
   return (
     <main
@@ -611,6 +625,22 @@ export function PollDetailPage() {
 
           {data.status === 'expired' && <p role="status">{t('detail.expiredNotice')}</p>}
           {data.status === 'canceled' && <p role="status">{t('detail.canceledNotice')}</p>}
+
+          <div>
+            <Button
+              aria-busy={mute.isPending}
+              aria-pressed={data.muted}
+              disabled={mute.isPending || isTerminal}
+              type="button"
+              variant={data.muted ? 'primary' : 'neutral'}
+              onClick={() => mute.mutate()}
+            >
+              {data.muted ? t('mute.off') : t('mute.on')}
+            </Button>
+            <p className="mt-1 text-ink-soft">
+              {isTerminal ? t('mute.disabledTerminal') : t('mute.copy')}
+            </p>
+          </div>
 
           <section aria-labelledby="poll-options-heading">
             <h2

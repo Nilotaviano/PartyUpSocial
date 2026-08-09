@@ -19,14 +19,21 @@ const namespaces = [
   'notifications',
 ] as const
 
-// Closed problem-code inventory for the S5-owned surface (PHASE7_DESIGN.md
-// §4/§9 ruling 1): the notification center only ever surfaces these three —
-// list-scope/cursor validation, an unknown/foreign mark-read id, and the
-// shared rate-limit code. Subscription/mute/reminder codes stay S6-owned.
+// Closed problem-code inventory for the S5/S6-owned surface (PHASE7_DESIGN.md
+// §4/§5/§9 ruling 1): the notification center's three (list-scope/cursor
+// validation, an unknown/foreign mark-read id, the shared rate-limit code)
+// plus S6's three push-subscription codes (`CreatePushSubscription`'s
+// `push_channel_unsupported`/`push_not_configured`,
+// `DeletePushSubscription`'s `push_subscription_not_found`). Mute's own codes
+// stay on sessions.json/polls.json (unchanged/`poll_invalid_transition`,
+// already closed in their own inventories) — this list never grows for them.
 const notificationProblemCodes = [
   'invalid_cursor',
   'notification_not_found',
   'rate_limited',
+  'push_subscription_not_found',
+  'push_not_configured',
+  'push_channel_unsupported',
 ] as const
 
 // Closed problem-code inventory (PHASE6_DESIGN.md §4.2/§7): the poll HTTP

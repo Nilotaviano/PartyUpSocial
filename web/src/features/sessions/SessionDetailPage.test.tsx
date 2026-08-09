@@ -72,6 +72,7 @@ function detail() {
       },
     ],
     version: 'v1',
+    muted: false,
   }
 }
 
@@ -249,6 +250,49 @@ describe('SessionDetailPage', () => {
 
     const select = (await screen.findByLabelText('Reminder')) as HTMLSelectElement
     await waitFor(() => expect(select.value).toBe('Hours1'))
+  })
+
+  it('mutes an unmuted session via PUT and shows the D-090 suppression copy_D090', async () => {
+    renderPage()
+
+    const toggle = await screen.findByRole('button', { name: 'Mute' })
+    expect(screen.getByText(/does not backfill/i)).toBeInTheDocument()
+    fireEvent.click(toggle)
+
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith(
+        '/api/v1/sessions/{sessionId}/mute',
+        expect.objectContaining({
+          params: expect.objectContaining({ path: { sessionId: 'session-1' } }),
+        }),
+      ),
+    )
+  })
+
+  it('unmutes a muted session via DELETE_D090', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/sessions/{sessionId}') {
+        const data = detail()
+        data.muted = true
+        return Promise.resolve({ data })
+      }
+      if (path === '/api/v1/sessions/{sessionId}/join-requests')
+        return Promise.resolve({ data: { items: [], nextCursor: null } })
+      if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Unmute' }))
+
+    await waitFor(() =>
+      expect(api.delete).toHaveBeenCalledWith(
+        '/api/v1/sessions/{sessionId}/mute',
+        expect.objectContaining({
+          params: expect.objectContaining({ path: { sessionId: 'session-1' } }),
+        }),
+      ),
+    )
   })
 
   it('renders the session start time in the viewer profile time zone rather than the browser zone_D038_D046', async () => {

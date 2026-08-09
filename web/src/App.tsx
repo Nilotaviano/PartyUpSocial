@@ -25,6 +25,7 @@ import { SteamImportPage } from './features/friends/SteamImportPage'
 import { HomePage } from './features/home/HomePage'
 import { NotificationBell } from './features/notifications/NotificationBell'
 import { NotificationCenterPage } from './features/notifications/NotificationCenterPage'
+import { PushEnableCard } from './features/notifications/PushEnableCard'
 import { OnboardingWizard } from './features/onboarding/OnboardingWizard'
 import { PublicDeletionConfirmPage } from './features/deletion/PublicDeletionConfirmPage'
 import { PublicDeletionRequestPage } from './features/deletion/PublicDeletionRequestPage'
@@ -34,6 +35,7 @@ import { PollListPage } from './features/polls/PollListPage'
 import { ProfileSettingsPage } from './features/profile/ProfileSettingsPage'
 import { AccountSettingsPage } from './features/settings/AccountSettingsPage'
 import { BlockedUsersPage } from './features/settings/BlockedUsersPage'
+import { NotificationSettingsPage } from './features/settings/NotificationSettingsPage'
 import { GuestSessionPage } from './features/sessions/GuestSessionPage'
 import { SessionCreatePage } from './features/sessions/SessionCreatePage'
 import { SessionDetailPage } from './features/sessions/SessionDetailPage'
@@ -136,6 +138,7 @@ function AuthenticatedShell() {
           </div>
         </nav>
       </header>
+      <PushEnableCard />
       <Outlet />
     </div>
   )
@@ -214,6 +217,10 @@ function App() {
             <Route path="/settings/profile" element={<ProfileSettingsPage />} />
             <Route path="/settings/account" element={<AccountSettingsPage />} />
             <Route path="/settings/blocked" element={<BlockedUsersPage />} />
+            <Route
+              path="/settings/notifications"
+              element={<NotificationSettingsPage />}
+            />
             <Route path="/notifications" element={<NotificationCenterPage />} />
             <Route path="/sessions/new" element={<SessionCreatePage />} />
             <Route

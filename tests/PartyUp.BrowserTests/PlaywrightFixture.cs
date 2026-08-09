@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Microsoft.Playwright;
@@ -106,10 +107,20 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         }
     }
 
+    /// <summary>
+    /// PHASE7_DESIGN.md §6: <c>Push:DispatchIntervalSeconds</c>'s value in this lane —
+    /// production never sets this key and keeps the minutely Hangfire cadence instead
+    /// (<see cref="PartyUp.Api.Hosting.PushDispatchTriggerService"/>'s own remarks).
+    /// </summary>
+    private const string PushDispatchIntervalSecondsOverride = "2";
+
     private readonly string _repoRoot = FindRepoRoot();
     private readonly List<IBrowserContext> _tracedContexts = [];
     private readonly Lock _tracedContextsLock = new();
     private string _mailDropPath = string.Empty;
+    private string _pushDropPath = string.Empty;
+    private string _pushVapidPublicKey = string.Empty;
+    private string _pushVapidPrivateKey = string.Empty;
     private KillOnCloseJob? _job;
     private Process? _apiProcess;
     private Process? _webProcess;
@@ -135,6 +146,18 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         {
             File.Delete(stale);
         }
+
+        // PHASE7_DESIGN.md §6: the push-drop analogue of the mail-drop above — one JSON file per
+        // `LoggingPushSender` send, cleared per run so a stale file from a prior run can never be
+        // mistaken for this run's own delivery.
+        _pushDropPath = Path.Combine(_repoRoot, "tests", "PartyUp.BrowserTests", ".push-drop");
+        Directory.CreateDirectory(_pushDropPath);
+        foreach (string stale in Directory.EnumerateFiles(_pushDropPath, "*.json"))
+        {
+            File.Delete(stale);
+        }
+
+        (_pushVapidPublicKey, _pushVapidPrivateKey) = GenerateVapidKeyPair();
 
         if (OperatingSystem.IsWindows())
         {
@@ -182,6 +205,12 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
                 ["Email__DropPath"] = _mailDropPath,
                 ["RateLimits__RegisterPerIpPerHour"] = RegisterPerIpPerHourOverride,
                 ["ConnectionStrings__Db"] = _dbConnectionString,
+                ["Push__DispatchIntervalSeconds"] = PushDispatchIntervalSecondsOverride,
+                ["Push__Provider"] = "log",
+                ["Push__DropPath"] = _pushDropPath,
+                ["Push__Vapid__PublicKey"] = _pushVapidPublicKey,
+                ["Push__Vapid__PrivateKey"] = _pushVapidPrivateKey,
+                ["Push__Vapid__Subject"] = "mailto:push-lane@partyup-browsertests.example",
             },
             logName: "api");
         AssignToJob(_apiProcess);
@@ -246,6 +275,12 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
                 ["ConnectionStrings__Db"] = _dbConnectionString,
                 ["PublicBaseUrl"] = ApiBaseUrl,
                 ["RateLimits__RegisterPerIpPerHour"] = RegisterPerIpPerHourOverride,
+                ["Push__DispatchIntervalSeconds"] = PushDispatchIntervalSecondsOverride,
+                ["Push__Provider"] = "log",
+                ["Push__DropPath"] = _pushDropPath,
+                ["Push__Vapid__PublicKey"] = _pushVapidPublicKey,
+                ["Push__Vapid__PrivateKey"] = _pushVapidPrivateKey,
+                ["Push__Vapid__Subject"] = "mailto:push-lane@partyup-browsertests.example",
             },
             logName: "api");
         AssignToJob(_apiProcess);
@@ -289,6 +324,28 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
             throw new InvalidOperationException(
                 $"SQL backdoor expected to update exactly one poll row for '{pollId}', affected {rowsAffected}.");
         }
+    }
+
+    /// <summary>
+    /// PHASE7_DESIGN.md §6's "asserts the subscription row" step: the same real-DB-connection
+    /// backdoor idiom as <see cref="BackdatePollPastDeadlineAsync"/>, reading rather than writing —
+    /// counts this user's active (never-revoked) `push_subscriptions` rows, the server-side proof
+    /// the enable flow's `POST /api/v1/push/subscriptions` actually committed.
+    /// </summary>
+    public async Task<int> CountActivePushSubscriptionsForUsernameAsync(string username)
+    {
+        await using var connection = new NpgsqlConnection(_dbConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new NpgsqlCommand(
+            "SELECT COUNT(*) FROM push_subscriptions ps " +
+            "JOIN users u ON u.id = ps.user_id " +
+            "WHERE u.username = @username AND ps.revoked_at IS NULL",
+            connection);
+        command.Parameters.AddWithValue("username", username);
+
+        object? result = await command.ExecuteScalarAsync();
+        return Convert.ToInt32(result, System.Globalization.CultureInfo.InvariantCulture);
     }
 
     public async Task DisposeAsync()
@@ -585,6 +642,73 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         }
 
         throw new TimeoutException($"No dropped email contained a link with '{pathContains}' within the timeout.");
+    }
+
+    /// <summary>
+    /// PHASE7_DESIGN.md §6: a fresh P-256 keypair per run — never a checked-in key, never the
+    /// production keypair (§8, owner-provisioned). `LoggingPushSender` (`Push:Provider=log`) never
+    /// reads these bytes at all — it only needs `Push:Vapid:PublicKey` to be non-empty so
+    /// `GetPushConfig` reports `pushEnabled=true`/a real `vapidPublicKey` — but both keys are
+    /// exported in the exact shape `Lib.Net.Http.WebPush`'s `VapidAuthentication` expects (an
+    /// uncompressed X9.62 point for the public key, the raw 32-byte scalar for the private key,
+    /// both base64url) so the same fixture output stays valid if a later slice ever flips the
+    /// lane to `Push:Provider=webpush`.
+    /// </summary>
+    private static (string PublicKey, string PrivateKey) GenerateVapidKeyPair()
+    {
+        using ECDsa ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        ECParameters parameters = ecdsa.ExportParameters(includePrivateParameters: true);
+
+        byte[] x = parameters.Q.X!;
+        byte[] y = parameters.Q.Y!;
+        byte[] uncompressedPoint = new byte[1 + x.Length + y.Length];
+        uncompressedPoint[0] = 0x04;
+        Buffer.BlockCopy(x, 0, uncompressedPoint, 1, x.Length);
+        Buffer.BlockCopy(y, 0, uncompressedPoint, 1 + x.Length, y.Length);
+
+        return (Base64UrlEncode(uncompressedPoint), Base64UrlEncode(parameters.D!));
+    }
+
+    private static string Base64UrlEncode(byte[] bytes) =>
+        Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    /// <summary>
+    /// The push-drop analogue of <see cref="HarvestLinkAsync"/>: polls
+    /// <see cref="_pushDropPath"/> for at least <paramref name="minimumCount"/> JSON file(s)
+    /// written after <paramref name="since"/> (`LoggingPushSender`'s one-file-per-send output),
+    /// returning their full contents for the caller's own `tag`/`url`/no-credential assertions.
+    /// </summary>
+    public async Task<string[]> WaitForPushDropFilesAsync(
+        DateTime since,
+        int minimumCount = 1,
+        TimeSpan? timeout = null)
+    {
+        DateTime sinceWithSkewGuard = since - TimeSpan.FromSeconds(2);
+        DateTime deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(30));
+        while (DateTime.UtcNow < deadline)
+        {
+            string[] candidates = Directory.Exists(_pushDropPath)
+                ? Directory.EnumerateFiles(_pushDropPath, "*.json")
+                    .Where(path => File.GetLastWriteTimeUtc(path) >= sinceWithSkewGuard)
+                    .ToArray()
+                : [];
+
+            if (candidates.Length >= minimumCount)
+            {
+                var contents = new string[candidates.Length];
+                for (int i = 0; i < candidates.Length; i++)
+                {
+                    contents[i] = await File.ReadAllTextAsync(candidates[i]);
+                }
+
+                return contents;
+            }
+
+            await Task.Delay(250);
+        }
+
+        throw new TimeoutException(
+            $"Fewer than {minimumCount} push-drop file(s) appeared under '{_pushDropPath}' within the timeout.");
     }
 
     /// <summary>

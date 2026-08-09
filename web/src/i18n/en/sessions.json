@@ -115,6 +115,11 @@
     "hours24": "24 hours before",
     "accountDefault": "Use account default"
   },
+  "mute": {
+    "on": "Mute",
+    "off": "Unmute",
+    "copy": "Muting suppresses everything about this session except your reminder while you're Going or Maybe. Unmuting does not backfill — nothing missed while muted is queued to deliver later."
+  },
   "list": {
     "upcoming": "Upcoming sessions",
     "history": "Session history",

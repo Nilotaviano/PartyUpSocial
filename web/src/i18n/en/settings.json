@@ -6,7 +6,8 @@
     "label": "Settings",
     "profile": "Profile",
     "account": "Account",
-    "blocked": "Blocked users"
+    "blocked": "Blocked users",
+    "notifications": "Notifications"
   },
   "loading": "Loading...",
   "actions": {
@@ -60,6 +61,34 @@
     "emailLink": "Email me a confirmation link",
     "confirmIdentity": "Continue with confirmed identity",
     "confirmedIdentityChooseAction": "Your identity is confirmed. Choose the action you want to continue."
+  },
+  "notificationsPage": {
+    "heading": "Notification settings",
+    "push": {
+      "title": "Push notifications",
+      "description": "Turn push notifications on or off for this browser.",
+      "toggleOn": "Turn on for this browser",
+      "toggleOff": "Turn off for this browser",
+      "unsupported": "This browser does not support push notifications.",
+      "error": "Something went wrong changing push notifications for this browser."
+    },
+    "reminderDefault": {
+      "title": "Default reminder",
+      "label": "Remind me before a session starts",
+      "off": "Off",
+      "minutes15": "15 minutes before",
+      "minutes30": "30 minutes before",
+      "hours1": "1 hour before",
+      "hours3": "3 hours before",
+      "hours12": "12 hours before",
+      "hours24": "24 hours before",
+      "saved": "Default reminder saved."
+    },
+    "mute": {
+      "title": "Muting",
+      "description": "Mute individual sessions or polls from their own pages.",
+      "link": "Go to your sessions"
+    }
   },
   "publicDeletion": {
     "requestTitle": "Delete your account",

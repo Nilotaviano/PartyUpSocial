@@ -247,6 +247,20 @@ export async function rejectWaitlisted(
   )
 }
 
+// design §5/§4 (D-090): mute/unmute the whole session — control always live (unlike a poll's
+// terminal-disabled arm; a session has no §4 "invalid transition" restriction on this route).
+export async function muteSession(sessionId: string) {
+  await client.PUT('/api/v1/sessions/{sessionId}/mute', {
+    params: { header: csrf, path: { sessionId } },
+  })
+}
+
+export async function unmuteSession(sessionId: string) {
+  await client.DELETE('/api/v1/sessions/{sessionId}/mute', {
+    params: { header: csrf, path: { sessionId } },
+  })
+}
+
 export async function setReminder(
   sessionId: string,
   choice: ReminderChoiceValue,

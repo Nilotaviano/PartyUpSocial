@@ -59,12 +59,23 @@
       "unknown": "Nova notificação"
     }
   },
+  "enable": {
+    "title": "Ativar notificações push?",
+    "body": "Receba uma notificação neste dispositivo quando algo precisar da sua atenção.",
+    "confirm": "Ativar notificações",
+    "dismiss": "Agora não",
+    "error": "Algo deu errado ao ativar as notificações push.",
+    "fallback": "Este navegador não pode mostrar notificações push. Você ainda verá as novidades no seu centro de notificações."
+  },
   "errors": {
     "generic": "Algo deu errado.",
     "codes": {
       "invalid_cursor": "Não foi possível carregar essa lista de notificações. Tente novamente.",
       "notification_not_found": "Essa notificação não foi encontrada.",
-      "rate_limited": "Muitas tentativas. Tente novamente mais tarde."
+      "rate_limited": "Muitas tentativas. Tente novamente mais tarde.",
+      "push_subscription_not_found": "Essa assinatura push não foi encontrada.",
+      "push_not_configured": "As notificações push não estão disponíveis no momento.",
+      "push_channel_unsupported": "Esse canal push não é compatível."
     }
   }
 }

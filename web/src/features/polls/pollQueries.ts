@@ -100,6 +100,22 @@ export async function removePollGuest(pollId: string, guestIdentityId: string) {
 // alone) — the server can 409/422 with poll_invalid_transition (premature),
 // poll_selection_window_closed, or poll_zero_options; the page renders those honestly
 // rather than assuming the preview is always available in awaitingSelection.
+// design §5/§4 (D-090/D-113): `MutePoll` on a terminal poll is refused (`poll_invalid_transition`)
+// — the page below disables the control on a terminal poll rather than letting that 400 surface.
+// `UnmutePoll` is never refused, including on a Finalized poll (it resolves through the
+// re-parented session row, `PollDetailResponse.muted` reading through the same resolution).
+export async function mutePoll(pollId: string) {
+  await client.PUT('/api/v1/polls/{pollId}/mute', {
+    params: { header: csrf, path: { pollId } },
+  })
+}
+
+export async function unmutePoll(pollId: string) {
+  await client.DELETE('/api/v1/polls/{pollId}/mute', {
+    params: { header: csrf, path: { pollId } },
+  })
+}
+
 export async function getPollFinalizationPreview(pollId: string) {
   const { data } = await client.GET('/api/v1/polls/{pollId}/finalization-preview', {
     params: { path: { pollId } },

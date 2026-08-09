@@ -100,6 +100,12 @@
   "prefill": {
     "pollTruncated": "Solo se conservaron los primeros {{max}} horarios candidatos de tu selección — una encuesta puede tener como máximo {{max}}."
   },
+  "mute": {
+    "on": "Silenciar",
+    "off": "Dejar de silenciar",
+    "copy": "Silenciar suprime todo sobre esta encuesta excepto tu recordatorio mientras estés en Voy o Tal vez. Dejar de silenciar no recupera nada — lo que se perdió mientras estaba silenciada no se pondrá en cola para entregarse después.",
+    "disabledTerminal": "Silenciar no está disponible una vez que una encuesta se finaliza, expira o se cancela. Para una encuesta finalizada, silencia en su lugar la sesión que creó."
+  },
   "finalize": {
     "heading": "Elegir un horario",
     "previewGuarantee": "Esta vista previa y la finalización usan la misma regla: las mismas entradas siempre producen el mismo resultado. Si algo cambia mientras tanto (se elimina una opción o cambia el acceso de alguien), el resultado puede diferir de lo mostrado aquí.",

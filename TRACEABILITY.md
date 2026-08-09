@@ -936,3 +936,73 @@ center page and the chrome bell. The bell shows the exact count and `99+` above 
 mark-read/mark-all invalidation. `/notifications` joins `AuditedRoutes.cs` for the S5/S6 WSL browser
 lane sync. **Not in this slice:** the enable flow, `sw.js`, `/settings/notifications`, and the
 session/poll mute toggles — S6 owns those (no push-subscription UI, no service worker landed here).
+
+## Phase 7 slice S6 (Web: enable flow + preferences + mute + browser lane) test citations
+
+| Decision | Slice S6 citations |
+|---|---|
+| D-147/D-159 | `PushEnableCard.test.tsx`: `renders the card when eligible and this browser has not been asked`, `an explicit grant registers the worker, subscribes and POSTs — then never re-nags`; `PushEnableFlowTests.cs`: `EnableFlow_SubscribesAndDeliversOneDropFileWithNoCredential_D147_D159` (real browser, spawned-process trigger seam, drop-file `tag`/`url`/no-credential proof) |
+| D-175 | `PushEnableCard.test.tsx`: `a denied permission shows the D-175 fallback notice instead of the card_D175`, `an absent PushManager shows the D-175 fallback notice without ever prompting_D175`; `PushEnableFlowTests.cs`: `EnableFlow_AbsentPushManagerShowsTheD175FallbackNotice_AndNeverPrompts_D175` |
+| D-082 | `NotificationSettingsPage.test.tsx`: `changing the account default reminder PUTs the new choice and confirms it saved_D082` |
+| D-090/D-113 | `SessionDetailPage.test.tsx`: `mutes an unmuted session via PUT and shows the D-090 suppression copy_D090`, `unmutes a muted session via DELETE_D090`; `PollDetailPage.test.tsx`: `mutes an unmuted, non-terminal poll via PUT_D090`, `unmutes a muted poll via DELETE_D090`, `disables the mute toggle on a terminal (%s) poll_D113` (finalized/expired/canceled) |
+
+S6 ships PHASE7_DESIGN.md §5's remaining three bullets whole, plus §6's browser lane:
+
+**Enable flow.** `web/public/sw.js` (`push` + `notificationclick`, focuses an existing client or opens
+`data.url`) registers only from `pushSubscription.ts`'s `enablePushInThisBrowser` — never on plain
+page load (`PushEnableCard.test.tsx`'s `navigator.serviceWorker.register` assertion). `PushEnableCard`
+(mounted once in `App.tsx`'s `AuthenticatedShell`, so it evaluates on every authenticated route)
+renders only when `MyProfileResponse.pushPromptEligible` (a server fact) is true **and** this browser's
+own `partyup:push-asked` localStorage flag (D-181 client-preference idiom, `theme.ts`'s own precedent)
+is unset — ruling 4's two independent axes. `Notification.requestPermission()` fires only from the
+card's own "Enable" click, never automatically (D-159). A grant registers `sw.js`, subscribes through
+the real `PushManager` against the server's `vapidPublicKey`, and POSTs the subscription, storing the
+returned id; a denial, an absent `PushManager` (D-175, iOS Safari included), or a "Not now" click all
+mark the browser asked and never re-show the card — the denial/absent-`PushManager` arms additionally
+show a persistent in-app fallback notice for that page load.
+
+**`/settings/notifications`** (`NotificationSettingsPage.tsx`, ruling 3's exactly-three controls):
+per-browser push on/off (off unsubscribes the real `PushManager` subscription best-effort and DELETEs
+the stored subscription id), the account default reminder (`PUT /me/reminder-default`, D-082's seven
+choices), and a link out to per-session/poll muting (which lives on each session/poll's own page, not
+duplicated here). Joins `AuditedRoutes.cs`.
+
+**Mute toggles.** `SessionDetailPage`/`PollDetailPage` read `muted` off the already-shipped S4 detail
+fields and PUT/DELETE the shipped mute routes; the poll toggle is `disabled` on every terminal status
+(`finalized`/`expired`/`canceled`, D-113 — the live control lives on the created session), the session
+toggle is never disabled (no terminal restriction on that route). Both surfaces show the identical
+D-090/D-113 copy: muting suppresses everything except the reminder while Going/Maybe, and unmuting does
+not backfill.
+
+**Browser lane (§6).** `PlaywrightFixture` generates a fresh P-256 keypair per run (`ECDsa`, uncompressed
+X9.62 point + raw 32-byte scalar, base64url — the exact shape `Lib.Net.Http.WebPush`'s
+`VapidAuthentication` expects, though `Push:Provider=log` never reads it) and spawns the API in both
+topologies with `Push__DispatchIntervalSeconds=2` (the `PushDispatchTriggerService` seam S3 shipped),
+`Push__Provider=log`, `Push__DropPath` under a fresh `.push-drop` directory, and the three
+`Push__Vapid__*` keys — never a checked-in key, never the production keypair (§8, owner-provisioned).
+`PushEnableFlowTests` proves the whole chain end-to-end against the real stack: a synthetic
+`PushManager.subscribe` (`AddInitScriptAsync` overriding `ServiceWorkerRegistration.prototype.pushManager`,
+since the lane has no real push service to subscribe against) plus a real context `notifications`
+permission grant walks qualifying action (creating a session) → card → enable, asserts exactly one
+active `push_subscriptions` row via the same real-DB-connection backdoor idiom as
+`BackdatePollPastDeadlineAsync`, then triggers a second, real notification (a friend's session
+invitation) and asserts exactly one `push-drop` JSON file whose `tag`/`url` match the session and whose
+top-level property set is exactly `{subscriptionId, title, body, url, tag}` — no endpoint, no keys, no
+credential field under any name (A-015). `EnableFlow_AbsentPushManagerShowsTheD175FallbackNotice_...`
+deletes `window.PushManager` before the SPA's own scripts run and proves the fallback notice renders
+without `Notification.requestPermission` ever being invoked, and that `/notifications` still works.
+`/settings/notifications` joins `AuditedRoutes.All` and is scanned by the existing axe theory (both
+themes, zero exclusions) with no new test class needed — the S1 axe harness already parameterizes over
+every entry in that list.
+
+**jsdom cannot prove sw/push mechanics** (no real `ServiceWorkerRegistration`, `PushManager` or
+`Notification` delivery pipeline) — every component test above proves only the client-side branching
+(what gets called, with what arguments, under which browser-local/server-fact state) and leans on
+`PushEnableFlowTests` for the real end-to-end mechanics, per this ticket's own instruction.
+
+**i18n:** `notifications.json` gains `enable.*` (card/fallback copy) and three push problem codes
+(`push_subscription_not_found`/`push_not_configured`/`push_channel_unsupported`, added to
+`i18n.keys.test.ts`'s closed inventory); `settings.json` gains `navigation.notifications` and
+`notificationsPage.*`; `sessions.json`/`polls.json` each gain their own `mute.*` block (poll's carries
+an additional `disabledTerminal` string) — every key ships en/pt-BR/es in this commit, verified by the
+shipped `i18n.keys.test.ts` parity gate (no new namespace, no `index.ts` change).

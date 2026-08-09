@@ -17,6 +17,7 @@ export function SettingsNavigation() {
     ['/settings/profile', t('navigation.profile')],
     ['/settings/account', t('navigation.account')],
     ['/settings/blocked', t('navigation.blocked')],
+    ['/settings/notifications', t('navigation.notifications')],
   ] as const
 
   return (

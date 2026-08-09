@@ -6,7 +6,8 @@
     "label": "Configurações",
     "profile": "Perfil",
     "account": "Conta",
-    "blocked": "Usuários bloqueados"
+    "blocked": "Usuários bloqueados",
+    "notifications": "Notificações"
   },
   "loading": "Carregando...",
   "actions": {
@@ -60,6 +61,34 @@
     "emailLink": "Envie-me um link de confirmação",
     "confirmIdentity": "Continuar com identidade confirmada",
     "confirmedIdentityChooseAction": "Sua identidade foi confirmada. Escolha a ação que deseja continuar."
+  },
+  "notificationsPage": {
+    "heading": "Configurações de notificações",
+    "push": {
+      "title": "Notificações push",
+      "description": "Ative ou desative as notificações push para este navegador.",
+      "toggleOn": "Ativar para este navegador",
+      "toggleOff": "Desativar para este navegador",
+      "unsupported": "Este navegador não é compatível com notificações push.",
+      "error": "Algo deu errado ao alterar as notificações push deste navegador."
+    },
+    "reminderDefault": {
+      "title": "Lembrete padrão",
+      "label": "Me lembre antes de uma sessão começar",
+      "off": "Desativado",
+      "minutes15": "15 minutos antes",
+      "minutes30": "30 minutos antes",
+      "hours1": "1 hora antes",
+      "hours3": "3 horas antes",
+      "hours12": "12 horas antes",
+      "hours24": "24 horas antes",
+      "saved": "Lembrete padrão salvo."
+    },
+    "mute": {
+      "title": "Silenciar",
+      "description": "Silencie sessões ou enquetes individuais nas próprias páginas delas.",
+      "link": "Ir para suas sessões"
+    }
   },
   "publicDeletion": {
     "requestTitle": "Excluir sua conta",

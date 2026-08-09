@@ -115,6 +115,11 @@
     "hours24": "24 horas antes",
     "accountDefault": "Usar el predeterminado de la cuenta"
   },
+  "mute": {
+    "on": "Silenciar",
+    "off": "Dejar de silenciar",
+    "copy": "Silenciar suprime todo sobre esta sesión excepto tu recordatorio mientras estés en Voy o Tal vez. Dejar de silenciar no recupera nada — lo que se perdió mientras estaba silenciado no se pondrá en cola para entregarse después."
+  },
   "list": {
     "upcoming": "Próximas sesiones",
     "history": "Historial de sesiones",

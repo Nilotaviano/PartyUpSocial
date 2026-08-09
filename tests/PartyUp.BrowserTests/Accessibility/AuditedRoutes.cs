@@ -96,5 +96,7 @@ public static class AuditedRoutes
         new AuditedRoute("poll-detail-awaiting-selection", "/polls/{pollAwaitingSelectionId}"),
         // Phase 7 S5 (PHASE7_DESIGN.md §5/§6, ticket-P7-S5): the notification center.
         new AuditedRoute("notifications", "/notifications"),
+        // Phase 7 S6 (PHASE7_DESIGN.md §5/§6, ticket-P7-S6): push/reminder/mute preferences.
+        new AuditedRoute("settings-notifications", "/settings/notifications"),
     ];
 }

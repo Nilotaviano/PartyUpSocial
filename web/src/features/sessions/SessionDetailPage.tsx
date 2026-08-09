@@ -16,6 +16,7 @@ import {
   invalidateSessionQueries,
   isSessionInProgress,
   leaveSession,
+  muteSession,
   promoteWaitlisted,
   rejectJoinRequest,
   rejectWaitlisted,
@@ -24,6 +25,7 @@ import {
   respondToInvitation,
   sessionKeys,
   setReminder,
+  unmuteSession,
   viewerProfileKey,
   withdrawJoinRequest,
   type ParticipationResponse,
@@ -278,6 +280,12 @@ export function SessionDetailPage() {
     onSuccess: () => afterMutation(t('reminder.label')),
   })
 
+  const mute = useMutation({
+    mutationFn: () =>
+      detail.data?.muted ? unmuteSession(sessionId) : muteSession(sessionId),
+    onSuccess: () => afterMutation(t('mute.on')),
+  })
+
   if (detail.isError && isApiError(detail.error) && detail.error.status === 404) {
     return <Navigate replace to="/welcome" />
   }
@@ -298,7 +306,8 @@ export function SessionDetailPage() {
     rejectWaitlist.error ??
     removeGuestParticipant.error ??
     cancel.error ??
-    reminder.error
+    reminder.error ??
+    mute.error
 
   const data = detail.data
   const going = data?.roster.filter((r) => r.status === 'going' && !r.isWaitlisted) ?? []
@@ -455,6 +464,20 @@ export function SessionDetailPage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="mt-4">
+              <Button
+                aria-busy={mute.isPending}
+                aria-pressed={data.muted}
+                disabled={mute.isPending}
+                type="button"
+                variant={data.muted ? 'primary' : 'neutral'}
+                onClick={() => mute.mutate()}
+              >
+                {data.muted ? t('mute.off') : t('mute.on')}
+              </Button>
+              <p className="mt-1 text-ink-soft">{t('mute.copy')}</p>
             </div>
           </section>
 

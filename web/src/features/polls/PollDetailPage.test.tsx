@@ -77,6 +77,7 @@ function pollDetail(overrides: Partial<Record<string, unknown>> = {}) {
         isActive: true,
       },
     ],
+    muted: false,
     ...overrides,
   }
 }
@@ -152,6 +153,52 @@ describe('PollDetailPage', () => {
     expect(await screen.findByText('Organizer One')).toBeInTheDocument()
     expect(screen.getByText('Anonymous User')).toBeInTheDocument()
   })
+
+  it('mutes an unmuted, non-terminal poll via PUT_D090', async () => {
+    api.get.mockResolvedValue({ data: pollDetail({ status: 'polling' }) })
+    api.put.mockResolvedValue({ data: {} })
+    renderPage()
+
+    const toggle = await screen.findByRole('button', { name: 'Mute' })
+    expect(toggle).not.toBeDisabled()
+    fireEvent.click(toggle)
+
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith(
+        '/api/v1/polls/{pollId}/mute',
+        expect.objectContaining({
+          params: expect.objectContaining({ path: { pollId: 'poll-1' } }),
+        }),
+      ),
+    )
+  })
+
+  it('unmutes a muted poll via DELETE_D090', async () => {
+    api.get.mockResolvedValue({ data: pollDetail({ status: 'polling', muted: true }) })
+    api.delete.mockResolvedValue({})
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Unmute' }))
+
+    await waitFor(() =>
+      expect(api.delete).toHaveBeenCalledWith(
+        '/api/v1/polls/{pollId}/mute',
+        expect.objectContaining({
+          params: expect.objectContaining({ path: { pollId: 'poll-1' } }),
+        }),
+      ),
+    )
+  })
+
+  it.each(['finalized', 'expired', 'canceled'])(
+    'disables the mute toggle on a terminal (%s) poll_D113',
+    async (status) => {
+      api.get.mockResolvedValue({ data: pollDetail({ status }) })
+      renderPage()
+
+      expect(await screen.findByRole('button', { name: 'Mute' })).toBeDisabled()
+    },
+  )
 
   describe('the clock-inclusive window gate (F1)', () => {
     it('pre-deadline: status polling, now < deadline -> ordinary polling chip and deadline text', async () => {

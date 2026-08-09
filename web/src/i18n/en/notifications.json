@@ -59,12 +59,23 @@
       "unknown": "New notification"
     }
   },
+  "enable": {
+    "title": "Turn on push notifications?",
+    "body": "Get a notification on this device when something needs your attention.",
+    "confirm": "Enable notifications",
+    "dismiss": "Not now",
+    "error": "Something went wrong turning on push notifications.",
+    "fallback": "This browser can't show push notifications. You'll still see updates in your notification center."
+  },
   "errors": {
     "generic": "Something went wrong.",
     "codes": {
       "invalid_cursor": "That notification list could not be loaded. Try again.",
       "notification_not_found": "That notification could not be found.",
-      "rate_limited": "Too many attempts. Try again later."
+      "rate_limited": "Too many attempts. Try again later.",
+      "push_subscription_not_found": "That push subscription could not be found.",
+      "push_not_configured": "Push notifications are not available right now.",
+      "push_channel_unsupported": "That push channel is not supported."
     }
   }
 }
