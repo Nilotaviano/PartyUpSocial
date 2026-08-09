@@ -22,6 +22,28 @@ public static class AuthEndpoints
     {
         RouteGroupBuilder auth = api.MapGroup("/auth");
 
+        // ticket-HOTFIX-auth500: AccountInput.RequirePassword/Email throw DomainException
+        // (ValidationFailed) straight out of the use-case layer for register, login, magic-link,
+        // forgot/reset/change/set password, change-email, and verify-email, with no per-route
+        // handling below -- one filter on the whole /auth group closes every one of those call sites
+        // at once instead of nine near-duplicate try/catches. Narrow to ValidationFailed only; every
+        // other DomainError keeps falling through to DomainExceptionMapper's existing behavior.
+        auth.AddEndpointFilter(async (invocationContext, next) =>
+        {
+            try
+            {
+                return await next(invocationContext);
+            }
+            catch (DomainException ex) when (ex.Error == DomainError.ValidationFailed)
+            {
+                return Problem(
+                    invocationContext.HttpContext,
+                    StatusCodes.Status400BadRequest,
+                    "auth_validation",
+                    ex.Message);
+            }
+        });
+
         auth.MapGet("/antiforgery", (HttpContext context, IAntiforgery antiforgery) =>
             {
                 AntiforgeryTokenSet tokens = antiforgery.GetAndStoreTokens(context);
@@ -742,6 +764,9 @@ public static class AuthEndpoints
     }
 
     private static IResult Problem(HttpContext context, int status, string code) =>
+        Problem(context, status, code, detail: null);
+
+    private static IResult Problem(HttpContext context, int status, string code, string? detail) =>
         Results.Json(
             new AuthProblem(
                 "about:blank",
@@ -752,7 +777,8 @@ public static class AuthEndpoints
                 code,
                 code is "invalid_credentials" or "reauth_required"
                     ? null
-                    : context.TraceIdentifier),
+                    : context.TraceIdentifier,
+                detail),
             statusCode: status,
             contentType: "application/problem+json");
 
@@ -849,7 +875,8 @@ public sealed record AuthProblem(
     string Title,
     int Status,
     string Code,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TraceId);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TraceId,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Detail = null);
 
 public sealed class ProviderCapabilities
 {
