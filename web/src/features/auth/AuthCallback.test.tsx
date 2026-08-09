@@ -1,6 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter, useLocation } from 'react-router'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
@@ -15,7 +21,7 @@ vi.mock('../../api/client', () => ({
 import '../../i18n'
 import { consumeReauthProof } from '../../auth/reauthProof'
 import { setPendingSettingsAction } from '../settings/reauthAction'
-import { AuthCallback } from './AuthScreens'
+import { AgeGate, AuthCallback } from './AuthScreens'
 
 function Location() {
   const location = useLocation()
@@ -136,6 +142,44 @@ describe('AuthCallback', () => {
 
     await waitFor(() =>
       expect(screen.getByTestId('location')).toHaveTextContent('/app'),
+    )
+  })
+
+  it('routes an age-gate requirement through the shipped screen instead of a silent session fetch, and preserves the continuation_D083', async () => {
+    api.get.mockResolvedValue({ data: activeSession() })
+    window.history.replaceState(
+      {},
+      '',
+      '/auth/callback?status=age_gate_required&next=%2Fadd%2FXQYENU8937',
+    )
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter
+          initialEntries={[
+            '/auth/callback?status=age_gate_required&next=%2Fadd%2FXQYENU8937',
+          ]}
+        >
+          <Routes>
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/age-gate" element={<AgeGate />} />
+          </Routes>
+          <Location />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await screen.findByTestId('screen-age-gate')
+    expect(api.get).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/login?next=%2Fadd%2FXQYENU8937',
     )
   })
 })

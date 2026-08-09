@@ -54,6 +54,23 @@ describe('AgeGate', () => {
     )
   })
 
+  it('returns to login with only a validated friend continuation_D083', () => {
+    const returnTo = encodeURIComponent('/login?next=%2Fadd%2F2345-6789-ab')
+    render(
+      <MemoryRouter initialEntries={['/age-gate?next=' + returnTo]}>
+        <AgeGate />
+        <Location />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/login?next=%2Fadd%2F23456789AB',
+    )
+  })
+
   it('drops an external return target_D031', () => {
     render(
       <MemoryRouter initialEntries={['/age-gate?next=https%3A%2F%2Fevil.test']}>

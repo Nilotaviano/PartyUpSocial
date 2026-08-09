@@ -25,5 +25,7 @@
   "friendship_already_exists": "Vocês já são amigos.",
   "friend_request_not_pending": "Esta solicitação não está mais pendente.",
   "steam_not_linked": "Vincule a Steam antes de importar amigos.",
-  "rate_limited": "Muitas tentativas. Tente novamente mais tarde."
+  "rate_limited": "Muitas tentativas. Tente novamente mais tarde.",
+  "auth_validation": "A senha deve ter pelo menos 12 caracteres.",
+  "validation_failed": "Verifique os campos destacados e tente novamente."
 }

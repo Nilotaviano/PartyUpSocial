@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter, useLocation } from 'react-router'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({ post: vi.fn() }))
@@ -12,7 +12,7 @@ vi.mock('../../api/client', () => ({
 }))
 
 import '../../i18n'
-import { Register } from './AuthScreens'
+import { AgeGate, Register } from './AuthScreens'
 
 function Location() {
   const location = useLocation()
@@ -94,5 +94,47 @@ describe('Register', () => {
       '/age-gate?next=%2Fregister%3Fnext%3D%252Fu%252Ffriend.one',
     )
     expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('preserves the typed email through an age-gate round trip and auto-resumes registration_D083', async () => {
+    api.post.mockResolvedValue({})
+    render(
+      <MemoryRouter initialEntries={['/register']}>
+        <Routes>
+          <Route path="/register" element={<Register />} />
+          <Route path="/age-gate" element={<AgeGate />} />
+        </Routes>
+        <Location />
+      </MemoryRouter>,
+    )
+
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'keepme@example.test' },
+    })
+    fireEvent.submit(
+      screen.getByRole('button', { name: 'Create account' }).closest('form')!,
+    )
+
+    await screen.findByTestId('screen-age-gate')
+    expect(api.post).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(screen.getByLabelText('Email address')).toHaveValue(
+      'keepme@example.test',
+    )
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/api/v1/auth/register', {
+        params: { header: { 'X-CSRF-TOKEN': '' } },
+        body: {
+          email: 'keepme@example.test',
+          ageGateAttested: true,
+          locale: 'en',
+          continuation: null,
+        },
+      }),
+    )
   })
 })

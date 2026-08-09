@@ -190,4 +190,42 @@ describe('authentication email links', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/add/23456789AB')
     expect(api.post).toHaveBeenCalledTimes(2)
   })
+
+  it('shows the 12-character hint and blocks a too-short password client-side', () => {
+    sessionStorage.setItem('partyup.age-gate-attested', 'true')
+    window.history.replaceState(
+      {},
+      '',
+      '/auth/verify-email#token=verify-token',
+    )
+
+    renderLink(<VerifyEmail />, '/auth/verify-email')
+
+    expect(screen.getByText('Use at least 12 characters.')).toBeInTheDocument()
+    const input = screen.getByLabelText('Password') as HTMLInputElement
+    expect(input).toHaveAttribute('minlength', '12')
+  })
+
+  it('renders the specific auth_validation copy for a mocked short-password rejection, not the generic message', async () => {
+    sessionStorage.setItem('partyup.age-gate-attested', 'true')
+    api.post.mockRejectedValue(new ApiError(400, 'auth_validation'))
+    window.history.replaceState(
+      {},
+      '',
+      '/auth/verify-email#token=verify-token',
+    )
+
+    renderLink(<VerifyEmail />, '/auth/verify-email')
+    fireEvent.change(screen.getByLabelText('Password'), {
+      target: { value: 'short' },
+    })
+    fireEvent.submit(
+      screen.getByRole('button', { name: 'Continue' }).closest('form')!,
+    )
+
+    expect(
+      await screen.findByText('Password must be at least 12 characters.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Something went wrong.')).not.toBeInTheDocument()
+  })
 })

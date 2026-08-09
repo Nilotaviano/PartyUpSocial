@@ -26,6 +26,7 @@ import { peekPendingSettingsAction } from '../settings/reauthAction'
 import { sessionQueryKey, useSession } from '../../auth/useSession'
 
 const ageGateStorageKey = 'partyup.age-gate-attested'
+const passwordMinLength = 12
 
 type HashAuthData = {
   token: string | null
@@ -40,6 +41,10 @@ type DestinationSession = {
 
 let pendingMagicLink: HashAuthData | null = null
 let pendingEmailVerification: HashAuthData | null = null
+let pendingRegistration: {
+  email: string
+  continuation: string | undefined
+} | null = null
 
 function readHashAuthData(): HashAuthData {
   const parameters = new URLSearchParams(window.location.hash.slice(1))
@@ -84,6 +89,7 @@ function safeAgeGateReturnTo(value: string | undefined) {
   if (
     !value ||
     (!value.startsWith('/register') &&
+      !value.startsWith('/login') &&
       !value.startsWith('/auth/magic') &&
       !value.startsWith('/auth/verify-email'))
   ) {
@@ -97,6 +103,7 @@ function safeAgeGateReturnTo(value: string | undefined) {
 
   const allowedPath = [
     '/register',
+    '/login',
     '/auth/magic',
     '/auth/verify-email',
   ].includes(parsed.pathname)
@@ -432,34 +439,56 @@ export function Register() {
   const navigate = useNavigate()
   const location = useLocation()
   const continuation = readFriendContinuation(location.search)
-  const [email, setEmail] = useState('')
+  const [resuming] = useState(() => pendingRegistration)
+  const [email, setEmail] = useState(() => resuming?.email ?? '')
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<unknown>()
 
-  async function submit(event: FormEvent) {
-    event.preventDefault()
+  async function register(
+    targetEmail: string,
+    targetContinuation: string | undefined,
+  ) {
     setError(undefined)
-    if (!attested()) {
-      const returnTo = withFriendContinuation('/register', continuation)
-      navigate('/age-gate?next=' + encodeURIComponent(returnTo))
-      return
-    }
-
     try {
       await client.POST('/api/v1/auth/register', {
         params: { header: { 'X-CSRF-TOKEN': '' } },
         body: {
-          email,
+          email: targetEmail,
           ageGateAttested: true,
           locale: i18n.language,
-          continuation: continuation ?? null,
+          continuation: targetContinuation ?? null,
         },
       })
+      pendingRegistration = null
       setSent(true)
     } catch (caught) {
       setError(caught)
     }
   }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    setError(undefined)
+    if (!attested()) {
+      pendingRegistration = { email, continuation }
+      const returnTo = withFriendContinuation('/register', continuation)
+      navigate('/age-gate?next=' + encodeURIComponent(returnTo))
+      return
+    }
+
+    await register(email, continuation)
+  }
+
+  useEffect(() => {
+    void (async () => {
+      if (resuming && attested()) {
+        await register(resuming.email, resuming.continuation)
+      }
+    })()
+    // Resume-once effect: only the initial mount after an age-gate return
+    // should auto-submit the stashed registration.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <main
@@ -571,8 +600,22 @@ export function AuthCallback() {
 
   useEffect(() => {
     void (async () => {
-      if (new URLSearchParams(location.search).get('status') === 'failed') {
+      const status = new URLSearchParams(location.search).get('status')
+      if (status === 'failed') {
         setError(new ApiError(400, 'callbackFailed'))
+        return
+      }
+
+      if (status === 'age_gate_required') {
+        navigate('/age-gate', {
+          replace: true,
+          state: {
+            returnTo: withFriendContinuation(
+              '/login',
+              readAuthNext(location.search),
+            ),
+          },
+        })
         return
       }
 
@@ -717,8 +760,12 @@ function TokenForm({
                 type="password"
                 value={value}
                 onChange={(event) => setValue(event.target.value)}
+                minLength={passwordMinLength}
                 required
               />
+              <p className="text-body-sm text-ink-soft">
+                {t('fields.passwordHint')}
+              </p>
             </div>
           )}
           <Button type="submit" variant="primary">
