@@ -89,6 +89,12 @@ function renderPage(pollId = 'poll-1') {
       <MemoryRouter initialEntries={[`/polls/${pollId}`]}>
         <Routes>
           <Route path="/polls/:pollId" element={<PollDetailPage />} />
+          {/* D-160: a real route the finalize navigation must actually land on — not just a
+              same-origin POST call — the honest way to prove `navigate` fired. */}
+          <Route
+            path="/sessions/:sessionId"
+            element={<div data-testid="navigated-to-session" />}
+          />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -581,6 +587,7 @@ describe('PollDetailPage', () => {
           }),
         ),
       )
+      expect(await screen.findByTestId('navigated-to-session')).toBeInTheDocument()
     })
 
     it('renders the honest 409/422 taxonomy on a premature preview fetch, never fabricating options', async () => {

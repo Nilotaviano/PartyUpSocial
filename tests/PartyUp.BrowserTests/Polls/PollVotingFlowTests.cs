@@ -208,9 +208,10 @@ public sealed class PollVotingFlowTests(PlaywrightFixture fixture)
     /// PHASE6_DESIGN.md §6 S7 row's named gate: create→vote→finalize→session, end to end. The
     /// poll's deadline is a fixed 6/12/24/48h choice (`PollDeadlineChoice`) — no organizer action
     /// closes voting early — so a real browser run cannot wait out even the shortest choice.
-    /// <see cref="PlaywrightFixture.RunSqlBackdoorAsync"/> backdates the just-created poll's own
-    /// `deadline` row to a minute in the past on the same Postgres the running API reads from; the
-    /// server's own real clock is what evaluates Finalize's guard from that point on — nothing about
+    /// <see cref="PlaywrightFixture.BackdatePollPastDeadlineAsync"/> backdates the just-created
+    /// poll's own `deadline` (and `selection_window_end`, kept D-088-consistent) a minute into the
+    /// past on the same Postgres the running API reads from; the server's own real clock is what
+    /// evaluates Finalize's guard from that point on — nothing about
     /// the finalize call itself is mocked or short-circuited.
     /// </summary>
     [Fact]
@@ -225,8 +226,7 @@ public sealed class PollVotingFlowTests(PlaywrightFixture fixture)
         await firstOptionCard.Locator("[data-testid^='vote-available-']").ClickAsync();
         await organizer.Page.GetByText("Your vote was saved.").WaitForAsync();
 
-        await fixture.RunSqlBackdoorAsync(
-            $"UPDATE polls SET deadline = now() - interval '1 minute' WHERE id = '{pollId}';");
+        await fixture.BackdatePollPastDeadlineAsync(pollId);
 
         await organizer.Page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/polls/" + pollId);
         await organizer.Page.GetByText("Closed · awaiting selection").WaitForAsync();

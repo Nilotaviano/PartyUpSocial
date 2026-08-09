@@ -17,6 +17,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Test-only: the browser lane's own real-clock backdoor (PlaywrightFixture.BackdatePollPastDeadlineAsync)
+         needs a Postgres client to write the same DB the running API reads. This never wires any
+         Infrastructure DI, EF DbContext, or app service — it only reuses the `Npgsql` assembly this
+         project reference already carries transitively, avoiding a second, uncentralized package
+         version. -->
+    <ProjectReference Include="..\..\src\PartyUp.Infrastructure\PartyUp.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="coverlet.collector">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

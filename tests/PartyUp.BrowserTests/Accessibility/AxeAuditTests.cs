@@ -43,7 +43,20 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
     private static readonly JsonSerializerOptions DumpJsonOptions = new() { WriteIndented = true };
 
     private static readonly SemaphoreSlim SetupLock = new(1, 1);
-    private static AuditContext? _context;
+
+    /// <summary>
+    /// F2 fix: the cache slot holds the in-flight <see cref="Task{TResult}"/> itself, assigned
+    /// inside the lock BEFORE setup's async work runs — not the completed result assigned only on
+    /// success. A prior version cached nothing until the very end, so any exception partway
+    /// through (e.g. the SQL backdoor's now-removed `docker` CLI dependency, F1) left the slot
+    /// null; every later `[Theory]` case then re-entered the lock and re-ran the WHOLE expensive,
+    /// non-idempotent setup from scratch — including `RegisterAndOnboardAsync` with the same fixed
+    /// "axeorganizer" username, which fails on the *second* attempt with a duplicate-account error
+    /// that has nothing to do with the real failure. Caching the task means every caller — the
+    /// first and every subsequent one — awaits the exact same attempt and observes the exact same
+    /// (real) exception, once, instead of a cascade of increasingly unrelated ones.
+    /// </summary>
+    private static Task<AuditContext>? _contextTask;
 
     private sealed record AuditContext(
         RegisteredUser Organizer,
@@ -80,20 +93,31 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
     /// </summary>
     private async Task<AuditContext> GetContextAsync()
     {
-        if (_context is not null)
+        if (_contextTask is not null)
         {
-            return _context;
+            return await _contextTask;
         }
 
         await SetupLock.WaitAsync();
         try
         {
-            if (_context is not null)
-            {
-                return _context;
-            }
+            // Re-check under the lock (the ordinary double-checked pattern), but assign the task
+            // — not its eventual result — before releasing the lock and before awaiting it below,
+            // so a concurrent caller that arrives while setup is still running joins this same
+            // attempt rather than starting a second one.
+            _contextTask ??= BuildContextAsync();
+        }
+        finally
+        {
+            SetupLock.Release();
+        }
 
-            Dictionary<(string Step, AuditedTheme Theme), AxeResultItem[]> onboardingFindings = [];
+        return await _contextTask;
+    }
+
+    private async Task<AuditContext> BuildContextAsync()
+    {
+        Dictionary<(string Step, AuditedTheme Theme), AxeResultItem[]> onboardingFindings = [];
             RegisteredUser organizer = await fixture.RegisterAndOnboardAsync(
                 await fixture.NewContextAsync(),
                 "axeorganizer",
@@ -158,18 +182,17 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
             string pollGuestLinkUrl = await MintPollGuestLinkFixtureAsync(organizer.Page, pollId);
 
             // Phase 6 S7 (PHASE6_DESIGN.md §5/§6.1, ticket-P6-S7): a second poll, voted then
-            // backdated past its deadline via `PlaywrightFixture.RunSqlBackdoorAsync` (the poll's
-            // fixed 6/12/24/48h deadline choice makes a real wait infeasible in this lane) — reaches
-            // the awaitingSelection UI (organizer selection controls + finalization preview) the S5
-            // poll above never renders.
+            // backdated past its deadline via `PlaywrightFixture.BackdatePollPastDeadlineAsync`
+            // (the poll's fixed 6/12/24/48h deadline choice makes a real wait infeasible in this
+            // lane) — reaches the awaitingSelection UI (organizer selection controls + finalization
+            // preview) the S5 poll above never renders.
             string pollAwaitingSelectionId = await CreatePollFixtureAsync(organizer.Page, "Axe audit poll (awaiting selection)");
             ILocator firstVoteControl = organizer.Page.Locator("[data-testid^='vote-available-']").First;
             await firstVoteControl.ClickAsync();
             await organizer.Page.GetByText("Your vote was saved.").WaitForAsync();
-            await fixture.RunSqlBackdoorAsync(
-                $"UPDATE polls SET deadline = now() - interval '1 minute' WHERE id = '{pollAwaitingSelectionId}';");
+            await fixture.BackdatePollPastDeadlineAsync(pollAwaitingSelectionId);
 
-            _context = new AuditContext(
+            return new AuditContext(
                 organizer,
                 sessionId,
                 guestLinkUrl,
@@ -178,12 +201,6 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
                 pollGuestLinkUrl,
                 pollAwaitingSelectionId,
                 onboardingFindings);
-            return _context;
-        }
-        finally
-        {
-            SetupLock.Release();
-        }
     }
 
     /// <summary>

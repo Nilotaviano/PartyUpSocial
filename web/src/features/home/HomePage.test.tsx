@@ -275,7 +275,7 @@ describe('HomePage', () => {
 
       const pollsRegion = await screen.findByTestId('home-region-polls')
       expect(
-        await within(pollsRegion).findByText('No polls need your vote right now.'),
+        await within(pollsRegion).findByText('No open polls right now.'),
       ).toBeInTheDocument()
       expect(screen.queryByText('Already closed')).not.toBeInTheDocument()
     })
@@ -285,7 +285,7 @@ describe('HomePage', () => {
 
       const pollsRegion = await screen.findByTestId('home-region-polls')
       expect(
-        await within(pollsRegion).findByText('No polls need your vote right now.'),
+        await within(pollsRegion).findByText('No open polls right now.'),
       ).toBeInTheDocument()
     })
   })

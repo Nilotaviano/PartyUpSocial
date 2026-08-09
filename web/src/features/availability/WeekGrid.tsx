@@ -584,7 +584,11 @@ export function WeekGrid({
                     <span
                       key={option.id}
                       aria-hidden="true"
-                      className="block truncate text-[10px] font-semibold leading-tight text-maybe-ink"
+                      // §1-ratified pairs only: grid cells are `free | busy | selected`, never a
+                      // `maybe` background, so `maybe-ink` text here would be an unratified
+                      // pairing. `free-ink` is the shipped session-title choice for exactly this
+                      // reason — it passes on both free and busy fills (PHASE5_1_DESIGN.md:53).
+                      className="block truncate text-[10px] italic leading-tight text-free-ink"
                       data-layer="poll-option"
                     >
                       {option.pollTitle}

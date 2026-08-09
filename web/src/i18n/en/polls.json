@@ -97,6 +97,9 @@
     "added": "Your suggestion was added.",
     "optionCap": "This poll already has 12 candidate times — the most it can hold."
   },
+  "prefill": {
+    "pollTruncated": "Only the first {{max}} candidate times from your selection were kept — a poll can have at most {{max}}."
+  },
   "finalize": {
     "heading": "Choose a time",
     "previewGuarantee": "This preview and finalizing use the same rule — the same inputs always produce the same result. If something changes in between (an option is removed, or someone's access changes), the outcome may differ from what's shown here.",

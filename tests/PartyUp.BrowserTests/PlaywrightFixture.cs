@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Microsoft.Playwright;
+using Npgsql;
 using Testcontainers.PostgreSql;
 
 namespace PartyUp.BrowserTests;
@@ -115,6 +116,15 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     private PostgreSqlContainer? _postgresContainer;
     private IPlaywright? _playwright;
 
+    /// <summary>
+    /// The exact `ConnectionStrings:Db` value the spawned API process reads, in whichever
+    /// topology — set once, in the same place each topology computes what it hands the API, so
+    /// <see cref="BackdatePollPastDeadlineAsync"/> can never target a different database than the one under
+    /// test (F1 fix: no more topology-specific guessing at credentials or a `docker` CLI
+    /// dependency the Windows dev host doesn't have, ARCHITECTURE.md:238).
+    /// </summary>
+    private string _dbConnectionString = string.Empty;
+
     public IBrowser Browser { get; private set; } = null!;
 
     public async Task InitializeAsync()
@@ -152,6 +162,15 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
 
     private void InitializeLocalTopology()
     {
+        // Explicitly computed and handed to the API rather than left to its own
+        // `appsettings.json` default — the exact string this fixture then also opens for
+        // `BackdatePollPastDeadlineAsync`, never a hardcoded guess at the local dev credentials
+        // (`deploy/compose.dev.yml`'s own comment cites the same default this falls back to,
+        // an environment override always wins, matching how `Database__MigrateOnStartup`
+        // above already flows through `ConnectionStrings__Db`'s double-underscore convention).
+        _dbConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Db")
+            ?? "Host=localhost;Port=5432;Database=partyup;Username=partyup;Password=partyup";
+
         _apiProcess = StartProcess(
             "dotnet",
             "run --no-launch-profile --project src/PartyUp.Api --urls " + ApiBaseUrl,
@@ -162,6 +181,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
                 ["Database__MigrateOnStartup"] = "true",
                 ["Email__DropPath"] = _mailDropPath,
                 ["RateLimits__RegisterPerIpPerHour"] = RegisterPerIpPerHourOverride,
+                ["ConnectionStrings__Db"] = _dbConnectionString,
             },
             logName: "api");
         AssignToJob(_apiProcess);
@@ -192,6 +212,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     {
         _postgresContainer = new PostgreSqlBuilder("postgres:17-alpine").Build();
         await _postgresContainer.StartAsync();
+        _dbConnectionString = _postgresContainer.GetConnectionString();
 
         string outputDirectory = BuiltApiOutputDirectory;
         string wwwrootPath = Path.Combine(outputDirectory, "wwwroot");
@@ -222,7 +243,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
                 ["ASPNETCORE_ENVIRONMENT"] = "Development",
                 ["Database__MigrateOnStartup"] = "true",
                 ["Email__DropPath"] = _mailDropPath,
-                ["ConnectionStrings__Db"] = _postgresContainer.GetConnectionString(),
+                ["ConnectionStrings__Db"] = _dbConnectionString,
                 ["PublicBaseUrl"] = ApiBaseUrl,
                 ["RateLimits__RegisterPerIpPerHour"] = RegisterPerIpPerHourOverride,
             },
@@ -236,52 +257,37 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
 
     /// <summary>
     /// A same-DB-instance, real-server-clock backdoor for tests that need to prove a real
-    /// time-gated transition (e.g. a poll's minimum 6-hour deadline) without waiting hours for one
-    /// in a browser lane. Runs <paramref name="sql"/> via <c>psql</c> against whichever Postgres
-    /// this fixture's own API process is already pointed at — never a second connection this
-    /// fixture doesn't otherwise own — so the API's very next read sees the write. No new package
-    /// reference: the built topology already carries <c>Testcontainers.PostgreSql</c>'s own
-    /// <c>ExecScriptAsync</c> (a <c>docker exec psql</c> wrapper); the local topology shells out to
-    /// the same <c>docker compose</c> Postgres this repo's local dev setup already requires
-    /// (CLAUDE.md's <c>deploy/compose.dev.yml</c>), matching its documented default credentials.
+    /// time-gated poll transition (Finalize's own clock-inclusive guard) without waiting out the
+    /// poll's real minimum 6-hour deadline in a browser lane. Opens a direct
+    /// <see cref="NpgsqlConnection"/> against <see cref="_dbConnectionString"/> — the exact same
+    /// string this fixture handed the running API process in whichever topology (F1: no `docker`
+    /// CLI dependency, which the Windows dev host does not have, ARCHITECTURE.md:238; no
+    /// topology-specific credential guessing) — so the API's very next read sees the write. Moves
+    /// <c>deadline</c> and <c>selection_window_end</c> together, keeping D-088's
+    /// <c>selection_window_end = deadline + 48h</c> invariant intact rather than backdating into a
+    /// row shape the aggregate itself could never produce (F3). The poll id is a bound parameter,
+    /// never interpolated into the command text (F1).
     /// </summary>
-    public async Task RunSqlBackdoorAsync(string sql)
+    public async Task BackdatePollPastDeadlineAsync(string pollId)
     {
-        if (IsBuiltTopology)
-        {
-            Testcontainers.PostgreSql.PostgreSqlContainer container = _postgresContainer
-                ?? throw new InvalidOperationException("Built topology must have started its Postgres container.");
-            var result = await container.ExecScriptAsync(sql);
-            if (result.ExitCode != 0)
-            {
-                throw new InvalidOperationException(
-                    $"SQL backdoor failed (exit {result.ExitCode}): {result.Stderr}");
-            }
-            return;
-        }
+        await using var connection = new NpgsqlConnection(_dbConnectionString);
+        await connection.OpenAsync();
 
-        var info = new ProcessStartInfo(
-            "docker",
-            "compose -f deploy/compose.dev.yml exec -T postgres psql -U partyup -d partyup -v ON_ERROR_STOP=1")
-        {
-            WorkingDirectory = _repoRoot,
-            UseShellExecute = false,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-        };
-        using var process = Process.Start(info)
-            ?? throw new InvalidOperationException("Failed to start the local-topology SQL backdoor process.");
-        await process.StandardInput.WriteAsync(sql);
-        process.StandardInput.Close();
-        string stdout = await process.StandardOutput.ReadToEndAsync();
-        string stderr = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        if (process.ExitCode != 0)
+        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddMinutes(-1);
+        DateTimeOffset selectionWindowEnd = deadline.AddHours(48);
+
+        await using var command = new NpgsqlCommand(
+            "UPDATE polls SET deadline = @deadline, selection_window_end = @selectionWindowEnd WHERE id = @pollId",
+            connection);
+        command.Parameters.AddWithValue("deadline", deadline);
+        command.Parameters.AddWithValue("selectionWindowEnd", selectionWindowEnd);
+        command.Parameters.AddWithValue("pollId", Guid.Parse(pollId));
+
+        int rowsAffected = await command.ExecuteNonQueryAsync();
+        if (rowsAffected != 1)
         {
             throw new InvalidOperationException(
-                $"SQL backdoor failed (exit {process.ExitCode}): {stderr}{stdout}");
+                $"SQL backdoor expected to update exactly one poll row for '{pollId}', affected {rowsAffected}.");
         }
     }
 

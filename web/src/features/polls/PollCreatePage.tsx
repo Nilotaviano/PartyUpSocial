@@ -28,15 +28,18 @@ const MINIMUM_LEAD_MS = 15 * 60_000
  * deduping (D-080's merge, not a validation error) up to the 12-option ceiling (§12-11's
  * server-side re-validated cap — this is client UX only). The clamp is re-applied here, not just
  * trusted from the URL, because time may have passed between the link being minted and this page
- * loading. Returns the deduped ISO instants plus whether any one of them was clamped, surfaced
- * once rather than per-option (clamp surfaced not silent, never silent).
+ * loading. Returns the deduped ISO instants (truncated to the cap, never silently — `anyTruncated`
+ * says so) plus whether any one of them was clamped, surfaced once rather than per-option (clamp
+ * surfaced not silent, never silent — the same discipline applies to truncation).
  */
-function readPollPrefill(params: URLSearchParams): { options: string[]; anyClamped: boolean } {
+function readPollPrefill(
+  params: URLSearchParams,
+): { options: string[]; anyClamped: boolean; anyTruncated: boolean } {
   const raw = params.getAll('startTimes')
-  if (raw.length === 0) return { options: [], anyClamped: false }
+  if (raw.length === 0) return { options: [], anyClamped: false, anyTruncated: false }
 
   const earliest = Date.now() + MINIMUM_LEAD_MS
-  const options: string[] = []
+  const deduped: string[] = []
   let anyClamped = false
 
   for (const value of raw) {
@@ -45,12 +48,17 @@ function readPollPrefill(params: URLSearchParams): { options: string[]; anyClamp
     const clamped = requested.getTime() < earliest
     if (clamped) anyClamped = true
     const iso = new Date(clamped ? earliest : requested.getTime()).toISOString()
-    if (!options.includes(iso) && options.length < MAX_OPTIONS) {
-      options.push(iso)
+    if (!deduped.includes(iso)) {
+      deduped.push(iso)
     }
   }
 
-  return { options: options.sort(), anyClamped }
+  const sorted = deduped.sort()
+  return {
+    options: sorted.slice(0, MAX_OPTIONS),
+    anyClamped,
+    anyTruncated: sorted.length > MAX_OPTIONS,
+  }
 }
 
 type DiscardDialogProps = {
@@ -346,6 +354,12 @@ export function PollCreatePage() {
       {prefill.anyClamped && (
         <p aria-live="polite" role="status">
           {t('prefill.clamped', { ns: 'availability' })}
+        </p>
+      )}
+
+      {prefill.anyTruncated && (
+        <p aria-live="polite" role="status">
+          {t('prefill.pollTruncated', { max: MAX_OPTIONS })}
         </p>
       )}
 

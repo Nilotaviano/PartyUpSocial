@@ -97,6 +97,9 @@
     "added": "Tu sugerencia se agregó.",
     "optionCap": "Esta encuesta ya tiene 12 horarios candidatos, el máximo que puede tener."
   },
+  "prefill": {
+    "pollTruncated": "Solo se conservaron los primeros {{max}} horarios candidatos de tu selección — una encuesta puede tener como máximo {{max}}."
+  },
   "finalize": {
     "heading": "Elegir un horario",
     "previewGuarantee": "Esta vista previa y la finalización usan la misma regla: las mismas entradas siempre producen el mismo resultado. Si algo cambia mientras tanto (se elimina una opción o cambia el acceso de alguien), el resultado puede diferir de lo mostrado aquí.",

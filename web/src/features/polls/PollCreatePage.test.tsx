@@ -199,6 +199,32 @@ describe('PollCreatePage', () => {
       expect(within(list).getAllByRole('listitem')).toHaveLength(1)
     })
 
+    it('truncates a prefill past the 12-option cap and surfaces it, never silently_F4b', async () => {
+      api.get.mockResolvedValue({ data: { items: [] } })
+      const starts = Array.from({ length: 14 }, (_, index) =>
+        encodeURIComponent(`2099-04-${String(index + 1).padStart(2, '0')}T10:00:00Z`),
+      )
+      renderPage(`/polls/new?${starts.map((s) => `startTimes=${s}`).join('&')}`)
+
+      const list = await screen.findByRole('group', { name: 'Candidate times' })
+      expect(within(list).getAllByRole('listitem')).toHaveLength(12)
+      expect(
+        await screen.findByText(
+          'Only the first 12 candidate times from your selection were kept — a poll can have at most 12.',
+        ),
+      ).toBeInTheDocument()
+    })
+
+    it('never surfaces a truncation notice with fewer prefilled instants than the cap', async () => {
+      api.get.mockResolvedValue({ data: { items: [] } })
+      renderPage('/polls/new?startTimes=2099-04-01T10%3A00%3A00Z&startTimes=2099-04-02T10%3A00%3A00Z')
+
+      await screen.findByRole('group', { name: 'Candidate times' })
+      expect(
+        screen.queryByText(/from your selection were kept/),
+      ).not.toBeInTheDocument()
+    })
+
     it('never surfaces a clamp notice with no prefill at all', async () => {
       api.get.mockResolvedValue({ data: { items: [] } })
       renderPage()

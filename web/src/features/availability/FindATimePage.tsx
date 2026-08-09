@@ -59,8 +59,10 @@ function buildPrefillUrl(
  * A-083's poll-arm producer half (design §5): each selected window contributes exactly one
  * option instant — never a duration, which is not an option property (spec §7.3-1) — accumulated
  * into `/polls/new?startTimes=...` as a repeated query param (route query only, never a server
- * draft, D-152/D-162). The clamp (`RecommendationPrefill.ForPollOption`'s `WouldClamp`) is
- * computed here so the poll-create page can surface it rather than silently absorbing it.
+ * draft, D-152/D-162). This function passes the raw window starts through unclamped — the clamp
+ * (`RecommendationPrefill.ForPollOption`'s `WouldClamp`) is computed on read, by
+ * `PollCreatePage.tsx`'s `readPollPrefill`, the same "re-apply on read, don't trust the URL's own
+ * age" pattern `SessionCreatePage.tsx`'s `readPrefill` already uses for the session arm.
  */
 function buildPollPrefillUrl(starts: string[]): string {
   const params = new URLSearchParams()
