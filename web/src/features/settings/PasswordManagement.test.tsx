@@ -73,6 +73,8 @@ describe('PasswordManagement', () => {
       ),
     )
     expect(await screen.findByRole('status')).toHaveTextContent('Your password has been changed.')
+    expect(screen.getByLabelText('Your current password')).toHaveValue('')
+    expect(screen.getByLabelText('New password')).toHaveValue('')
   })
 
   it('renders the wrong-current-password copy on a reauth_required 409', async () => {
@@ -109,7 +111,16 @@ describe('PasswordManagement', () => {
   })
 
   it('renders the set-password form for an account without a password and posts after reauth', async () => {
-    api.get.mockResolvedValue({ data: { methods: [] } })
+    // /auth/methods emits every kind unconditionally; a passwordless account is a password entry
+    // with linked:false, never an empty array.
+    api.get.mockResolvedValue({
+      data: {
+        methods: [
+          { kind: 'password', linked: false, removable: false, detail: null },
+          { kind: 'google', linked: true, removable: true, detail: 'user@example.test' },
+        ],
+      },
+    })
     api.post.mockResolvedValue({ data: null })
     setPendingSettingsAction({ kind: 'setPassword' })
     setReauthProof('fresh-reauth-proof')
@@ -135,12 +146,20 @@ describe('PasswordManagement', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Your password has been set.')
   })
 
-  it('shows the set-password trigger, not a form, before reauth for accounts without a password', async () => {
-    api.get.mockResolvedValue({ data: { methods: [] } })
+  it('shows the set-password trigger, not a change form, for an unlinked password method', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        methods: [
+          { kind: 'password', linked: false, removable: false, detail: null },
+          { kind: 'google', linked: true, removable: true, detail: 'user@example.test' },
+        ],
+      },
+    })
 
     renderPage()
 
     expect(await screen.findByRole('button', { name: 'Set a password' })).toBeVisible()
     expect(screen.queryByLabelText('New password')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Your current password')).not.toBeInTheDocument()
   })
 })

@@ -231,7 +231,9 @@ export function AccountSettingsPage() {
     )
   }
 
-  const hasPassword = methods.some((method) => method.kind.toLowerCase() === 'password')
+  // /auth/methods emits every method kind unconditionally; only the linked flag says whether a
+  // password hash actually exists (same linked-aware idiom as the unlinked-provider filter below).
+  const hasPassword = methods.some((method) => method.linked && method.kind.toLowerCase() === 'password')
   const emailMethod = methods.find((method) => method.kind.toLowerCase().includes('magic'))
   const configuredProviders = (session?.providers ?? []).filter((provider) => ['google', 'steam'].includes(provider.toLowerCase()))
   const unlinkedProviders = configuredProviders.filter((provider) => !methods.some((method) => method.linked && method.kind.toLowerCase() === provider.toLowerCase()))
