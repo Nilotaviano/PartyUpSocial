@@ -608,9 +608,15 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         await page.Locator("#locale").ClickAsync();
         await page.GetByRole(AriaRole.Option, new() { Name = optionLabel }).ClickAsync();
         // The saved-confirmation renders in the *new* language (the switch is synchronous with
-        // the confirmation in `AccountSettingsPage`'s `onSuccess`), so this waits on the
-        // language-neutral `role="status"` region rather than an English string.
-        await page.Locator("[role='status']").First.WaitForAsync();
+        // the confirmation in `AccountSettingsPage`'s `onSuccess`), so this waits on a
+        // language-neutral non-empty `role="status"` region rather than an English string. Both
+        // the main scope and the non-empty filter are load-bearing: the app chrome's notification
+        // bell carries its own status region in the banner (empty at first, announcing counts
+        // later), and matching it resolves this wait before the locale save lands — the caller
+        // then navigates away and cancels the in-flight PUT.
+        await page.Locator("main [role='status']")
+            .Filter(new() { HasTextRegex = new System.Text.RegularExpressions.Regex(".+") })
+            .First.WaitForAsync();
     }
 
     /// <summary>

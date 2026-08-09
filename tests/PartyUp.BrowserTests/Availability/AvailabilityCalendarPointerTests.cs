@@ -200,7 +200,11 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             await Assertions.Expect(grid).ToHaveAttributeAsync("data-touch-dragging", "false");
             await Assertions.Expect(page.GetByRole(AriaRole.Gridcell).Nth(cellIndex))
                 .ToHaveAttributeAsync("data-state", "free");
-            await Assertions.Expect(page.GetByRole(AriaRole.Status)).ToHaveTextAsync("");
+            // Scoped to the calendar screen: the app chrome carries its own role="status" live
+            // region (the notification bell), so the bare-page locator is ambiguous.
+            await Assertions.Expect(
+                    page.GetByTestId("screen-calendar").GetByRole(AriaRole.Status))
+                .ToHaveTextAsync("");
         }
         finally
         {
