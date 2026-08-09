@@ -134,7 +134,7 @@
       "poll_terminal": "This poll can no longer be changed.",
       "poll_invalid_transition": "That change is no longer possible.",
       "poll_participant_removed": "You no longer have access to this poll.",
-      "poll_conflict": "This poll changed elsewhere. Please try again.",
+      "poll_conflict": "This guest has already claimed their link and can't be revoked. Remove the guest instead.",
       "poll_guest_not_found": "That guest could not be found.",
       "poll_selection_window_closed": "The selection window for this poll has closed.",
       "poll_zero_options": "This poll has no remaining options.",

@@ -250,6 +250,68 @@ describe('PollDetailPage', () => {
       expect(await screen.findByText('Your vote was saved.')).toBeInTheDocument()
     })
 
+    it('a rejected vote on one option leaves an already-accepted vote on another standing_F4a_design7note1', async () => {
+      let optionOneVote: string | null = null
+      api.get.mockImplementation(() =>
+        Promise.resolve({
+          data: pollDetail({
+            options: [
+              {
+                id: 'option-1',
+                startTime: '2099-01-01T10:00:00Z',
+                suggestedByUserId: null,
+                suggestedByGuestIdentityId: null,
+                availableCount: 0,
+                maybeCount: 0,
+                unavailableCount: 0,
+                viewerVote: optionOneVote,
+              },
+              {
+                id: 'option-2',
+                startTime: '2099-01-02T10:00:00Z',
+                suggestedByUserId: null,
+                suggestedByGuestIdentityId: null,
+                availableCount: 0,
+                maybeCount: 0,
+                unavailableCount: 0,
+                viewerVote: null,
+              },
+            ],
+          }),
+        }),
+      )
+      const RejectedError = class extends Error {
+        status = 422
+        code = 'poll_voting_closed'
+      }
+      api.put.mockImplementation(
+        (_path: string, options: { params: { path: { optionId: string } } }) => {
+          if (options.params.path.optionId === 'option-2') {
+            return Promise.reject(new RejectedError())
+          }
+          optionOneVote = 'maybe'
+          return Promise.resolve({ data: pollDetail() })
+        },
+      )
+      renderPage()
+
+      fireEvent.click(await screen.findByTestId('vote-maybe-option-1'))
+      await waitFor(() =>
+        expect(screen.getByTestId('vote-maybe-option-1')).toHaveAttribute('aria-checked', 'true'),
+      )
+
+      fireEvent.click(screen.getByTestId('vote-available-option-2'))
+      await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
+
+      // A "submit all" affordance never exists here — vote B's rejection leaves vote A's
+      // already-accepted state untouched (per-option submission, design §7 note 1).
+      expect(screen.getByTestId('vote-maybe-option-1')).toHaveAttribute('aria-checked', 'true')
+      expect(screen.getByTestId('vote-available-option-2')).toHaveAttribute(
+        'aria-checked',
+        'false',
+      )
+    })
+
     it('revising an existing vote keeps focus on the clicked control_S6gate', async () => {
       api.get.mockResolvedValue({ data: pollDetail() })
       api.put.mockResolvedValue({ data: pollDetail() })
@@ -364,6 +426,36 @@ describe('PollDetailPage', () => {
       expect(screen.queryByText('https://partyup.social/g/abc')).not.toBeInTheDocument()
     })
 
+    it('renders the D-044 remove-guest-instead copy on a poll_conflict revoke, and the link stays listed_F1', async () => {
+      api.get.mockResolvedValue({
+        data: pollDetail({ organizerId: 'viewer-1' }),
+      })
+      api.post.mockResolvedValue({
+        data: [{ guestLinkId: 'link-1', url: 'https://partyup.social/g/abc' }],
+      })
+      const ConflictError = class extends Error {
+        status = 409
+        code = 'poll_conflict'
+      }
+      api.delete.mockRejectedValue(new ConflictError())
+      renderPage()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Create link' }))
+      expect(
+        await screen.findByText('https://partyup.social/g/abc'),
+      ).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Revoke' }))
+
+      expect(
+        await screen.findByText(
+          "This guest has already claimed their link and can't be revoked. Remove the guest instead.",
+        ),
+      ).toBeInTheDocument()
+      // The failed revoke never removed the link from local state.
+      expect(screen.getByText('https://partyup.social/g/abc')).toBeInTheDocument()
+    })
+
     it('removes a claimed guest voter behind a confirmation dialog_D044', async () => {
       api.get.mockResolvedValue({
         data: pollDetail({
@@ -403,6 +495,73 @@ describe('PollDetailPage', () => {
 
       await screen.findByText('Raid night poll')
       expect(screen.queryByText('Guest links')).not.toBeInTheDocument()
+    })
+
+    it('hides the mint control in awaitingSelection_F4b', async () => {
+      api.get.mockResolvedValue({
+        data: pollDetail({
+          organizerId: 'viewer-1',
+          status: 'closed',
+          deadline: new Date(Date.now() - 60_000).toISOString(),
+        }),
+      })
+      renderPage()
+
+      expect(await screen.findByText('Guest links')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Create link' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+    })
+
+    it('a link minted before the deadline stays listed and revokable once the poll moves to awaitingSelection_F4c', async () => {
+      let closed = false
+      api.get.mockImplementation(() =>
+        Promise.resolve({
+          data: pollDetail({
+            organizerId: 'viewer-1',
+            status: closed ? 'closed' : 'polling',
+            deadline: closed
+              ? new Date(Date.now() - 60_000).toISOString()
+              : new Date(Date.now() + 60 * 60_000).toISOString(),
+            roster: [
+              {
+                participationId: 'participation-3',
+                userId: null,
+                guestIdentityId: 'guest-9',
+                displayName: 'Casey',
+                isActive: true,
+              },
+            ],
+          }),
+        }),
+      )
+      api.post.mockImplementation((path: string) =>
+        path === '/api/v1/polls/{pollId}/guest-links'
+          ? Promise.resolve({
+              data: [{ guestLinkId: 'link-1', url: 'https://partyup.social/g/abc' }],
+            })
+          : Promise.resolve({}),
+      )
+      renderPage()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Create link' }))
+      expect(
+        await screen.findByText('https://partyup.social/g/abc'),
+      ).toBeInTheDocument()
+
+      // Removing the claimed guest (D-044) also flips the mocked poll to closed/past-deadline
+      // (awaitingSelection) and invalidates the query — an in-place transition, same component.
+      closed = true
+      fireEvent.click(screen.getByRole('button', { name: 'Remove guest Casey' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Remove guest', hidden: true }))
+
+      expect(
+        await screen.findByText('Closed · awaiting selection'),
+      ).toBeInTheDocument()
+      // Minting is gone now, but the link minted before the transition stays listed and
+      // revokable — revoke rendering is never gated by `canMint`.
+      expect(screen.queryByRole('button', { name: 'Create link' })).not.toBeInTheDocument()
+      expect(screen.getByText('https://partyup.social/g/abc')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Revoke' })).toBeInTheDocument()
     })
   })
 })

@@ -90,11 +90,10 @@ export function VotingGrid({
           timeStyle: 'short',
         }).format(new Date(option.startTime))
         const current = (option.viewerVote as VoteChoiceValue | null) ?? null
-        // The closed-presentation `disabled` prop disables every control, but an in-flight vote
-        // on THIS row must never disable it — a disabled button drops browser focus outright,
-        // which would break revise-keeps-focus (design §6 S6 gate) the instant a click's own
-        // mutation goes pending. `pendingOptionId` only marks the row `aria-busy`.
-        const rowDisabled = disabled
+        // An in-flight vote on THIS row must never disable its controls — a disabled button
+        // drops browser focus outright, which would break revise-keeps-focus (design §6 S6
+        // gate) the instant a click's own mutation goes pending. Only the closed-presentation
+        // `disabled` prop disables controls; `pendingOptionId` only marks the row `aria-busy`.
         const rowBusy = pendingOptionId === option.id
 
         return (
@@ -124,13 +123,13 @@ export function VotingGrid({
                       time: timeText,
                       value: t(`vote.${choice}`),
                     })}
-                    className={`min-h-11 min-w-11 rounded-control border-2 border-ink bg-card px-3 py-2 font-display text-sm font-bold text-ink dark:aria-checked:border-accent-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:pointer-events-none disabled:opacity-50 ${fillClasses[choice]} ${checked ? 'ring-2 ring-inset ring-ink' : ''}`}
+                    className={`min-h-11 min-w-11 rounded-control border-2 border-ink bg-card px-3 py-2 font-display text-sm font-bold text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:pointer-events-none disabled:opacity-50 ${fillClasses[choice]} ${checked ? 'ring-2 ring-inset ring-ink' : ''}`}
                     data-testid={`vote-${choice}-${option.id}`}
-                    disabled={rowDisabled}
+                    disabled={disabled}
                     role="radio"
                     tabIndex={checked || (!current && choice === 'available') ? 0 : -1}
                     type="button"
-                    onClick={() => !rowDisabled && onVote(option.id, choice)}
+                    onClick={() => !disabled && onVote(option.id, choice)}
                     onKeyDown={(event) => onKeyDown(event, option.id, current)}
                   >
                     <span aria-hidden="true">{glyph[choice]}</span>

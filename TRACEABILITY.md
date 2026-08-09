@@ -561,8 +561,12 @@ options as rows, each row an **independent radiogroup** of three vote controls (
 tabindex + arrow keys on the shipped `ThemeToggle.tsx` APG idiom, control accessible name `"{time}, {value}"`,
 per-option tally as plain text. Vote-state marks (§5 owner-ratified): value glyphs (`✓`/`?`/`✕`) always render
 `aria-hidden`; selected = the value fill (`free`/`maybe`/`busy` tokens) plus a 2px inset `ink` ring
-(`ring-2 ring-inset ring-ink`, Phase 5.1's selection idiom); unselected = card-filled, glyph in `ink-soft`; dark
-keeps the `accent-ink` border rule on the roving-tabindex focus treatment. `PollDetailPage.tsx` wires the grid
+(`ring-2 ring-inset ring-ink`, Phase 5.1's selection idiom); unselected = card-filled, glyph in `ink-soft`. The
+standing 2px `border-2 border-ink` outline is unchanged by selection or theme — the `accent-ink` border rule
+is scoped to accent-**filled** elements (PHASE5_1_DESIGN.md's dark block, paired with `bg-accent` at every
+shipped precedent) and does not apply to the free/maybe/busy availability fills; round-1 F3 removed a
+misapplied `dark:aria-checked:border-accent-ink` that measured 1.56:1 against the fill and made the selected
+control's outline disappear in dark. `PollDetailPage.tsx` wires the grid
 into the Polling state (vote/revise per option, D-172 — not a batch ballot, §7 note 1), disables it under the
 closed presentation, and adds an inline suggest form (D-033, any Active voter) whose 12-option cap error
 (D-171) renders its own copy — distinct from the creation-cap D-131 string `PollCreatePage.tsx` already owns
@@ -594,8 +598,9 @@ non-organizer viewer; its two S5 assertions that read vote state as static text 
 the radiogroup instead (S6 replaced that text with the interactive grid). `GuestSessionPage.test.tsx` gains
 the poll-branch describe block: session-404-falls-back-to-poll-view, claim-then-vote over the poll transport,
 guest self-rename, the four poll terminal notices (`canceled`/`revoked`/`pollExpired` + the finalized
-"re-open your invitation link" arm with no re-exchange field). Full Vitest run this slice: **308/308 passed**.
-`npm run lint`: clean. `npm run build` (`tsc -b && vite build`): succeeds. `npx tsc --noEmit`: clean.
+"re-open your invitation link" arm with no re-exchange field). Full Vitest run this slice (post round-1
+fixes): **312/312 passed**. `npm run lint`: clean. `npm run build` (`tsc -b && vite build`): succeeds.
+`npx tsc --noEmit`: clean.
 
 **Browser lane (S6, new routes/fixture work).** `AuditedRoutes.cs` gains `guest-poll`
 (`/guest/{guestLinkId}`, a poll-typed link — the shared route already covers `poll-detail`'s now-interactive
@@ -622,6 +627,59 @@ and `VotingGrid_ArrowKeysCycleTheChoiceWithRovingTabindex_APG`, both real-browse
 jsdom environment cannot exercise the same way). Fixed: only the closed-presentation `disabled` prop disables
 controls now; an in-flight per-row vote sets `aria-busy` on the radiogroup instead of disabling anything.
 Full Chromium+axe close-out run: `.foreman/scratch/browser-full-run.log`.
+
+**Round-1 fixes (foreman verdict FAIL, addressed on HEAD 5562192, ticket-P6-S6):**
+
+- **F1 (closed):** `PollDetailPage.tsx`'s `GuestPanel` collapsed every mint/revoke/remove error to
+  `errors.generic` via a blanket `onError={() => setStatus(t('errors.generic'))}`. Rewired: `GuestPanel`
+  bubbles the raw error to a new `guestPanelError` state folded into the page's existing `mutationError`
+  union, so it renders through the SAME shipped `errors.codes.${code}` mapping the vote/suggest errors
+  already use — no new mapping logic, just correct wiring. `errors.codes.poll_conflict` (unused anywhere
+  else in the app) now reads "This guest has already claimed their link and can't be revoked. Remove the
+  guest instead." (D-044) in en/pt-BR/es. A failed mutation never touches local `guestLinks` state (only
+  `onSuccess` does), so a link a revoke-conflict rejected simply stays listed. Test:
+  `PollDetailPage.test.tsx` — `renders the D-044 remove-guest-instead copy on a poll_conflict revoke, and
+  the link stays listed_F1`.
+- **F2 (REGRESSION, closed):** `GuestSessionPage.tsx`'s `renderInvalid` filter only suppressed
+  `session_not_found`, but the branch feeding it `pollDetail.error` (not `detail.error`) meant a genuine
+  dead poll-typed link's real `poll_not_found` (`GuestPollEndpoints.cs:79`) stacked a `role=alert`
+  "Something went wrong." onto the calm invalid page — a regression the original tests never caught
+  because their mocks rejected BOTH the session and poll routes with the identical `session_not_found`
+  value, which the old filter already suppressed by accident. Fixed the filter to suppress `poll_not_found`
+  equally, and replaced the three uniform `api.get.mockRejectedValue(...)` call sites with a route-aware
+  `mockGuestRoutes(sessionError, pollError)` helper: the 404 test now honestly mocks
+  `session_not_found`/`poll_not_found` per route and asserts `queryByRole('alert')` is absent; the
+  rate-limit and unknown-code tests keep an identical code on both routes (realistic — those are
+  infra-level failures a shared rate limiter/500 would raise uniformly, unlike the domain-specific 404
+  codes). Test: `GuestSessionPage.test.tsx` — `renders the invalid notice when the credential resolves to
+  404 on both routes, with no alert stacked_D044_F2`.
+- **F3 (closed):** both §5-ratified mark violations fixed in `VotingGrid.tsx`. (a) the unselected glyph's
+  base text color was `text-ink` (the comment already claimed `ink-soft`) — corrected to `text-ink-soft`,
+  overridden to each fill's `-ink` companion only when `aria-checked`. (b) `dark:aria-checked:border-accent-ink`
+  was removed — that rule is scoped to accent-*filled* elements (PHASE5_1_DESIGN.md, every shipped
+  precedent pairs it with `bg-accent`) and measured 1.56:1 against the free/maybe/busy fills in dark,
+  making the selected control's outline disappear; the standing `border-2 border-ink` (unaffected by
+  selection or theme) is the only border now, with the ratified 2px inset `ring-ink` carrying selection.
+  TRACEABILITY's own S6 narrative above corrected to match (no more "dark keeps the accent-ink border
+  rule" claim).
+- **F4 (closed, missing tests added):** (a) `PollDetailPage.test.tsx` —
+  `a rejected vote on one option leaves an already-accepted vote on another standing_F4a_design7note1`
+  (vote A succeeds, vote B 422s; A's `aria-checked` stands, the alert surfaces, B stays unchecked). (b)
+  `hides the mint control in awaitingSelection_F4b` (no "Create link" button, no spinbutton input). (c)
+  `a link minted before the deadline stays listed and revokable once the poll moves to
+  awaitingSelection_F4c` — mints a link while Polling, removes a claimed guest (which the mock also uses
+  to flip the poll to `closed`/past-deadline in place, the same mounted component), and asserts the
+  previously-minted link stays listed with its Revoke control intact even though minting is now hidden —
+  proving revoke rendering is never gated by `canMint`.
+- **F5 (closed):** the dead `const rowDisabled = disabled` alias removed from `VotingGrid.tsx`; every call
+  site now reads `disabled` directly.
+
+Gates re-run after the fix: `npm run lint` clean; full Vitest **312/312 passed**; `npm run build`
+(`tsc -b && vite build`) succeeds (round-1 also surfaced and fixed a `tsc -b`-only strict-mode error the
+plain `npx tsc --noEmit` pass had not caught: `guestPanelError`'s `unknown` type leaking into a JSX `&&`
+guard, fixed with `Boolean(...)`); targeted browser rerun (`PollVotingFlowTests`, foreground, WSL Postgres
+held alive), log at `.foreman/scratch/browser-poll-voting-round1fix.log`: **4/4 passed, 4s** — unaffected
+by the F1/F3/F5 changes. No full Chromium lane re-run this round — lead's close-out.
 
 **Not in this slice (by design, deferred to S7 per PHASE6_DESIGN.md §6):** selection/finalize UX, the
 `?startTimes=` prefill arm, and Home/calendar poll wiring. No row here reads `Client | 6` for D-102's poll

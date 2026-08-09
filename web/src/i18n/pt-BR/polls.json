@@ -134,7 +134,7 @@
       "poll_terminal": "Esta enquete não pode mais ser alterada.",
       "poll_invalid_transition": "Essa alteração não é mais possível.",
       "poll_participant_removed": "Você não tem mais acesso a esta enquete.",
-      "poll_conflict": "Esta enquete mudou em outro lugar. Tente novamente.",
+      "poll_conflict": "Esse convidado já reivindicou o link dele e não pode ser revogado. Remova-o em vez disso.",
       "poll_guest_not_found": "Esse convidado não pôde ser encontrado.",
       "poll_selection_window_closed": "A janela de seleção desta enquete encerrou.",
       "poll_zero_options": "Esta enquete não tem opções restantes.",

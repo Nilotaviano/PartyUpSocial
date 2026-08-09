@@ -134,7 +134,7 @@
       "poll_terminal": "Esta encuesta ya no se puede modificar.",
       "poll_invalid_transition": "Ese cambio ya no es posible.",
       "poll_participant_removed": "Ya no tienes acceso a esta encuesta.",
-      "poll_conflict": "Esta encuesta cambió en otro lugar. Inténtalo de nuevo.",
+      "poll_conflict": "Este invitado ya reclamó su enlace y no se puede revocar. Quítalo en su lugar.",
       "poll_guest_not_found": "No se pudo encontrar a ese invitado.",
       "poll_selection_window_closed": "La ventana de selección de esta encuesta cerró.",
       "poll_zero_options": "Esta encuesta no tiene opciones restantes.",

@@ -106,7 +106,10 @@ export function GuestSessionPage() {
           {t('guest.invalid')}
         </h1>
         <p className="text-ink-soft">{t('guest.linkExpiredReopen')}</p>
-        {extra != null && isApiError(extra) && extra.code !== 'session_not_found' && (
+        {extra != null &&
+          isApiError(extra) &&
+          extra.code !== 'session_not_found' &&
+          extra.code !== 'poll_not_found' && (
           <p role="alert">
             {t(extra.code, { ns: 'errors', defaultValue: t('generic', { ns: 'errors' }) })}
           </p>

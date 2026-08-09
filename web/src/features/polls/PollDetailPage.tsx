@@ -101,6 +101,7 @@ type GuestPanelProps = {
   roster: PollDetail['roster']
   canMint: boolean
   onError: (error: unknown) => void
+  clearError: () => void
 }
 
 /**
@@ -109,7 +110,7 @@ type GuestPanelProps = {
  * links are plaintext-shown-once local state, matching the shipped session precedent — there
  * is no list-unclaimed-links endpoint to hydrate from.
  */
-function GuestPanel({ pollId, roster, canMint, onError }: GuestPanelProps) {
+function GuestPanel({ pollId, roster, canMint, onError, clearError }: GuestPanelProps) {
   const { t } = useTranslation('polls')
   const queryClient = useQueryClient()
   const [linkCount, setLinkCount] = useState('1')
@@ -117,20 +118,31 @@ function GuestPanel({ pollId, roster, canMint, onError }: GuestPanelProps) {
 
   const mint = useMutation({
     mutationFn: () => createPollGuestLinks(pollId, Number(linkCount)),
-    onSuccess: (created) => setGuestLinks((current) => [...current, ...created]),
+    onSuccess: (created) => {
+      clearError()
+      setGuestLinks((current) => [...current, ...created])
+    },
     onError,
   })
 
+  // D-044: a claimed link's revoke 409s (poll_conflict) — the link stays listed on failure
+  // (never removed from local state here) and the specific "remove the guest instead" copy
+  // renders through the shared error-mapping idiom (PollDetailPage's own alert block).
   const revoke = useMutation({
     mutationFn: (guestLinkId: string) => revokePollGuestLink(pollId, guestLinkId),
-    onSuccess: (_result, guestLinkId) =>
-      setGuestLinks((current) => current.filter((link) => link.guestLinkId !== guestLinkId)),
+    onSuccess: (_result, guestLinkId) => {
+      clearError()
+      setGuestLinks((current) => current.filter((link) => link.guestLinkId !== guestLinkId))
+    },
     onError,
   })
 
   const remove = useMutation({
     mutationFn: (guestIdentityId: string) => removePollGuest(pollId, guestIdentityId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: pollKeys.detail(pollId) }),
+    onSuccess: () => {
+      clearError()
+      return queryClient.invalidateQueries({ queryKey: pollKeys.detail(pollId) })
+    },
     onError,
   })
 
@@ -239,6 +251,7 @@ export function PollDetailPage() {
   const [suggestValue, setSuggestValue] = useState('')
   const [suggestError, setSuggestError] = useState<string | null>(null)
   const [suggestNotice, setSuggestNotice] = useState<string | null>(null)
+  const [guestPanelError, setGuestPanelError] = useState<unknown>(null)
 
   const detail = useQuery({
     queryKey: pollKeys.detail(pollId),
@@ -312,7 +325,8 @@ export function PollDetailPage() {
     suggest.mutate(asInstant.toISOString())
   }
 
-  const mutationError = vote.error ?? (suggest.error && !suggestError ? suggest.error : null)
+  const mutationError =
+    vote.error ?? (suggest.error && !suggestError ? suggest.error : null) ?? guestPanelError
 
   return (
     <main
@@ -332,7 +346,7 @@ export function PollDetailPage() {
         {status}
       </p>
 
-      {(detail.error || mutationError) && (
+      {Boolean(detail.error || mutationError) && (
         <p role="alert">
           {(() => {
             const anyError = detail.error ?? mutationError
@@ -469,9 +483,10 @@ export function PollDetailPage() {
           {isOrganizer && (windowState === 'polling' || windowState === 'awaitingSelection') && (
             <GuestPanel
               canMint={windowState === 'polling'}
+              clearError={() => setGuestPanelError(null)}
               pollId={pollId}
               roster={data.roster}
-              onError={() => setStatus(t('errors.generic'))}
+              onError={setGuestPanelError}
             />
           )}
         </>

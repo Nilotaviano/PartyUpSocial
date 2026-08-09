@@ -49,6 +49,18 @@ function liveClaimed() {
   return { ...liveUnclaimed(), guestIdentityId: 'guest-1', displayName: 'Bob', response: 'Pending' }
 }
 
+// Route-aware guest-link rejection: the session GET and the poll GET are two DISTINCT backend
+// routes (`GuestSessionEndpoints`/`GuestPollEndpoints`) that fail independently — a single
+// uniform mocked rejection previously hid F2 (a real dead link's poll fallback returns its own
+// `poll_not_found`, per `GuestPollEndpoints.cs:79`, never `session_not_found`).
+function mockGuestRoutes(sessionError: unknown, pollError: unknown = sessionError) {
+  api.get.mockImplementation((path: string) =>
+    path === '/api/v1/guest/{guestLinkId}/session'
+      ? Promise.reject(sessionError)
+      : Promise.reject(pollError),
+  )
+}
+
 function renderPage(path: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const utils = render(
@@ -133,15 +145,25 @@ describe('GuestSessionPage', () => {
     },
   )
 
-  it('renders the invalid notice when the credential resolves to 404_D044', async () => {
-    const ApiErrorClass = class extends Error {
+  it('renders the invalid notice when the credential resolves to 404 on both routes, with no alert stacked_D044_F2', async () => {
+    const SessionNotFoundError = class extends Error {
       status = 404
       code = 'session_not_found'
     }
-    api.get.mockRejectedValue(new ApiErrorClass())
+    // The poll GET is a genuinely different route (`GuestPollEndpoints.cs:79`) that 404s with
+    // its own `poll_not_found` code for the same physically-nonexistent link — never
+    // `session_not_found`, which only the session route ever returns.
+    const PollNotFoundError = class extends Error {
+      status = 404
+      code = 'poll_not_found'
+    }
+    mockGuestRoutes(new SessionNotFoundError(), new PollNotFoundError())
     renderPage(`/guest/${linkId}`)
 
     expect(await screen.findByTestId('screen-guest-invalid')).toBeInTheDocument()
+    // Both a dead session-typed link and a dead poll-typed link render the same calm notice
+    // with no stacked role=alert — poll_not_found is suppressed exactly like session_not_found.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('renders the browser-zone start time without a viewer timezone override_D169', async () => {
@@ -158,7 +180,10 @@ describe('GuestSessionPage', () => {
       status = 429
       code = 'rate_limited'
     }
-    api.get.mockRejectedValue(new ApiErrorClass())
+    // A rate limit is an infra-level ceiling applied uniformly ahead of both routes — realistic
+    // to reject both the session and the poll GET with the identical code, unlike the domain-
+    // specific 404 codes above.
+    mockGuestRoutes(new ApiErrorClass())
     renderPage(`/guest/${linkId}`)
 
     expect(
@@ -171,7 +196,7 @@ describe('GuestSessionPage', () => {
       status = 500
       code = 'totally_unknown_code'
     }
-    api.get.mockRejectedValue(new ApiErrorClass())
+    mockGuestRoutes(new ApiErrorClass())
     renderPage(`/guest/${linkId}`)
 
     expect(
