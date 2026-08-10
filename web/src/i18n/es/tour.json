@@ -32,8 +32,8 @@
       "body": "Las invitaciones y novedades llegan aquí; las notificaciones push son opcionales en ajustes."
     },
     "settings": {
-      "name": "Ajustes",
-      "body": "Gestiona tu perfil, idioma y notificaciones — y repite este tour cuando quieras."
+      "name": "Configuración",
+      "body": "Abre el menú de la cuenta para acceder a la configuración — perfil, idioma y notificaciones — y para cerrar sesión. Repite este tour cuando quieras desde la configuración."
     }
   },
   "actions": {

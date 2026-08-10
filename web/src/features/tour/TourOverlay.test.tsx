@@ -43,7 +43,7 @@ function ChromeStub() {
       <a data-tour="calendar" href="/calendar" tabIndex={-1}>Calendar</a>
       <a data-tour="discover" href="/discover" tabIndex={-1}>Discover</a>
       <a data-tour="notifications" href="/notifications" tabIndex={-1}>Notifications</a>
-      <a data-tour="settings" href="/settings/account" tabIndex={-1}>Settings</a>
+      <button aria-label="Account menu" data-tour="settings" tabIndex={-1} type="button">Settings</button>
     </nav>
   )
 }

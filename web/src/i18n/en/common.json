@@ -13,6 +13,10 @@
     "friends": "Friends",
     "settings": "Settings"
   },
+  "accountMenu": {
+    "trigger": "Account menu",
+    "signOut": "Sign out"
+  },
   "pages": {
     "welcome": "Welcome",
     "ageGate": "Age gate",

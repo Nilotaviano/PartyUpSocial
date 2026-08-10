@@ -23,7 +23,9 @@ Eight, in nav order, each one sentence, in a new `tour` i18n namespace (en/pt-BR
 | 5 | Calendar | Paint when you're free so finding a shared time is easy |
 | 6 | Discover (`App.tsx:113-124`) | Find joinable sessions friends have made visible to you (D-149/D-018 visibility — no stranger discovery, D-004) |
 | 7 | Notifications bell (`NotificationBell`) | Invites and updates land here; push is opt-in in settings |
-| 8 | Settings | Profile, language, notifications — and this tour, replayable |
+| 8 | Account menu trigger (`AccountMenu`'s avatar button) | Settings and sign-out live behind the avatar; the tour is replayable from settings |
+
+D-183 moved this stop's anchor from the settings `NavLink` to the account-menu **trigger**: menu items are absent from the DOM while the menu is closed, so the tour must never depend on an open menu. Step count and the `settings` step id are unchanged.
 
 ## 3. Mechanics (web only, no new packages — two components don't justify a dependency)
 
@@ -41,7 +43,7 @@ Eight, in nav order, each one sentence, in a new `tour` i18n namespace (en/pt-BR
 
 ## 5. Spec change (proposed, needs ratification with this doc)
 
-> **D-182** — After onboarding, a registered account's first visit to the app home starts a skippable 8-stop tour of the app chrome. Finishing or skipping marks the tour completed for the **account** (any device); it never auto-shows again. The tour is replayable from account settings. Accounts that had **completed onboarding** before the feature ships are treated as completed. | Proposed
+> **D-182** — After onboarding, a registered account's first visit to the app home starts a skippable 8-stop tour of the app chrome. Finishing or skipping marks the tour completed for the **account** (any device); it never auto-shows again. The tour is replayable from account settings. Accounts that had **completed onboarding** before the feature ships are treated as completed. | Confirmed
 
 PRODUCT_SPEC.md gains this row (Confirmed on ratification, T2's docs work); TRACEABILITY.md gains the D-182 row citing this feature's tests.
 

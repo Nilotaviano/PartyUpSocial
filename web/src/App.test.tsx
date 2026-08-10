@@ -15,7 +15,10 @@ import { RequireAuth } from './auth/RequireAuth'
 import { RequireOnboarded } from './auth/RequireOnboarded'
 import { useSession } from './auth/useSession'
 
-vi.mock('./auth/useSession', () => ({ useSession: vi.fn() }))
+vi.mock('./auth/useSession', () => ({
+  useSession: vi.fn(),
+  useLogoutMutation: () => ({ isPending: false, mutate: vi.fn() }),
+}))
 
 const mockedUseSession = vi.mocked(useSession)
 
@@ -240,7 +243,11 @@ describe('AppNavigationTests', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Find Steam friends' }))
     expect(await screen.findByTestId('screen-steam-import')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('link', { name: 'Settings' }))
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Account menu' }), {
+      button: 0,
+      pointerType: 'mouse',
+    })
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Settings' }))
     expect(
       await screen.findByTestId('screen-settings-account'),
     ).toBeInTheDocument()
@@ -273,22 +280,26 @@ describe('AppNavigationTests', () => {
   })
 
   it.each([
-    ['en', 'Friends', 'Settings', 'Sessions', 'Calendar', 'Discover'],
-    ['pt-BR', 'Amigos', 'Configurações', 'Sessões', 'Calendário', 'Descobrir'],
-    ['es', 'Amistades', 'Configuración', 'Sesiones', 'Calendario', 'Descubrir'],
+    ['en', 'Friends', 'Account menu', 'Settings', 'Sessions', 'Calendar', 'Discover'],
+    ['pt-BR', 'Amigos', 'Menu da conta', 'Configurações', 'Sessões', 'Calendário', 'Descobrir'],
+    ['es', 'Amistades', 'Menú de la cuenta', 'Configuración', 'Sesiones', 'Calendario', 'Descubrir'],
   ])(
     'PersistentEntries_HaveLocalizedAccessibleLabelsAndCurrentState_D139: %s',
-    async (locale, friendsLabel, settingsLabel, sessionsLabel, calendarLabel, discoverLabel) => {
+    async (
+      locale,
+      friendsLabel,
+      accountMenuLabel,
+      settingsLabel,
+      sessionsLabel,
+      calendarLabel,
+      discoverLabel,
+    ) => {
       await i18n.changeLanguage(locale)
       setSession(session({ authenticated: true, state: 'active' }))
       renderRoute('/friends')
 
       const link = await screen.findByRole('link', { name: friendsLabel })
       expect(link).toHaveAttribute('aria-current', 'page')
-      expect(screen.getByRole('link', { name: settingsLabel })).toHaveAttribute(
-        'href',
-        '/settings/account',
-      )
       expect(screen.getByRole('link', { name: sessionsLabel })).toHaveAttribute(
         'href',
         '/sessions/upcoming',
@@ -301,6 +312,14 @@ describe('AppNavigationTests', () => {
         'href',
         '/discover',
       )
+
+      // Opened last: Radix's dropdown menu marks the rest of the page `aria-hidden` while open,
+      // so the persistent nav links above are no longer queryable by role once this fires.
+      const accountMenuTrigger = screen.getByRole('button', { name: accountMenuLabel })
+      fireEvent.pointerDown(accountMenuTrigger, { button: 0, pointerType: 'mouse' })
+      expect(
+        await screen.findByRole('menuitem', { name: settingsLabel }),
+      ).toHaveAttribute('href', '/settings/account')
     },
   )
 

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { RequireAuth } from './auth/RequireAuth'
 import { RequireOnboarded } from './auth/RequireOnboarded'
 import { useSession } from './auth/useSession'
+import { AccountMenu } from './features/account/AccountMenu'
 import {
   AgeGate,
   AuthCallback,
@@ -130,19 +131,7 @@ function AuthenticatedShell() {
               {t('nav.discover', { ns: 'home' })}
             </NavLink>
             <NotificationBell />
-            <NavLink
-              className={({ isActive }) =>
-                `inline-flex min-h-11 flex-none items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-                  isActive
-                    ? 'bg-primary font-semibold text-primary-ink'
-                    : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
-                }`
-              }
-              data-tour="settings"
-              to="/settings/account"
-            >
-              {t('navigation.settings')}
-            </NavLink>
+            <AccountMenu />
           </div>
         </nav>
       </header>

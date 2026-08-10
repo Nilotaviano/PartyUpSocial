@@ -13,6 +13,10 @@
     "friends": "Amigos",
     "settings": "Configurações"
   },
+  "accountMenu": {
+    "trigger": "Menu da conta",
+    "signOut": "Sair"
+  },
   "pages": {
     "welcome": "Boas-vindas",
     "ageGate": "Verificação de idade",
