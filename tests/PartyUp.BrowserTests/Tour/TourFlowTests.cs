@@ -117,10 +117,9 @@ public sealed class TourFlowTests(PlaywrightFixture fixture)
         }
 
         await user.Page.GetByText("Step 8 of 8: Settings").WaitForAsync();
-        await Assertions.Expect(settingsAnchor).ToBeInViewportAsync();
-        var afterBox = await settingsAnchor.BoundingBoxAsync();
-        Assert.NotNull(afterBox);
-        Assert.InRange(afterBox!.X, 0, 375 - afterBox.Width);
+        // Ratio = 1 demands full containment and auto-retries, which also waits out the smooth
+        // scroll animation — a one-shot BoundingBox sample here races it on slow runners.
+        await Assertions.Expect(settingsAnchor).ToBeInViewportAsync(new() { Ratio = 1 });
 
         // Dismiss so a leaked open tour never reaches a later fact sharing this account.
         IResponse response = await user.Page.RunAndWaitForResponseAsync(
