@@ -25,6 +25,18 @@
     "earlyHoursShown": "Earlier hours shown. The grid now starts at midnight.",
     "earlyHoursHidden": "Earlier hours hidden. The grid now starts in the morning."
   },
+  "summary": {
+    "heading": "Your availability",
+    "empty": "You have not published any availability yet.",
+    "weeklyRule": "Every {{weekday}} · {{start}}–{{end}}",
+    "oneOffRule": "{{date}} · {{start}}–{{end}}",
+    "delete": "Delete",
+    "deleteNamed": "Delete {{rule}}",
+    "cancel": "Keep it",
+    "deleteSeriesTitle": "Delete this weekly availability?",
+    "deleteSeriesBody": "This removes the whole weekly window, including occurrences you already changed on their own.",
+    "deleteSeriesConfirm": "Delete series"
+  },
   "block": {
     "editHeading": "Edit availability",
     "start": "Start time",

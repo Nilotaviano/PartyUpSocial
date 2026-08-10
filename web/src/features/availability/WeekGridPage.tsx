@@ -7,6 +7,10 @@ import { Button } from '../../components/ui/button'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { getViewerProfile, viewerProfileKey } from '../sessions/sessionQueries'
 import { AgendaView, type AgendaEntry } from './AgendaView'
+import {
+  AvailabilitySummary,
+  type AvailabilityOneOff,
+} from './AvailabilitySummary'
 import { BlockEditorDialog, type BlockEditorValue } from './BlockEditorDialog'
 import { CalendarLayers, type CalendarLayerState } from './CalendarLayers'
 import {
@@ -27,6 +31,7 @@ import {
   createAvailabilityBlock,
   deleteAvailabilityBlock,
   deleteAvailabilityOccurrence,
+  deleteAvailabilitySeries,
   editAvailabilityBlock,
   editAvailabilityOccurrence,
   getCalendarView,
@@ -213,6 +218,10 @@ export function WeekGridPage() {
       setBlockDialogOpen(false)
     },
   })
+  const deleteSeries = useMutation({
+    mutationFn: deleteAvailabilitySeries,
+    onSuccess: invalidate,
+  })
   const editOccurrence = useMutation({
     mutationFn: ({
       seriesId,
@@ -261,6 +270,23 @@ export function WeekGridPage() {
         end: instantToFakeLocal(range.end, timeZone),
       }))
     : []
+
+  // The rules list is not a layer: it manages what the viewer published, so it
+  // stays readable while the grid layer is toggled off (D-135 keeps the toggle
+  // presentational).
+  const oneOffBlocks: AvailabilityOneOff[] = (
+    calendar.data?.myAvailability.occurrences ?? []
+  ).flatMap((occurrence) =>
+    occurrence.origin.kind === 'block' && occurrence.origin.blockId
+      ? [
+          {
+            blockId: occurrence.origin.blockId,
+            startTime: occurrence.startTime,
+            endTime: occurrence.endTime,
+          },
+        ]
+      : [],
+  )
 
   // Stabilized by reference (react-query keeps `data` referentially equal
   // across renders that don't refetch) so `CalendarLayers`' state-report
@@ -508,11 +534,20 @@ export function WeekGridPage() {
     })
   }
 
+  // One in-flight delete at a time is all the summary can start, so the id of
+  // whichever mutation is running names the row to disable.
+  const deletingId: string | null = deleteSeries.isPending
+    ? deleteSeries.variables
+    : deleteBlock.isPending
+      ? deleteBlock.variables
+      : null
+
   const activeError =
     calendar.error ??
     createBlock.error ??
     editBlock.error ??
     deleteBlock.error ??
+    deleteSeries.error ??
     editOccurrence.error ??
     deleteOccurrence.error
 
@@ -602,35 +637,49 @@ export function WeekGridPage() {
           timeLabelFormatter={timeLabelFormatter}
         />
       ) : (
-        <div ref={gridScroller} className="space-y-2">
-          {/* Stays mounted in both states: unmounting the control on
-              activation would drop focus to document.body and leave the 28
-              revealed rows unannounced (WCAG 2.4.3). */}
-          <Button type="button" variant="neutral" onClick={toggleEarlyHours}>
-            {showEarlyHours ? t('viewport.hideEarlyHours') : t('viewport.showEarlyHours')}
-          </Button>
-          <p
-            aria-live="polite"
-            className="sr-only"
-            data-testid="early-hours-status"
-            role="status"
-          >
-            {earlyHoursMessage}
-          </p>
-          <WeekGrid
-            dayLabels={dayLabels}
-            endHour={END_HOUR}
-            friendRanges={friendRanges}
-            merged={merged}
-            occurrences={occurrences}
-            pollOptionEntries={pollOptionEntries}
-            sessionEntries={sessionEntries}
-            startHour={startHour}
-            timeLabelFormatter={timeLabelFormatter}
-            weekStart={weekStart}
-            onCreateBlock={handleCreateBlock}
-            onEditOccurrence={handleEditOccurrence}
-          />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+          <div className="lg:w-72 lg:shrink-0">
+            <AvailabilitySummary
+              deletingId={deletingId}
+              oneOffs={oneOffBlocks}
+              series={calendar.data?.myAvailability.series ?? []}
+              timeZone={timeZone}
+              onDeleteBlock={(blockId) => deleteBlock.mutate(blockId)}
+              onDeleteSeries={(seriesId) => deleteSeries.mutate(seriesId)}
+            />
+          </div>
+          <div ref={gridScroller} className="min-w-0 flex-1 space-y-2">
+            {/* Stays mounted in both states: unmounting the control on
+                activation would drop focus to document.body and leave the 28
+                revealed rows unannounced (WCAG 2.4.3). */}
+            <Button type="button" variant="neutral" onClick={toggleEarlyHours}>
+              {showEarlyHours
+                ? t('viewport.hideEarlyHours')
+                : t('viewport.showEarlyHours')}
+            </Button>
+            <p
+              aria-live="polite"
+              className="sr-only"
+              data-testid="early-hours-status"
+              role="status"
+            >
+              {earlyHoursMessage}
+            </p>
+            <WeekGrid
+              dayLabels={dayLabels}
+              endHour={END_HOUR}
+              friendRanges={friendRanges}
+              merged={merged}
+              occurrences={occurrences}
+              pollOptionEntries={pollOptionEntries}
+              sessionEntries={sessionEntries}
+              startHour={startHour}
+              timeLabelFormatter={timeLabelFormatter}
+              weekStart={weekStart}
+              onCreateBlock={handleCreateBlock}
+              onEditOccurrence={handleEditOccurrence}
+            />
+          </div>
         </div>
       )}
 

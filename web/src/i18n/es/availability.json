@@ -25,6 +25,18 @@
     "earlyHoursShown": "Horas anteriores mostradas. La cuadrícula ahora empieza a medianoche.",
     "earlyHoursHidden": "Horas anteriores ocultadas. La cuadrícula ahora empieza por la mañana."
   },
+  "summary": {
+    "heading": "Tu disponibilidad",
+    "empty": "Todavía no has publicado ninguna disponibilidad.",
+    "weeklyRule": "Cada {{weekday}} · {{start}}–{{end}}",
+    "oneOffRule": "{{date}} · {{start}}–{{end}}",
+    "delete": "Eliminar",
+    "deleteNamed": "Eliminar {{rule}}",
+    "cancel": "Conservar",
+    "deleteSeriesTitle": "¿Eliminar esta disponibilidad semanal?",
+    "deleteSeriesBody": "Esto elimina la ventana semanal completa, incluidas las ocurrencias que ya cambiaste por separado.",
+    "deleteSeriesConfirm": "Eliminar serie"
+  },
   "block": {
     "editHeading": "Editar disponibilidad",
     "start": "Hora de inicio",

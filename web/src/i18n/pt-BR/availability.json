@@ -25,6 +25,18 @@
     "earlyHoursShown": "Horas anteriores exibidas. A grade agora começa à meia-noite.",
     "earlyHoursHidden": "Horas anteriores ocultadas. A grade agora começa pela manhã."
   },
+  "summary": {
+    "heading": "Sua disponibilidade",
+    "empty": "Você ainda não publicou nenhuma disponibilidade.",
+    "weeklyRule": "Toda {{weekday}} · {{start}}–{{end}}",
+    "oneOffRule": "{{date}} · {{start}}–{{end}}",
+    "delete": "Excluir",
+    "deleteNamed": "Excluir {{rule}}",
+    "cancel": "Manter",
+    "deleteSeriesTitle": "Excluir esta disponibilidade semanal?",
+    "deleteSeriesBody": "Isto remove a janela semanal inteira, incluindo as ocorrências que você já alterou individualmente.",
+    "deleteSeriesConfirm": "Excluir série"
+  },
   "block": {
     "editHeading": "Editar disponibilidade",
     "start": "Horário de início",
