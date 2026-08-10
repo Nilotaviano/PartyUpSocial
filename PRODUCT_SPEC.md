@@ -671,6 +671,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-179 | Admins see a user list with per-user stats and ban state. | Confirmed |
 | D-180 | Admins can ban/unban. Ban = sign-out everywhere + login blocked + hidden from lookup/discovery, content untouched, unban restores; the admin may optionally also remove the user's content (the D-092 effects without the tombstone), which unban does not reverse. | Confirmed |
 | D-181 | The app offers a theme preference — system (default), light, dark — set in settings, stored client-side only (localStorage); no server or API involvement. | Confirmed |
+| D-182 | After onboarding, a registered account's first visit to the app home starts a skippable 8-stop tour of the app chrome. Finishing or skipping marks the tour completed for the account (any device); it never auto-shows again. The tour is replayable from account settings. Accounts that had completed onboarding before the feature ships are treated as completed. | Confirmed |
 
 ## 15. Open questions
 
