@@ -28,6 +28,17 @@ public interface IPollRepository
     void RemoveOptionAndCascadedVotes(PollOption deletedOption, IReadOnlyList<PollVote> cascadedVotes);
 
     /// <summary>
+    /// The same explicit-delete idiom as <see cref="RemoveOptionAndCascadedVotes"/>, for D-186's
+    /// self-removal: <see cref="Poll.Leave"/> severs the participant row and that participant's
+    /// votes from the aggregate's in-memory collections, and the participant/vote rows carry the
+    /// same required, non-cascading FK, so the application layer calls this once, right after the
+    /// domain mutation, to tell the change tracker those rows are deleted rather than detached.
+    /// </summary>
+    void RemoveParticipationAndWithdrawnVotes(
+        PollParticipant leftParticipant,
+        IReadOnlyList<PollVote> withdrawnVotes);
+
+    /// <summary>
     /// A non-locking read for callers that only need the aggregate shape; invariant-touching
     /// commands must use <see cref="LoadForUpdateAsync"/> instead.
     /// </summary>

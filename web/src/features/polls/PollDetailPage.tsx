@@ -13,6 +13,7 @@ import {
   finalizePoll,
   getPollDetail,
   getPollFinalizationPreview,
+  leavePoll,
   mutePoll,
   pollKeys,
   pollWindowState,
@@ -595,11 +596,22 @@ export function PollDetailPage() {
     onError: setCancelError,
   })
 
+  // D-186. Leaving usually costs the caller their inherited visibility of the poll, so a refetch
+  // in place would only resolve to the 404 branch above; this navigates away deliberately, the way
+  // CancelPoll does, and drops the list caches whose roster/tally figures just changed.
+  const leave = useMutation({
+    mutationFn: () => leavePoll(pollId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: pollKeys.listFamily('involved') })
+      await queryClient.invalidateQueries({ queryKey: pollKeys.listFamily('discoverable') })
+    },
+  })
+
   if (detail.isError && isApiError(detail.error) && detail.error.status === 404) {
     return <Navigate replace to="/polls" />
   }
 
-  if (cancel.isSuccess) {
+  if (cancel.isSuccess || leave.isSuccess) {
     return <Navigate replace to="/polls" />
   }
 
@@ -634,12 +646,25 @@ export function PollDetailPage() {
   const isTerminal =
     data?.status === 'finalized' || data?.status === 'expired' || data?.status === 'canceled'
 
+  // D-186: the organizer holds the poll's own row and cannot leave it; guests are unaffected, so
+  // this is gated on the viewer's own Active registered roster entry. A terminal poll refuses the
+  // leave server-side, so the control goes away with the rest of the live surface.
+  const canLeave =
+    !isOrganizer &&
+    !isTerminal &&
+    (windowState === 'polling' || windowState === 'awaitingSelection') &&
+    Boolean(
+      session?.userId &&
+        data?.roster.some((entry) => entry.userId === session.userId && entry.isActive),
+    )
+
   const mutationError =
     vote.error ??
     (suggest.error && !suggestError ? suggest.error : null) ??
     guestPanelError ??
     finalizeError ??
     cancelError ??
+    leave.error ??
     mute.error
 
   return (
@@ -784,6 +809,22 @@ export function PollDetailPage() {
               <p role="alert">{suggestError}</p>
             )}
           </section>
+
+          {canLeave && (
+            <div>
+              <Button
+                aria-busy={leave.isPending}
+                data-testid="poll-leave"
+                disabled={leave.isPending}
+                type="button"
+                variant="neutral"
+                onClick={() => leave.mutate()}
+              >
+                {t('leave.action')}
+              </Button>
+              <p className="mt-1 text-ink-soft">{t('leave.help')}</p>
+            </div>
+          )}
 
           <section aria-labelledby="poll-roster-heading">
             <h2

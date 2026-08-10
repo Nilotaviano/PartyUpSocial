@@ -483,6 +483,46 @@ public sealed class Poll : AggregateRoot
         row.Remove();
     }
 
+    /// <summary>
+    /// D-186: a registered participant undoes their own participation. Deliberately not
+    /// <see cref="RemoveParticipant"/>: that one is the block (§4) and deletion (§11) executors'
+    /// path, which freezes the row as <c>Removed</c> — permanent for this poll (§5.3, §12-24) — and
+    /// keeps its votes for the §6.3 exclusion rules. Leaving instead erases the row and withdraws
+    /// the votes outright, so the leaver is free to rejoin by the route they first joined and a
+    /// later vote stamps a fresh <see cref="PollParticipant.FirstResponseAt"/> — D-186's explicit
+    /// carve-out from D-172's write-once rule, which binds within a participation, not across a
+    /// leave. Silent: no event is raised, so no notification is materialized (D-088). Guests are
+    /// unchanged — their removal stays organizer-driven, which taking a <see cref="UserId"/> rather
+    /// than a <see cref="ParticipantRef"/> enforces at the signature.
+    /// </summary>
+    public void Leave(UserId actorId, IClock clock)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        ApplyDueTransitions(clock);
+        RequireNotTerminal("be left");
+
+        if (actorId == OrganizerId)
+        {
+            throw new DomainException(
+                DomainError.Conflict,
+                "The organizer holds the poll's own participant row and cannot leave it (D-155, §6.4-4).");
+        }
+
+        ParticipantRef participant = ParticipantRef.ForUser(actorId);
+        PollParticipant row = FindParticipant(participant)
+            ?? throw new DomainException(DomainError.NotFound, "That participant is not on this poll.");
+
+        if (row.IsRemoved)
+        {
+            throw new DomainException(
+                DomainError.RemovalIsPermanent,
+                "That participant was removed; removal is permanent for this poll (§6.3).");
+        }
+
+        _participants.Remove(row);
+        _votes.RemoveAll(vote => vote.CastBy(participant));
+    }
+
     // ---- §6.4 finalization --------------------------------------------------------------------
 
     /// <summary>

@@ -1,4 +1,4 @@
-using NodaTime;
+﻿using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Polls;
 using PartyUp.Application.Tests.Friends;
@@ -78,6 +78,13 @@ internal sealed class FakePollRepository : IPollRepository
     public void RemoveOptionAndCascadedVotes(PollOption deletedOption, IReadOnlyList<PollVote> cascadedVotes)
     {
         // No-op: this fake never tracks options/votes as separate rows.
+    }
+
+    public void RemoveParticipationAndWithdrawnVotes(
+        PollParticipant leftParticipant,
+        IReadOnlyList<PollVote> withdrawnVotes)
+    {
+        // No-op: this fake never tracks participants/votes as separate rows.
     }
 
     public Task<Poll?> FindAsync(PollId id, CancellationToken cancellationToken) =>

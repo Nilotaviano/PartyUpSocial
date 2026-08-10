@@ -108,6 +108,10 @@
     "unmutedAnnouncement": "Enquete reativada.",
     "disabledTerminal": "Silenciar não está disponível quando uma enquete é finalizada, expira ou é cancelada. Para uma enquete finalizada, silencie a sessão criada por ela."
   },
+  "leave": {
+    "action": "Sair da enquete",
+    "help": "Ao sair, seus votos são retirados. Você não fica banido — pode ser convidado de novo ou pedir para entrar."
+  },
   "finalize": {
     "heading": "Escolha um horário",
     "previewGuarantee": "Esta prévia e a finalização usam a mesma regra — as mesmas entradas sempre produzem o mesmo resultado. Se algo mudar nesse meio-tempo (uma opção for removida, ou o acesso de alguém mudar), o resultado pode ser diferente do que é mostrado aqui.",

@@ -819,4 +819,61 @@ describe('PollDetailPage', () => {
       expect(screen.queryByTestId('screen-poll-detail')).toBeInTheDocument()
     })
   })
+  describe('leaving a poll (D-186)', () => {
+    function participantPoll(overrides: Partial<Record<string, unknown>> = {}) {
+      return pollDetail({
+        organizerId: 'organizer-1',
+        roster: [
+          {
+            participationId: 'participation-1',
+            userId: 'organizer-1',
+            guestIdentityId: null,
+            displayName: 'Organizer One',
+            isActive: true,
+          },
+          {
+            participationId: 'participation-9',
+            userId: 'viewer-1',
+            guestIdentityId: null,
+            displayName: 'Viewer One',
+            isActive: true,
+          },
+        ],
+        ...overrides,
+      })
+    }
+
+    it('offers the control to a participant and calls the leave endpoint_D186', async () => {
+      api.get.mockResolvedValue({ data: participantPoll() })
+      api.delete.mockResolvedValue({ data: undefined })
+      renderPage()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Leave poll' }))
+
+      await waitFor(() =>
+        expect(api.delete).toHaveBeenCalledWith(
+          '/api/v1/polls/{pollId}/my-participation',
+          expect.objectContaining({
+            params: expect.objectContaining({ path: { pollId: 'poll-1' } }),
+          }),
+        ),
+      )
+    })
+
+    it('hides the control from the organizer, whose row the poll needs_D186', async () => {
+      api.get.mockResolvedValue({ data: participantPoll({ organizerId: 'viewer-1' }) })
+      renderPage()
+
+      await screen.findByText('Raid night poll')
+      expect(screen.queryByRole('button', { name: 'Leave poll' })).not.toBeInTheDocument()
+    })
+
+    it('hides the control from a viewer who is not on the roster_D186', async () => {
+      api.get.mockResolvedValue({ data: pollDetail() })
+      renderPage()
+
+      await screen.findByText('Raid night poll')
+      expect(screen.queryByRole('button', { name: 'Leave poll' })).not.toBeInTheDocument()
+    })
+  })
 })

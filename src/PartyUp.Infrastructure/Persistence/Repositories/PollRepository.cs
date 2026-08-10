@@ -22,6 +22,14 @@ public sealed class PollRepository(AppDbContext context) : IPollRepository
         context.Set<PollOption>().Remove(deletedOption);
     }
 
+    public void RemoveParticipationAndWithdrawnVotes(
+        PollParticipant leftParticipant,
+        IReadOnlyList<PollVote> withdrawnVotes)
+    {
+        context.Set<PollVote>().RemoveRange(withdrawnVotes);
+        context.Set<PollParticipant>().Remove(leftParticipant);
+    }
+
     public Task<Poll?> FindAsync(PollId id, CancellationToken cancellationToken) =>
         LoadWithChildren(context.Polls).FirstOrDefaultAsync(poll => poll.Id == id, cancellationToken);
 

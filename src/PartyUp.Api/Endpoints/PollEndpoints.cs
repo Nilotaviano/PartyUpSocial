@@ -103,6 +103,15 @@ public static class PollEndpoints
                 .Produces(StatusCodes.Status204NoContent))
             .ProducesPartyUpProblem(StatusCodes.Status404NotFound);
 
+        // D-186: the poll analogue of DELETE .../sessions/{id}/my-participation. Leaving withdraws
+        // the caller's votes and erases their participant row, so a rejoin starts clean; it is
+        // silent (D-088) and refused on a terminal poll.
+        Unsafe(polls.MapDelete("/polls/{pollId:guid}/my-participation", LeavePollAsync)
+                .WithName(ApiOperationIds.LeavePoll)
+                .Produces(StatusCodes.Status204NoContent))
+            .ProducesPartyUpProblem(StatusCodes.Status404NotFound)
+            .ProducesPartyUpProblem(StatusCodes.Status409Conflict);
+
         Unsafe(polls.MapPost("/polls/{pollId:guid}/join-requests", RequestPollJoinAsync)
                 .WithName(ApiOperationIds.RequestPollJoin)
                 .Produces<PollJoinRequestViewResponse>(StatusCodes.Status201Created))
@@ -436,6 +445,35 @@ public static class PollEndpoints
 
         PollCommandResult result = await useCase.DeleteOptionAsync(
             PollId.From(pollId), actorId.Value, PollOptionId.From(optionId), cancellationToken);
+        if (!result.Succeeded)
+        {
+            return Problem(context, StatusToCodeStatus(result.Code!), result.Code!);
+        }
+
+        return Results.NoContent();
+    }
+
+    /// <summary>
+    /// D-186. Every failure goes through <see cref="StatusToCodeStatus"/> and reuses the shipped
+    /// poll codes — no new problem code: a caller who cannot see the poll, or is not on it, gets
+    /// <c>poll_not_found</c> (404, fail-closed), a terminal poll <c>poll_terminal</c> and an
+    /// organizer trying to leave their own poll <c>poll_conflict</c> (both 409).
+    /// </summary>
+    private static async Task<IResult> LeavePollAsync(
+        Guid pollId,
+        ICurrentUserAccessor currentUser,
+        PollVoteUseCases useCase,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Problem(context, StatusCodes.Status401Unauthorized, "unauthorized");
+        }
+
+        PollCommandResult result = await useCase.LeavePollAsync(
+            PollId.From(pollId), actorId.Value, cancellationToken);
         if (!result.Succeeded)
         {
             return Problem(context, StatusToCodeStatus(result.Code!), result.Code!);

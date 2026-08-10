@@ -108,6 +108,10 @@
     "unmutedAnnouncement": "Poll unmuted.",
     "disabledTerminal": "Muting is not available once a poll is finalized, expired, or canceled. For a finalized poll, mute the session it created instead."
   },
+  "leave": {
+    "action": "Leave poll",
+    "help": "Leaving withdraws your votes. You are not banned — you can be invited again or ask to join."
+  },
   "finalize": {
     "heading": "Choose a time",
     "previewGuarantee": "This preview and finalizing use the same rule — the same inputs always produce the same result. If something changes in between (an option is removed, or someone's access changes), the outcome may differ from what's shown here.",

@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
@@ -229,6 +229,7 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 JsonContent.Create(new { count = 1 })),
             ["DELETE /api/v1/polls/{pollId:guid}/guest-links/{guestLinkId:guid}"] = Onboarded(() => null),
             ["POST /api/v1/polls/{pollId:guid}/guests/{guestIdentityId:guid}/remove"] = Onboarded(() => null),
+            ["DELETE /api/v1/polls/{pollId:guid}/my-participation"] = Onboarded(() => null),
             ["POST /api/v1/polls/{pollId:guid}/join-requests"] = Onboarded(() => null),
             ["DELETE /api/v1/polls/{pollId:guid}/join-requests/mine"] = Onboarded(() => null),
             ["POST /api/v1/polls/{pollId:guid}/join-requests/{requestId:guid}/approve"] =

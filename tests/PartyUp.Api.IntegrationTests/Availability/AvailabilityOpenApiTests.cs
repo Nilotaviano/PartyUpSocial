@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace PartyUp.Api.IntegrationTests.Availability;
 
@@ -55,6 +55,9 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
     [
         ApiOperationIds.ListPolls, ApiOperationIds.GetPollFinalizationPreview,
     ];
+
+    /// <summary>D-186: the one operation id the poll self-removal route added.</summary>
+    private static readonly string[] NewPollLeaveOperationIds = [ApiOperationIds.LeavePoll];
 
     /// <summary>PHASE7_DESIGN.md §4 (ticket-P7-S4): the eleven operation ids the S4 HTTP surface added.</summary>
     private static readonly string[] NewPushNotificationOperationIds =
@@ -154,7 +157,8 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         string[] expectedOperationIds =
         [
             .. PreExistingOperationIds, .. NewPhase5OperationIds, .. NewPollOperationIds,
-            .. NewGuestPollOperationIds, .. NewPollListOperationIds, .. NewPushNotificationOperationIds,
+            .. NewGuestPollOperationIds, .. NewPollListOperationIds, .. NewPollLeaveOperationIds,
+            .. NewPushNotificationOperationIds,
         ];
         Assert.Equal(
             expectedOperationIds.OrderBy(id => id, StringComparer.Ordinal).ToArray(),

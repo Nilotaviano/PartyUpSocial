@@ -58,6 +58,9 @@ public static class ApiOperationIds
     public const string RemoveSessionGuest = "RemoveSessionGuest";
     public const string RespondToSessionInvitation = "RespondToSessionInvitation";
     public const string LeaveSession = "LeaveSession";
+
+    /// <summary>D-186: the poll analogue of <see cref="LeaveSession"/>, on the poll surface below.</summary>
+    public const string LeavePoll = "LeavePoll";
     public const string RequestSessionJoin = "RequestSessionJoin";
     public const string WithdrawSessionJoinRequest = "WithdrawSessionJoinRequest";
     public const string ListSessionJoinRequests = "ListSessionJoinRequests";

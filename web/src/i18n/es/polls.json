@@ -108,6 +108,10 @@
     "unmutedAnnouncement": "Se dejó de silenciar la encuesta.",
     "disabledTerminal": "Silenciar no está disponible una vez que una encuesta se finaliza, expira o se cancela. Para una encuesta finalizada, silencia en su lugar la sesión que creó."
   },
+  "leave": {
+    "action": "Salir de la encuesta",
+    "help": "Al salir, se retiran tus votos. No quedas vetado: pueden invitarte de nuevo o puedes pedir unirte."
+  },
   "finalize": {
     "heading": "Elegir un horario",
     "previewGuarantee": "Esta vista previa y la finalización usan la misma regla: las mismas entradas siempre producen el mismo resultado. Si algo cambia mientras tanto (se elimina una opción o cambia el acceso de alguien), el resultado puede diferir de lo mostrado aquí.",

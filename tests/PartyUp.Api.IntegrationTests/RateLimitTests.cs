@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
@@ -125,6 +125,8 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
                 "CreatePollGuestLinks",
                 "RevokePollGuestLink",
                 "RemovePollGuest",
+                // D-186: the poll-local analogue of LeaveSession's place in session-write.
+                "LeavePoll",
             ],
             ["poll-attach"] =
             [

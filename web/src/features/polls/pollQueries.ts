@@ -96,6 +96,16 @@ export async function removePollGuest(pollId: string, guestIdentityId: string) {
   })
 }
 
+// D-186: a registered voter removes themselves. Leaving withdraws their votes outright (they are
+// gone, not ignored at finalization) and clears their first-response time, so both the roster and
+// the tallies change — and the poll usually stops being visible to them at all, hence the page's
+// navigate-away on success rather than a silent refetch.
+export async function leavePoll(pollId: string) {
+  await client.DELETE('/api/v1/polls/{pollId}/my-participation', {
+    params: { header: csrf, path: { pollId } },
+  })
+}
+
 // design §5/§4: same clock-inclusive gate as Finalize (never materialized `Closed`
 // alone) — the server can 409/422 with poll_invalid_transition (premature),
 // poll_selection_window_closed, or poll_zero_options; the page renders those honestly
