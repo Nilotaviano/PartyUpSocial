@@ -97,6 +97,7 @@ builder.Services.AddScoped<ChangeAvatarUseCase>();
 builder.Services.AddScoped<ChangeTimeZoneUseCase>();
 builder.Services.AddScoped<ChangeLocaleUseCase>();
 builder.Services.AddScoped<SetReminderDefaultUseCase>();
+builder.Services.AddScoped<CompleteTourUseCase>();
 builder.Services.AddScoped<RequestAccountDeletionUseCase>();
 builder.Services.AddScoped<RequestPublicDeletionUseCase>();
 builder.Services.AddScoped<IssueSteamDeletionConfirmationUseCase>();

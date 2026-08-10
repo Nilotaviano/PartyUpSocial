@@ -234,12 +234,12 @@ public sealed class PushTransportMigrationTests : IAsyncLifetime
         await using AppDbContext context = CreateContext();
         IMigrator migrator = context.GetService<IMigrator>();
         await migrator.MigrateAsync("20260808182728_AddPollDeadlineNoticeIndex");
-        UserId recipientId = await SeedUserAsync(context);
-        // Inserted via raw SQL against the pre-Phase-7 column set (mirroring
-        // FriendGraphMigrationTests.Migrate_BackfillsBlockUsernameSnapshotFromCurrentUsername_D065):
-        // the current AppDbContext model already carries dispatch_state, so a domain-object
-        // SaveChanges here would generate an INSERT against a column the DB at this migration point
-        // does not have yet.
+        // Both the user and the notification below are inserted via raw SQL against the schema at
+        // this migration target (unchanged since AddUserAggregate for users; pre-dispatch_state for
+        // notifications): the current AppDbContext model already carries dispatch_state AND
+        // tour_completed_at, so a domain-object SaveChanges here would generate an INSERT against
+        // columns the DB at this migration point does not have yet.
+        UserId recipientId = await SeedUserRawAsync(context);
         Guid preExistingId = Guid.CreateVersion7();
         await ExecuteAsync(context, $"""
             INSERT INTO notifications (id, recipient_user_id, type, actor_user_id, created_at)
@@ -352,6 +352,23 @@ public sealed class PushTransportMigrationTests : IAsyncLifetime
         context.DomainUsers.Add(user);
         await context.SaveChangesAsync();
         return user.Id;
+    }
+
+    /// <summary>
+    /// The <see cref="SeedUserAsync"/> shape (a bare <c>BeginOnboarding</c> row, no completed
+    /// profile), persisted via raw SQL against the `users` columns <c>AddUserAggregate</c> shipped
+    /// (unchanged through every migration up to this file's own pre-head targets) -- for a test that
+    /// migrates to a specific point rather than the full current model.
+    /// </summary>
+    private static async Task<UserId> SeedUserRawAsync(AppDbContext context)
+    {
+        UserId id = UserId.New();
+        Instant now = SystemClock.Instance.GetCurrentInstant();
+        await context.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO users (id, lifecycle, age_gate_passed, age_gate_source, reminder_default, created_at)
+            VALUES ({id.Value}, 0, true, 0, 3, {now})
+            """);
+        return id;
     }
 
     private static async Task<Guid> SeedNotificationAsync(

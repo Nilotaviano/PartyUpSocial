@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { useLocation } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 
 import { ApiError, client, isApiError } from '../../api/client'
 import { useSession, sessionQueryKey } from '../../auth/useSession'
@@ -42,8 +42,9 @@ function errorKey(error: unknown) {
 type PasswordProof = { currentPassword?: string; reauthToken?: string }
 
 export function AccountSettingsPage() {
-  const { t, i18n } = useTranslation(['settings', 'errors'])
+  const { t, i18n } = useTranslation(['settings', 'errors', 'tour'])
   const location = useLocation()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { data: session } = useSession()
   const { data: methods = [], isPending } = useQuery({
@@ -402,6 +403,16 @@ export function AccountSettingsPage() {
       <section aria-labelledby="theme-heading" className="space-y-2">
         <h2 className="font-display text-h2 font-semibold text-ink" id="theme-heading">{t('theme.title')}</h2>
         <ThemeToggle />
+      </section>
+      <section aria-labelledby="tour-heading" className="space-y-2">
+        <h2 className="font-display text-h2 font-semibold text-ink" id="tour-heading">{t('replay.title', { ns: 'tour' })}</h2>
+        <p className="text-ink-soft">{t('replay.body', { ns: 'tour' })}</p>
+        <Button
+          variant="neutral"
+          onClick={() => navigate('/app', { state: { replayTour: true } })}
+        >
+          {t('replay.action', { ns: 'tour' })}
+        </Button>
       </section>
       <section aria-labelledby="time-zone-heading" className="space-y-2">
         <h2 className="font-display text-h2 font-semibold text-ink" id="time-zone-heading">{t('fields.timeZone', { ns: 'profile' })}</h2>

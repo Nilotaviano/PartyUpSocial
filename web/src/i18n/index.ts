@@ -14,6 +14,7 @@ import enPolls from './en/polls.json'
 import enProfile from './en/profile.json'
 import enSessions from './en/sessions.json'
 import enSettings from './en/settings.json'
+import enTour from './en/tour.json'
 import esAuth from './es/auth.json'
 import esAvailability from './es/availability.json'
 import esCommon from './es/common.json'
@@ -26,6 +27,7 @@ import esPolls from './es/polls.json'
 import esProfile from './es/profile.json'
 import esSessions from './es/sessions.json'
 import esSettings from './es/settings.json'
+import esTour from './es/tour.json'
 import ptBRAuth from './pt-BR/auth.json'
 import ptBRAvailability from './pt-BR/availability.json'
 import ptBRCommon from './pt-BR/common.json'
@@ -38,6 +40,7 @@ import ptBRPolls from './pt-BR/polls.json'
 import ptBRProfile from './pt-BR/profile.json'
 import ptBRSessions from './pt-BR/sessions.json'
 import ptBRSettings from './pt-BR/settings.json'
+import ptBRTour from './pt-BR/tour.json'
 
 export const defaultNS = 'common'
 export const resources = {
@@ -54,6 +57,7 @@ export const resources = {
     home: enHome,
     polls: enPolls,
     notifications: enNotifications,
+    tour: enTour,
   },
   'pt-BR': {
     common: ptBRCommon,
@@ -68,6 +72,7 @@ export const resources = {
     home: ptBRHome,
     polls: ptBRPolls,
     notifications: ptBRNotifications,
+    tour: ptBRTour,
   },
   es: {
     common: esCommon,
@@ -82,6 +87,7 @@ export const resources = {
     home: esHome,
     polls: esPolls,
     notifications: esNotifications,
+    tour: esTour,
   },
 }
 
@@ -105,6 +111,7 @@ void i18n
       'home',
       'polls',
       'notifications',
+      'tour',
     ],
     resources,
     interpolation: {

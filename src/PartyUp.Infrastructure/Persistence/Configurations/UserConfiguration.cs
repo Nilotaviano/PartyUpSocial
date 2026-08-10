@@ -42,6 +42,8 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnType("timestamp with time zone");
         builder.Property(user => user.BannedAt)
             .HasColumnType("timestamp with time zone");
+        builder.Property(user => user.TourCompletedAt)
+            .HasColumnType("timestamp with time zone");
 
         builder.ComplexProperty(user => user.Avatar, avatar =>
         {

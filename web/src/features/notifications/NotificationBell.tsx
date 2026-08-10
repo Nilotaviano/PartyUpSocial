@@ -33,6 +33,7 @@ export function NotificationBell() {
               : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
           }`
         }
+        data-tour="notifications"
         to="/notifications"
       >
         <svg aria-hidden="true" className="size-6" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} viewBox="0 0 24 24">

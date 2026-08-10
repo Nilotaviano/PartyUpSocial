@@ -70,6 +70,13 @@ public sealed class User : AggregateRoot
     /// <summary>D-180: orthogonal to the lifecycle. A banned user keeps their content and history.</summary>
     public Instant? BannedAt { get; private set; }
 
+    /// <summary>
+    /// D-182: null until the account finishes or skips the first-login tour; a profile fact like
+    /// <see cref="ReminderDefault"/>, not a lifecycle value. Account-grained (any device), so no
+    /// device-local flag exists alongside it.
+    /// </summary>
+    public Instant? TourCompletedAt { get; private set; }
+
     public IReadOnlyList<PlatformLink> PlatformLinks => _platformLinks;
 
     public bool IsOnboarding => Lifecycle == UserLifecycle.Onboarding;
@@ -231,6 +238,23 @@ public sealed class User : AggregateRoot
         }
 
         ReminderDefault = reminderDefault;
+    }
+
+    /// <summary>
+    /// D-182: first instant wins, idempotent — both finishing and skipping call this, and a second
+    /// call (a retried POST, or Replay's completion no-op on an already-completed account) never
+    /// moves the instant.
+    /// </summary>
+    public void CompleteTour(IClock clock)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+
+        if (TourCompletedAt is not null)
+        {
+            return;
+        }
+
+        TourCompletedAt = clock.GetCurrentInstant();
     }
 
     /// <summary>D-032/D-127: platform linking is available during onboarding and afterwards.</summary>

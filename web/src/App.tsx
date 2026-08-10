@@ -27,6 +27,7 @@ import { NotificationBell } from './features/notifications/NotificationBell'
 import { NotificationCenterPage } from './features/notifications/NotificationCenterPage'
 import { PushEnableCard } from './features/notifications/PushEnableCard'
 import { OnboardingWizard } from './features/onboarding/OnboardingWizard'
+import { TourOverlay } from './features/tour'
 import { PublicDeletionConfirmPage } from './features/deletion/PublicDeletionConfirmPage'
 import { PublicDeletionRequestPage } from './features/deletion/PublicDeletionRequestPage'
 import { PollCreatePage } from './features/polls/PollCreatePage'
@@ -56,6 +57,7 @@ function AuthenticatedShell() {
           <NavLink
             aria-label={t('navigation.home')}
             className="mr-auto inline-flex min-h-11 flex-none items-center rounded-control font-display font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            data-tour="home"
             end
             to="/app"
           >
@@ -70,6 +72,7 @@ function AuthenticatedShell() {
                     : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
                 }`
               }
+              data-tour="friends"
               to="/friends"
             >
               {t('navigation.friends')}
@@ -82,6 +85,7 @@ function AuthenticatedShell() {
                     : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
                 }`
               }
+              data-tour="sessions"
               to="/sessions/upcoming"
             >
               {t('nav.sessions', { ns: 'sessions' })}
@@ -94,6 +98,7 @@ function AuthenticatedShell() {
                     : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
                 }`
               }
+              data-tour="polls"
               to="/polls"
             >
               {t('nav.polls', { ns: 'polls' })}
@@ -106,6 +111,7 @@ function AuthenticatedShell() {
                     : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
                 }`
               }
+              data-tour="calendar"
               to="/calendar"
             >
               {t('nav.calendar', { ns: 'availability' })}
@@ -118,6 +124,7 @@ function AuthenticatedShell() {
                     : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
                 }`
               }
+              data-tour="discover"
               to="/discover"
             >
               {t('nav.discover', { ns: 'home' })}
@@ -131,6 +138,7 @@ function AuthenticatedShell() {
                     : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
                 }`
               }
+              data-tour="settings"
               to="/settings/account"
             >
               {t('navigation.settings')}
@@ -139,6 +147,7 @@ function AuthenticatedShell() {
         </nav>
       </header>
       <PushEnableCard />
+      <TourOverlay />
       <Outlet />
     </div>
   )

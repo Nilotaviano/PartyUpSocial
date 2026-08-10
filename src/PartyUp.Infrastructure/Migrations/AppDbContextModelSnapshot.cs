@@ -1188,6 +1188,10 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("time_zone_id");
 
+                    b.Property<Instant?>("TourCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("tour_completed_at");
+
                     b.Property<string>("Username")
                         .HasColumnType("text")
                         .HasColumnName("username");

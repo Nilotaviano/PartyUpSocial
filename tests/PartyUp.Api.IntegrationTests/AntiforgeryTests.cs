@@ -114,6 +114,8 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 JsonContent.Create(new { locale = "en" })),
             ["PUT /api/v1/me/reminder-default"] = Onboarded(() =>
                 JsonContent.Create(new { reminderDefault = "Min15" })),
+            // TOUR_DESIGN.md §4: idempotent, RequireOnboarded (registered surface only).
+            ["POST /api/v1/me/tour-completed"] = Onboarded(() => null),
             ["POST /api/v1/me/deletion"] = Authenticated(() =>
                 JsonContent.Create(new { currentPassword = "current-password" })),
             ["POST /api/v1/me/platform-links"] = Authenticated(() =>

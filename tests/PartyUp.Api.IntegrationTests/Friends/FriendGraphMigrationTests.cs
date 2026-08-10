@@ -114,8 +114,12 @@ public sealed class FriendGraphMigrationTests : IAsyncLifetime
         var clock = new MutableClock(Instant.FromUtc(2026, 8, 2, 12, 0));
         User blocker = FriendGraphDatabase.CreateActiveUser(clock);
         User blocked = FriendGraphDatabase.CreateActiveUser(clock);
-        context.DomainUsers.AddRange(blocker, blocked);
-        await context.SaveChangesAsync();
+        // Inserted via raw SQL against the schema at this migration target (unchanged since
+        // AddUserAggregate): the current AppDbContext model already carries tour_completed_at, so a
+        // domain-object SaveChanges here would generate an INSERT against a column the DB at this
+        // migration point does not have yet.
+        await FriendGraphDatabase.InsertUserRawAsync(context, blocker);
+        await FriendGraphDatabase.InsertUserRawAsync(context, blocked);
         Block block = Block.Create(
             blocker.Id,
             blocked.Id,
@@ -165,6 +169,30 @@ internal sealed class FriendGraphDatabase
         context.DomainUsers.AddRange(users);
         await context.SaveChangesAsync();
         return users;
+    }
+
+    /// <summary>
+    /// Persists an already-constructed <see cref="User"/> via raw SQL against the `users` columns
+    /// <c>AddUserAggregate</c> shipped (unchanged by every migration through the caller's chosen
+    /// target) -- for tests that migrate to a specific pre-head point rather than the full current
+    /// model, where a domain-object <c>SaveChangesAsync</c> would emit an INSERT against a column
+    /// (e.g. <c>tour_completed_at</c>) that migration point's schema doesn't have yet.
+    /// </summary>
+    internal static async Task InsertUserRawAsync(AppDbContext context, User user)
+    {
+        await context.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO users
+                (id, lifecycle, username, display_name, time_zone_id, locale, friend_code,
+                 age_gate_passed, age_gate_source, reminder_default, created_at,
+                 avatar_kind, avatar_emoji, avatar_source_platform_link_id)
+            VALUES
+                ({user.Id.Value}, {(int)user.Lifecycle}, {user.Username!.Value.Value},
+                 {user.DisplayName!.Value.Value}, {user.TimeZone!.Id}, {user.Locale!.Value.Value},
+                 {user.FriendCode!.Value.Value}, {user.AgeGatePassed}, {(int)user.AgeGateSource!.Value},
+                 {(int)user.ReminderDefault}, {user.CreatedAt},
+                 {(int)user.Avatar!.Value.Kind}, {user.Avatar.Value.Emoji},
+                 {(user.Avatar.Value.SourcePlatformLinkId.HasValue ? user.Avatar.Value.SourcePlatformLinkId.Value.Value : (Guid?)null)})
+            """);
     }
 
     internal static User CreateActiveUser(IClock clock)

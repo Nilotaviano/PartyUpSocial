@@ -89,7 +89,7 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         "ChangeEmail", "ChangeMyAvatar", "ChangeMyDisplayName", "ChangeMyLocale",
         "ChangeMyReminderDefault", "ChangeMyTimeZone", "ChangeMyUsername", "ChangePassword",
         "ChangePlatformHandle", "CheckUsernameAvailability", "ClaimGuestSessionLink",
-        "CompleteOnboarding", "CompleteSteamDeletion", "CompleteSteamExternal",
+        "CompleteOnboarding", "CompleteSteamDeletion", "CompleteSteamExternal", "CompleteTour",
         "ConfirmAccountDeletion", "ConsumeMagicLink", "CreateSession", "CreateSessionGuestLinks",
         "DeleteAuthMethod", "DeleteMe", "DeletePlatformLink", "EditSession", "ForgotPassword",
         "GetAdminUser", "GetAntiforgery", "GetAuthMethods", "GetFriendShare", "GetGuestSession",

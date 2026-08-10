@@ -83,12 +83,10 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
     /// resolve against the organizer's own identity rather than a second party's.
     /// </para>
     /// <para>
-    /// Round-1 F9 (record only): this leaves <b>zero</b> `register-ip` headroom for any later
-    /// slice's own browser tests that need a fresh account in this same collection — the five
-    /// registrations already shipped (three here, one in each flow class) are the whole hourly
-    /// budget. A slice that needs a sixth registration must either reuse an account a `[Collection]`
-    /// sibling already created or the dimension itself must widen (`RateLimitPolicies.cs`, not in
-    /// this ticket's write set).
+    /// The lane overrides `register-ip` to 100 (`PlaywrightFixture.cs`'s
+    /// <c>RegisterPerIpPerHourOverride</c>), not production's 5 — the five registrations this
+    /// collection already ships (three here, one in each flow class) leave well over ninety
+    /// remaining, and <see cref="Tour.TourFlowTests"/>'s own registration fits comfortably inside it.
     /// </para>
     /// </summary>
     private async Task<AuditContext> GetContextAsync()
@@ -435,6 +433,68 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
             $"Route '{route.Name}' ({ThemeValue(theme)}) has {unexpected.Length} un-excluded axe " +
             "violation(s): " + string.Join(", ", unexpected.Select(v => $"{v.Id} ({v.Impact})")) +
             $". Details in {AxeArtifactsDirectory}.");
+    }
+
+    /// <summary>
+    /// TOUR_DESIGN.md §6: the tour's own axe coverage reaches the overlay through Replay — the
+    /// fixture skip (`PlaywrightFixture.RegisterAndOnboardAsync`) makes auto-open unreachable for
+    /// every lane account by design, including this class's own organizer, so this is the only path
+    /// back to an open tour. Reused per theme: a fresh tab reaches `/settings/account` under a
+    /// pre-navigation theme seed (`SeedThemeBeforeFirstNavigationAsync`, the same idiom the
+    /// onboarding-step capture reload above uses), same as a real theme swap's own reload would —
+    /// auditing the *already-closed* overlay from a stale page would silently pass.
+    /// </summary>
+    [Theory]
+    [InlineData(AuditedTheme.Light)]
+    [InlineData(AuditedTheme.Dark)]
+    public async Task TourOverlay_ReopenedViaReplay_HasNoWcagViolationOutsideTheDatedExclusionList_D182(
+        AuditedTheme theme)
+    {
+        AuditContext context = await GetContextAsync();
+        IPage page = await context.Organizer.Page.Context.NewPageAsync();
+        try
+        {
+            await SeedThemeBeforeFirstNavigationAsync(page, theme);
+            await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/settings/account");
+            await AssertThemeAppliedAsync(page, theme);
+
+            await page.GetByRole(AriaRole.Button, new() { Name = "Replay the tour" }).ClickAsync();
+            await page.GetByRole(AriaRole.Dialog).WaitForAsync();
+
+            AxeResultItem[] violations = await RunAxeAsync(page);
+            HashSet<string> excludedRuleIds = AxeExclusions.Entries
+                .Where(entry => entry.RouteName == "tour-overlay")
+                .Select(entry => entry.RuleId)
+                .ToHashSet(StringComparer.Ordinal);
+            AxeResultItem[] unexpected = violations
+                .Where(violation => !excludedRuleIds.Contains(violation.Id))
+                .ToArray();
+
+            if (unexpected.Length > 0)
+            {
+                Directory.CreateDirectory(AxeArtifactsDirectory);
+                string dumpPath = Path.Combine(
+                    AxeArtifactsDirectory, $"tour-overlay.{ThemeValue(theme)}.json");
+                await File.WriteAllTextAsync(dumpPath, JsonSerializer.Serialize(unexpected, DumpJsonOptions));
+            }
+
+            Assert.True(
+                unexpected.Length == 0,
+                $"Tour overlay ({ThemeValue(theme)}) has {unexpected.Length} un-excluded axe " +
+                "violation(s): " + string.Join(", ", unexpected.Select(v => $"{v.Id} ({v.Impact})")) +
+                $". Details in {AxeArtifactsDirectory}.");
+
+            // Dismiss so a leaked open tour never reaches a later test sharing this organizer.
+            IResponse response = await page.RunAndWaitForResponseAsync(
+                () => page.GetByRole(AriaRole.Button, new() { Name = "Skip tour" }).ClickAsync(),
+                candidate => candidate.Url.Contains("/api/v1/me/tour-completed", StringComparison.Ordinal) &&
+                    candidate.Request.Method == "POST");
+            Assert.Equal(204, response.Status);
+        }
+        finally
+        {
+            await page.CloseAsync();
+        }
     }
 
     /// <summary>

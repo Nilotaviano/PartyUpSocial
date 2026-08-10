@@ -576,6 +576,21 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
 
         await page.GetByRole(AriaRole.Button, new() { Name = "Finish setup" }).ClickAsync();
         await page.WaitForURLAsync(url => url.EndsWith("/app", StringComparison.Ordinal));
+
+        // TOUR_DESIGN.md §1/§6: a fresh account lands on `/app` with a succeeded profile fetch and
+        // `tourCompleted: false`, so the first-login tour now deterministically auto-opens here —
+        // every one of this fixture's 14 call sites across 8 lane files would otherwise leak an open
+        // tour into whatever that test does next. Dismissed with the shipped click-and-await idiom
+        // (`PollVotingFlowTests.cs`'s `CreatePrivatePollAsync`: arming `RunAndWaitForResponseAsync`
+        // AFTER the click would race a fast 204) so a failed completion POST fails this helper loudly
+        // rather than silently leaving the overlay open for the caller's own first assertion.
+        await page.GetByRole(AriaRole.Dialog).WaitForAsync();
+        IResponse tourCompletedResponse = await page.RunAndWaitForResponseAsync(
+            () => page.GetByRole(AriaRole.Button, new() { Name = "Skip tour" }).ClickAsync(),
+            candidate => candidate.Url.Contains("/api/v1/me/tour-completed", StringComparison.Ordinal) &&
+                candidate.Request.Method == "POST");
+        Assert.Equal(204, tourCompletedResponse.Status);
+
         return new RegisteredUser(page, username, displayName);
     }
 

@@ -1,0 +1,49 @@
+{
+  "dialog": {
+    "title": "Paso {{step}} de {{total}}: {{name}}"
+  },
+  "steps": {
+    "home": {
+      "name": "Inicio",
+      "body": "Mira qué necesita tu atención y qué viene a continuación."
+    },
+    "friends": {
+      "name": "Amigos",
+      "body": "Agrega amigos por código o enlace — PartyUp está pensado para amigos."
+    },
+    "sessions": {
+      "name": "Sesiones",
+      "body": "Organiza noches de juego a una hora fija, con confirmaciones y lista de espera."
+    },
+    "polls": {
+      "name": "Encuestas",
+      "body": "Vota horarios con tus amigos; el horario ganador se convierte en una sesión."
+    },
+    "calendar": {
+      "name": "Calendario",
+      "body": "Marca cuándo estás libre para que sea fácil encontrar un horario en común."
+    },
+    "discover": {
+      "name": "Descubrir",
+      "body": "Encuentra sesiones que tus amigos hicieron visibles para ti."
+    },
+    "notifications": {
+      "name": "Notificaciones",
+      "body": "Las invitaciones y novedades llegan aquí; las notificaciones push son opcionales en ajustes."
+    },
+    "settings": {
+      "name": "Ajustes",
+      "body": "Gestiona tu perfil, idioma y notificaciones — y repite este tour cuando quieras."
+    }
+  },
+  "actions": {
+    "next": "Siguiente",
+    "finish": "Finalizar",
+    "skip": "Omitir tour"
+  },
+  "replay": {
+    "title": "Tour de la app",
+    "body": "Vuelve a ver el tour de la app.",
+    "action": "Repetir el tour"
+  }
+}

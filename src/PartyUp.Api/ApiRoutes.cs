@@ -132,4 +132,7 @@ public static class ApiOperationIds
     public const string UnmuteSession = "UnmuteSession";
     public const string MutePoll = "MutePoll";
     public const string UnmutePoll = "UnmutePoll";
+
+    // TOUR_DESIGN.md §4: the first-login tour's one write.
+    public const string CompleteTour = "CompleteTour";
 }

@@ -44,6 +44,13 @@ public static class MeEndpoints
         api.MapPut("/me/reminder-default", ChangeReminderDefaultAsync)
             .WithName("ChangeMyReminderDefault")
             .RequireAuthorization(AuthorizationPolicies.RequireOnboarded);
+        // TOUR_DESIGN.md §4: idempotent, first instant wins; rides the "default" rate-limit
+        // dimension exactly like the reminder-default write above (no explicit OperationIds
+        // membership needed — RateLimitPolicies.cs's "default" dimension covers every operation).
+        api.MapPost("/me/tour-completed", CompleteTourAsync)
+            .WithName(ApiOperationIds.CompleteTour)
+            .RequireAuthorization(AuthorizationPolicies.RequireOnboarded)
+            .Produces(StatusCodes.Status204NoContent);
         api.MapPost("/me/deletion", RequestDeletionAsync)
             .WithName(ApiOperationIds.DeleteMe)
             .RequireAuthorization(AuthorizationPolicies.RequireAuthenticated)
@@ -252,6 +259,17 @@ public static class MeEndpoints
             (id, ct) => useCase.ExecuteAsync(id, reminder, ct),
             cancellationToken);
     }
+
+    private static Task<IResult> CompleteTourAsync(
+        HttpContext context,
+        ICurrentUserAccessor currentUser,
+        CompleteTourUseCase useCase,
+        CancellationToken cancellationToken) =>
+        ExecuteProfileMutationAsync(
+            context,
+            currentUser,
+            (id, ct) => useCase.ExecuteAsync(id, ct),
+            cancellationToken);
 
     private static async Task<IResult> ExecuteProfileMutationAsync(
         HttpContext context,
@@ -938,7 +956,10 @@ public sealed record MyProfileResponse(
     IReadOnlyList<AuthMethodResponse> AuthMethods,
     // PHASE7_DESIGN.md §4/ruling 4: the server-derived half of the push-prompt split — an account
     // fact, so a second device does not restart the D-147 qualification.
-    bool PushPromptEligible)
+    bool PushPromptEligible,
+    // TOUR_DESIGN.md §4: the client-friendly half of TourCompletedAt — the tour gate only ever
+    // needs the boolean, never the instant.
+    bool TourCompleted)
 {
     public static MyProfileResponse From(MyProfileResult profile)
     {
@@ -960,6 +981,7 @@ public sealed record MyProfileResponse(
                 method.Linked,
                 method.Removable,
                 method.Detail)).ToArray(),
-            profile.PushPromptEligible);
+            profile.PushPromptEligible,
+            user.TourCompletedAt is not null);
     }
 }

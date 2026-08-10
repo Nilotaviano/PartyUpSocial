@@ -1,0 +1,49 @@
+{
+  "dialog": {
+    "title": "Step {{step}} of {{total}}: {{name}}"
+  },
+  "steps": {
+    "home": {
+      "name": "Home",
+      "body": "See what needs your attention and what's coming up next."
+    },
+    "friends": {
+      "name": "Friends",
+      "body": "Add friends by code or link — PartyUp is friends-first."
+    },
+    "sessions": {
+      "name": "Sessions",
+      "body": "Plan game nights at a fixed time, with RSVPs and a waitlist."
+    },
+    "polls": {
+      "name": "Polls",
+      "body": "Vote on times with your friends; the winning time becomes a session."
+    },
+    "calendar": {
+      "name": "Calendar",
+      "body": "Paint when you're free so finding a shared time is easy."
+    },
+    "discover": {
+      "name": "Discover",
+      "body": "Find joinable sessions friends have made visible to you."
+    },
+    "notifications": {
+      "name": "Notifications",
+      "body": "Invites and updates land here; push notifications are opt-in in settings."
+    },
+    "settings": {
+      "name": "Settings",
+      "body": "Manage your profile, language, and notifications — and replay this tour anytime."
+    }
+  },
+  "actions": {
+    "next": "Next",
+    "finish": "Finish",
+    "skip": "Skip tour"
+  },
+  "replay": {
+    "title": "App tour",
+    "body": "Take another look at the app chrome tour.",
+    "action": "Replay the tour"
+  }
+}
