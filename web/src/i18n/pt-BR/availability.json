@@ -20,7 +20,10 @@
     }
   },
   "viewport": {
-    "showEarlyHours": "Mostrar horas anteriores"
+    "showEarlyHours": "Mostrar horas anteriores",
+    "hideEarlyHours": "Ocultar horas anteriores",
+    "earlyHoursShown": "Horas anteriores exibidas. A grade agora começa à meia-noite.",
+    "earlyHoursHidden": "Horas anteriores ocultadas. A grade agora começa pela manhã."
   },
   "block": {
     "editHeading": "Editar disponibilidade",

@@ -166,6 +166,7 @@ export function WeekGridPage() {
   })
   const [layers, setLayers] = useState<CalendarLayerState | null>(null)
   const [showEarlyHours, setShowEarlyHours] = useState(false)
+  const [earlyHoursMessage, setEarlyHoursMessage] = useState('')
   const editTrigger = useRef<HTMLElement | null>(null)
   const gridScroller = useRef<HTMLDivElement>(null)
   const didInitialScroll = useRef(false)
@@ -403,6 +404,14 @@ export function WeekGridPage() {
     scroller.scrollTop = row.offsetTop
   }, [calendarData, startHour, timeZone])
 
+  function toggleEarlyHours() {
+    const next = !showEarlyHours
+    setShowEarlyHours(next)
+    setEarlyHoursMessage(
+      next ? t('viewport.earlyHoursShown') : t('viewport.earlyHoursHidden'),
+    )
+  }
+
   function handleCreateBlock(range: GridRange) {
     createBlock.mutate({
       startTime: fakeLocalToInstant(range.start, timeZone),
@@ -594,15 +603,20 @@ export function WeekGridPage() {
         />
       ) : (
         <div ref={gridScroller} className="space-y-2">
-          {!showEarlyHours && (
-            <Button
-              type="button"
-              variant="neutral"
-              onClick={() => setShowEarlyHours(true)}
-            >
-              {t('viewport.showEarlyHours')}
-            </Button>
-          )}
+          {/* Stays mounted in both states: unmounting the control on
+              activation would drop focus to document.body and leave the 28
+              revealed rows unannounced (WCAG 2.4.3). */}
+          <Button type="button" variant="neutral" onClick={toggleEarlyHours}>
+            {showEarlyHours ? t('viewport.hideEarlyHours') : t('viewport.showEarlyHours')}
+          </Button>
+          <p
+            aria-live="polite"
+            className="sr-only"
+            data-testid="early-hours-status"
+            role="status"
+          >
+            {earlyHoursMessage}
+          </p>
           <WeekGrid
             dayLabels={dayLabels}
             endHour={END_HOUR}

@@ -454,6 +454,33 @@ describe('WeekGridPage viewport', () => {
 
     expect(await screen.findByText(/^12:00\s?AM$/)).toBeInTheDocument()
   })
+
+  // WCAG 2.4.3: the control must survive its own activation, so focus stays on
+  // it instead of falling to document.body, and the 28 revealed rows are
+  // announced rather than appearing silently above the viewport.
+  it('keeps the early-hours control focused and announces the change', async () => {
+    renderPage()
+
+    const toggle = await screen.findByRole('button', { name: 'Show earlier hours' })
+    toggle.focus()
+    fireEvent.click(toggle)
+
+    const collapse = await screen.findByRole('button', { name: 'Hide earlier hours' })
+    expect(collapse).toHaveFocus()
+    expect(screen.getByTestId('early-hours-status')).toHaveTextContent(
+      'Earlier hours shown. The grid now starts at midnight.',
+    )
+
+    fireEvent.click(collapse)
+
+    expect(
+      await screen.findByRole('button', { name: 'Show earlier hours' }),
+    ).toHaveFocus()
+    expect(screen.queryByText(/^12:00\s?AM$/)).not.toBeInTheDocument()
+    expect(screen.getByTestId('early-hours-status')).toHaveTextContent(
+      'Earlier hours hidden. The grid now starts in the morning.',
+    )
+  })
 })
 
 describe('WeekGridPage occurrence editing', () => {

@@ -20,7 +20,10 @@
     }
   },
   "viewport": {
-    "showEarlyHours": "Mostrar horas anteriores"
+    "showEarlyHours": "Mostrar horas anteriores",
+    "hideEarlyHours": "Ocultar horas anteriores",
+    "earlyHoursShown": "Horas anteriores mostradas. La cuadrícula ahora empieza a medianoche.",
+    "earlyHoursHidden": "Horas anteriores ocultadas. La cuadrícula ahora empieza por la mañana."
   },
   "block": {
     "editHeading": "Editar disponibilidad",

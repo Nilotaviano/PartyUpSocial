@@ -20,7 +20,10 @@
     }
   },
   "viewport": {
-    "showEarlyHours": "Show earlier hours"
+    "showEarlyHours": "Show earlier hours",
+    "hideEarlyHours": "Hide earlier hours",
+    "earlyHoursShown": "Earlier hours shown. The grid now starts at midnight.",
+    "earlyHoursHidden": "Earlier hours hidden. The grid now starts in the morning."
   },
   "block": {
     "editHeading": "Edit availability",
