@@ -19,6 +19,9 @@
       "friendFilterHeading": "Friends shown"
     }
   },
+  "viewport": {
+    "showEarlyHours": "Show earlier hours"
+  },
   "block": {
     "editHeading": "Edit availability",
     "start": "Start time",

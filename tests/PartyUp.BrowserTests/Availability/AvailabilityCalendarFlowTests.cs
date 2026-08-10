@@ -183,11 +183,11 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         ILocator busyCells = page.GetByRole(AriaRole.Gridcell, new() { NameRegex = new Regex("Busy") });
         int baselineBusyCount = await busyCells.CountAsync();
 
-        // Create: focus the grid's one tab stop (00:00 on the week's first day — always earlier
-        // than the sibling fact's fixed 10:00 series, so it sorts first in DOM order below
-        // regardless of run order), then keyboard alone — Enter starts a selection,
-        // Shift+ArrowDown extends it by one 15-minute slot (a 00:00–00:30 range, two grid rows),
-        // Enter commits (P5-CAL-01).
+        // Create: focus the grid's one tab stop (07:00 on the week's first day, the clamped
+        // viewport's first row — always earlier than the sibling fact's fixed 10:00 series, so
+        // it sorts first in DOM order below regardless of run order), then keyboard alone —
+        // Enter starts a selection, Shift+ArrowDown extends it by one 15-minute slot (a
+        // 07:00–07:30 range, two grid rows), Enter commits (P5-CAL-01).
         ILocator firstCell = page.GetByRole(AriaRole.Gridcell).First;
         await firstCell.FocusAsync();
         await Assertions.Expect(firstCell).ToBeFocusedAsync();

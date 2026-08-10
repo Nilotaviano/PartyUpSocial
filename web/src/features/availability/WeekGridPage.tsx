@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router'
 import { isApiError } from '../../api/client'
+import { Button } from '../../components/ui/button'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { getViewerProfile, viewerProfileKey } from '../sessions/sessionQueries'
 import { AgendaView, type AgendaEntry } from './AgendaView'
@@ -33,6 +34,14 @@ import {
 } from './availabilityQueries'
 
 const DAY_MS = 24 * 60 * 60 * 1000
+
+// The grid renders one row per 15 minutes, so a full day is 96 rows. Clamping
+// the default viewport to waking hours costs 28 of them; the early hours stay
+// one control away rather than being unreachable.
+const WAKING_START_HOUR = 7
+const END_HOUR = 24
+// Where the grid lands when the viewer has nothing published this week.
+const FALLBACK_SCROLL_HOUR = 18
 
 // The five new §8 problem codes (design §10.2): each renders its own
 // `availability.json` message. Every other code — including the two shared
@@ -156,7 +165,10 @@ export function WeekGridPage() {
     end: '',
   })
   const [layers, setLayers] = useState<CalendarLayerState | null>(null)
+  const [showEarlyHours, setShowEarlyHours] = useState(false)
   const editTrigger = useRef<HTMLElement | null>(null)
+  const gridScroller = useRef<HTMLDivElement>(null)
+  const didInitialScroll = useRef(false)
 
   const isAgenda = location.pathname.endsWith('/agenda')
 
@@ -363,6 +375,34 @@ export function WeekGridPage() {
       timeZone: 'UTC',
     }).format(date)
 
+  const startHour = showEarlyHours ? 0 : WAKING_START_HOUR
+
+  // Landing at `startHour` would still put the viewer's own evening windows
+  // below the fold, so the first paint after the calendar resolves scrolls the
+  // grid's own container (never the page) to the earliest hour that matters.
+  // Once only: a later scroll is the viewer's, and re-running would yank it back.
+  const calendarData = calendar.data
+  useEffect(() => {
+    if (didInitialScroll.current || !calendarData) return
+
+    const mine = calendarData.myAvailability.occurrences ?? []
+    const earliestHour = mine.length
+      ? Math.min(
+          ...mine.map((occurrence) =>
+            instantToFakeLocal(occurrence.startTime, timeZone).getUTCHours(),
+          ),
+        )
+      : FALLBACK_SCROLL_HOUR
+    const target = Math.max(earliestHour, startHour)
+
+    const scroller = gridScroller.current?.querySelector<HTMLElement>('[role="grid"]')
+    const row = scroller?.querySelector<HTMLElement>(`[data-hour="${target}"]`)
+    if (!scroller || !row) return
+
+    didInitialScroll.current = true
+    scroller.scrollTop = row.offsetTop
+  }, [calendarData, startHour, timeZone])
+
   function handleCreateBlock(range: GridRange) {
     createBlock.mutate({
       startTime: fakeLocalToInstant(range.start, timeZone),
@@ -553,18 +593,31 @@ export function WeekGridPage() {
           timeLabelFormatter={timeLabelFormatter}
         />
       ) : (
-        <WeekGrid
-          dayLabels={dayLabels}
-          friendRanges={friendRanges}
-          merged={merged}
-          occurrences={occurrences}
-          pollOptionEntries={pollOptionEntries}
-          sessionEntries={sessionEntries}
-          timeLabelFormatter={timeLabelFormatter}
-          weekStart={weekStart}
-          onCreateBlock={handleCreateBlock}
-          onEditOccurrence={handleEditOccurrence}
-        />
+        <div ref={gridScroller} className="space-y-2">
+          {!showEarlyHours && (
+            <Button
+              type="button"
+              variant="neutral"
+              onClick={() => setShowEarlyHours(true)}
+            >
+              {t('viewport.showEarlyHours')}
+            </Button>
+          )}
+          <WeekGrid
+            dayLabels={dayLabels}
+            endHour={END_HOUR}
+            friendRanges={friendRanges}
+            merged={merged}
+            occurrences={occurrences}
+            pollOptionEntries={pollOptionEntries}
+            sessionEntries={sessionEntries}
+            startHour={startHour}
+            timeLabelFormatter={timeLabelFormatter}
+            weekStart={weekStart}
+            onCreateBlock={handleCreateBlock}
+            onEditOccurrence={handleEditOccurrence}
+          />
+        </div>
       )}
 
       <OccurrenceScopeDialog

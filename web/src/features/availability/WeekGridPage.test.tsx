@@ -415,6 +415,47 @@ function renderPage() {
   )
 }
 
+describe('WeekGridPage viewport', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-08-10T12:00:00.000Z'))
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve({ data: profileResponse() })
+      if (path === '/api/v1/calendar') {
+        return Promise.resolve({
+          data: calendarResponse({
+            start: '2026-08-10T13:00:00.000Z',
+            end: '2026-08-10T13:30:00.000Z',
+          }),
+        })
+      }
+      throw new Error(`Unexpected GET ${path}`)
+    })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // The grid's own default is startHour 0 — 96 rows the viewer has to scroll
+  // past. `timeLabelFormatter` renders through `Intl` in the active locale, so
+  // 07:00 reads "7:00 AM" and midnight "12:00 AM" under `en`.
+  it('renders the day from 07:00 by default instead of midnight', async () => {
+    renderPage()
+
+    expect(await screen.findByText(/^7:00\s?AM$/)).toBeInTheDocument()
+    expect(screen.queryByText(/^12:00\s?AM$/)).not.toBeInTheDocument()
+  })
+
+  it('reveals the early hours on request', async () => {
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Show earlier hours' }))
+
+    expect(await screen.findByText(/^12:00\s?AM$/)).toBeInTheDocument()
+  })
+})
+
 describe('WeekGridPage occurrence editing', () => {
   beforeEach(() => {
     // Only `Date` is faked — leaving real timers so `findBy*`/`waitFor`

@@ -452,18 +452,26 @@ export function WeekGrid({
 
   return (
     <div>
+      {/* `relative` makes the scroll container the offset parent of every row,
+          so WeekGridPage's initial scroll can read an hour row's `offsetTop`
+          straight into `scrollTop`, and the sticky header/gutter resolve
+          against this box rather than the page. */}
       <div
         ref={gridRef}
         aria-colcount={8}
         aria-label={t('a11y.gridLabel')}
         aria-rowcount={slots + 1}
-        className={`max-h-[70vh] overflow-x-auto overflow-y-auto [-webkit-overflow-scrolling:touch] ${isTouchDragging ? 'touch-none' : ''}`}
+        className={`relative max-h-[70vh] overflow-x-auto overflow-y-auto [-webkit-overflow-scrolling:touch] ${isTouchDragging ? 'touch-none' : ''}`}
         data-touch-dragging={isTouchDragging}
         role="grid"
         onMouseUp={handleMouseUp}
       >
-        <div className="flex" role="row">
-          <div aria-colindex={1} className="min-h-11 w-16 shrink-0" role="columnheader" />
+        <div className="sticky top-0 z-20 flex bg-card" role="row">
+          <div
+            aria-colindex={1}
+            className="sticky left-0 z-10 min-h-11 w-16 shrink-0 bg-card"
+            role="columnheader"
+          />
           {dayIndexes.map((day) => (
             <div
               key={day}
@@ -480,7 +488,8 @@ export function WeekGrid({
             <div
               aria-colindex={1}
               aria-rowindex={slot + 2}
-              className="min-h-11 w-16 shrink-0 pr-2 text-right text-xs text-ink-soft"
+              className="sticky left-0 z-10 min-h-11 w-16 shrink-0 bg-card pr-2 text-right text-xs text-ink-soft"
+              data-hour={slot % 4 === 0 ? startHour + slot / 4 : undefined}
               role="rowheader"
             >
               {slot % 4 === 0

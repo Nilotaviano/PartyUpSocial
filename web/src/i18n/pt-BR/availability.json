@@ -19,6 +19,9 @@
       "friendFilterHeading": "Amigos exibidos"
     }
   },
+  "viewport": {
+    "showEarlyHours": "Mostrar horas anteriores"
+  },
   "block": {
     "editHeading": "Editar disponibilidade",
     "start": "Horário de início",
