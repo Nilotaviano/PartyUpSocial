@@ -141,6 +141,26 @@ describe('NotificationSettingsPage — the three ruling-3 controls', () => {
     expect(localStorage.getItem('partyup:push-subscription-id')).toBeNull()
   })
 
+  it('renders translated reminder option labels, never raw i18n keys_D082', async () => {
+    mockProfile('Off')
+    installPushSupport()
+
+    renderPage()
+    const select = (await screen.findByLabelText(
+      'Remind me before a session starts',
+    )) as HTMLSelectElement
+
+    expect([...select.options].map((option) => option.textContent)).toEqual([
+      'Off',
+      '15 minutes before',
+      '30 minutes before',
+      '1 hour before',
+      '3 hours before',
+      '12 hours before',
+      '24 hours before',
+    ])
+  })
+
   it.each([
     ['Off', 'Off'],
     ['Minutes15', 'Min15'],

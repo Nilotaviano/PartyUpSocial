@@ -25,13 +25,13 @@ type ReminderDefaultValue =
 // D-082's seven choices — the account default is always one of these (never null; "use account
 // default" is the SESSION-level option, not this one).
 const reminderOptions: { value: ReminderDefaultValue; key: string }[] = [
-  { value: 'Off', key: 'reminderDefault.off' },
-  { value: 'Minutes15', key: 'reminderDefault.minutes15' },
-  { value: 'Minutes30', key: 'reminderDefault.minutes30' },
-  { value: 'Hours1', key: 'reminderDefault.hours1' },
-  { value: 'Hours3', key: 'reminderDefault.hours3' },
-  { value: 'Hours12', key: 'reminderDefault.hours12' },
-  { value: 'Hours24', key: 'reminderDefault.hours24' },
+  { value: 'Off', key: 'notificationsPage.reminderDefault.off' },
+  { value: 'Minutes15', key: 'notificationsPage.reminderDefault.minutes15' },
+  { value: 'Minutes30', key: 'notificationsPage.reminderDefault.minutes30' },
+  { value: 'Hours1', key: 'notificationsPage.reminderDefault.hours1' },
+  { value: 'Hours3', key: 'notificationsPage.reminderDefault.hours3' },
+  { value: 'Hours12', key: 'notificationsPage.reminderDefault.hours12' },
+  { value: 'Hours24', key: 'notificationsPage.reminderDefault.hours24' },
 ]
 
 // The `/me/reminder-default` route speaks the `ReminderOffset` enum's member names on the wire
