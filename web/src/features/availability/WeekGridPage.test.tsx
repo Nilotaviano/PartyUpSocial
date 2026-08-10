@@ -472,6 +472,62 @@ describe('WeekGrid resize handles', () => {
       'touch-none',
     )
   })
+
+  // A `touch-none` handle that overhangs its cell would freeze page scrolling
+  // on a neighbouring free cell — the exact P5-TOUCH-01 failure, displaced.
+  it('keeps each handle inside its own cell box_P5TOUCH01', () => {
+    renderGrid({
+      occurrences,
+      onAdjustOccurrence: vi.fn<(adjustment: GridAdjustment) => void>(),
+    })
+
+    selectBlock()
+
+    expect(screen.getByRole('button', { name: 'Change start time' })).toHaveClass('top-0')
+    expect(screen.getByRole('button', { name: 'Change end time' })).toHaveClass('bottom-0')
+    for (const name of ['Change start time', 'Change end time']) {
+      const className = screen.getByRole('button', { name }).className
+      expect(className).not.toMatch(/(^|\s)-(top|bottom|inset)-/)
+    }
+  })
+
+  // Cancelling `pointerdown` does not cancel the `click`: without an explicit
+  // guard the release bubbles to the gridcell and reopens the editor, which
+  // overwrites the adjustment the drag just produced.
+  it('does not reopen the editor after a pointer resize', () => {
+    const onAdjustOccurrence = vi.fn<(adjustment: GridAdjustment) => void>()
+    const { onEditOccurrence } = renderGrid({ occurrences, onAdjustOccurrence })
+
+    selectBlock()
+    onEditOccurrence.mockClear()
+
+    const handle = screen.getByRole('button', { name: 'Change end time' })
+    fireEvent.pointerDown(handle, { pointerType: 'mouse', button: 0, clientY: 0 })
+    fireEvent.pointerMove(handle, { pointerType: 'mouse', clientY: 100 })
+    fireEvent.pointerUp(handle, { pointerType: 'mouse', clientY: 100 })
+    fireEvent.click(handle)
+
+    expect(onAdjustOccurrence).toHaveBeenCalledTimes(1)
+    expect(onEditOccurrence).not.toHaveBeenCalled()
+  })
+
+  // A block only one or two slots tall is covered edge to edge by its own
+  // handles, so the press that never travelled has to stay a plain tap.
+  it('treats a press that never moved as a tap on the block', () => {
+    const onAdjustOccurrence = vi.fn<(adjustment: GridAdjustment) => void>()
+    const { onEditOccurrence } = renderGrid({ occurrences, onAdjustOccurrence })
+
+    selectBlock()
+    onEditOccurrence.mockClear()
+
+    const handle = screen.getByRole('button', { name: 'Change end time' })
+    fireEvent.pointerDown(handle, { pointerType: 'mouse', button: 0, clientY: 40 })
+    fireEvent.pointerUp(handle, { pointerType: 'mouse', clientY: 40 })
+    fireEvent.click(handle)
+
+    expect(onAdjustOccurrence).not.toHaveBeenCalled()
+    expect(onEditOccurrence).toHaveBeenCalledWith('block-a')
+  })
 })
 
 function calendarResponse(
@@ -912,11 +968,19 @@ describe('WeekGridPage occurrence editing', () => {
     const handle = await screen.findByRole('button', { name: 'Change end time' })
     fireEvent.pointerDown(handle, { pointerType: 'mouse', button: 0, clientY: 0 })
     fireEvent.pointerUp(handle, { pointerType: 'mouse', clientY: 100 })
+    // A real browser dispatches this after the release; if it reaches the
+    // gridcell the editor reopens on the pre-drag times and the drag is lost.
+    fireEvent.click(handle)
 
     expect(await screen.findByRole('dialog')).toHaveTextContent(
       'Only this occurrence',
     )
     expect(api.patch).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    await waitFor(() =>
+      expect(screen.getByLabelText('End time')).toHaveValue('2026-08-10T14:00'),
+    )
   })
 
   it('rejects an end time at or before the start time locally, without a server round trip_D071', async () => {

@@ -179,6 +179,10 @@ export function WeekGrid({
   const [selectedOccurrenceId, setSelectedOccurrenceId] = useState<string | null>(null)
   const [resizePreview, setResizePreview] = useState<GridRange | null>(null)
   const resizeDrag = useRef<ResizeDrag | null>(null)
+  // Cancelling `pointerdown` suppresses only the compatibility mouse events;
+  // the `click` still fires on the handle and bubbles to the gridcell. A
+  // resize that moved must not also be read as a tap on the block.
+  const resizeMoved = useRef(false)
   const dragging = useRef(false)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const touchOrigin = useRef<{ x: number; y: number } | null>(null)
@@ -306,6 +310,7 @@ export function WeekGrid({
     // start of a paint (mouse) or a long-press (touch).
     event.stopPropagation()
     event.preventDefault()
+    resizeMoved.current = false
     const measured = event.currentTarget.parentElement?.getBoundingClientRect().height ?? 0
     resizeDrag.current = {
       occurrenceId: occurrence.id,
@@ -335,7 +340,13 @@ export function WeekGrid({
     resizeDrag.current = null
     setResizePreview(null)
     event.currentTarget.releasePointerCapture?.(event.pointerId)
-    const next = resizedRange(drag, slotDelta(drag, event.clientY))
+    const delta = slotDelta(drag, event.clientY)
+    // A press that never travelled a slot is a tap, not a resize: it must not
+    // fire a no-op adjustment, and its click is left to bubble to the cell so
+    // a block too short to expose any bare body still opens its editor.
+    if (delta === 0) return
+    resizeMoved.current = true
+    const next = resizedRange(drag, delta)
     announceRange(next)
     onAdjustOccurrence?.({ occurrenceId: drag.occurrenceId, ...next })
   }
@@ -344,6 +355,7 @@ export function WeekGrid({
     if (!resizeDrag.current) return
     event.stopPropagation()
     resizeDrag.current = null
+    resizeMoved.current = false
     setResizePreview(null)
   }
 
@@ -495,6 +507,10 @@ export function WeekGrid({
   // drag, so a plain click on a block is otherwise inert — this is the only
   // place that opens it.
   function handleClick(day: number, slot: number) {
+    if (resizeMoved.current) {
+      resizeMoved.current = false
+      return
+    }
     const occurrence = occurrenceAt(day, slot)
     setSelectedOccurrenceId(occurrence?.id ?? null)
     if (occurrence) onEditOccurrence(occurrence.id)
@@ -669,6 +685,9 @@ export function WeekGrid({
               // middle of a multi-hour band. A window that starts before or
               // ends after the clamped viewport keeps its handle on the first
               // or last visible slot, where the viewer can still reach it.
+              // They must stay inside their own cell's box: the handle carries
+              // `touch-none`, so any overhang would kill page scrolling on a
+              // neighbouring free cell (P5-TOUCH-01).
               const selectedHere =
                 onAdjustOccurrence && occurrence && occurrence.id === selectedOccurrenceId
                   ? occurrence
@@ -767,7 +786,7 @@ export function WeekGrid({
                   {selectedHere && isStartSlot && (
                     <button
                       aria-label={t('grid.resizeStart')}
-                      className="absolute inset-x-0 -top-5 z-10 flex h-11 touch-none cursor-ns-resize items-center justify-center bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                      className="absolute inset-x-0 top-0 z-10 flex h-11 touch-none cursor-ns-resize items-start justify-center bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                       type="button"
                       onKeyDown={(event) => handleResizeKeyDown(event, selectedHere, 'start')}
                       onPointerCancel={handleResizeCancel}
@@ -781,7 +800,7 @@ export function WeekGrid({
                   {selectedHere && isEndSlot && (
                     <button
                       aria-label={t('grid.resizeEnd')}
-                      className="absolute inset-x-0 -bottom-5 z-10 flex h-11 touch-none cursor-ns-resize items-center justify-center bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                      className="absolute inset-x-0 bottom-0 z-10 flex h-11 touch-none cursor-ns-resize items-end justify-center bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                       type="button"
                       onKeyDown={(event) => handleResizeKeyDown(event, selectedHere, 'end')}
                       onPointerCancel={handleResizeCancel}
