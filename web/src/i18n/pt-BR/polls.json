@@ -119,6 +119,12 @@
     "confirmTitle": "Finalizar esta enquete?",
     "confirmBody": "Isso cria uma sessão em {{time}} e não pode ser desfeito."
   },
+  "cancel": {
+    "action": "Cancelar enquete",
+    "title": "Cancelar esta enquete?",
+    "body": "Esta ação não pode ser desfeita. Os convidados perdem acesso a esta enquete imediatamente, e os links de convite deles deixam de funcionar.",
+    "confirm": "Cancelar enquete"
+  },
   "guests": {
     "heading": "Links de convidado",
     "mint": "Criar link",

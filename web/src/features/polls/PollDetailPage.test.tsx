@@ -739,4 +739,84 @@ describe('PollDetailPage', () => {
       expect(screen.getByRole('button', { name: 'Revoke' })).toBeInTheDocument()
     })
   })
+
+  describe('organizer cancel (D-156)', () => {
+    it('an organizer confirms cancel, POSTs to the endpoint and lands on /polls_D156', async () => {
+      api.get.mockResolvedValue({ data: pollDetail({ organizerId: 'viewer-1' }) })
+      api.post.mockResolvedValue({})
+      render(
+        <QueryClientProvider
+          client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+        >
+          <MemoryRouter initialEntries={['/polls/poll-1']}>
+            <Routes>
+              <Route path="/polls/:pollId" element={<PollDetailPage />} />
+              <Route path="/polls" element={<div data-testid="navigated-to-polls" />} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      )
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Cancel poll' }))
+      const dialog = screen.getByRole('dialog')
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel poll' }))
+
+      await waitFor(() =>
+        expect(api.post).toHaveBeenCalledWith(
+          '/api/v1/polls/{pollId}/cancel',
+          expect.objectContaining({
+            params: expect.objectContaining({ path: { pollId: 'poll-1' } }),
+          }),
+        ),
+      )
+      expect(await screen.findByTestId('navigated-to-polls')).toBeInTheDocument()
+    })
+
+    // Security-shaped: proves the control is never rendered for a viewer who is not the
+    // organizer — pre-change code has no cancel control at all, so this would already pass
+    // vacuously without the trigger-presence assertion in the organizer test above pairing
+    // it. This test alone catches a regression where the gate is dropped (e.g. `isOrganizer`
+    // check removed or inverted) while the organizer-visible test still passes.
+    it('never shows the cancel control to a non-organizer_D156', async () => {
+      api.get.mockResolvedValue({ data: pollDetail({ organizerId: 'someone-else' }) })
+      renderPage()
+
+      await screen.findByText('Raid night poll')
+      expect(screen.queryByRole('button', { name: 'Cancel poll' })).not.toBeInTheDocument()
+    })
+
+    it('hides the cancel control once the poll is no longer cancelable (expiredPending)_D156', async () => {
+      api.get.mockResolvedValue({
+        data: pollDetail({
+          organizerId: 'viewer-1',
+          status: 'polling',
+          deadline: new Date(Date.now() - 50 * 60 * 60_000).toISOString(),
+          selectionWindowEndsAt: new Date(Date.now() - 60_000).toISOString(),
+        }),
+      })
+      renderPage()
+
+      await screen.findByText('Raid night poll')
+      expect(screen.queryByRole('button', { name: 'Cancel poll' })).not.toBeInTheDocument()
+    })
+
+    it('a rejected (409) cancel surfaces a localized error instead of redirecting_D156', async () => {
+      api.get.mockResolvedValue({ data: pollDetail({ organizerId: 'viewer-1' }) })
+      const ConflictError = class extends Error {
+        status = 409
+        code = 'poll_invalid_transition'
+      }
+      api.post.mockRejectedValue(new ConflictError())
+      renderPage()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Cancel poll' }))
+      const dialog = screen.getByRole('dialog')
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel poll' }))
+
+      expect(
+        await screen.findByText('That change is no longer possible.'),
+      ).toBeInTheDocument()
+      expect(screen.queryByTestId('screen-poll-detail')).toBeInTheDocument()
+    })
+  })
 })

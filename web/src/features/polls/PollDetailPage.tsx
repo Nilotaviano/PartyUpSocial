@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/button'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
 import {
+  cancelPoll,
   createPollGuestLinks,
   finalizePoll,
   getPollDetail,
@@ -93,6 +94,73 @@ function RemoveGuestDialog({ displayName, pending, onConfirm }: RemoveGuestDialo
               }}
             >
               {t('guests.remove')}
+            </Button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  )
+}
+
+type CancelPollDialogProps = {
+  pending: boolean
+  onConfirm: () => void
+}
+
+/**
+ * D-156: the organizer may cancel any time before finalization. Mirrors
+ * SessionDetailPage's CancelSessionDialog exactly — same Dialog structure, focus handling
+ * and danger variants. Guest links are revoked server-side on cancel (D-167/D-174), which is
+ * why the body copy below says so rather than reading as a reversible soft toggle.
+ */
+function CancelPollDialog({ pending, onConfirm }: CancelPollDialogProps) {
+  const { t } = useTranslation('polls')
+  const [open, setOpen] = useState(false)
+  const cancelButton = useRef<HTMLButtonElement>(null)
+
+  return (
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger asChild>
+        <Button disabled={pending} variant="danger">
+          {t('cancel.action')}
+        </Button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-scrim" />
+        <Dialog.Content
+          aria-describedby="poll-cancel-description"
+          aria-label={t('a11y.dialogLabel')}
+          className="fixed left-1/2 top-1/2 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-card border-2 border-ink bg-card p-6 shadow-offset-dialog focus:outline-none"
+          onOpenAutoFocus={(event) => {
+            event.preventDefault()
+            cancelButton.current?.focus()
+          }}
+        >
+          <Dialog.Title className="text-h2 font-display font-semibold text-ink">
+            {t('cancel.title')}
+          </Dialog.Title>
+          <Dialog.Description id="poll-cancel-description" className="mt-2 text-ink-soft">
+            {t('cancel.body')}
+          </Dialog.Description>
+          <div className="mt-6 flex flex-wrap justify-end gap-2">
+            <Dialog.Close asChild>
+              <button
+                ref={cancelButton}
+                className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+                type="button"
+              >
+                {t('dirty.stay')}
+              </button>
+            </Dialog.Close>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => {
+                setOpen(false)
+                onConfirm()
+              }}
+            >
+              {t('cancel.confirm')}
             </Button>
           </div>
         </Dialog.Content>
@@ -464,6 +532,7 @@ export function PollDetailPage() {
   const [suggestNotice, setSuggestNotice] = useState<string | null>(null)
   const [guestPanelError, setGuestPanelError] = useState<unknown>(null)
   const [finalizeError, setFinalizeError] = useState<unknown>(null)
+  const [cancelError, setCancelError] = useState<unknown>(null)
 
   const detail = useQuery({
     queryKey: pollKeys.detail(pollId),
@@ -521,7 +590,16 @@ export function PollDetailPage() {
     },
   })
 
+  const cancel = useMutation({
+    mutationFn: () => cancelPoll(pollId),
+    onError: setCancelError,
+  })
+
   if (detail.isError && isApiError(detail.error) && detail.error.status === 404) {
+    return <Navigate replace to="/polls" />
+  }
+
+  if (cancel.isSuccess) {
     return <Navigate replace to="/polls" />
   }
 
@@ -561,6 +639,7 @@ export function PollDetailPage() {
     (suggest.error && !suggestError ? suggest.error : null) ??
     guestPanelError ??
     finalizeError ??
+    cancelError ??
     mute.error
 
   return (
@@ -737,6 +816,12 @@ export function PollDetailPage() {
               pollId={pollId}
               onError={setFinalizeError}
             />
+          )}
+
+          {isOrganizer && (windowState === 'polling' || windowState === 'awaitingSelection') && (
+            <div>
+              <CancelPollDialog pending={cancel.isPending} onConfirm={() => cancel.mutate()} />
+            </div>
           )}
 
           {isOrganizer && (windowState === 'polling' || windowState === 'awaitingSelection') && (

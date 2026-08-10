@@ -119,6 +119,12 @@
     "confirmTitle": "¿Finalizar esta encuesta?",
     "confirmBody": "Esto crea una sesión a las {{time}} y no se puede deshacer."
   },
+  "cancel": {
+    "action": "Cancelar encuesta",
+    "title": "¿Cancelar esta encuesta?",
+    "body": "Esta acción no se puede deshacer. Los invitados pierden acceso a esta encuesta de inmediato, y sus enlaces de invitación dejan de funcionar.",
+    "confirm": "Cancelar encuesta"
+  },
   "guests": {
     "heading": "Enlaces de invitado",
     "mint": "Crear enlace",

@@ -133,6 +133,14 @@ export async function finalizePoll(pollId: string, optionId: string) {
   return data
 }
 
+// D-156: legal only from Polling/Closed, idempotent, applies due transitions first — the
+// server is the sole enforcer of the rule; the page below only gates when the control is shown.
+export async function cancelPoll(pollId: string) {
+  await client.POST('/api/v1/polls/{pollId}/cancel', {
+    params: { header: csrf, path: { pollId } },
+  })
+}
+
 export type PollWindow = Pick<
   PollDetail | PollSummary,
   'status' | 'deadline' | 'selectionWindowEndsAt'

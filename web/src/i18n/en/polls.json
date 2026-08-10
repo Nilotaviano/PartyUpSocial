@@ -119,6 +119,12 @@
     "confirmTitle": "Finalize this poll?",
     "confirmBody": "This creates a session at {{time}} and cannot be undone."
   },
+  "cancel": {
+    "action": "Cancel poll",
+    "title": "Cancel this poll?",
+    "body": "This cannot be undone. Guests lose access to this poll immediately, and their invitation links stop working.",
+    "confirm": "Cancel poll"
+  },
   "guests": {
     "heading": "Guest links",
     "mint": "Create link",
