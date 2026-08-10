@@ -16,8 +16,9 @@ public sealed record FinalizePollResult(bool Succeeded, string? Code, Poll? Poll
 
 /// <summary>
 /// Organizer finalization (PHASE6_DESIGN.md §2 "Finalize", DOMAIN_MODEL §6.4): the clock-gated window
-/// (due Close applied first, then <c>Deadline &lt;= now &lt; SelectionWindowEndsAt</c>) is entirely
-/// the aggregate's own guard inside <see cref="Poll.Finalize"/> — this use case's job is the single
+/// (due Close applied first, then <c>now &lt; SelectionWindowEndsAt</c>, and before the deadline only
+/// for an option already meeting the minimum — D-187) is entirely the aggregate's own guard inside
+/// <see cref="Poll.Finalize"/> — this use case's job is the single
 /// A-016 transaction around it: lock order per the organizer-only single-actor idiom (users, then the
 /// poll parent — <see cref="PollOptionUseCases.DeleteOptionAsync"/>'s shape), persist the session
 /// <see cref="Poll.Finalize"/> mints (<see cref="ISessionRepository.Add"/>), carry the poll's
@@ -61,19 +62,13 @@ public sealed class FinalizePollUseCase(
                     return FinalizePollResult.Failed("poll_not_found");
                 }
 
-                // Mirrors Poll.Finalize's own unconditional window check (Poll.cs:489-503) so the two
-                // windows surface distinct, honest codes instead of collapsing into poll_voting_closed
-                // -- a transition attempted before the deadline is not yet legal
-                // (poll_invalid_transition); one attempted from the 48-hour selection window's close
-                // onward is the design-named poll_selection_window_closed. Both are evaluated ahead
-                // of, and instead of, the domain call so its WindowClosed exception is never produced
-                // for these two cases.
+                // Mirrors Poll.Finalize's own selection-window check so an attempt from the 48-hour
+                // window's close onward surfaces the design-named poll_selection_window_closed rather
+                // than collapsing into the domain's generic poll_voting_closed. Whether a pre-deadline
+                // attempt is legal is D-187's viability question, which only the aggregate can answer
+                // (it needs the chosen option's mapped roster), so that case reaches the domain call
+                // and comes back as poll_invalid_transition.
                 Instant now = clock.GetCurrentInstant();
-                if (now < poll.Deadline)
-                {
-                    return FinalizePollResult.Failed("poll_invalid_transition");
-                }
-
                 if (now >= poll.SelectionWindowEndsAt)
                 {
                     return FinalizePollResult.Failed("poll_selection_window_closed");

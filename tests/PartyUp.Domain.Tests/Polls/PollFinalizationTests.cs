@@ -392,15 +392,15 @@ public class PollFinalizationTests
     // ---- clock gates ---------------------------------------------------------------------------
 
     [Fact]
-    public void Finalize_IsRejectedBeforeTheDeadline_D079()
+    public void Finalize_IsRejectedBeforeTheDeadlineWhileNoOptionIsViable_D079()
     {
         FakeClock clock = TestPolls.Clock();
-        PollUnderTest fixture = TestPolls.New(clock, minAttendance: 1);
+        PollUnderTest fixture = TestPolls.New(clock, minAttendance: 3);
 
         DomainException error = Assert.Throws<DomainException>(
             () => fixture.Poll.Finalize(fixture.Option(0).Id, TestPolls.At(TestPolls.DefaultDeadline - Duration.FromMinutes(1))));
 
-        Assert.Equal(DomainError.WindowClosed, error.Error);
+        Assert.Equal(DomainError.InvalidTransition, error.Error);
         Assert.Equal(PollStatus.Polling, fixture.Poll.Status);
     }
 
@@ -594,4 +594,123 @@ public class PollFinalizationTests
         Assert.False(session.Find(fixture.InviteeRef(0))!.IsWaitlisted);
         Assert.True(session.Find(fixture.InviteeRef(1))!.IsWaitlisted);
     }
+
+    // ---- D-187 early finalization --------------------------------------------------------------
+
+    /// <summary>Two hours in — deep inside the default 24-hour poll's voting window.</summary>
+    private static FakeClock EarlyTime => TestPolls.At(TestPolls.Hours(2));
+
+    [Fact]
+    public void Finalize_BeforeTheDeadlineOnAViableOption_D187()
+    {
+        FakeClock clock = TestPolls.Clock();
+        PollUnderTest fixture = TestPolls.New(clock, inviteeCount: 3, minAttendance: 3);
+        PollOptionId chosen = fixture.Option(0).Id;
+        fixture.Poll.Vote(fixture.InviteeRef(0), chosen, VoteChoice.Available, clock);
+        fixture.Poll.Vote(fixture.InviteeRef(1), chosen, VoteChoice.Available, clock);
+        fixture.Drain();
+
+        PollFinalizationResult result = fixture.Poll.Finalize(chosen, EarlyTime);
+
+        Assert.Equal(PollStatus.Finalized, fixture.Poll.Status);
+        Assert.Equal(chosen, fixture.Poll.SelectedOptionId);
+        Assert.Equal(SessionStatus.Confirmed, result.Session.Status);
+        Assert.Single(fixture.Drain().OfType<PollOptionSelected>());
+    }
+
+    [Fact]
+    public void Finalize_BeforeTheDeadlineIsRejectedWhenNoOptionIsViable_D187()
+    {
+        FakeClock clock = TestPolls.Clock();
+        PollUnderTest fixture = TestPolls.New(clock, inviteeCount: 3, minAttendance: 3);
+        fixture.Poll.Vote(fixture.InviteeRef(0), fixture.Option(0).Id, VoteChoice.Available, clock);
+
+        DomainException error = Assert.Throws<DomainException>(
+            () => fixture.Poll.Finalize(fixture.Option(0).Id, EarlyTime));
+
+        Assert.Equal(DomainError.InvalidTransition, error.Error);
+        Assert.Equal(PollStatus.Polling, fixture.Poll.Status);
+        Assert.Null(fixture.Poll.SelectedOptionId);
+    }
+
+    [Fact]
+    public void Finalize_BeforeTheDeadlineIsRejectedOnANonViableOptionWhileAnotherIsViable_D187()
+    {
+        FakeClock clock = TestPolls.Clock();
+        PollUnderTest fixture = TestPolls.New(clock, inviteeCount: 3, minAttendance: 3);
+        PollOptionId viable = fixture.Option(0).Id;
+        fixture.Poll.Vote(fixture.InviteeRef(0), viable, VoteChoice.Available, clock);
+        fixture.Poll.Vote(fixture.InviteeRef(1), viable, VoteChoice.Available, clock);
+        fixture.Poll.Vote(fixture.InviteeRef(2), fixture.Option(1).Id, VoteChoice.Available, clock);
+
+        DomainException error = Assert.Throws<DomainException>(
+            () => fixture.Poll.Finalize(fixture.Option(1).Id, EarlyTime));
+
+        Assert.Equal(DomainError.InvalidTransition, error.Error);
+        Assert.Equal(PollStatus.Polling, fixture.Poll.Status);
+
+        fixture.Poll.Finalize(viable, EarlyTime);
+
+        Assert.Equal(PollStatus.Finalized, fixture.Poll.Status);
+    }
+
+    [Fact]
+    public void Finalize_BeforeTheDeadlineCountsAvailableVotesOnly_D187()
+    {
+        FakeClock clock = TestPolls.Clock();
+        PollUnderTest fixture = TestPolls.New(clock, inviteeCount: 3, minAttendance: 3);
+        PollOptionId chosen = fixture.Option(0).Id;
+        fixture.Poll.Vote(fixture.InviteeRef(0), chosen, VoteChoice.Available, clock);
+        fixture.Poll.Vote(fixture.InviteeRef(1), chosen, VoteChoice.Maybe, clock);
+        fixture.Poll.Vote(fixture.InviteeRef(2), chosen, VoteChoice.Maybe, clock);
+
+        // Three responders and the organizer, but only two of them map to Going (D-051).
+        DomainException error = Assert.Throws<DomainException>(
+            () => fixture.Poll.Finalize(chosen, EarlyTime));
+
+        Assert.Equal(DomainError.InvalidTransition, error.Error);
+
+        fixture.Poll.Vote(fixture.InviteeRef(1), chosen, VoteChoice.Available, clock);
+        fixture.Poll.Finalize(chosen, EarlyTime);
+
+        Assert.Equal(PollStatus.Finalized, fixture.Poll.Status);
+    }
+
+    [Fact]
+    public void Finalize_BeforeTheDeadlineProducesTheSameSessionAsAtTheDeadline_D187()
+    {
+        FakeClock clock = TestPolls.Clock();
+        UserId organizer = UserId.New();
+        UserId[] invitees = [UserId.New(), UserId.New(), UserId.New(), UserId.New()];
+
+        Poll early = EquivalencePoll(organizer, invitees, clock);
+        Poll onTime = EquivalencePoll(organizer, invitees, clock);
+
+        foreach (Poll poll in new[] { early, onTime })
+        {
+            PollOptionId chosen = poll.Options[0].Id;
+            poll.Vote(ParticipantRef.ForUser(invitees[0]), chosen, VoteChoice.Available, clock);
+            poll.Vote(ParticipantRef.ForUser(invitees[1]), chosen, VoteChoice.Available, clock);
+            poll.Vote(ParticipantRef.ForUser(invitees[2]), chosen, VoteChoice.Available, clock);
+            poll.Vote(ParticipantRef.ForUser(invitees[3]), chosen, VoteChoice.Maybe, clock);
+        }
+
+        Session earlySession = early.Finalize(early.Options[0].Id, EarlyTime).Session;
+        Session onTimeSession = onTime.Finalize(onTime.Options[0].Id, SelectionTime).Session;
+
+        Assert.Equal(onTimeSession.Status, earlySession.Status);
+        Assert.Equal(onTimeSession.StartTime, earlySession.StartTime);
+        Assert.Equal(
+            onTimeSession.Participations.Select(p => (p.Participant, p.Status, p.IsWaitlisted)),
+            earlySession.Participations.Select(p => (p.Participant, p.Status, p.IsWaitlisted)));
+    }
+
+    private static Poll EquivalencePoll(UserId organizer, IReadOnlyList<UserId> invitees, IClock clock) =>
+        Poll.Create(
+            organizer,
+            TestPolls.Details(minAttendance: 3, maxCapacity: 3),
+            PollDeadlineChoice.Hours24,
+            [TestPolls.Hours(72), TestPolls.Hours(96)],
+            invitees,
+            clock);
 }

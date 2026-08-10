@@ -526,27 +526,36 @@ public sealed class Poll : AggregateRoot
     // ---- §6.4 finalization --------------------------------------------------------------------
 
     /// <summary>
+    /// The finalization mapping without the transition: the roster <see cref="Finalize"/> would
+    /// commit for <paramref name="optionId"/> right now, and whether that option already carries
+    /// the minimum attendance (D-153's arithmetic, which D-187's early gate reads). One allocation
+    /// function, so a preview and the finalization it previews cannot drift.
+    /// </summary>
+    public PollOptionProjection ProjectFinalization(PollOptionId optionId)
+    {
+        PollOption option = _options.Find(o => o.Id == optionId)
+            ?? throw new DomainException(DomainError.NotFound, "No such option on this poll.");
+
+        return Project(option);
+    }
+
+    /// <summary>
     /// The one atomic transition of §6.4. Clock-gated both ways: selection is valid from the
     /// deadline instant onward even if the Close sweep has not run — the due Close is applied
     /// inline — and invalid from <see cref="SelectionWindowEndsAt"/> onward, half-open like every
-    /// window (D-088, §1). Votes on the selected option map per D-051 (Available → Going,
-    /// Maybe → Maybe, Unavailable → Declined, no vote → Pending) with the organizer Going
-    /// regardless (D-155); overflow beyond the maximum is waitlisted in D-119 order; the created
-    /// session's status follows D-153; the poll's guests re-parent with their tokens preserved.
+    /// window (D-088, §1). Before the deadline it is valid only for an option that already meets
+    /// <see cref="MinAttendance"/> (D-187, amending D-079): the organizer ends voting early by
+    /// selecting, and only ever manually. Votes on the selected option map per D-051
+    /// (Available → Going, Maybe → Maybe, Unavailable → Declined, no vote → Pending) with the
+    /// organizer Going regardless (D-155); overflow beyond the maximum is waitlisted in D-119
+    /// order; the created session's status follows D-153; the poll's guests re-parent with their
+    /// tokens preserved.
     /// </summary>
     public PollFinalizationResult Finalize(PollOptionId optionId, IClock clock)
     {
         ArgumentNullException.ThrowIfNull(clock);
 
         Instant now = clock.GetCurrentInstant();
-
-        if (now < Deadline)
-        {
-            throw new DomainException(
-                DomainError.WindowClosed,
-                FormattableString.Invariant(
-                    $"Selection opens at {Deadline}; voting has to close first (D-079, §12-10)."));
-        }
 
         if (now >= SelectionWindowEndsAt)
         {
@@ -557,16 +566,35 @@ public sealed class Poll : AggregateRoot
         }
 
         ApplyDueTransitions(clock);
-        RequireStatus(PollStatus.Closed, "be finalized");
+
+        if (Status is not (PollStatus.Polling or PollStatus.Closed))
+        {
+            throw new DomainException(
+                IsTerminal ? DomainError.TerminalState : DomainError.InvalidTransition,
+                FormattableString.Invariant(
+                    $"Only a Polling or Closed poll can be finalized, but it is {Status}."));
+        }
 
         PollOption option = _options.Find(o => o.Id == optionId)
             ?? throw new DomainException(DomainError.NotFound, "No such option on this poll.");
 
-        (List<FinalizedParticipation> roster, List<ParticipantRef> waitlisted) = AllocateRoster(option);
+        PollOptionProjection projection = Project(option);
+        IReadOnlyList<FinalizedParticipation> roster = projection.Roster;
+        IReadOnlyList<ParticipantRef> waitlisted = projection.Waitlisted;
+        bool meetsMinimum = projection.MeetsMinimum;
 
-        int activeGoing = roster.Count(r => !r.IsWaitlisted && r.Status == ParticipationStatus.Going);
+        // D-187: still Polling means the deadline has not passed, so selecting ends voting early —
+        // allowed only for an option already at the minimum. Available votes are what reaches Going
+        // here; a Maybe maps to Maybe (D-051) and so cannot carry an option over the line.
+        if (Status == PollStatus.Polling && !meetsMinimum)
+        {
+            throw new DomainException(
+                DomainError.InvalidTransition,
+                FormattableString.Invariant(
+                    $"Voting closes at {Deadline}; before then only an option already holding {MinAttendance} available can be selected (D-187)."));
+        }
+
         Instant endTime = option.StartTime + Duration.Value;
-        bool meetsMinimum = activeGoing >= MinAttendance;
 
         // D-153: an ended option settles immediately as Completed or Expired; anything else — future
         // or in progress — goes through the normal confirmation evaluation.
@@ -884,6 +912,15 @@ public sealed class Poll : AggregateRoot
     /// (§12-14). The organizer is excluded from the ordered lists so an organizer who voted
     /// Available earliest is allocated exactly once.
     /// </summary>
+    private PollOptionProjection Project(PollOption option)
+    {
+        (List<FinalizedParticipation> roster, List<ParticipantRef> waitlisted) = AllocateRoster(option);
+        int activeGoing = roster.Count(r => !r.IsWaitlisted && r.Status == ParticipationStatus.Going);
+
+        return new PollOptionProjection(
+            option.Id, option.StartTime, activeGoing >= MinAttendance, roster, waitlisted);
+    }
+
     private (List<FinalizedParticipation> Roster, List<ParticipantRef> Waitlisted) AllocateRoster(PollOption option)
     {
         ParticipantRef organizer = ParticipantRef.ForUser(OrganizerId);

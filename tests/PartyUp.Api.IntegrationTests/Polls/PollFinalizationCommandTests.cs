@@ -405,8 +405,91 @@ public sealed class PollFinalizationCommandTests : IAsyncLifetime, IDisposable
             .AnyAsync(n => n.PollId == pollId && n.Type == NotificationType.PollOptionSelected));
     }
 
+    /// <summary>
+    /// D-187 over the real transaction: before the deadline the organizer's selection is refused
+    /// while the option is short of the minimum and committed once it is not -- one path, so the
+    /// early finalization persists the same session, notifications and status any other would.
+    /// </summary>
+    [Fact]
+    public async Task Finalize_BeforeTheDeadline_IsRefusedUntilTheOptionIsViable_D187()
+    {
+        (PollId pollId, UserId organizerId, UserId inviteeId, PollOptionId optionId) =
+            await SeedPollAsync(startOffset: Duration.FromDays(4), minAttendance: 2);
+
+        await using (AsyncServiceScope earlyScope = _factory.Services.CreateAsyncScope())
+        {
+            FinalizePollResult tooEarly = await PollTestHelpers.BuildFinalizeUseCase(earlyScope)
+                .FinalizeAsync(pollId, organizerId, optionId, default);
+            Assert.False(tooEarly.Succeeded);
+            Assert.Equal("poll_invalid_transition", tooEarly.Code);
+        }
+
+        await using (AsyncServiceScope voteScope = _factory.Services.CreateAsyncScope())
+        {
+            PollCommandResult voted = await PollTestHelpers.BuildVoteUseCases(voteScope)
+                .VoteAsync(pollId, inviteeId, optionId, VoteChoice.Available, default);
+            Assert.True(voted.Succeeded, voted.Code);
+        }
+
+        // Still inside the 6-hour voting window: the organizer, plus one Available vote, is the
+        // minimum -- the poll goes Polling -> Finalized without ever materializing Closed.
+        await using AsyncServiceScope finalizeScope = _factory.Services.CreateAsyncScope();
+        FinalizePollResult result = await PollTestHelpers.BuildFinalizeUseCase(finalizeScope)
+            .FinalizeAsync(pollId, organizerId, optionId, default);
+        Assert.True(result.Succeeded, result.Code);
+        Assert.Equal(PollStatus.Finalized, result.Poll!.Status);
+        Assert.Equal(SessionStatus.Confirmed, result.Session!.Status);
+
+        await using AsyncServiceScope readScope = _factory.Services.CreateAsyncScope();
+        AppDbContext readContext = readScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        Poll persistedPoll = await readContext.Polls.AsNoTracking().SingleAsync(p => p.Id == pollId);
+        Assert.Equal(PollStatus.Finalized, persistedPoll.Status);
+        Assert.Equal(optionId, persistedPoll.SelectedOptionId);
+
+        Session persisted = await readContext.Sessions.AsNoTracking()
+            .Include(s => s.Participations)
+            .SingleAsync(s => s.Id == result.Session!.Id);
+        Assert.Equal(2, persisted.Participations.Count);
+
+        List<Notification> optionSelected = await readContext.Notifications.AsNoTracking()
+            .Where(n => n.PollId == pollId && n.Type == NotificationType.PollOptionSelected)
+            .ToListAsync();
+        Assert.Equal(2, optionSelected.Count);
+    }
+
+    /// <summary>D-187 counts Available only: a Maybe maps to Maybe (D-051) and never opens the gate.</summary>
+    [Fact]
+    public async Task Finalize_BeforeTheDeadline_DoesNotCountAMaybeVote_D187()
+    {
+        (PollId pollId, UserId organizerId, UserId inviteeId, PollOptionId optionId) =
+            await SeedPollAsync(startOffset: Duration.FromDays(4), minAttendance: 2);
+
+        await using (AsyncServiceScope voteScope = _factory.Services.CreateAsyncScope())
+        {
+            PollCommandResult voted = await PollTestHelpers.BuildVoteUseCases(voteScope)
+                .VoteAsync(pollId, inviteeId, optionId, VoteChoice.Maybe, default);
+            Assert.True(voted.Succeeded, voted.Code);
+        }
+
+        await using AsyncServiceScope finalizeScope = _factory.Services.CreateAsyncScope();
+        FinalizePollResult result = await PollTestHelpers.BuildFinalizeUseCase(finalizeScope)
+            .FinalizeAsync(pollId, organizerId, optionId, default);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("poll_invalid_transition", result.Code);
+
+        await using AsyncServiceScope readScope = _factory.Services.CreateAsyncScope();
+        AppDbContext readContext = readScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(
+            PollStatus.Polling,
+            (await readContext.Polls.AsNoTracking().SingleAsync(p => p.Id == pollId)).Status);
+        Assert.False(await readContext.Sessions.AsNoTracking().AnyAsync(s => s.OriginPollId == pollId));
+    }
+
     private async Task<(PollId PollId, UserId OrganizerId, UserId InviteeId, PollOptionId OptionId)> SeedPollAsync(
-        Duration startOffset)
+        Duration startOffset,
+        int minAttendance = 1)
     {
         UserId organizerId = await _factory.SeedUserAsync(email: $"poll-fin-org-{Guid.NewGuid():N}@example.test");
         UserId inviteeId = await _factory.SeedUserAsync(email: $"poll-fin-invitee-{Guid.NewGuid():N}@example.test");
@@ -425,7 +508,7 @@ public sealed class PollFinalizationCommandTests : IAsyncLifetime, IDisposable
                 Platform: null,
                 Game: null,
                 Notes: null,
-                MinAttendance: 1,
+                MinAttendance: minAttendance,
                 MaxCapacity: null,
                 IsPrivate: false,
                 OptionStartTimes: [now + startOffset, now + startOffset + Duration.FromHours(1)],

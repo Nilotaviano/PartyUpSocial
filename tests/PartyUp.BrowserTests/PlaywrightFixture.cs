@@ -619,9 +619,15 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         await requester.Page.GetByText("Friend request sent.").WaitForAsync();
 
         await recipient.Page.GotoAsync(WebBaseUrl + "/friends");
-        await recipient.Page
-            .GetByRole(AriaRole.Button, new() { Name = $"Accept request @{requester.Username}" })
-            .ClickAsync();
+        ILocator acceptButton = recipient.Page
+            .GetByRole(AriaRole.Button, new() { Name = $"Accept request @{requester.Username}" });
+        await acceptButton.ClickAsync();
+        // Callers navigate `recipient.Page` immediately after this returns; returning on the click
+        // alone lets that navigation abort the in-flight accept POST, which the server then sees as
+        // a cancelled request and answers 500 — so wait for the accept mutation to actually settle
+        // (the pending-request row leaving the list). A genuine accept failure leaves the button in
+        // place and fails here, which is the point.
+        await acceptButton.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached });
     }
 
     /// <summary>

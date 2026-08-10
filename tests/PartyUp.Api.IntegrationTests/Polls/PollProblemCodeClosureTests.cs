@@ -260,8 +260,10 @@ public sealed class PollProblemCodeClosureTests : IAsyncLifetime, IDisposable
         UserId organizerId = await _factory.SeedUserAsync(email: $"poll-code-window-{Guid.NewGuid():N}@example.test");
         using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
 
-        // Outcome 1: finalize attempted before the deadline -- not yet a legal transition.
-        (Guid earlyPollId, Guid earlyOptionId) = await CreatePollWithFirstOptionAsync(organizerSession, []);
+        // Outcome 1: finalize attempted before the deadline on an option nobody has carried to the
+        // minimum -- not yet a legal transition (D-187 opens this only for a viable option).
+        (Guid earlyPollId, Guid earlyOptionId) =
+            await CreatePollWithFirstOptionAsync(organizerSession, [], minAttendance: 2);
         await SessionEndpointTestSupport.AssertProblemAsync(
             await organizerSession.SendUnsafeAsync(
                 HttpMethod.Post,
@@ -417,7 +419,8 @@ public sealed class PollProblemCodeClosureTests : IAsyncLifetime, IDisposable
         return body.RootElement.GetProperty("poll").GetProperty("id").GetGuid();
     }
 
-    private async Task<Guid> CreatePollWithInviteesAsync(SessionHttpSession organizerSession, IReadOnlyList<UserId> inviteeIds)
+    private async Task<Guid> CreatePollWithInviteesAsync(
+        SessionHttpSession organizerSession, IReadOnlyList<UserId> inviteeIds, int minAttendance = 1)
     {
         Instant baseTime = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
         HttpResponseMessage created = await organizerSession.SendUnsafeAsync(
@@ -432,7 +435,7 @@ public sealed class PollProblemCodeClosureTests : IAsyncLifetime, IDisposable
                     SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)),
                 },
                 isPrivate = inviteeIds.Count == 0,
-                minAttendance = 1,
+                minAttendance,
                 inviteeUserIds = inviteeIds.Select(id => id.Value).ToArray(),
             }));
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
@@ -441,9 +444,9 @@ public sealed class PollProblemCodeClosureTests : IAsyncLifetime, IDisposable
     }
 
     private async Task<(Guid PollId, Guid OptionId)> CreatePollWithFirstOptionAsync(
-        SessionHttpSession organizerSession, IReadOnlyList<UserId> inviteeIds)
+        SessionHttpSession organizerSession, IReadOnlyList<UserId> inviteeIds, int minAttendance = 1)
     {
-        Guid pollId = await CreatePollWithInviteesAsync(organizerSession, inviteeIds);
+        Guid pollId = await CreatePollWithInviteesAsync(organizerSession, inviteeIds, minAttendance);
         using JsonDocument detail = await SessionEndpointTestSupport.SuccessJsonAsync(
             await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}"));
         Guid optionId = detail.RootElement.GetProperty("options")[0].GetProperty("id").GetGuid();

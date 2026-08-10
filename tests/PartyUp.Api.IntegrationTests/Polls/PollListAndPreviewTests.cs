@@ -470,17 +470,27 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
 
     // ---- finalization preview ---------------------------------------------------------------------
 
+    /// <summary>
+    /// D-187: the preview is what tells the organizer which option is already viable, so it is
+    /// readable while the poll is still Polling -- it closes only with the selection window.
+    /// </summary>
     [Fact]
-    public async Task Preview_PreDeadlineIs409_InWindowIs200_PostWindowIs422()
+    public async Task Preview_PreDeadlineIs200_InWindowIs200_PostWindowIs422_D187()
     {
         UserId organizerId = await _factory.SeedUserAsync(email: $"pl-preview-window-{Guid.NewGuid():N}@example.test");
         using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
 
         (Guid earlyPollId, _) = await CreatePollWithFirstOptionAsync(organizerSession);
-        await SessionEndpointTestSupport.AssertProblemAsync(
-            await organizerSession.GetAsync($"/api/v1/polls/{earlyPollId:D}/finalization-preview"),
-            HttpStatusCode.Conflict,
-            "poll_invalid_transition");
+        HttpResponseMessage earlyPreview = await organizerSession.GetAsync(
+            $"/api/v1/polls/{earlyPollId:D}/finalization-preview");
+        Assert.Equal(HttpStatusCode.OK, earlyPreview.StatusCode);
+        using JsonDocument earlyBody = await SessionEndpointTestSupport.SuccessJsonAsync(earlyPreview);
+        JsonElement earlyOptions = earlyBody.RootElement.GetProperty("options");
+        Assert.Equal(2, earlyOptions.GetArrayLength());
+        // minAttendance 1 and the organizer always Going (D-155): both options already qualify.
+        Assert.All(
+            earlyOptions.EnumerateArray(),
+            option => Assert.True(option.GetProperty("meetsMinimum").GetBoolean()));
 
         (Guid onTimePollId, _) = await CreatePollWithFirstOptionAsync(organizerSession);
         _factory.Clock.Advance(Duration.FromHours(25));

@@ -79,51 +79,6 @@ public sealed class PushEnableFlowTests(PlaywrightFixture fixture)
     private static readonly string[] ExpectedDropFilePropertyNames =
         [.. new[] { "subscriptionId", "title", "body", "url", "tag" }.OrderBy(name => name, StringComparer.Ordinal)];
 
-    /// <summary>
-    /// A retrying wrapper around <see cref="PlaywrightFixture.BefriendAsync"/>: this lane's
-    /// spawned-process trigger seam (`Push:DispatchIntervalSeconds=2`) adds constant background
-    /// DB traffic for the whole run, which has been observed to make the
-    /// friend-request accept call race `FriendPairLocker`'s row lock and 500 once in this
-    /// collection — a transport-level flake, never a UI assertion failure, so this only re-clicks
-    /// Accept (never re-sends the request, which would 409 `friend_request_already_exists` on a
-    /// retry after a transient accept failure).
-    /// </summary>
-    private static async Task BefriendWithRetryAsync(RegisteredUser requester, RegisteredUser recipient)
-    {
-        string recipientCode = await PlaywrightFixture.GetOwnFriendCodeAsync(recipient.Page);
-        await requester.Page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/add/" + recipientCode);
-        await requester.Page.GetByRole(AriaRole.Button, new() { Name = "Send friend request" }).ClickAsync();
-        await requester.Page.GetByText("Friend request sent.").WaitForAsync();
-
-        await recipient.Page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/friends");
-        ILocator acceptButton = recipient.Page.GetByRole(
-            AriaRole.Button, new() { Name = $"Accept request @{requester.Username}" });
-
-        for (int attempt = 1; attempt <= 3; attempt++)
-        {
-            await acceptButton.ClickAsync();
-            try
-            {
-                await acceptButton.WaitForAsync(
-                    new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = 5000 });
-                return;
-            }
-            catch (TimeoutException) when (attempt < 3)
-            {
-                // The accept call 500'd (a transient lock race, per this method's remarks) — the
-                // button is still there because the mutation's `onSuccess` invalidation never ran.
-                // A reload before retrying re-reads the pending-request list from the server rather
-                // than trusting stale client state.
-                await recipient.Page.ReloadAsync();
-            }
-        }
-
-        // Fall through to a final, unguarded wait so a genuine (non-transient) failure still
-        // surfaces Playwright's own real timeout/assertion, not a silently-swallowed retry loop.
-        await acceptButton.WaitForAsync(
-            new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = 5000 });
-    }
-
     private static string StartTimeValue() =>
         DateTime.UtcNow.AddDays(1).Date.AddHours(18).ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
 
@@ -172,7 +127,7 @@ public sealed class PushEnableFlowTests(PlaywrightFixture fixture)
         // a private session), so it runs first, off `recipient`'s own page, with no such dependency;
         // only `sender`'s page (never touched since the initial friend-request step) reads the
         // now-settled friends list later, for the notification-producing session.
-        await BefriendWithRetryAsync(sender, recipient);
+        await PlaywrightFixture.BefriendAsync(sender, recipient);
 
         // D-147 qualifying action ("creating a session") — private, so no invitee is required.
         await recipient.Page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/sessions/new");
@@ -226,7 +181,7 @@ public sealed class PushEnableFlowTests(PlaywrightFixture fixture)
             sender.Page, "Push lane notification-producing session", recipient);
         string expectedTag = $"session:{sessionId}";
 
-        // `since` is captured before this call, but `BefriendWithRetryAsync` above already sent
+        // `since` is captured before this call, but `BefriendAsync` above already sent
         // `recipient` a `friendRequestReceived` notification whose OWN dispatch can legitimately
         // land after `since` (dispatch is async, on the trigger seam's own 2s cadence) — so this
         // polls for the specific `tag` this test cares about rather than asserting the directory

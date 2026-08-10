@@ -18,14 +18,14 @@ public sealed record PollFinalizationPreviewResult(
 
 /// <summary>
 /// Organizer preview (PHASE6_DESIGN.md §4 "GET /{id}/finalization-preview", design §5 "Preview
-/// guarantee"): the SAME clock-inclusive window <see cref="FinalizePollUseCase"/> gates on (due Close
-/// applied first, then <c>Deadline &lt;= now &lt; SelectionWindowEndsAt</c>) -- never materialized
-/// <c>Closed</c> alone (§6.1's never-delays-the-organizer promise). Per candidate option, this calls
-/// the exact <see cref="Poll.Finalize"/> the real finalization commits, on a freshly loaded, untracked
-/// aggregate this use case never persists (no <c>IUnitOfWork</c>, no <c>SaveChanges</c> anywhere in
-/// this file) -- so the shared allocation function's output is reused verbatim: no state mutation, no
-/// notification, identical inputs give identical outputs to what <see cref="FinalizePollUseCase"/>
-/// would commit right now for that option.
+/// guarantee"): open for the whole live poll -- D-187 lets the organizer select before the deadline
+/// once an option is viable, so the preview that tells them which one is viable has to be readable
+/// then too; it closes with the selection window (<c>now &lt; SelectionWindowEndsAt</c>). Per
+/// candidate option this calls <see cref="Poll.ProjectFinalization"/> -- the exact mapping and
+/// allocation <see cref="Poll.Finalize"/> commits, minus the transition -- on an untracked aggregate
+/// this use case never persists (no <c>IUnitOfWork</c>, no <c>SaveChanges</c> anywhere in this file):
+/// no state mutation, no notification, identical inputs give identical outputs to what
+/// <see cref="FinalizePollUseCase"/> would commit right now for that option.
 /// </summary>
 public sealed class PollFinalizationPreviewUseCase(
     IPollRepository polls,
@@ -53,16 +53,9 @@ public sealed class PollFinalizationPreviewUseCase(
             return PollFinalizationPreviewResult.Failed("poll_invalid_transition");
         }
 
-        // Mirrors FinalizePollUseCase's own pre-check split (Poll.Finalize's unconditional window
-        // guard is evaluated a second time below, per simulated option, but these two outcomes are
-        // reported once here so a poll with zero options still fails honestly rather than looping
-        // zero times and returning an empty, misleadingly-"successful" preview.
+        // Mirrors FinalizePollUseCase's own pre-check so a poll with zero options fails honestly
+        // rather than looping zero times and returning an empty, misleadingly-"successful" preview.
         Instant now = clock.GetCurrentInstant();
-        if (now < poll.Deadline)
-        {
-            return PollFinalizationPreviewResult.Failed("poll_invalid_transition");
-        }
-
         if (now >= poll.SelectionWindowEndsAt)
         {
             return PollFinalizationPreviewResult.Failed("poll_selection_window_closed");
@@ -88,12 +81,10 @@ public sealed class PollFinalizationPreviewUseCase(
         List<PollFinalizationPreviewOption> previews = [];
         foreach (PollOption option in poll.Options)
         {
-            Poll simulated = (await polls.FindNoTrackingAsync(pollId, cancellationToken))!;
-
-            PollFinalizationResult result;
+            PollOptionProjection projection;
             try
             {
-                result = simulated.Finalize(option.Id, clock);
+                projection = poll.ProjectFinalization(option.Id);
             }
             catch (DomainException exception)
             {
@@ -101,21 +92,20 @@ public sealed class PollFinalizationPreviewUseCase(
             }
 
             List<PollFinalizationPreviewRosterEntry> roster = [];
-            foreach (Participation participation in result.Session.Participations)
+            foreach (FinalizedParticipation entry in projection.Roster)
             {
-                DisplayName? displayName = participation.UserId is { } userId
+                DisplayName? displayName = entry.Participant.UserId is { } userId
                     ? displayNames.GetValueOrDefault(userId.Value)
-                    : participation.GuestIdentityId is { } guestId
+                    : entry.Participant.GuestIdentityId is { } guestId
                         ? poll.GuestIdentities.FirstOrDefault(g => g.Id == guestId)?.DisplayName
                         : null;
 
                 roster.Add(new PollFinalizationPreviewRosterEntry(
-                    participation.Participant, displayName, participation.Status, participation.IsWaitlisted));
+                    entry.Participant, displayName, entry.Status, entry.IsWaitlisted));
             }
 
-            int activeGoing = roster.Count(r => !r.IsWaitlisted && r.Status == ParticipationStatus.Going);
             previews.Add(new PollFinalizationPreviewOption(
-                option.Id, option.StartTime, activeGoing >= poll.MinAttendance, roster));
+                projection.OptionId, projection.StartTime, projection.MeetsMinimum, roster));
         }
 
         return PollFinalizationPreviewResult.Ok(previews);
