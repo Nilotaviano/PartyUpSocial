@@ -114,6 +114,8 @@
   },
   "finalize": {
     "heading": "Choose a time",
+    "earlyHeading": "Finalize early",
+    "earlyNotice": "Enough people are available for at least one time. Finalizing now ends voting immediately and creates the session.",
     "previewGuarantee": "This preview and finalizing use the same rule — the same inputs always produce the same result. If something changes in between (an option is removed, or someone's access changes), the outcome may differ from what's shown here.",
     "chooseOption": "Choose the time to finalize",
     "belowMinimum": "Below minimum attendance",
@@ -121,7 +123,9 @@
     "waitlisted": "Waitlisted: {{names}}",
     "action": "Finalize",
     "confirmTitle": "Finalize this poll?",
-    "confirmBody": "This creates a session at {{time}} and cannot be undone."
+    "confirmTitleEarly": "End voting and finalize?",
+    "confirmBody": "This creates a session at {{time}} and cannot be undone.",
+    "confirmBodyEarly": "This closes voting right now and creates a session at {{time}}. It cannot be undone."
   },
   "cancel": {
     "action": "Cancel poll",

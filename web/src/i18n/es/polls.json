@@ -114,6 +114,8 @@
   },
   "finalize": {
     "heading": "Elegir un horario",
+    "earlyHeading": "Finalizar antes del plazo",
+    "earlyNotice": "Hay suficiente gente disponible para al menos un horario. Finalizar ahora cierra la votación de inmediato y crea la sesión.",
     "previewGuarantee": "Esta vista previa y la finalización usan la misma regla: las mismas entradas siempre producen el mismo resultado. Si algo cambia mientras tanto (se elimina una opción o cambia el acceso de alguien), el resultado puede diferir de lo mostrado aquí.",
     "chooseOption": "Elige el horario para finalizar",
     "belowMinimum": "Por debajo de la asistencia mínima",
@@ -121,7 +123,9 @@
     "waitlisted": "En lista de espera: {{names}}",
     "action": "Finalizar",
     "confirmTitle": "¿Finalizar esta encuesta?",
-    "confirmBody": "Esto crea una sesión a las {{time}} y no se puede deshacer."
+    "confirmTitleEarly": "¿Cerrar la votación y finalizar?",
+    "confirmBody": "Esto crea una sesión a las {{time}} y no se puede deshacer.",
+    "confirmBodyEarly": "Esto cierra la votación ahora y crea una sesión a las {{time}}. No se puede deshacer."
   },
   "cancel": {
     "action": "Cancelar encuesta",

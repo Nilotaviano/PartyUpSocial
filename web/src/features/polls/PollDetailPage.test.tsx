@@ -653,6 +653,80 @@ describe('PollDetailPage', () => {
       expect(screen.queryByTestId('finalize-option-option-1')).not.toBeInTheDocument()
     })
 
+    /**
+     * D-187: a still-polling poll offers the organizer an early finalize, but only for options the
+     * server reports as viable, and the copy has to say that confirming ends voting now.
+     */
+    it('offers early finalization on a viable option while the poll is still polling_D187', async () => {
+      const preview = previewResponse()
+      preview.options.push({
+        optionId: 'option-2',
+        startTime: '2099-02-01T10:00:00Z',
+        meetsMinimum: false,
+        roster: [],
+      })
+      api.get.mockImplementation((path: string) =>
+        Promise.resolve({
+          data: path.includes('finalization-preview')
+            ? preview
+            : pollDetail({
+                organizerId: 'viewer-1',
+                status: 'polling',
+                deadline: new Date(Date.now() + 60 * 60_000).toISOString(),
+              }),
+        }),
+      )
+      renderPage()
+
+      expect(await screen.findByText('Finalize early')).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          'Enough people are available for at least one time. Finalizing now ends voting immediately and creates the session.',
+        ),
+      ).toBeInTheDocument()
+      expect(screen.getByTestId('finalize-option-option-1')).toBeInTheDocument()
+      // The non-viable option is not selectable early at all — it is not offered.
+      expect(screen.queryByTestId('finalize-option-option-2')).not.toBeInTheDocument()
+
+      fireEvent.click(
+        within(screen.getByTestId('finalize-option-option-1')).getByRole('radio'),
+      )
+      fireEvent.click(await screen.findByTestId('finalize-trigger'))
+
+      expect(screen.getByText('End voting and finalize?')).toBeInTheDocument()
+      expect(
+        screen.getByText(/This closes voting right now and creates a session at/),
+      ).toBeInTheDocument()
+    })
+
+    it('offers no early finalization while no option is viable_D187', async () => {
+      api.get.mockImplementation((path: string) =>
+        Promise.resolve({
+          data: path.includes('finalization-preview')
+            ? {
+                options: [
+                  {
+                    optionId: 'option-1',
+                    startTime: '2099-01-01T10:00:00Z',
+                    meetsMinimum: false,
+                    roster: [],
+                  },
+                ],
+              }
+            : pollDetail({
+                organizerId: 'viewer-1',
+                status: 'polling',
+                deadline: new Date(Date.now() + 60 * 60_000).toISOString(),
+              }),
+        }),
+      )
+      renderPage()
+
+      await screen.findByText('Raid night poll')
+      expect(screen.queryByText('Finalize early')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('finalize-option-option-1')).not.toBeInTheDocument()
+    })
+
     it('shows no selection controls in expiredPending, only the S5 notice', async () => {
       api.get.mockResolvedValue({
         data: pollDetail({
@@ -673,13 +747,17 @@ describe('PollDetailPage', () => {
 
   describe('organizer guest panel continued (S6, D-044)', () => {
     it('hides the mint control in awaitingSelection_F4b', async () => {
-      api.get.mockResolvedValue({
-        data: pollDetail({
-          organizerId: 'viewer-1',
-          status: 'closed',
-          deadline: new Date(Date.now() - 60_000).toISOString(),
+      api.get.mockImplementation((path: string) =>
+        Promise.resolve({
+          data: path.includes('finalization-preview')
+            ? { options: [] }
+            : pollDetail({
+                organizerId: 'viewer-1',
+                status: 'closed',
+                deadline: new Date(Date.now() - 60_000).toISOString(),
+              }),
         }),
-      })
+      )
       renderPage()
 
       expect(await screen.findByText('Guest links')).toBeInTheDocument()
@@ -689,25 +767,27 @@ describe('PollDetailPage', () => {
 
     it('a link minted before the deadline stays listed and revokable once the poll moves to awaitingSelection_F4c', async () => {
       let closed = false
-      api.get.mockImplementation(() =>
-        Promise.resolve({
-          data: pollDetail({
-            organizerId: 'viewer-1',
-            status: closed ? 'closed' : 'polling',
-            deadline: closed
-              ? new Date(Date.now() - 60_000).toISOString()
-              : new Date(Date.now() + 60 * 60_000).toISOString(),
-            roster: [
-              {
-                participationId: 'participation-3',
-                userId: null,
-                guestIdentityId: 'guest-9',
-                displayName: 'Casey',
-                isActive: true,
-              },
-            ],
-          }),
-        }),
+      api.get.mockImplementation((path: string) =>
+        path.includes('finalization-preview')
+          ? Promise.resolve({ data: { options: [] } })
+          : Promise.resolve({
+              data: pollDetail({
+                organizerId: 'viewer-1',
+                status: closed ? 'closed' : 'polling',
+                deadline: closed
+                  ? new Date(Date.now() - 60_000).toISOString()
+                  : new Date(Date.now() + 60 * 60_000).toISOString(),
+                roster: [
+                  {
+                    participationId: 'participation-3',
+                    userId: null,
+                    guestIdentityId: 'guest-9',
+                    displayName: 'Casey',
+                    isActive: true,
+                  },
+                ],
+              }),
+            }),
       )
       api.post.mockImplementation((path: string) =>
         path === '/api/v1/polls/{pollId}/guest-links'

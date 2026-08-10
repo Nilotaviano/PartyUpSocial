@@ -313,15 +313,17 @@ function GuestPanel({ pollId, roster, canMint, onError, clearError }: GuestPanel
 type FinalizeDialogProps = {
   option: FinalizationPreviewOption
   locale: string
+  early: boolean
   pending: boolean
   onConfirm: () => void
 }
 
 /**
  * design §5 (kit confirm Dialog): finalize is a destructive, irreversible transition — one option
- * is selected and confirmed behind the shipped Dialog idiom before the mutation fires.
+ * is selected and confirmed behind the shipped Dialog idiom before the mutation fires. Before the
+ * deadline (D-187) the confirmation also says what else it does: voting stops there and then.
  */
-function FinalizeDialog({ option, locale, pending, onConfirm }: FinalizeDialogProps) {
+function FinalizeDialog({ option, locale, early, pending, onConfirm }: FinalizeDialogProps) {
   const { t } = useTranslation('polls')
   const [open, setOpen] = useState(false)
   const cancelButton = useRef<HTMLButtonElement>(null)
@@ -354,10 +356,10 @@ function FinalizeDialog({ option, locale, pending, onConfirm }: FinalizeDialogPr
           }}
         >
           <Dialog.Title className="text-h2 font-display font-semibold text-ink">
-            {t('finalize.confirmTitle')}
+            {t(early ? 'finalize.confirmTitleEarly' : 'finalize.confirmTitle')}
           </Dialog.Title>
           <Dialog.Description id="poll-finalize-description" className="mt-2 text-ink-soft">
-            {t('finalize.confirmBody', { time: optionText })}
+            {t(early ? 'finalize.confirmBodyEarly' : 'finalize.confirmBody', { time: optionText })}
           </Dialog.Description>
           <div className="mt-6 flex flex-wrap justify-end gap-2">
             <Dialog.Close asChild>
@@ -390,6 +392,7 @@ function FinalizeDialog({ option, locale, pending, onConfirm }: FinalizeDialogPr
 type FinalizeSectionProps = {
   pollId: string
   locale: string
+  early: boolean
   onError: (error: unknown) => void
 }
 
@@ -400,8 +403,11 @@ type FinalizeSectionProps = {
  * exact preview-guarantee copy: preview and finalization share one mapping/allocation function —
  * identical inputs give identical outputs; a shown preview can still differ from the outcome when
  * inputs legitimately change in between. No stronger claim is made anywhere in this UI.
+ *
+ * `early` is the D-187 entry: the poll is still Polling, so only options the server already reports
+ * as `meetsMinimum` may be selected, and selecting one ends voting there and then.
  */
-function FinalizeSection({ pollId, locale, onError }: FinalizeSectionProps) {
+function FinalizeSection({ pollId, locale, early, onError }: FinalizeSectionProps) {
   const { t } = useTranslation('polls')
   const navigate = useNavigate()
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null)
@@ -418,8 +424,16 @@ function FinalizeSection({ pollId, locale, onError }: FinalizeSectionProps) {
     onError,
   })
 
-  const options = preview.data?.options ?? []
+  // D-187: while the poll is still Polling only a viable option may be selected, so the others are
+  // not offered at all; with none viable there is no early finalization to offer yet.
+  const options = (preview.data?.options ?? []).filter((option) => !early || option.meetsMinimum)
   const selected = options.find((option) => option.optionId === selectedOptionId) ?? null
+
+  // Nothing to show until the preview says an option is viable — no loading shell, no error banner
+  // on a page whose main business is still voting.
+  if (early && !(preview.isSuccess && options.length > 0)) {
+    return null
+  }
 
   if (preview.isError) {
     return (
@@ -442,8 +456,13 @@ function FinalizeSection({ pollId, locale, onError }: FinalizeSectionProps) {
   return (
     <section aria-labelledby="poll-finalize-heading">
       <h2 id="poll-finalize-heading" className="text-h2 font-display font-semibold text-ink">
-        {t('finalize.heading')}
+        {t(early ? 'finalize.earlyHeading' : 'finalize.heading')}
       </h2>
+      {early && (
+        <p className="text-ink" data-testid="finalize-early-notice">
+          {t('finalize.earlyNotice')}
+        </p>
+      )}
       <p className="text-ink-soft">{t('finalize.previewGuarantee')}</p>
 
       {preview.isPending && <p role="status">{t('common.loading', { ns: 'common' })}</p>}
@@ -505,6 +524,7 @@ function FinalizeSection({ pollId, locale, onError }: FinalizeSectionProps) {
       {selected && (
         <div className="mt-3">
           <FinalizeDialog
+            early={early}
             locale={locale}
             option={selected}
             pending={finalize.isPending}
@@ -550,6 +570,8 @@ export function PollDetailPage() {
     setStatus(message)
     setPendingOptionId(null)
     await queryClient.invalidateQueries({ queryKey: pollKeys.detail(pollId) })
+    // A vote is what moves an option over the D-187 line, so the organizer's preview goes stale.
+    await queryClient.invalidateQueries({ queryKey: pollKeys.finalizationPreview(pollId) })
   }
 
   const vote = useMutation({
@@ -851,8 +873,9 @@ export function PollDetailPage() {
             </ul>
           </section>
 
-          {isOrganizer && windowState === 'awaitingSelection' && (
+          {isOrganizer && (windowState === 'awaitingSelection' || windowState === 'polling') && (
             <FinalizeSection
+              early={windowState === 'polling'}
               locale={i18n.language}
               pollId={pollId}
               onError={setFinalizeError}

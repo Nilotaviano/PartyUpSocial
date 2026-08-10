@@ -114,6 +114,8 @@
   },
   "finalize": {
     "heading": "Escolha um horário",
+    "earlyHeading": "Finalizar antes do prazo",
+    "earlyNotice": "Há gente disponível suficiente para pelo menos um horário. Finalizar agora encerra a votação imediatamente e cria a sessão.",
     "previewGuarantee": "Esta prévia e a finalização usam a mesma regra — as mesmas entradas sempre produzem o mesmo resultado. Se algo mudar nesse meio-tempo (uma opção for removida, ou o acesso de alguém mudar), o resultado pode ser diferente do que é mostrado aqui.",
     "chooseOption": "Escolha o horário para finalizar",
     "belowMinimum": "Abaixo da presença mínima",
@@ -121,7 +123,9 @@
     "waitlisted": "Na lista de espera: {{names}}",
     "action": "Finalizar",
     "confirmTitle": "Finalizar esta enquete?",
-    "confirmBody": "Isso cria uma sessão em {{time}} e não pode ser desfeito."
+    "confirmTitleEarly": "Encerrar a votação e finalizar?",
+    "confirmBody": "Isso cria uma sessão em {{time}} e não pode ser desfeito.",
+    "confirmBodyEarly": "Isso encerra a votação agora e cria uma sessão em {{time}}. Não pode ser desfeito."
   },
   "cancel": {
     "action": "Cancelar enquete",

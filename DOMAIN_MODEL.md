@@ -146,10 +146,10 @@ There is no organizer command to remove a *registered* participant — D-044 cov
 | Close | `Polling` → `Closed` | now ≥ Deadline (sweeper; D-079) | notify closed-awaiting-selection; pending join requests lapse (§5.3 — requests are open only while `Polling`); guest links unaffected |
 | Expire | `Closed` → `Expired` | now ≥ Deadline+48 h (sweeper; D-088) | notify per §10 (D-170); excluded from history; guest links → `ExpiredPoll`; pending join requests lapse |
 | Expire (deletion) | `Polling`/`Closed` → `Expired` | organizer's deletion executed (D-092) | same effects (D-170) |
-| Finalize | (`Polling`)/`Closed` → `Finalized` | **clock-gated both ways:** now ≥ Deadline (a due Close applies first — a late sweep never delays the organizer, §1) and now < Deadline+48 h (half-open like every window, §1) | §6.4 |
+| Finalize | `Polling`/`Closed` → `Finalized` | now < Deadline+48 h (half-open like every window, §1). From the Deadline onward any option may be selected (a due Close applies first — a late sweep never delays the organizer, §1); **before** it, only an option whose mapped Going count already reaches `MinAttendance` (D-187), which ends voting early — organizer-driven, never automatic | §6.4 |
 | Cancel | `Polling`/`Closed` → `Canceled` | before finalization (D-156) | excluded from history; guest links → RevokedByCancel (§5.4 notice); pending join requests lapse; notify per §10 (D-166) |
 
-No early expiry when all options pass (D-140). No finalization before the deadline (§12-10).
+No early expiry when all options pass (D-140). Finalization before the deadline is allowed only for an already-viable option (§12-10).
 
 ### 6.2 Options
 
@@ -262,7 +262,7 @@ Where a note overrides or arbitrates spec text, that text is quoted.
 7. **Private → non-private flips are allowed silently** (D-123); D-099's invited-friend rule is creation-time only. The flip exposes roster/notes to inherited viewers with no signal to participants — a UI-disclosure concern, noted.
 8. **Invites close at session start** — a post-start invitee could never respond (D-081) yet would extend visibility; join requests (open to EndTime, D-173) are the in-progress entry path.
 9. **Pending poll join requests lapse at finalization** rather than transferring to the session (the session has its own request flow, D-173).
-10. **No finalization before the deadline** (D-079 "closes and waits") — an organizer whose voters all responded still waits. Visible product cost; flag if unwanted. From the deadline onward, selection is clock-valid regardless of sweeper lag (§6.1).
+10. **No finalization before the deadline unless an option is already viable** (D-187, amending D-079 "closes and waits"). From the deadline onward, selection is clock-valid regardless of sweeper lag (§6.1). Before it, the organizer may select an option whose §6.4 mapping already puts `MinAttendance` participants at Going — the `Polling` → `Finalized` edge, which ends voting early without ever materializing `Closed`. Only **Available** votes reach Going: a Maybe maps to Maybe (D-051), so a Maybe-padded option cannot open the gate and convert a session that is short on real attendance. It is always the organizer's manual act, and it is the same transition as any other finalization — same mapping, same D-119 overflow, same D-153 session status.
 11. **Poll option instants are bounded to creation + 1 year** — the D-130 ceiling's analogue; otherwise finalization mints sessions decades out that direct creation would refuse.
 12. **Options can be deleted down to zero** (D-080: "the organizer can delete any option" — no floor is inventable); a zero-option poll can only be canceled or expire.
 13. **`FirstResponseAt` = first *vote* submission** — suggesting an option or being approved as a voter does not set it (D-172 "first submitted poll response").
