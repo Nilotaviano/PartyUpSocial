@@ -95,6 +95,10 @@
       "createPollCta": "Create poll with selected times"
     }
   },
+  "grid": {
+    "resizeStart": "Change start time",
+    "resizeEnd": "Change end time"
+  },
   "a11y": {
     "gridLabel": "Weekly availability",
     "agendaLabel": "Agenda",

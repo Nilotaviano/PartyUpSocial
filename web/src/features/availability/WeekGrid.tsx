@@ -12,6 +12,14 @@ export type GridRange = {
   end: Date
 }
 
+/** A resize/move released on an existing window, in the same fake-local
+ * convention as every other Date this component produces. */
+export type GridAdjustment = {
+  occurrenceId: string
+  start: Date
+  end: Date
+}
+
 export type GridFriendRange = {
   /** Already resolved by the caller from `MaskedParticipant` — a display
    * name or the Anonymous User fallback (§8.1: no id ever crosses here). */
@@ -70,18 +78,52 @@ export type WeekGridProps = {
   pollOptionEntries?: GridPollOptionEntry[]
   onCreateBlock: (range: GridRange) => void
   onEditOccurrence: (occurrenceId: string) => void
+  /** Omitted when the caller has nothing to do with an adjustment — the edge
+   * handles are then not rendered at all, rather than rendered inert. */
+  onAdjustOccurrence?: (adjustment: GridAdjustment) => void
   dayLabels: string[]
   timeLabelFormatter: (date: Date) => string
 }
 
 const SLOT_MINUTES = 15
+const SLOT_MS = SLOT_MINUTES * 60_000
 const LONG_PRESS_MS = 400
 const MOVE_CANCEL_PX = 10
 const AUTO_SCROLL_EDGE_PX = 32
 const AUTO_SCROLL_STEP_PX = 12
+// A cell is `min-h-11`, so 44px is the floor a slot can occupy. It is also the
+// only height available when the measured rect is zero — a grid inside a
+// display:none ancestor, or a layout that has not been flushed yet — where
+// dividing by 0 would make every drag an infinite slot delta.
+const SLOT_HEIGHT_FLOOR_PX = 44
 
 type Cursor = { day: number; slot: number }
 type Selection = { day: number; anchorSlot: number; endSlot: number }
+type ResizeDrag = {
+  occurrenceId: string
+  edge: 'start' | 'end'
+  originY: number
+  slotHeight: number
+  start: Date
+  end: Date
+}
+
+/** Applies a whole-slot delta to one edge, never letting the window collapse
+ * past a single slot — a drag that overshoots stops at the minimum rather
+ * than inverting the range. */
+function resizedRange(drag: ResizeDrag, deltaSlots: number): GridRange {
+  const shift = deltaSlots * SLOT_MS
+  if (drag.edge === 'end') {
+    return {
+      start: drag.start,
+      end: new Date(Math.max(drag.start.getTime() + SLOT_MS, drag.end.getTime() + shift)),
+    }
+  }
+  return {
+    start: new Date(Math.min(drag.end.getTime() - SLOT_MS, drag.start.getTime() + shift)),
+    end: drag.end,
+  }
+}
 
 function slotsPerDay(startHour: number, endHour: number) {
   return ((endHour - startHour) * 60) / SLOT_MINUTES
@@ -114,6 +156,7 @@ export function WeekGrid({
   pollOptionEntries = [],
   onCreateBlock,
   onEditOccurrence,
+  onAdjustOccurrence,
   dayLabels,
   timeLabelFormatter,
 }: WeekGridProps) {
@@ -130,6 +173,12 @@ export function WeekGrid({
   // the browser's own scroll gesture stops fighting the drag-extend
   // handlers (§10.3's `touch-action:none` conflict, P5-TOUCH-01).
   const [isTouchDragging, setIsTouchDragging] = useState(false)
+  // Edge handles belong to one window at a time: permanent handles on every
+  // window would turn each of them into a scroll trap on touch (they must set
+  // `touch-action: none` on themselves to be draggable at all).
+  const [selectedOccurrenceId, setSelectedOccurrenceId] = useState<string | null>(null)
+  const [resizePreview, setResizePreview] = useState<GridRange | null>(null)
+  const resizeDrag = useRef<ResizeDrag | null>(null)
   const dragging = useRef(false)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const touchOrigin = useRef<{ x: number; y: number } | null>(null)
@@ -234,6 +283,98 @@ export function WeekGrid({
     setLiveMessage(t('a11y.selectionCanceled'))
   }
 
+  function announceRange(range: GridRange) {
+    setLiveMessage(
+      t('a11y.selectionExtent', {
+        start: timeLabelFormatter(range.start),
+        end: timeLabelFormatter(range.end),
+      }),
+    )
+  }
+
+  function slotDelta(drag: ResizeDrag, clientY: number) {
+    if (!Number.isFinite(clientY)) return 0
+    return Math.round((clientY - drag.originY) / drag.slotHeight)
+  }
+
+  function beginResize(
+    event: React.PointerEvent<HTMLButtonElement>,
+    occurrence: GridOccurrence,
+    edge: 'start' | 'end',
+  ) {
+    // Without this the press reaches the cell underneath and is read as the
+    // start of a paint (mouse) or a long-press (touch).
+    event.stopPropagation()
+    event.preventDefault()
+    const measured = event.currentTarget.parentElement?.getBoundingClientRect().height ?? 0
+    resizeDrag.current = {
+      occurrenceId: occurrence.id,
+      edge,
+      originY: event.clientY,
+      slotHeight: measured > 0 ? measured : SLOT_HEIGHT_FLOOR_PX,
+      start: occurrence.start,
+      end: occurrence.end,
+    }
+    setResizePreview({ start: occurrence.start, end: occurrence.end })
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+
+  function handleResizeMove(event: React.PointerEvent<HTMLButtonElement>) {
+    const drag = resizeDrag.current
+    if (!drag) return
+    event.stopPropagation()
+    const next = resizedRange(drag, slotDelta(drag, event.clientY))
+    setResizePreview(next)
+    announceRange(next)
+  }
+
+  function handleResizeUp(event: React.PointerEvent<HTMLButtonElement>) {
+    const drag = resizeDrag.current
+    if (!drag) return
+    event.stopPropagation()
+    resizeDrag.current = null
+    setResizePreview(null)
+    event.currentTarget.releasePointerCapture?.(event.pointerId)
+    const next = resizedRange(drag, slotDelta(drag, event.clientY))
+    announceRange(next)
+    onAdjustOccurrence?.({ occurrenceId: drag.occurrenceId, ...next })
+  }
+
+  function handleResizeCancel(event: React.PointerEvent<HTMLButtonElement>) {
+    if (!resizeDrag.current) return
+    event.stopPropagation()
+    resizeDrag.current = null
+    setResizePreview(null)
+  }
+
+  // The pointer gesture's keyboard equivalent (WCAG 2.1.1): one slot per
+  // press, committed immediately, so the edge is adjustable without a pointer
+  // and without reopening the editor to retype a time.
+  function handleResizeKeyDown(
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    occurrence: GridOccurrence,
+    edge: 'start' | 'end',
+  ) {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+    event.preventDefault()
+    // The cell below owns ArrowUp/ArrowDown for roving focus; letting this
+    // bubble would move focus off the handle mid-adjustment.
+    event.stopPropagation()
+    const next = resizedRange(
+      {
+        occurrenceId: occurrence.id,
+        edge,
+        originY: 0,
+        slotHeight: SLOT_HEIGHT_FLOOR_PX,
+        start: occurrence.start,
+        end: occurrence.end,
+      },
+      event.key === 'ArrowDown' ? 1 : -1,
+    )
+    announceRange(next)
+    onAdjustOccurrence?.({ occurrenceId: occurrence.id, ...next })
+  }
+
   function handleKeyDown(event: React.KeyboardEvent, day: number, slot: number) {
     switch (event.key) {
       case 'ArrowUp': {
@@ -272,8 +413,10 @@ export function WeekGrid({
         }
         const occurrence = occurrenceAt(day, slot)
         if (occurrence) {
+          setSelectedOccurrenceId(occurrence.id)
           onEditOccurrence(occurrence.id)
         } else {
+          setSelectedOccurrenceId(null)
           beginSelection(day, slot)
         }
         break
@@ -324,6 +467,7 @@ export function WeekGrid({
     if (event.button !== 0) return
     if (occurrenceAt(day, slot)) return
     dragging.current = true
+    setSelectedOccurrenceId(null)
     setFocused({ day, slot })
     beginSelection(day, slot)
   }
@@ -352,6 +496,7 @@ export function WeekGrid({
   // place that opens it.
   function handleClick(day: number, slot: number) {
     const occurrence = occurrenceAt(day, slot)
+    setSelectedOccurrenceId(occurrence?.id ?? null)
     if (occurrence) onEditOccurrence(occurrence.id)
   }
 
@@ -371,6 +516,7 @@ export function WeekGrid({
     longPressTimer.current = setTimeout(() => {
       dragging.current = true
       setIsTouchDragging(true)
+      setSelectedOccurrenceId(null)
       setFocused({ day, slot })
       beginSelection(day, slot)
     }, LONG_PRESS_MS)
@@ -421,6 +567,7 @@ export function WeekGrid({
     }
     if (isTap) {
       const occurrence = occurrenceAt(day, slot)
+      setSelectedOccurrenceId(occurrence?.id ?? null)
       if (occurrence) {
         setFocused({ day, slot })
         onEditOccurrence(occurrence.id)
@@ -509,7 +656,33 @@ export function WeekGrid({
                 slot <= Math.max(selection.anchorSlot, selection.endSlot)
               const isFocused = focused.day === day && focused.slot === slot
               const key = `${day}:${slot}`
-              const state = inSelection ? 'selected' : busy ? 'busy' : 'free'
+              const cellStart = cellTime(weekStart, day, slot, startHour)
+              const cellEnd = cellTime(weekStart, day, slot + 1, startHour)
+              const resizing =
+                occurrence?.id === selectedOccurrenceId &&
+                resizePreview !== null &&
+                overlaps(resizePreview.start, resizePreview.end, cellStart, cellEnd)
+              const state = inSelection || resizing ? 'selected' : busy ? 'busy' : 'free'
+
+              // Handles sit on the two slots the window actually ends in, so
+              // they land on the visible edge rather than floating over the
+              // middle of a multi-hour band. A window that starts before or
+              // ends after the clamped viewport keeps its handle on the first
+              // or last visible slot, where the viewer can still reach it.
+              const selectedHere =
+                onAdjustOccurrence && occurrence && occurrence.id === selectedOccurrenceId
+                  ? occurrence
+                  : null
+              const isStartSlot =
+                selectedHere !== null &&
+                (slot === 0
+                  ? selectedHere.start < cellEnd
+                  : selectedHere.start >= cellStart && selectedHere.start < cellEnd)
+              const isEndSlot =
+                selectedHere !== null &&
+                (slot === slots - 1
+                  ? selectedHere.end > cellStart
+                  : selectedHere.end > cellStart && selectedHere.end <= cellEnd)
 
               // §3: the selection ring is drawn around the *band*, not per
               // cell. A drag/keyboard selection is always one column wide
@@ -591,6 +764,34 @@ export function WeekGrid({
                   onPointerCancel={handlePointerCancel}
                   onPointerUp={(event) => handlePointerUp(event, day, slot)}
                 >
+                  {selectedHere && isStartSlot && (
+                    <button
+                      aria-label={t('grid.resizeStart')}
+                      className="absolute inset-x-0 -top-5 z-10 flex h-11 touch-none cursor-ns-resize items-center justify-center bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                      type="button"
+                      onKeyDown={(event) => handleResizeKeyDown(event, selectedHere, 'start')}
+                      onPointerCancel={handleResizeCancel}
+                      onPointerDown={(event) => beginResize(event, selectedHere, 'start')}
+                      onPointerMove={handleResizeMove}
+                      onPointerUp={handleResizeUp}
+                    >
+                      <span aria-hidden="true" className="block h-1 w-6 rounded-full bg-ink" />
+                    </button>
+                  )}
+                  {selectedHere && isEndSlot && (
+                    <button
+                      aria-label={t('grid.resizeEnd')}
+                      className="absolute inset-x-0 -bottom-5 z-10 flex h-11 touch-none cursor-ns-resize items-center justify-center bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                      type="button"
+                      onKeyDown={(event) => handleResizeKeyDown(event, selectedHere, 'end')}
+                      onPointerCancel={handleResizeCancel}
+                      onPointerDown={(event) => beginResize(event, selectedHere, 'end')}
+                      onPointerMove={handleResizeMove}
+                      onPointerUp={handleResizeUp}
+                    >
+                      <span aria-hidden="true" className="block h-1 w-6 rounded-full bg-ink" />
+                    </button>
+                  )}
                   {busy && (
                     <span aria-hidden="true" className="text-xs text-busy-ink">
                       &bull;

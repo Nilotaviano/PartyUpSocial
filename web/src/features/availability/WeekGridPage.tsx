@@ -21,6 +21,7 @@ import {
 } from './OccurrenceScopeDialog'
 import {
   WeekGrid,
+  type GridAdjustment,
   type GridFriendRange,
   type GridOccurrence,
   type GridPollOptionEntry,
@@ -123,6 +124,19 @@ function datetimeLocalValue(fakeLocal: Date): string {
   return `${fakeLocal.getUTCFullYear()}-${pad(fakeLocal.getUTCMonth() + 1)}-${pad(
     fakeLocal.getUTCDate(),
   )}T${pad(fakeLocal.getUTCHours())}:${pad(fakeLocal.getUTCMinutes())}`
+}
+
+type CalendarOccurrence = Awaited<
+  ReturnType<typeof getCalendarView>
+>['myAvailability']['occurrences'][number]
+
+/** The grid addresses an occurrence by a single string; a one-time block is
+ * its own id, a series occurrence is the (series, date) pair that identifies
+ * it on the wire. */
+function occurrenceKey(occurrence: CalendarOccurrence): string {
+  return occurrence.origin.kind === 'block'
+    ? (occurrence.origin.blockId ?? '')
+    : `${occurrence.origin.seriesId}:${occurrence.origin.occurrenceDate}`
 }
 
 function parseDatetimeLocal(value: string): Date {
@@ -282,10 +296,7 @@ export function WeekGridPage() {
 
   const occurrences: GridOccurrence[] = showMyAvailability
     ? (calendar.data?.myAvailability.occurrences ?? []).map((occurrence) => ({
-        id:
-          occurrence.origin.kind === 'block'
-            ? (occurrence.origin.blockId ?? '')
-            : `${occurrence.origin.seriesId}:${occurrence.origin.occurrenceDate}`,
+        id: occurrenceKey(occurrence),
         start: instantToFakeLocal(occurrence.startTime, timeZone),
         end: instantToFakeLocal(occurrence.endTime, timeZone),
       }))
@@ -506,15 +517,15 @@ export function WeekGridPage() {
     }
   }
 
+  function findOccurrence(occurrenceId: string): CalendarOccurrence | undefined {
+    return (calendar.data?.myAvailability.occurrences ?? []).find(
+      (occurrence) => occurrenceKey(occurrence) === occurrenceId,
+    )
+  }
+
   function handleEditOccurrence(occurrenceId: string) {
     editTrigger.current = document.activeElement as HTMLElement | null
-    const raw = (calendar.data?.myAvailability.occurrences ?? []).find((occurrence) => {
-      const id =
-        occurrence.origin.kind === 'block'
-          ? (occurrence.origin.blockId ?? '')
-          : `${occurrence.origin.seriesId}:${occurrence.origin.occurrenceDate}`
-      return id === occurrenceId
-    })
+    const raw = findOccurrence(occurrenceId)
     if (!raw) return
 
     setBlockEditorValue({
@@ -533,6 +544,44 @@ export function WeekGridPage() {
     } else if (raw.origin.blockId) {
       setEditingTarget({ kind: 'block', blockId: raw.origin.blockId })
       setBlockDialogOpen(true)
+    }
+  }
+
+  // A dragged edge is a proposed range, not a committed one. For a recurring
+  // occurrence it goes through the scope dialog first: without that, nudging an
+  // edge could silently rewrite the whole series (D-025 keeps "only this
+  // occurrence" the default). A one-time block has no such ambiguity, so it
+  // saves straight away.
+  function handleAdjustOccurrence(adjustment: GridAdjustment) {
+    editTrigger.current = document.activeElement as HTMLElement | null
+    const raw = findOccurrence(adjustment.occurrenceId)
+    if (!raw) return
+
+    setBlockEditorValue({
+      start: datetimeLocalValue(adjustment.start),
+      end: datetimeLocalValue(adjustment.end),
+    })
+
+    if (raw.origin.kind === 'occurrence' && raw.origin.seriesId && raw.origin.occurrenceDate) {
+      setEditingTarget({
+        kind: 'occurrence',
+        seriesId: raw.origin.seriesId,
+        occurrenceDate: raw.origin.occurrenceDate,
+      })
+      setPendingScope('onlyThis')
+      setScopeDialogOpen(true)
+      return
+    }
+
+    if (raw.origin.blockId) {
+      setEditingTarget({ kind: 'block', blockId: raw.origin.blockId })
+      editBlock.mutate({
+        blockId: raw.origin.blockId,
+        body: {
+          startTime: fakeLocalToInstant(adjustment.start, timeZone),
+          endTime: fakeLocalToInstant(adjustment.end, timeZone),
+        },
+      })
     }
   }
 
@@ -738,6 +787,7 @@ export function WeekGridPage() {
               startHour={startHour}
               timeLabelFormatter={timeLabelFormatter}
               weekStart={weekStart}
+              onAdjustOccurrence={handleAdjustOccurrence}
               onCreateBlock={handleCreateBlock}
               onEditOccurrence={handleEditOccurrence}
             />

@@ -19,6 +19,7 @@ vi.mock('../../api/client', () => ({
 import '../../i18n'
 import {
   WeekGrid,
+  type GridAdjustment,
   type GridFriendRange,
   type GridOccurrence,
   type GridPollOptionEntry,
@@ -48,6 +49,7 @@ function renderGrid(props: {
   pollOptionEntries?: GridPollOptionEntry[]
   onCreateBlock?: ReturnType<typeof vi.fn<(range: GridRange) => void>>
   onEditOccurrence?: ReturnType<typeof vi.fn<(id: string) => void>>
+  onAdjustOccurrence?: ReturnType<typeof vi.fn<(adjustment: GridAdjustment) => void>>
   startHour?: number
   endHour?: number
 }) {
@@ -65,6 +67,7 @@ function renderGrid(props: {
       startHour={props.startHour ?? 9}
       timeLabelFormatter={timeLabelFormatter}
       weekStart={localDate(0)}
+      onAdjustOccurrence={props.onAdjustOccurrence}
       onCreateBlock={onCreateBlock}
       onEditOccurrence={onEditOccurrence}
     />,
@@ -360,6 +363,114 @@ describe('WeekGrid pointer flow', () => {
     block.focus()
     fireEvent.keyDown(block, { key: 'Enter' })
     expect(onEditOccurrence).toHaveBeenCalledWith('block-a')
+  })
+})
+
+describe('WeekGrid resize handles', () => {
+  const occurrences: GridOccurrence[] = [
+    { id: 'block-a', start: localDate(9, 0), end: localDate(9, 30) },
+  ]
+
+  function selectBlock() {
+    const block = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    fireEvent.mouseDown(block, { button: 0 })
+    fireEvent.mouseUp(block)
+    fireEvent.click(block)
+  }
+
+  it('shows no resize handles until the block is selected', () => {
+    renderGrid({
+      occurrences,
+      onAdjustOccurrence: vi.fn<(adjustment: GridAdjustment) => void>(),
+    })
+
+    expect(
+      screen.queryByRole('button', { name: 'Change end time' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Change start time' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('resizes a selected block by dragging its end edge', () => {
+    const onAdjustOccurrence = vi.fn<(adjustment: GridAdjustment) => void>()
+    renderGrid({ occurrences, onAdjustOccurrence })
+
+    selectBlock()
+
+    const handle = screen.getByRole('button', { name: 'Change end time' })
+    // jsdom reports a zero-height rect, so the grid falls back to the
+    // min-h-11 floor: 100px is two 44px slots' worth of travel.
+    fireEvent.pointerDown(handle, { pointerType: 'mouse', button: 0, clientY: 0 })
+    fireEvent.pointerMove(handle, { pointerType: 'mouse', clientY: 100 })
+    fireEvent.pointerUp(handle, { pointerType: 'mouse', clientY: 100 })
+
+    expect(onAdjustOccurrence).toHaveBeenCalledTimes(1)
+    const [adjustment] = onAdjustOccurrence.mock.calls[0]
+    expect(adjustment.occurrenceId).toBe('block-a')
+    expect(adjustment.start.getTime()).toBe(localDate(9, 0).getTime())
+    expect(adjustment.end.getTime()).toBe(localDate(10, 0).getTime())
+  })
+
+  it('drags the start edge without moving the end', () => {
+    const onAdjustOccurrence = vi.fn<(adjustment: GridAdjustment) => void>()
+    renderGrid({ occurrences, onAdjustOccurrence })
+
+    selectBlock()
+
+    const handle = screen.getByRole('button', { name: 'Change start time' })
+    fireEvent.pointerDown(handle, { pointerType: 'mouse', button: 0, clientY: 100 })
+    fireEvent.pointerUp(handle, { pointerType: 'mouse', clientY: 56 })
+
+    const [adjustment] = onAdjustOccurrence.mock.calls[0]
+    expect(adjustment.start.getTime()).toBe(localDate(8, 45).getTime())
+    expect(adjustment.end.getTime()).toBe(localDate(9, 30).getTime())
+  })
+
+  it('never resizes a window down to nothing', () => {
+    const onAdjustOccurrence = vi.fn<(adjustment: GridAdjustment) => void>()
+    renderGrid({ occurrences, onAdjustOccurrence })
+
+    selectBlock()
+
+    const handle = screen.getByRole('button', { name: 'Change end time' })
+    fireEvent.pointerDown(handle, { pointerType: 'mouse', button: 0, clientY: 400 })
+    fireEvent.pointerUp(handle, { pointerType: 'mouse', clientY: 0 })
+
+    const [adjustment] = onAdjustOccurrence.mock.calls[0]
+    expect(adjustment.end.getTime()).toBe(localDate(9, 15).getTime())
+  })
+
+  // The pointer affordance needs a keyboard equivalent that is not "reopen the
+  // editor and retype" (WCAG 2.1.1).
+  it('nudges the end edge one slot per arrow key', () => {
+    const onAdjustOccurrence = vi.fn<(adjustment: GridAdjustment) => void>()
+    renderGrid({ occurrences, onAdjustOccurrence })
+
+    selectBlock()
+
+    const handle = screen.getByRole('button', { name: 'Change end time' })
+    fireEvent.keyDown(handle, { key: 'ArrowDown' })
+
+    const [adjustment] = onAdjustOccurrence.mock.calls[0]
+    expect(adjustment.end.getTime()).toBe(localDate(9, 45).getTime())
+  })
+
+  // The handles are the only thing that may not steal a bare finger-drag:
+  // P5-TOUCH-01 keeps the grid itself scrollable until a long-press fires.
+  it('leaves the grid-level touch gating untouched_P5TOUCH01', () => {
+    renderGrid({
+      occurrences,
+      onAdjustOccurrence: vi.fn<(adjustment: GridAdjustment) => void>(),
+    })
+
+    selectBlock()
+
+    expect(screen.getByRole('grid')).toHaveAttribute('data-touch-dragging', 'false')
+    expect(screen.getByRole('grid')).not.toHaveClass('touch-none')
+    expect(screen.getByRole('button', { name: 'Change end time' })).toHaveClass(
+      'touch-none',
+    )
   })
 })
 
@@ -770,6 +881,42 @@ describe('WeekGridPage occurrence editing', () => {
     // field that legitimately isn't there.
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('routes a resize on a recurring occurrence through the scope dialog_D025', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve({ data: profileResponse() })
+      if (path === '/api/v1/calendar') {
+        return Promise.resolve({
+          data: calendarResponse({
+            start: '2026-08-10T13:00:00.000Z',
+            end: '2026-08-10T13:30:00.000Z',
+          }),
+        })
+      }
+      throw new Error(`Unexpected GET ${path}`)
+    })
+
+    renderPage()
+
+    await screen.findAllByRole('gridcell', { name: /Busy/ }, { timeout: 5000 })
+    const busyCell = screen.getAllByRole('gridcell', { name: /Busy/ })[0]
+    fireEvent.click(busyCell)
+
+    // Activation selects the occurrence and opens the scope dialog; dismissing
+    // it leaves the selection (and so the handles) in place.
+    await screen.findByRole('dialog')
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    const handle = await screen.findByRole('button', { name: 'Change end time' })
+    fireEvent.pointerDown(handle, { pointerType: 'mouse', button: 0, clientY: 0 })
+    fireEvent.pointerUp(handle, { pointerType: 'mouse', clientY: 100 })
+
+    expect(await screen.findByRole('dialog')).toHaveTextContent(
+      'Only this occurrence',
+    )
+    expect(api.patch).not.toHaveBeenCalled()
   })
 
   it('rejects an end time at or before the start time locally, without a server round trip_D071', async () => {

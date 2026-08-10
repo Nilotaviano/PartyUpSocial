@@ -95,6 +95,10 @@
       "createPollCta": "Crear encuesta con los horarios seleccionados"
     }
   },
+  "grid": {
+    "resizeStart": "Cambiar la hora de inicio",
+    "resizeEnd": "Cambiar la hora de fin"
+  },
   "a11y": {
     "gridLabel": "Disponibilidad semanal",
     "agendaLabel": "Agenda",
