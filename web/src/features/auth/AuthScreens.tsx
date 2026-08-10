@@ -24,9 +24,18 @@ import {
 import { setReauthProof } from '../../auth/reauthProof'
 import { peekPendingSettingsAction } from '../settings/reauthAction'
 import { sessionQueryKey, useSession } from '../../auth/useSession'
+import { PASSWORD_MIN_LENGTH } from '../../auth/passwordPolicy'
 
 const ageGateStorageKey = 'partyup.age-gate-attested'
-const passwordMinLength = 12
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+type EmailFieldError = 'required' | 'invalid' | null
+
+function validateEmailField(value: string): EmailFieldError {
+  if (!value) return 'required'
+  if (!emailPattern.test(value)) return 'invalid'
+  return null
+}
 
 type HashAuthData = {
   token: string | null
@@ -311,16 +320,24 @@ export function Login() {
   const authNext = readAuthNext(location.search)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [emailError, setEmailError] = useState<EmailFieldError>(null)
+  const [passwordMissing, setPasswordMissing] = useState(false)
   const [error, setError] = useState<unknown>()
   const [sent, setSent] = useState(false)
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     setError(undefined)
+    const trimmedEmail = email.trim()
+    const emailValidation = validateEmailField(trimmedEmail)
+    const missingPassword = password.length === 0
+    setEmailError(emailValidation)
+    setPasswordMissing(missingPassword)
+    if (emailValidation || missingPassword) return
     try {
       const { data } = await client.POST('/api/v1/auth/login', {
         params: { header: { 'X-CSRF-TOKEN': '' } },
-        body: { email, password },
+        body: { email: trimmedEmail, password },
       })
       await refreshAntiforgeryToken()
       await queryClient.invalidateQueries({ queryKey: sessionQueryKey })
@@ -332,13 +349,9 @@ export function Login() {
 
   async function magic() {
     setError(undefined)
-    const emailField = document.getElementById(
-      'login-email',
-    ) as HTMLInputElement | null
-    if (emailField && !emailField.checkValidity()) {
-      emailField.reportValidity()
-      return
-    }
+    const emailValidation = validateEmailField(email.trim())
+    setEmailError(emailValidation)
+    if (emailValidation) return
     try {
       await client.POST('/api/v1/auth/magic-link', {
         params: { header: { 'X-CSRF-TOKEN': '' } },
@@ -395,7 +408,7 @@ export function Login() {
       <h1 className="text-h1 font-display font-bold text-ink">
         {t('pages.login')}
       </h1>
-      <form className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card" onSubmit={submit}>
+      <form className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card" noValidate onSubmit={submit}>
         <div>
           <Label htmlFor="login-email">{t('fields.email')}</Label>
           <Input
@@ -403,8 +416,15 @@ export function Login() {
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
+            aria-invalid={emailError ? true : undefined}
+            aria-describedby={emailError ? 'login-email-error' : undefined}
             required
           />
+          {emailError && (
+            <p id="login-email-error" role="alert">
+              {t(emailError === 'required' ? 'fields.emailRequired' : 'fields.emailInvalid')}
+            </p>
+          )}
         </div>
         <div>
           <Label htmlFor="login-password">{t('fields.password')}</Label>
@@ -413,8 +433,11 @@ export function Login() {
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
+            aria-invalid={passwordMissing || undefined}
+            aria-describedby={passwordMissing ? 'login-password-error' : undefined}
             required
           />
+          {passwordMissing && <p id="login-password-error" role="alert">{t('fields.passwordRequired')}</p>}
         </div>
         <Button type="submit" variant="primary">
           {t('actions.signIn')}
@@ -451,6 +474,7 @@ export function Register() {
   )
   const [resuming] = useState(() => pendingRegistration)
   const [email, setEmail] = useState(() => resuming?.email ?? '')
+  const [emailError, setEmailError] = useState<EmailFieldError>(null)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<unknown>()
 
@@ -478,6 +502,9 @@ export function Register() {
   async function submit(event: FormEvent) {
     event.preventDefault()
     setError(undefined)
+    const emailValidation = validateEmailField(email.trim())
+    setEmailError(emailValidation)
+    if (emailValidation) return
     if (!attested()) {
       pendingRegistration = { email, continuation }
       const returnTo = withFriendContinuation('/register', continuation)
@@ -517,7 +544,7 @@ export function Register() {
       {sent ? (
         <p role="status">{t('messages.checkInbox')}</p>
       ) : (
-        <form className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card" onSubmit={submit}>
+        <form className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card" noValidate onSubmit={submit}>
           <div>
             <Label htmlFor="register-email">{t('fields.email')}</Label>
             <Input
@@ -525,8 +552,15 @@ export function Register() {
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
+              aria-invalid={emailError ? true : undefined}
+              aria-describedby={emailError ? 'register-email-error' : undefined}
               required
             />
+            {emailError && (
+              <p id="register-email-error" role="alert">
+                {t(emailError === 'required' ? 'fields.emailRequired' : 'fields.emailInvalid')}
+              </p>
+            )}
           </div>
           <Button type="submit" variant="primary">
             {t('actions.createAccount')}
@@ -706,6 +740,10 @@ function TokenForm({
     if (!authData.token) return
     setError(undefined)
     setPasswordTooShort(false)
+    if (password && value.length < PASSWORD_MIN_LENGTH) {
+      setPasswordTooShort(true)
+      return
+    }
 
     try {
       let nextDestination = '/'
@@ -775,7 +813,7 @@ function TokenForm({
       {!authData.token ? (
         <p role="alert">{t('messages.invalidLink')}</p>
       ) : (
-        <form className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card" onSubmit={submit}>
+        <form className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card" noValidate onSubmit={submit}>
           {password && (
             <div>
               <Label htmlFor={page + '-password'}>{t('fields.password')}</Label>
@@ -784,8 +822,13 @@ function TokenForm({
                 type="password"
                 value={value}
                 onChange={(event) => setValue(event.target.value)}
-                minLength={passwordMinLength}
-                aria-describedby={page + '-password-hint'}
+                minLength={PASSWORD_MIN_LENGTH}
+                aria-describedby={
+                  passwordTooShort
+                    ? `${page}-password-hint ${page}-password-error`
+                    : page + '-password-hint'
+                }
+                aria-invalid={passwordTooShort || undefined}
                 required
               />
               <p
@@ -794,6 +837,11 @@ function TokenForm({
               >
                 {t('fields.passwordHint')}
               </p>
+              {passwordTooShort && (
+                <p id={page + '-password-error'} role="alert">
+                  {t('fields.passwordTooShort')}
+                </p>
+              )}
             </div>
           )}
           <Button type="submit" variant="primary">
@@ -801,7 +849,6 @@ function TokenForm({
           </Button>
         </form>
       )}
-      {passwordTooShort && <p role="alert">{t('fields.passwordTooShort')}</p>}
       <ErrorAlert error={error} />
     </main>
   )

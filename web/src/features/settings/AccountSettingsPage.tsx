@@ -12,6 +12,7 @@ import { Input } from '../../components/ui/input'
 import { Select } from '../../components/ui/select'
 import { ReauthPrompt, type ReauthAction } from './ReauthPrompt'
 import { clearPendingSettingsAction, getPendingSettingsAction } from './reauthAction'
+import { PASSWORD_MIN_LENGTH } from '../../auth/passwordPolicy'
 import { SettingsNavigation } from './BlockedUsersPage'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -58,6 +59,7 @@ export function AccountSettingsPage() {
   const [graceEndsAt, setGraceEndsAt] = useState<string | null>(null)
   const [returnFocusTo, setReturnFocusTo] = useState<HTMLElement | null>(null)
   const [currentPassword, setCurrentPassword] = useState('')
+  const [changeCurrentMissing, setChangeCurrentMissing] = useState(false)
   const [changeNewPassword, setChangeNewPassword] = useState('')
   const [changeTooShort, setChangeTooShort] = useState(false)
   const [changeWrongCurrent, setChangeWrongCurrent] = useState(false)
@@ -154,10 +156,19 @@ export function AccountSettingsPage() {
 
   async function submitChangePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    setChangeCurrentMissing(false)
     setChangeTooShort(false)
     setChangeWrongCurrent(false)
     setChangeError(undefined)
     setChangeSuccess(false)
+    if (!currentPassword) {
+      setChangeCurrentMissing(true)
+      return
+    }
+    if (changeNewPassword.length < PASSWORD_MIN_LENGTH) {
+      setChangeTooShort(true)
+      return
+    }
     try {
       await client.POST('/api/v1/auth/password/change', {
         params: { header: { 'X-CSRF-TOKEN': '' } },
@@ -185,6 +196,10 @@ export function AccountSettingsPage() {
     setSetPasswordTooShort(false)
     setSetPasswordError(undefined)
     setSetPasswordSuccess(false)
+    if (setPasswordValue.length < PASSWORD_MIN_LENGTH) {
+      setSetPasswordTooShort(true)
+      return
+    }
     try {
       await client.POST('/api/v1/auth/password/set', {
         params: { header: { 'X-CSRF-TOKEN': '' } },
@@ -257,6 +272,10 @@ export function AccountSettingsPage() {
       })
     : null
 
+  function authMethodName(kind: string) {
+    return t(`authMethods.kind.${kind.toLowerCase()}`, { defaultValue: kind })
+  }
+
   return (
     <main className="mx-auto max-w-3xl space-y-8 p-4 sm:p-8" data-testid="screen-settings-account">
       <SettingsNavigation />
@@ -270,47 +289,58 @@ export function AccountSettingsPage() {
         <h2 className="font-display text-h2 font-semibold text-ink" id="account-password-heading">{t('password.title')}</h2>
         <p className="text-ink-soft">{hasPassword ? t('password.enabled') : t('password.notSet')}</p>
         {hasPassword ? (
-          <form className="space-y-2" onSubmit={(event) => void submitChangePassword(event)}>
+          <form className="space-y-2" noValidate onSubmit={(event) => void submitChangePassword(event)}>
             <Label htmlFor="password-current">{t('password.currentLabel')}</Label>
             <Input
               id="password-current"
               type="password"
               value={currentPassword}
               onChange={(event) => setCurrentPassword(event.target.value)}
+              aria-invalid={changeCurrentMissing || changeWrongCurrent || undefined}
+              aria-describedby={
+                changeCurrentMissing
+                  ? 'password-current-error'
+                  : changeWrongCurrent
+                    ? 'password-current-incorrect'
+                    : undefined
+              }
               required
             />
+            {changeCurrentMissing && <p id="password-current-error" role="alert">{t('password.currentRequired')}</p>}
             <Label htmlFor="password-change-new">{t('password.newLabel')}</Label>
             <Input
               id="password-change-new"
               type="password"
               value={changeNewPassword}
               onChange={(event) => setChangeNewPassword(event.target.value)}
-              minLength={12}
-              aria-describedby="password-change-new-hint"
+              minLength={PASSWORD_MIN_LENGTH}
+              aria-describedby={changeTooShort ? 'password-change-new-hint password-change-new-error' : 'password-change-new-hint'}
+              aria-invalid={changeTooShort || undefined}
               required
             />
             <p className="text-body-sm text-ink-soft" id="password-change-new-hint">{t('password.hint')}</p>
             <Button type="submit" variant="primary">{t('password.changeSubmit')}</Button>
-            {changeTooShort && <p role="alert">{t('password.tooShort')}</p>}
-            {changeWrongCurrent && <p role="alert">{t('password.currentIncorrect')}</p>}
+            {changeTooShort && <p id="password-change-new-error" role="alert">{t('password.tooShort')}</p>}
+            {changeWrongCurrent && <p id="password-current-incorrect" role="alert">{t('password.currentIncorrect')}</p>}
             {changeErrorMessage && <p role="alert">{changeErrorMessage}</p>}
             {changeSuccess && <p className="text-ink" role="status">{t('password.changeSuccess')}</p>}
           </form>
         ) : setPasswordProof ? (
-          <form className="space-y-2" onSubmit={(event) => void submitSetPassword(event)}>
+          <form className="space-y-2" noValidate onSubmit={(event) => void submitSetPassword(event)}>
             <Label htmlFor="password-set-new">{t('password.newLabel')}</Label>
             <Input
               id="password-set-new"
               type="password"
               value={setPasswordValue}
               onChange={(event) => setSetPasswordValue(event.target.value)}
-              minLength={12}
-              aria-describedby="password-set-new-hint"
+              minLength={PASSWORD_MIN_LENGTH}
+              aria-describedby={setPasswordTooShort ? 'password-set-new-hint password-set-new-error' : 'password-set-new-hint'}
+              aria-invalid={setPasswordTooShort || undefined}
               required
             />
             <p className="text-body-sm text-ink-soft" id="password-set-new-hint">{t('password.hint')}</p>
             <Button type="submit" variant="primary">{t('password.setSubmit')}</Button>
-            {setPasswordTooShort && <p role="alert">{t('password.tooShort')}</p>}
+            {setPasswordTooShort && <p id="password-set-new-error" role="alert">{t('password.tooShort')}</p>}
             {setPasswordErrorMessage && <p role="alert">{setPasswordErrorMessage}</p>}
           </form>
         ) : (
@@ -334,7 +364,7 @@ export function AccountSettingsPage() {
           <ul className="space-y-2">
             {methods.map((method) => (
               <li className="flex flex-wrap items-center justify-between gap-2 rounded-card border-2 border-ink bg-card p-3 shadow-offset-card" key={method.kind}>
-                <span className="text-ink">{method.detail ?? method.kind}</span>
+                <span className="text-ink">{method.detail ?? authMethodName(method.kind)}</span>
                 {method.removable && (
                   <Button
                     variant="danger"
@@ -346,7 +376,7 @@ export function AccountSettingsPage() {
                       })
                     }}
                   >
-                    {t('authMethods.unlink', { method: method.kind })}
+                    {t('authMethods.unlink', { method: authMethodName(method.kind) })}
                   </Button>
                 )}
               </li>

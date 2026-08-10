@@ -220,6 +220,23 @@ describe('authentication email links', () => {
     expect(input).toHaveAttribute('aria-describedby', hint.id)
   })
 
+  it('blocks a short reset password app-side, without ever POSTing_D184', async () => {
+    sessionStorage.setItem('partyup.age-gate-attested', 'true')
+    window.history.replaceState({}, '', '/auth/reset#token=reset-token')
+
+    renderLink(<ResetPassword />, '/auth/reset')
+
+    const input = screen.getByLabelText('Password') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'short' } })
+    fireEvent.submit(input.closest('form')!)
+
+    expect(
+      await screen.findByText('Password must be at least 12 characters.'),
+    ).toBeInTheDocument()
+    expect(input).toHaveAttribute('aria-invalid', 'true')
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
   it('renders the specific auth_validation copy for a mocked short-password rejection, not the generic message', async () => {
     sessionStorage.setItem('partyup.age-gate-attested', 'true')
     api.post.mockRejectedValue(new ApiError(400, 'auth_validation'))
@@ -251,6 +268,44 @@ describe('authentication email links', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Email me a link' }))
 
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('blocks an empty login submit app-side with localized errors, without ever POSTing_D184', async () => {
+    renderLink(<Login />, '/login')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    expect(await screen.findByText('Enter your email address.')).toBeInTheDocument()
+    expect(screen.getByText('Enter your password.')).toBeInTheDocument()
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('rejects a malformed email on login submit with a localized app error, without ever POSTing_D184', async () => {
+    renderLink(<Login />, '/login')
+
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'not-an-email' },
+    })
+    fireEvent.change(screen.getByLabelText('Password'), {
+      target: { value: 'correct horse battery staple' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    expect(await screen.findByText('Enter a valid email address.')).toBeInTheDocument()
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('shows a localized app error for the magic-link button, where reportValidity used to bubble_D184', async () => {
+    renderLink(<Login />, '/login')
+
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'not-an-email' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Email me a link' }))
+
+    expect(await screen.findByText('Enter a valid email address.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Email address')).toHaveAttribute('aria-invalid', 'true')
     expect(api.post).not.toHaveBeenCalled()
   })
 

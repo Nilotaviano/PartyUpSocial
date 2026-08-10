@@ -22,6 +22,7 @@
     "enabled": "O acesso com senha está ativado.",
     "notSet": "Nenhuma senha está definida para esta conta.",
     "currentLabel": "Sua senha atual",
+    "currentRequired": "Informe sua senha atual.",
     "newLabel": "Nova senha",
     "hint": "Use pelo menos 12 caracteres.",
     "tooShort": "A senha deve ter pelo menos 12 caracteres.",
@@ -36,7 +37,13 @@
     "title": "Métodos de entrada",
     "unlink": "Desvincular {{method}}",
     "linkTitle": "Adicionar método de entrada",
-    "link": "Vincular {{provider}}"
+    "link": "Vincular {{provider}}",
+    "kind": {
+      "password": "Senha",
+      "magiclink": "Link mágico",
+      "google": "Google",
+      "steam": "Steam"
+    }
   },
   "language": {
     "title": "Idioma",

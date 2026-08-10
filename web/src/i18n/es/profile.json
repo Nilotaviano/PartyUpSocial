@@ -4,5 +4,5 @@
   "fields": { "username": "Nombre de usuario", "displayName": "Nombre para mostrar", "avatar": "Avatar", "timeZone": "Zona horaria" },
   "usernameCooldown": "Los nombres de usuario se pueden cambiar una vez cada 30 días.",
   "actions": { "saveUsername": "Guardar nombre de usuario", "saveDisplayName": "Guardar nombre para mostrar", "saveAvatar": "Guardar avatar", "saveTimeZone": "Guardar zona horaria" },
-  "platformLinks": { "title": "Cuentas vinculadas", "empty": "Aún no hay cuentas vinculadas.", "item": "{{platform}}: {{handle}}", "unlink": "Desvincular {{platform}}", "steamUnlinkNotice": "Desvincular Steam elimina sus datos de personaje guardados y su mÃ©todo de inicio de sesiÃ³n." }
+  "platformLinks": { "title": "Cuentas vinculadas", "empty": "Aún no hay cuentas vinculadas.", "item": "{{platform}}: {{handle}}", "unlink": "Desvincular {{platform}}", "steamUnlinkNotice": "Desvincular Steam elimina sus datos de personaje guardados y su método de inicio de sesión." }
 }

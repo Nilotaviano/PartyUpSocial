@@ -93,7 +93,7 @@ describe('AuthMethods', () => {
     renderPage()
 
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Unlink google' }),
+      await screen.findByRole('button', { name: 'Unlink Google' }),
     )
     fireEvent.change(screen.getByLabelText('Current password'), {
       target: { value: 'correct-password' },

@@ -22,6 +22,7 @@
     "enabled": "El acceso con contraseña está activado.",
     "notSet": "No hay una contraseña configurada para esta cuenta.",
     "currentLabel": "Tu contraseña actual",
+    "currentRequired": "Ingresa tu contraseña actual.",
     "newLabel": "Nueva contraseña",
     "hint": "Usa al menos 12 caracteres.",
     "tooShort": "La contraseña debe tener al menos 12 caracteres.",
@@ -36,7 +37,13 @@
     "title": "Métodos de inicio de sesión",
     "unlink": "Desvincular {{method}}",
     "linkTitle": "Agregar método de inicio",
-    "link": "Vincular {{provider}}"
+    "link": "Vincular {{provider}}",
+    "kind": {
+      "password": "Contraseña",
+      "magiclink": "Enlace mágico",
+      "google": "Google",
+      "steam": "Steam"
+    }
   },
   "language": {
     "title": "Idioma",

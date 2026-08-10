@@ -31,6 +31,7 @@ vi.mock('../../auth/useSession', () => ({
 }))
 
 import '../../i18n'
+import i18n from '../../i18n'
 import { setReauthProof } from '../../auth/reauthProof'
 import { AccountSettingsPage } from './AccountSettingsPage'
 import { setPendingSettingsAction } from './reauthAction'
@@ -45,10 +46,11 @@ function renderPage() {
   )
 }
 
-afterEach(() => {
+afterEach(async () => {
   cleanup()
   vi.clearAllMocks()
   sessionStorage.clear()
+  await i18n.changeLanguage('en')
 })
 
 describe('PasswordManagement', () => {
@@ -161,5 +163,89 @@ describe('PasswordManagement', () => {
     expect(await screen.findByRole('button', { name: 'Set a password' })).toBeVisible()
     expect(screen.queryByLabelText('New password')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Your current password')).not.toBeInTheDocument()
+  })
+
+  it('blocks a short new password on the change form app-side, without ever POSTing_D184', async () => {
+    api.get.mockResolvedValue({
+      data: { methods: [{ kind: 'password', linked: true, removable: true, detail: 'Password' }] },
+    })
+
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Your current password'), { target: { value: 'old-correct-password' } })
+    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'short' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Change password' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Password must be at least 12 characters.')
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('blocks a missing current password on the change form app-side, without ever POSTing_D184', async () => {
+    api.get.mockResolvedValue({
+      data: { methods: [{ kind: 'password', linked: true, removable: true, detail: 'Password' }] },
+    })
+
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('New password'), { target: { value: 'brand-new-password-12' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Change password' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Enter your current password.')
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('blocks a short new password on the set-password form app-side, without ever POSTing_D184', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        methods: [
+          { kind: 'password', linked: false, removable: false, detail: null },
+          { kind: 'google', linked: true, removable: true, detail: 'user@example.test' },
+        ],
+      },
+    })
+    setPendingSettingsAction({ kind: 'setPassword' })
+    setReauthProof('fresh-reauth-proof')
+
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue with confirmed identity' }))
+    fireEvent.change(await screen.findByLabelText('New password'), { target: { value: 'short' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Set password' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Password must be at least 12 characters.')
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('still surfaces the localized too-short copy from the server auth_validation backstop_D184', async () => {
+    api.get.mockResolvedValue({
+      data: { methods: [{ kind: 'password', linked: true, removable: true, detail: 'Password' }] },
+    })
+    api.post.mockRejectedValue(new api.ApiError(400, 'auth_validation'))
+
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Your current password'), { target: { value: 'old-correct-password' } })
+    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'brand-new-password-12' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Change password' }))
+
+    await waitFor(() => expect(api.post).toHaveBeenCalled())
+    expect(await screen.findByRole('alert')).toHaveTextContent('Password must be at least 12 characters.')
+  })
+
+  it('renders localized auth-method names in pt-BR, not the raw API kind_D184', async () => {
+    await i18n.changeLanguage('pt-BR')
+    api.get.mockResolvedValue({
+      data: { methods: [{ kind: 'magicLink', linked: true, removable: true, detail: null }] },
+    })
+
+    renderPage()
+
+    const entry = await screen.findByText('Link mágico')
+    expect(entry).toBeInTheDocument()
+    expect(entry.textContent).not.toContain('magicLink')
+
+    const unlinkButton = screen.getByRole('button', { name: 'Desvincular Link mágico' })
+    expect(unlinkButton).toBeInTheDocument()
+    expect(unlinkButton.textContent).not.toContain('magicLink')
   })
 })

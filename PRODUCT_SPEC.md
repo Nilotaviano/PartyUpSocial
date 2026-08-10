@@ -673,6 +673,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-181 | The app offers a theme preference — system (default), light, dark — set in settings, stored client-side only (localStorage); no server or API involvement. | Confirmed |
 | D-182 | After onboarding, a registered account's first visit to the app home starts a skippable 8-stop tour of the app chrome. Finishing or skipping marks the tour completed for the account (any device); it never auto-shows again. The tour is replayable from account settings. Accounts that had completed onboarding before the feature ships are treated as completed. | Confirmed |
 | D-183 | The app chrome ends in an account menu: the signed-in account's D-050 avatar acts as the trigger in the top-right, opening a menu that holds the settings entry and a sign-out action. Sign out ends the session on the current device only — other devices stay signed in — and returns to the welcome screen. The trigger is the anchor for the tour's settings stop (D-182 keeps its eight stops). | Confirmed |
+| D-184 | Password strength is governed by length alone — a 12-character minimum, with no composition rules (no required digit, symbol, or mixed case). This is deliberate, per NIST SP 800-63B: composition rules push users toward predictable substitutions without materially raising entropy. Form validation is rendered by the app and localized; the browser's native validation UI is never the mechanism, because it is unlocalized and unstyled. | Confirmed |
 
 ## 15. Open questions
 

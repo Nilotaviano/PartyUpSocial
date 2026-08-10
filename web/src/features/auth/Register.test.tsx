@@ -49,6 +49,30 @@ afterEach(() => {
 
 describe('Register', () => {
   it.each([
+    ['', 'Enter your email address.'],
+    ['not-an-email', 'Enter a valid email address.'],
+  ])(
+    'rejects %s app-side with a localized error instead of the browser bubble, without POSTing_D184',
+    async (value, message) => {
+      sessionStorage.setItem('partyup.age-gate-attested', 'true')
+      renderRegister('/register')
+
+      if (value) {
+        fireEvent.change(screen.getByLabelText('Email address'), {
+          target: { value },
+        })
+      }
+      fireEvent.submit(
+        screen.getByRole('button', { name: 'Create account' }).closest('form')!,
+      )
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(message)
+      expect(api.post).not.toHaveBeenCalled()
+      expect(screen.getByLabelText('Email address')).toHaveAttribute('aria-invalid', 'true')
+    },
+  )
+
+  it.each([
     ['/register?next=%2Fu%2FFriend.One', '/u/friend.one'],
     ['/register?next=%2Fadd%2F2345-6789-ab', '/add/23456789AB'],
   ])(

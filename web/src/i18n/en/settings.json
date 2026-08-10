@@ -22,6 +22,7 @@
     "enabled": "Password sign-in is enabled.",
     "notSet": "No password is set for this account.",
     "currentLabel": "Your current password",
+    "currentRequired": "Enter your current password.",
     "newLabel": "New password",
     "hint": "Use at least 12 characters.",
     "tooShort": "Password must be at least 12 characters.",
@@ -36,7 +37,13 @@
     "title": "Sign-in methods",
     "unlink": "Unlink {{method}}",
     "linkTitle": "Link a sign-in method",
-    "link": "Link {{provider}}"
+    "link": "Link {{provider}}",
+    "kind": {
+      "password": "Password",
+      "magiclink": "Magic link",
+      "google": "Google",
+      "steam": "Steam"
+    }
   },
   "language": {
     "title": "Language",
