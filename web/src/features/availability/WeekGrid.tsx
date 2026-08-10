@@ -343,14 +343,31 @@ export function WeekGrid({
     })
   }
 
+  // A native `click` only fires when the same element received both
+  // mousedown and mouseup — a drag that starts on an empty cell and is
+  // released over a block (or vice-versa) never reaches here, so this can't
+  // also be misread as "commit the paint selection". `handleMouseDown`
+  // already bails on an occurrence (`:325`-ish above) without starting a
+  // drag, so a plain click on a block is otherwise inert — this is the only
+  // place that opens it.
+  function handleClick(day: number, slot: number) {
+    const occurrence = occurrenceAt(day, slot)
+    if (occurrence) onEditOccurrence(occurrence.id)
+  }
+
   // Touch is a capability check (`PointerEvent` + `pointerType`), never UA
-  // sniffing (design §10.3): a short tap does nothing, a long-press begins a
-  // selection, and a press that turns into a scroll (movement past the
-  // threshold before the timer fires) commits nothing (A-018/P5-TOUCH-01).
+  // sniffing (design §10.3): a short tap on an existing block opens its
+  // editor, a short tap on empty space does nothing, a long-press on empty
+  // space begins a paint selection, and a press that turns into a scroll
+  // (movement past the threshold before the timer fires, or before liftoff)
+  // commits nothing (A-018/P5-TOUCH-01).
   function handlePointerDown(event: React.PointerEvent, day: number, slot: number) {
     if (event.pointerType !== 'touch') return
-    if (occurrenceAt(day, slot)) return
     touchOrigin.current = { x: event.clientX, y: event.clientY }
+    // A touch that starts on an existing block never becomes a paint drag —
+    // the long-press timer simply never starts — but `touchOrigin` still
+    // needs setting so `handlePointerUp` can recognise the tap.
+    if (occurrenceAt(day, slot)) return
     longPressTimer.current = setTimeout(() => {
       dragging.current = true
       setIsTouchDragging(true)
@@ -368,30 +385,46 @@ export function WeekGrid({
       return
     }
     const origin = touchOrigin.current
-    if (!origin || !longPressTimer.current) return
+    if (!origin) return
     const movedPx = Math.hypot(event.clientX - origin.x, event.clientY - origin.y)
     if (movedPx > MOVE_CANCEL_PX) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = undefined
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = undefined
+      }
+      // Nulling this beyond the cancel threshold is also what disqualifies
+      // the eventual pointerup from being read as a tap.
       touchOrigin.current = null
     }
   }
 
-  function handlePointerUp(event: React.PointerEvent) {
+  function handlePointerUp(event: React.PointerEvent, day: number, slot: number) {
     if (event.pointerType !== 'touch') return
+    const wasLongPress = dragging.current
+    // A tap: liftoff happened before a long-press fired, and without moving
+    // past the cancel threshold in between (which would have nulled this).
+    const isTap = !wasLongPress && touchOrigin.current !== null
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = undefined
     }
     touchOrigin.current = null
     stopAutoScroll()
-    if (dragging.current) {
+    if (wasLongPress) {
       dragging.current = false
       setIsTouchDragging(false)
       setSelection((current) => {
         if (current) commitSelection(current)
         return null
       })
+      return
+    }
+    if (isTap) {
+      const occurrence = occurrenceAt(day, slot)
+      if (occurrence) {
+        setFocused({ day, slot })
+        onEditOccurrence(occurrence.id)
+      }
     }
   }
 
@@ -540,13 +573,14 @@ export function WeekGrid({
                         : { day, slot },
                     )
                   }}
+                  onClick={() => handleClick(day, slot)}
                   onKeyDown={(event) => handleKeyDown(event, day, slot)}
                   onMouseDown={(event) => handleMouseDown(event, day, slot)}
                   onMouseEnter={() => handleMouseEnter(day, slot)}
                   onPointerDown={(event) => handlePointerDown(event, day, slot)}
                   onPointerMove={(event) => handlePointerMove(event, day, slot)}
                   onPointerCancel={handlePointerCancel}
-                  onPointerUp={handlePointerUp}
+                  onPointerUp={(event) => handlePointerUp(event, day, slot)}
                 >
                   {busy && (
                     <span aria-hidden="true" className="text-xs text-busy-ink">

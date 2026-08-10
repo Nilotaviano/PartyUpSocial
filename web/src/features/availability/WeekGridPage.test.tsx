@@ -259,6 +259,108 @@ describe('WeekGrid keyboard flow', () => {
   })
 })
 
+describe('WeekGrid pointer flow', () => {
+  const occurrences: GridOccurrence[] = [
+    { id: 'block-a', start: localDate(9, 0), end: localDate(9, 30) },
+  ]
+
+  // Catches a regression to `handleMouseDown`'s `occurrenceAt` bail (`:325`)
+  // being the *only* mouse path — before the fix, a click on a block did
+  // nothing because no click handler existed at all.
+  it('opens the editor on a mouse click on an existing block', () => {
+    const { onEditOccurrence, onCreateBlock } = renderGrid({ occurrences })
+
+    const block = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    fireEvent.mouseDown(block, { button: 0 })
+    fireEvent.mouseUp(block)
+    fireEvent.click(block)
+
+    expect(onEditOccurrence).toHaveBeenCalledWith('block-a')
+    // A click on a block must never also start/commit a paint selection.
+    expect(onCreateBlock).not.toHaveBeenCalled()
+  })
+
+  // Catches a regression to the missing touch entry point: before the fix,
+  // `handlePointerUp` had no branch at all for "this was a short tap on an
+  // existing block" — a phone user could not reach the editor.
+  it('opens the editor on a touch tap on an existing block_P5TOUCH01', () => {
+    const { onEditOccurrence } = renderGrid({ occurrences })
+
+    const block = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    fireEvent.pointerDown(block, { pointerType: 'touch', clientX: 10, clientY: 10 })
+    fireEvent.pointerUp(block, { pointerType: 'touch', clientX: 10, clientY: 10 })
+
+    expect(onEditOccurrence).toHaveBeenCalledWith('block-a')
+  })
+
+  // Catches a regression where any touch liftoff on a block — including one
+  // that dragged past the cancel threshold first (e.g. a scroll gesture
+  // that happened to end over the block) — would be misread as a tap.
+  it('does not open the editor when a touch moves past the cancel threshold before lifting_P5TOUCH01', () => {
+    const { onEditOccurrence } = renderGrid({ occurrences })
+
+    const block = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    fireEvent.pointerDown(block, { pointerType: 'touch', clientX: 10, clientY: 10 })
+    fireEvent.pointerMove(block, { pointerType: 'touch', clientX: 10, clientY: 40 })
+    fireEvent.pointerUp(block, { pointerType: 'touch', clientX: 10, clientY: 40 })
+
+    expect(onEditOccurrence).not.toHaveBeenCalled()
+  })
+
+  // Regression guard: this already passes pre-change (the mouse-drag paint
+  // path was never broken), included so the pointer suite proves the fix
+  // didn't turn blocks into paint surfaces or otherwise disturb drag-to-paint
+  // on empty cells.
+  it('still paints a block by dragging across empty cells with the mouse', () => {
+    const { onCreateBlock } = renderGrid({})
+
+    const dragStart = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    const dragEnd = screen.getAllByRole('gridcell', { name: '9:30' })[0]
+    fireEvent.mouseDown(dragStart, { button: 0 })
+    fireEvent.mouseEnter(dragEnd)
+    fireEvent.mouseUp(screen.getByRole('grid'))
+
+    expect(onCreateBlock).toHaveBeenCalledTimes(1)
+    const [range] = onCreateBlock.mock.calls[0]
+    expect(range.start.getTime()).toBe(localDate(9, 0).getTime())
+    expect(range.end.getTime()).toBe(localDate(9, 45).getTime())
+  })
+
+  // Regression guard: this already passes pre-change — `handleMouseDown`'s
+  // `occurrenceAt` bail (`:325`) predates this ticket and is left untouched.
+  // Included so the pointer suite proves a mouse drag still cannot start on
+  // top of a block.
+  it('does not begin a paint selection when a mouse drag starts on an existing block', () => {
+    const { onCreateBlock, onEditOccurrence } = renderGrid({ occurrences })
+
+    const block = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    const empty = screen.getAllByRole('gridcell', { name: '9:30' })[0]
+    fireEvent.mouseDown(block, { button: 0 })
+    fireEvent.mouseEnter(empty)
+    fireEvent.mouseUp(screen.getByRole('grid'))
+
+    expect(onCreateBlock).not.toHaveBeenCalled()
+    // No click fired either (mousedown and mouseup targeted different
+    // elements), so the editor doesn't open from this ambiguous gesture.
+    expect(onEditOccurrence).not.toHaveBeenCalled()
+  })
+
+  // Regression guard: this already passes pre-change — Enter through
+  // `handleKeyDown` (`:275`) is the path this ticket deliberately leaves
+  // alone. Included so the pointer suite proves the new mouse/touch entry
+  // points didn't disturb it. (`handleKeyDown`'s switch has no `' '`/Space
+  // case at all — only Enter opens the editor from the keyboard today; see
+  // report concerns.)
+  it('still opens the editor with Enter from the keyboard', () => {
+    const { onEditOccurrence } = renderGrid({ occurrences })
+
+    const block = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    block.focus()
+    fireEvent.keyDown(block, { key: 'Enter' })
+    expect(onEditOccurrence).toHaveBeenCalledWith('block-a')
+  })
+})
+
 function calendarResponse(
   occurrenceIso: { start: string; end: string },
   overrides: { friendAvailability?: unknown[]; sessions?: unknown[]; pollOptions?: unknown[] } = {},
