@@ -153,7 +153,7 @@ Phase 7 shipped end-to-end across seven slices (S1-S7), documented in `PHASE7_DE
 ## Visual design pass — owner-sequenced, independent of Phases 4–8
 
 - Build and apply the app-wide palette, typography, spacing, motion, and component token system from the PartyUp thesis and owner-ratified Rallly/Luma/Sleeper references recorded in `PHASE3_DESIGN.md` §19.
-- Preserve the shipped Phase 3 constraints until migration: request cards remain username-only, accepted friends stay avatar-forward, QR/share remains the calm signature surface, masking looks ordinary, and WCAG 2.2 AA/reduced-motion/i18n remain the floor.
+- Preserve the shipped Phase 3 constraints until migration: accepted friends stay avatar-forward, QR/share remains the calm signature surface, masking looks ordinary, and WCAG 2.2 AA/reduced-motion/i18n remain the floor. **The username-only rule for request cards was overturned by D-188 (owner, 2026-08-10)** — requests now carry an avatar like every other surface listing a person; masked participants remain the sole exclusion.
 
 ---
 
