@@ -162,7 +162,14 @@ describe('FindATimePage', () => {
         return Promise.resolve({
           data: {
             items: [
-              { friendshipId: 'f-1', userId: 'friend-1', username: 'ada', displayName: 'Ada' },
+              {
+                friendshipId: 'f-1',
+                userId: 'friend-1',
+                username: 'ada',
+                displayName: 'Ada',
+                avatar: { kind: 'emoji', emoji: '🎲', sourcePlatformLinkId: null },
+                platforms: [],
+              },
             ],
           },
         })
@@ -185,6 +192,43 @@ describe('FindATimePage', () => {
 
     await screen.findByText('1 selected')
     expect(screen.queryByTestId('find-a-time-considered-friends')).not.toBeInTheDocument()
+  })
+
+  it('shows the friend avatar without changing the checkbox accessible name, and toggles by click and keyboard_D050', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/friends')
+        return Promise.resolve({
+          data: {
+            items: [
+              {
+                friendshipId: 'f-1',
+                userId: 'friend-1',
+                username: 'ada',
+                displayName: 'Ada',
+                avatar: { kind: 'emoji', emoji: '🎲', sourcePlatformLinkId: null },
+                platforms: [],
+              },
+            ],
+          },
+        })
+      return defaultGetHandler(path)
+    })
+    renderPage()
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Ada (@ada)' })
+    const label = checkbox.closest('label')
+    expect(label?.querySelector('[aria-hidden="true"]')).not.toBeNull()
+
+    expect(checkbox).not.toBeChecked()
+    fireEvent.click(label as HTMLElement)
+    expect(checkbox).toBeChecked()
+
+    // Native keyboard activation (Space/Enter on a focused input) dispatches
+    // a click event on the input itself; jsdom does not synthesize this from
+    // keydown, so a direct click on the focused control is the faithful proxy.
+    checkbox.focus()
+    fireEvent.click(checkbox)
+    expect(checkbox).not.toBeChecked()
   })
 
   it('warns on an over-duration window without hiding it_D109', async () => {

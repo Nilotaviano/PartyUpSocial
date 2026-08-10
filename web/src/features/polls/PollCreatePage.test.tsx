@@ -68,6 +68,39 @@ describe('PollCreatePage', () => {
     expect(api.post).not.toHaveBeenCalled()
   })
 
+  it('shows the invitee avatar without changing the checkbox accessible name, and toggles by click and keyboard_D050', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        items: [
+          {
+            friendshipId: 'friendship-1',
+            userId: 'user-1',
+            username: 'friend.one',
+            displayName: 'Friend One',
+            avatar: { kind: 'emoji', emoji: '🎮', sourcePlatformLinkId: null },
+            platforms: [],
+          },
+        ],
+      },
+    })
+    renderPage()
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Friend One (@friend.one)' })
+    const label = checkbox.closest('label')
+    expect(label?.querySelector('[aria-hidden="true"]')).not.toBeNull()
+
+    expect(checkbox).not.toBeChecked()
+    fireEvent.click(label as HTMLElement)
+    expect(checkbox).toBeChecked()
+
+    // Native keyboard activation (Space/Enter on a focused input) dispatches
+    // a click event on the input itself; jsdom does not synthesize this from
+    // keydown, so a direct click on the focused control is the faithful proxy.
+    checkbox.focus()
+    fireEvent.click(checkbox)
+    expect(checkbox).not.toBeChecked()
+  })
+
   it('merges a duplicate option instant instead of erroring_D080', async () => {
     api.get.mockResolvedValue({ data: { items: [] } })
     renderPage()

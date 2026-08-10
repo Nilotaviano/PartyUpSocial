@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
+import { AvatarDisc } from '../friends/AvatarDisc'
 import { friendKeys, getFriends } from '../friends/friendGraph'
 import {
   availabilityKeys,
@@ -183,6 +184,7 @@ export function FindATimePage() {
                     )
                   }}
                 />
+                <AvatarDisc emoji={friend.avatar.emoji} seed={friend.username} size="xs" />
                 {friend.displayName} (@{friend.username})
               </label>
             </li>

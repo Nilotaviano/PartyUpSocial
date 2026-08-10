@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/button'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
 import { useDirtyGuard } from '../../components/useDirtyGuard'
+import { AvatarDisc } from '../friends/AvatarDisc'
 import { friendKeys, getFriends } from '../friends/friendGraph'
 import { createPoll, type CreatePollRequest } from './pollQueries'
 
@@ -706,6 +707,7 @@ export function PollCreatePage() {
                       )
                     }}
                   />
+                  <AvatarDisc emoji={friend.avatar.emoji} seed={friend.username} size="xs" />
                   {friend.displayName} (@{friend.username})
                 </label>
               </li>

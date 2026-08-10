@@ -99,7 +99,7 @@ describe('SessionInvitePage', () => {
   it('invites the selected friends_D115', async () => {
     renderPage()
 
-    fireEvent.click(await screen.findByLabelText('Friend One (@friend.one)'))
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Friend One (@friend.one)' }))
     fireEvent.click(screen.getByRole('button', { name: 'Invite friends' }))
 
     await waitFor(() =>
@@ -110,13 +110,32 @@ describe('SessionInvitePage', () => {
     )
   })
 
+  it('shows the friend avatar without changing the checkbox accessible name, and toggles by click and keyboard_D050', async () => {
+    renderPage()
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Friend One (@friend.one)' })
+    const label = checkbox.closest('label')
+    expect(label?.querySelector('[aria-hidden="true"]')).not.toBeNull()
+
+    expect(checkbox).not.toBeChecked()
+    fireEvent.click(label as HTMLElement)
+    expect(checkbox).toBeChecked()
+
+    // Native keyboard activation (Space/Enter on a focused input) dispatches
+    // a click event on the input itself; jsdom does not synthesize this from
+    // keydown, so a direct click on the focused control is the faithful proxy.
+    checkbox.focus()
+    fireEvent.click(checkbox)
+    expect(checkbox).not.toBeChecked()
+  })
+
   it('creates and copies a guest link_D115', async () => {
     api.post.mockResolvedValue({
       data: [{ guestLinkId: 'link-1', url: 'https://partyup.test/g/token' }],
     })
     renderPage()
 
-    await screen.findByLabelText('Friend One (@friend.one)')
+    await screen.findByRole('checkbox', { name: 'Friend One (@friend.one)' })
     fireEvent.click(screen.getByRole('button', { name: 'Create guest link' }))
 
     expect(await screen.findByText('https://partyup.test/g/token')).toBeInTheDocument()
@@ -130,7 +149,7 @@ describe('SessionInvitePage', () => {
     api.post.mockRejectedValue(new ApiError(404, 'user_not_found'))
     renderPage()
 
-    fireEvent.click(await screen.findByLabelText('Friend One (@friend.one)'))
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Friend One (@friend.one)' }))
     fireEvent.click(screen.getByRole('button', { name: 'Invite friends' }))
 
     expect(await screen.findByText('That user could not be found.')).toBeInTheDocument()
@@ -142,7 +161,7 @@ describe('SessionInvitePage', () => {
     })
     renderPage()
 
-    await screen.findByLabelText('Friend One (@friend.one)')
+    await screen.findByRole('checkbox', { name: 'Friend One (@friend.one)' })
     fireEvent.click(screen.getByRole('button', { name: 'Create guest link' }))
     const revokeTrigger = await screen.findByRole('button', { name: 'Revoke' })
     revokeTrigger.focus()
