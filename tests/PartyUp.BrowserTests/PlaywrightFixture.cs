@@ -498,8 +498,22 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
             await page.Locator("#age-gate").DispatchEventAsync("click");
             await page.GetByRole(AriaRole.Button, new() { Name = "Continue" }).ClickAsync();
             await page.WaitForURLAsync(url => url.Contains("/register", StringComparison.Ordinal));
-            await page.GetByLabel("Email address").FillAsync(email);
-            await page.GetByRole(AriaRole.Button, new() { Name = "Create account" }).ClickAsync();
+            // Returning attested, the register page resumes the stashed registration on its own
+            // (prefill + auto-submit); racing it with a manual re-fill detaches the input
+            // mid-fill. Wait for the resume's confirmation first — the prefilled form is visible
+            // for a moment before the auto-submit replaces it, so an either-or wait would pick
+            // the form and re-enter the race. Manual fill remains only as the stash-less
+            // fallback (a full page load clears the in-memory stash).
+            try
+            {
+                await page.GetByText("Check your inbox.").WaitForAsync(
+                    new LocatorWaitForOptions { Timeout = 15000 });
+            }
+            catch (TimeoutException)
+            {
+                await page.GetByLabel("Email address").FillAsync(email);
+                await page.GetByRole(AriaRole.Button, new() { Name = "Create account" }).ClickAsync();
+            }
         }
 
         await page.GetByText("Check your inbox.").WaitForAsync();
