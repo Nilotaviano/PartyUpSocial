@@ -28,33 +28,52 @@ const SPOTLIGHT_CLASSES = [
  * Card layout constants (§3: below the anchor, clamped to the viewport, arrow points at it).
  * CARD_WIDTH_PX and CARD_MARGIN_PX must match the card's Tailwind classes
  * (max-w-[320px] w-[calc(100%_-_2rem)]) — the arrow is aimed with this arithmetic,
- * so changing the classes without these constants silently de-points it.
+ * so changing the classes without these constants silently de-points it. CARD_MAX_HEIGHT_PX is
+ * the height the above/below flip decision below plans against, and matches the card's
+ * `max-h-[min(280px,calc(100dvh-2rem))]` — the `calc(100dvh-2rem)` half is load-bearing, not
+ * decorative: without it CSS could render the card taller than this constant on a short viewport,
+ * which would silently invalidate the flip math's own height assumption (`overflow-y-auto` only
+ * guards genuinely-long content, not this).
  */
 const CARD_WIDTH_PX = 320
+const CARD_MAX_HEIGHT_PX = 280
 const CARD_MARGIN_PX = 16
 const CARD_GAP_PX = 12
 const ARROW_HALF_PX = 8
 
 type ReplayState = { replayTour?: boolean } | null
 
-type CardPosition = { top: number; left: number; arrowLeft: number }
+type CardPosition = { top: number; left: number; arrowLeft: number; arrowAtBottom: boolean }
 
 /**
- * Computes the card's viewport-fixed `{top, left}` below the active anchor (the nav is a
- * horizontal row, so below-with-clamped-horizontal-offset always has room) and the arrow's
- * left offset within the card pointing back at the anchor's center.
+ * Computes the card's viewport-fixed `{top, left}` near the active anchor and the arrow's left
+ * offset pointing back at the anchor's center. Horizontally: the nav is a row, so a clamped
+ * center-under-anchor offset always has room. Vertically: below the anchor by default (every
+ * shipped anchor lives in the top header, so this is the common case). It flips above the anchor
+ * (`arrowAtBottom`) ONLY when the above position genuinely clears the viewport's top margin on
+ * its own — a flip that would itself need clamping back down draws the card over the very anchor
+ * it spotlights (a short landscape-phone height clamping the flipped top to `CARD_MARGIN_PX`,
+ * which sits on top of a top-header anchor, is exactly that case) — so on a viewport too short for
+ * either to fit cleanly, this stays below and clamped, never flips into the anchor.
  */
 function computeCardPosition(anchorRect: DOMRect): CardPosition {
   const cardWidth = Math.min(CARD_WIDTH_PX, window.innerWidth - CARD_MARGIN_PX * 2)
   const anchorCenter = anchorRect.left + anchorRect.width / 2
   const maxLeft = Math.max(window.innerWidth - cardWidth - CARD_MARGIN_PX, CARD_MARGIN_PX)
   const left = Math.min(Math.max(anchorCenter - cardWidth / 2, CARD_MARGIN_PX), maxLeft)
-  const top = Math.min(anchorRect.bottom + CARD_GAP_PX, window.innerHeight - CARD_MARGIN_PX)
+
+  const cardHeight = Math.min(CARD_MAX_HEIGHT_PX, window.innerHeight - CARD_MARGIN_PX * 2)
+  const belowTop = anchorRect.bottom + CARD_GAP_PX
+  const fitsBelow = belowTop + cardHeight <= window.innerHeight - CARD_MARGIN_PX
+  const aboveTop = anchorRect.top - CARD_GAP_PX - cardHeight
+  const canFlipAbove = !fitsBelow && aboveTop >= CARD_MARGIN_PX
+  const top = canFlipAbove ? aboveTop : Math.min(belowTop, window.innerHeight - CARD_MARGIN_PX)
+
   const arrowLeft = Math.min(
     Math.max(anchorCenter - left, ARROW_HALF_PX * 2),
     cardWidth - ARROW_HALF_PX * 2,
   )
-  return { top, left, arrowLeft }
+  return { top, left, arrowLeft, arrowAtBottom: canFlipAbove }
 }
 
 /**
@@ -134,6 +153,19 @@ export function TourOverlay() {
       setCardPosition(computeCardPosition(element!.getBoundingClientRect()))
     }
 
+    // Coalesces however many scroll/resize events land in one frame into a single recompute —
+    // smooth-scrolling `scrollIntoView` fires `scroll` on essentially every frame, and without
+    // this a `setCardPosition` (and the dialog re-render it triggers) would run once per event
+    // instead of once per paint.
+    let pendingFrame: number | null = null
+    function scheduleReposition() {
+      if (pendingFrame !== null) return
+      pendingFrame = window.requestAnimationFrame(() => {
+        pendingFrame = null
+        reposition()
+      })
+    }
+
     const reducedMotion =
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -143,12 +175,15 @@ export function TourOverlay() {
 
     // Tracks the anchor through the scroll-into-view animation and any viewport resize — the card
     // and its arrow stay pinned to the anchor rather than freezing at the pre-scroll position.
-    window.addEventListener('resize', reposition)
-    window.addEventListener('scroll', reposition, true)
+    window.addEventListener('resize', scheduleReposition)
+    window.addEventListener('scroll', scheduleReposition, true)
     return () => {
       element.classList.remove(...SPOTLIGHT_CLASSES)
-      window.removeEventListener('resize', reposition)
-      window.removeEventListener('scroll', reposition, true)
+      window.removeEventListener('resize', scheduleReposition)
+      window.removeEventListener('scroll', scheduleReposition, true)
+      if (pendingFrame !== null) {
+        window.cancelAnimationFrame(pendingFrame)
+      }
     }
   }, [isOpen, stepIndex])
 
@@ -199,7 +234,7 @@ export function TourOverlay() {
         <Dialog.Overlay className="fixed inset-0 z-40 bg-scrim" data-testid="tour-overlay-backdrop" />
         <Dialog.Content
           aria-describedby={`tour-step-${stepId}-description`}
-          className="fixed z-50 w-[calc(100%_-_2rem)] max-w-[320px] rounded-card border-2 border-ink bg-card p-6 shadow-offset-dialog motion-safe:transition-[top,left] motion-safe:duration-200 motion-safe:ease-out focus:outline-none"
+          className="fixed z-50 w-[calc(100%_-_2rem)] max-w-[320px] max-h-[min(280px,calc(100dvh-2rem))] overflow-y-auto rounded-card border-2 border-ink bg-card p-6 shadow-offset-dialog motion-safe:transition-[top,left] motion-safe:duration-200 motion-safe:ease-out focus:outline-none"
           data-testid="tour-overlay"
           style={cardStyle}
           onCloseAutoFocus={(event) => {
@@ -210,12 +245,19 @@ export function TourOverlay() {
           }}
           onInteractOutside={(event) => event.preventDefault()}
         >
-          {/* §3's card arrow: a rotated square whose top-left border edges read as a caret pointing
-              up at the spotlit anchor above the card. Purely decorative (aria-hidden) — the ring on
-              the anchor itself and Dialog.Title/Description carry the real semantics. */}
+          {/* §3's card arrow: a rotated square whose visible border edges read as a caret pointing
+              at the spotlit anchor — top-left edges when the card sits below the anchor (the
+              common case, every shipped anchor lives in the header), bottom-right edges when
+              `computeCardPosition` had to flip the card above it instead. Purely decorative
+              (aria-hidden) — the ring on the anchor itself and Dialog.Title/Description carry the
+              real semantics. */}
           <div
             aria-hidden="true"
-            className="absolute -top-[9px] h-4 w-4 rotate-45 rounded-[2px] border-l-2 border-t-2 border-ink bg-card"
+            className={
+              cardPosition?.arrowAtBottom
+                ? 'absolute -bottom-[9px] h-4 w-4 rotate-45 rounded-[2px] border-b-2 border-r-2 border-ink bg-card'
+                : 'absolute -top-[9px] h-4 w-4 rotate-45 rounded-[2px] border-l-2 border-t-2 border-ink bg-card'
+            }
             style={{ left: cardPosition ? cardPosition.arrowLeft - ARROW_HALF_PX : undefined }}
           />
           <div aria-live="polite">

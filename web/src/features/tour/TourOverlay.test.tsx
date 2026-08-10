@@ -257,6 +257,26 @@ describe('TourOverlay — overrides (D-182)', () => {
   })
 })
 
+describe('TourOverlay — reposition scheduling (D-182)', () => {
+  it('coalesces a burst of scroll events into a single requestAnimationFrame call', async () => {
+    mockProfile(false)
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame')
+    renderOverlay()
+
+    await screen.findByRole('dialog')
+    // Mounting alone never schedules a frame — only a subsequent scroll/resize does — but clear
+    // defensively so this assertion is scoped to the burst below regardless.
+    rafSpy.mockClear()
+
+    for (let i = 0; i < 5; i++) {
+      fireEvent.scroll(window)
+    }
+
+    expect(rafSpy).toHaveBeenCalledTimes(1)
+    rafSpy.mockRestore()
+  })
+})
+
 describe('TourOverlay — Replay (D-182)', () => {
   it('opens regardless of tourCompleted, clears the dismissed ref, and consumes the router state once', async () => {
     mockProfile(true)
