@@ -17,6 +17,7 @@ import { getSession, sessionQueryKey, useSession } from '../../auth/useSession'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { TimeZoneField, isKnownTimeZone } from '../../components/TimeZoneField'
 import { FriendCodeInput } from '../friends/FriendCodeInput'
 import { FriendCodeResolution } from '../friends/AddFriendPage'
 import { ProfileResolution } from '../friends/ProfilePage'
@@ -232,27 +233,33 @@ function TimeZoneStep({
   value: string | null
   onNext: (timeZone: string) => void
 }) {
-  const { t } = useTranslation('onboarding')
+  const { t } = useTranslation(['onboarding', 'profile'])
   const [timeZone, setTimeZone] = useState(
     value ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
   )
+  const [invalid, setInvalid] = useState(false)
   return (
     <form
+      noValidate
       onSubmit={(event) => {
         event.preventDefault()
+        if (!isKnownTimeZone(timeZone)) {
+          setInvalid(true)
+          return
+        }
+        setInvalid(false)
         onNext(timeZone)
       }}
     >
-      <Label htmlFor="time-zone">{t('fields.timeZone')}</Label>
-      <select
-        className="min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+      <TimeZoneField
+        errorMessage={invalid ? t('timeZoneField.invalid', { ns: 'profile' }) : undefined}
+        hint={t('timeZoneField.hint', { ns: 'profile' })}
         id="time-zone"
-        value={timeZone}
+        label={t('fields.timeZone')}
+        name="timeZone"
         onChange={(event) => setTimeZone(event.target.value)}
-      >
-        <option value={timeZone}>{timeZone}</option>
-        <option value="UTC">UTC</option>
-      </select>
+        value={timeZone}
+      />
       <Button type="submit" variant="primary">
         {t('actions.continue')}
       </Button>

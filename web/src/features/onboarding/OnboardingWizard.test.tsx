@@ -292,6 +292,42 @@ describe('OnboardingWizard', () => {
     ).toBe(true)
   })
 
+  it('lets the time-zone step reach a zone that is neither the browser zone nor UTC', async () => {
+    sessionStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        username: 'partyup',
+        displayName: 'Party Up',
+        avatar: { kind: 'emoji', emoji: 'game', platformLinkId: null },
+        timeZone: null,
+      }),
+    )
+    renderWizard('/onboarding/time-zone')
+
+    await expectHeading('Choose your time zone')
+    fireEvent.change(screen.getByLabelText('Time zone'), {
+      target: { value: 'America/Sao_Paulo' },
+    })
+    fireEvent.submit(
+      screen.getByRole('button', { name: 'Continue' }).closest('form')!,
+    )
+    await expectHeading('Link platforms')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await screen.findByRole('button', { name: 'Finish setup' })
+
+    expect(client.POST).toHaveBeenCalledWith('/api/v1/onboarding/complete', {
+      params: { header: { 'X-CSRF-TOKEN': '' } },
+      body: {
+        username: 'partyup',
+        displayName: 'Party Up',
+        avatar: { kind: 'emoji', emoji: 'game', platformLinkId: null },
+        timeZone: 'America/Sao_Paulo',
+        locale: 'en',
+      },
+    })
+  })
+
   it('renders the optional friends step on an Active direct reload without completing again_D127', async () => {
     auth.session = activeSession('/u/friend.one')
     renderWizard('/onboarding/friends?next=%2Fu%2Ffriend.one')

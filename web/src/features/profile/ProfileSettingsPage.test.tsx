@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -17,11 +17,11 @@ const api = vi.hoisted(() => {
       this.errors = errors
     }
   }
-  return { get: vi.fn(), remove: vi.fn(), ApiError }
+  return { get: vi.fn(), remove: vi.fn(), put: vi.fn(), ApiError }
 })
 
 vi.mock('../../api/client', () => ({
-  client: { GET: api.get, DELETE: api.remove },
+  client: { GET: api.get, DELETE: api.remove, PUT: api.put },
   isApiError: (error: unknown) => error instanceof api.ApiError,
 }))
 
@@ -35,6 +35,7 @@ function renderPage() {
 }
 
 afterEach(() => {
+  cleanup()
   sessionStorage.clear()
   vi.clearAllMocks()
 })
@@ -98,5 +99,57 @@ describe('ProfileSettingsPage', () => {
     })))
     expect(api.remove).toHaveBeenCalledTimes(1)
     expect(getPendingSettingsAction()).toBeNull()
+  })
+
+  it('blocks submission of a typed time zone that is not a real IANA zone, without calling the API', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') {
+        return Promise.resolve({ data: {
+          username: 'player',
+          displayName: 'Player',
+          avatar: { kind: 'emoji', emoji: 'game', platformLinkId: null },
+          timeZone: 'America/Fortaleza',
+          platformLinks: [],
+        } })
+      }
+      return Promise.resolve({ data: { methods: [] } })
+    })
+
+    renderPage()
+
+    const field = await screen.findByLabelText('Time zone')
+    fireEvent.change(field, { target: { value: 'Not/A_Real_Zone' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save time zone' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Choose a time zone from the list.')
+    expect(api.put).not.toHaveBeenCalled()
+  })
+
+  it('accepts and saves a real IANA zone typed into the time zone field, keeping the account current stored zone valid too', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') {
+        return Promise.resolve({ data: {
+          username: 'player',
+          displayName: 'Player',
+          avatar: { kind: 'emoji', emoji: 'game', platformLinkId: null },
+          timeZone: 'America/Fortaleza',
+          platformLinks: [],
+        } })
+      }
+      return Promise.resolve({ data: { methods: [] } })
+    })
+    api.put.mockResolvedValue({ data: {} })
+
+    renderPage()
+
+    const field = await screen.findByLabelText('Time zone')
+    expect(field).toHaveValue('America/Fortaleza')
+    fireEvent.change(field, { target: { value: 'America/Sao_Paulo' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save time zone' }))
+
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/api/v1/me/time-zone', expect.objectContaining({
+      body: { timeZone: 'America/Sao_Paulo' },
+    })))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

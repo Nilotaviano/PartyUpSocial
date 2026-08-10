@@ -97,7 +97,7 @@ describe('LanguageSwitch', () => {
 
     await renderPage()
 
-    fireEvent.click(screen.getByRole('combobox'))
+    fireEvent.click(screen.getByRole('combobox', { name: 'Display language' }))
     fireEvent.click(screen.getAllByRole('option')[1])
 
     await waitFor(() => expect(api.put).toHaveBeenCalledWith('/api/v1/me/locale', expect.objectContaining({ body: { locale: 'pt-BR' } })))

@@ -4,5 +4,6 @@
   "fields": { "username": "Username", "displayName": "Display name", "avatar": "Avatar", "timeZone": "Time zone" },
   "usernameCooldown": "Usernames can be changed once every 30 days.",
   "actions": { "saveUsername": "Save username", "saveDisplayName": "Save display name", "saveAvatar": "Save avatar", "saveTimeZone": "Save time zone" },
+  "timeZoneField": { "hint": "Type to filter by city or region.", "invalid": "Choose a time zone from the list." },
   "platformLinks": { "title": "Platform links", "empty": "No platform links yet.", "item": "{{platform}}: {{handle}}", "unlink": "Unlink {{platform}}", "steamUnlinkNotice": "Unlinking Steam removes its saved persona data and sign-in method." }
 }

@@ -10,6 +10,7 @@ import { Button } from '../../components/ui/button'
 import { Label } from '../../components/ui/label'
 import { Input } from '../../components/ui/input'
 import { Select } from '../../components/ui/select'
+import { TimeZoneField, isKnownTimeZone } from '../../components/TimeZoneField'
 import { ReauthPrompt, type ReauthAction } from './ReauthPrompt'
 import { clearPendingSettingsAction, getPendingSettingsAction } from './reauthAction'
 import { PASSWORD_MIN_LENGTH } from '../../auth/passwordPolicy'
@@ -70,6 +71,7 @@ export function AccountSettingsPage() {
   const [setPasswordError, setSetPasswordError] = useState<unknown>()
   const [setPasswordSuccess, setSetPasswordSuccess] = useState(false)
   const [setPasswordProof, setSetPasswordProof] = useState<PasswordProof | null>(null)
+  const [timeZoneInvalid, setTimeZoneInvalid] = useState(false)
 
   useEffect(() => {
     const accountLocale = session?.profile?.locale
@@ -104,8 +106,13 @@ export function AccountSettingsPage() {
   async function saveTimeZone(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(undefined)
+    const timeZone = String(new FormData(event.currentTarget).get('timeZone') ?? '')
+    if (!isKnownTimeZone(timeZone, session?.profile?.timeZone)) {
+      setTimeZoneInvalid(true)
+      return
+    }
+    setTimeZoneInvalid(false)
     try {
-      const timeZone = String(new FormData(event.currentTarget).get('timeZone') ?? '')
       await client.PUT('/api/v1/me/time-zone', {
         params: { header: { 'X-CSRF-TOKEN': '' } },
         body: { timeZone },
@@ -446,9 +453,16 @@ export function AccountSettingsPage() {
       </section>
       <section aria-labelledby="time-zone-heading" className="space-y-2">
         <h2 className="font-display text-h2 font-semibold text-ink" id="time-zone-heading">{t('fields.timeZone', { ns: 'profile' })}</h2>
-        <form className="space-y-2" onSubmit={(event) => void saveTimeZone(event)}>
-          <Label htmlFor="account-time-zone">{t('fields.timeZone', { ns: 'profile' })}</Label>
-          <Input id="account-time-zone" name="timeZone" defaultValue={session?.profile?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone} required />
+        <form className="space-y-2" noValidate onSubmit={(event) => void saveTimeZone(event)}>
+          <TimeZoneField
+            defaultValue={session?.profile?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
+            errorMessage={timeZoneInvalid ? t('timeZoneField.invalid', { ns: 'profile' }) : undefined}
+            hint={t('timeZoneField.hint', { ns: 'profile' })}
+            id="account-time-zone"
+            label={t('fields.timeZone', { ns: 'profile' })}
+            name="timeZone"
+            storedZone={session?.profile?.timeZone}
+          />
           <Button type="submit" variant="primary">{t('actions.saveTimeZone', { ns: 'profile' })}</Button>
         </form>
       </section>

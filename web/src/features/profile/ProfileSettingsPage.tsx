@@ -8,6 +8,7 @@ import { clearPendingSettingsAction, getPendingSettingsAction } from '../setting
 import { SettingsNavigation } from '../settings/BlockedUsersPage'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { TimeZoneField, isKnownTimeZone } from '../../components/TimeZoneField'
 
 const profileQueryKey = ['my-profile'] as const
 const methodsQueryKey = ['auth-methods'] as const
@@ -41,6 +42,7 @@ export function ProfileSettingsPage() {
   const [formError, setFormError] = useState<unknown>()
   const [saving, setSaving] = useState(false)
   const [action, setAction] = useState<ReauthAction | null>(null)
+  const [timeZoneInvalid, setTimeZoneInvalid] = useState(false)
 
   useEffect(() => {
     const pendingAction = getPendingSettingsAction()
@@ -49,9 +51,17 @@ export function ProfileSettingsPage() {
 
   async function save(event: FormEvent<HTMLFormElement>, endpoint: ProfileEndpoint) {
     event.preventDefault()
-    setSaving(true)
     setFormError(undefined)
     const values = new FormData(event.currentTarget)
+    if (endpoint === '/api/v1/me/time-zone') {
+      const timeZone = String(values.get('timeZone') ?? '')
+      if (!isKnownTimeZone(timeZone, profile?.timeZone)) {
+        setTimeZoneInvalid(true)
+        return
+      }
+      setTimeZoneInvalid(false)
+    }
+    setSaving(true)
     try {
       if (endpoint === '/api/v1/me/username') {
         await client.PUT(endpoint, { params: { header: { 'X-CSRF-TOKEN': '' } }, body: { username: String(values.get('username') ?? '') } })
@@ -115,9 +125,16 @@ export function ProfileSettingsPage() {
         <Input id="profile-avatar" name="emoji" defaultValue={profile?.avatar?.emoji ?? 'game'} required />
         <Button disabled={saving} type="submit" variant="neutral">{t('actions.saveAvatar')}</Button>
       </form>
-      <form className="space-y-2" onSubmit={(event) => void save(event, '/api/v1/me/time-zone')}>
-        <Label htmlFor="profile-time-zone">{t('fields.timeZone')}</Label>
-        <Input id="profile-time-zone" name="timeZone" defaultValue={profile?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone} required />
+      <form className="space-y-2" noValidate onSubmit={(event) => void save(event, '/api/v1/me/time-zone')}>
+        <TimeZoneField
+          defaultValue={profile?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
+          errorMessage={timeZoneInvalid ? t('timeZoneField.invalid') : undefined}
+          hint={t('timeZoneField.hint')}
+          id="profile-time-zone"
+          label={t('fields.timeZone')}
+          name="timeZone"
+          storedZone={profile?.timeZone}
+        />
         <Button disabled={saving} type="submit" variant="neutral">{t('actions.saveTimeZone')}</Button>
       </form>
       <section aria-labelledby="platform-links-heading" className="space-y-3">
