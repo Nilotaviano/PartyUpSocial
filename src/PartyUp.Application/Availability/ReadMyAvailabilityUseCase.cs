@@ -28,7 +28,7 @@ public sealed class ReadMyAvailabilityUseCase(
         AvailabilityOwnerData? data = ownerData.FirstOrDefault(d => d.OwnerId == ownerId);
         if (data is null)
         {
-            return new MyAvailabilityLayer([], [], range);
+            return new MyAvailabilityLayer([], [], range, []);
         }
 
         List<MyAvailabilityOccurrence> occurrences = [];
@@ -59,6 +59,6 @@ public sealed class ReadMyAvailabilityUseCase(
         IReadOnlyList<TimeRange> merged = AvailabilityProjection.Project(
             data.Blocks, data.Series, data.Skips, range, zoneProvider, data.ZoneId);
 
-        return new MyAvailabilityLayer(occurrences, merged, range);
+        return new MyAvailabilityLayer(occurrences, merged, range, data.Series);
     }
 }

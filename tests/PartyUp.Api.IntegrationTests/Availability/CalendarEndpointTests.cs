@@ -243,5 +243,81 @@ public sealed class CalendarEndpointTests : IAsyncLifetime, IDisposable
         Assert.Empty(pollOptions.EnumerateArray());
     }
 
+    /// <summary>
+    /// D-025: the summary surface addresses recurring rules, not the week's expanded marks, so the
+    /// viewer's own series definitions ride the <c>myAvailability</c> layer. The fixture's only
+    /// occurrence in the window is skipped, so <c>occurrences</c> is empty — the definition must still
+    /// come back, which is the whole point of the field: grouping the visible week's occurrences would
+    /// lose this series entirely.
+    /// </summary>
+    [Fact]
+    public async Task Calendar_ReturnsTheViewersSeriesDefinitions_D025()
+    {
+        UserId viewerId = await _factory.SeedUserAsync(email: $"cal-series-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession session = await SessionEndpointTestSupport.SignInAsync(_factory, viewerId);
+
+        // A single-occurrence series (effectiveUntil the day after its first date) inside the
+        // A-076-padded fetch window, whose one occurrence is then skipped.
+        LocalDate occurrenceDate = NextTuesday(_factory.Clock.GetCurrentInstant().InUtc().Date.PlusDays(1));
+        string occurrenceDateText = LocalDatePattern.Iso.Format(occurrenceDate);
+        HttpResponseMessage createdSeries = await session.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/me/availability/series",
+            JsonContent.Create(new
+            {
+                dayOfWeek = (int)IsoDayOfWeek.Tuesday,
+                startTime = "20:00",
+                durationMinutes = 180,
+                effectiveFrom = occurrenceDateText,
+                effectiveUntil = LocalDatePattern.Iso.Format(occurrenceDate.PlusDays(1)),
+            }));
+        Assert.Equal(HttpStatusCode.Created, createdSeries.StatusCode);
+        using JsonDocument createdBody = await SessionEndpointTestSupport.SuccessJsonAsync(createdSeries);
+        Guid seriesId = createdBody.RootElement.GetProperty("seriesId").GetGuid();
+
+        HttpResponseMessage skipped = await session.SendUnsafeAsync(
+            HttpMethod.Delete,
+            $"/api/v1/me/availability/series/{seriesId:D}/occurrences/{occurrenceDateText}");
+        Assert.Equal(HttpStatusCode.NoContent, skipped.StatusCode);
+
+        Instant from = _factory.Clock.GetCurrentInstant();
+        Instant to = from + Duration.FromDays(14);
+        HttpResponseMessage calendar = await session.GetAsync(
+            $"/api/v1/calendar?from={Uri.EscapeDataString(Iso(from))}&to={Uri.EscapeDataString(Iso(to))}");
+        using JsonDocument body = await SessionEndpointTestSupport.SuccessJsonAsync(calendar);
+
+        JsonElement myAvailability = body.RootElement.GetProperty("myAvailability");
+        Assert.Empty(myAvailability.GetProperty("occurrences").EnumerateArray());
+
+        JsonElement only = Assert.Single(myAvailability.GetProperty("series").EnumerateArray());
+        Assert.Equal(seriesId, only.GetProperty("seriesId").GetGuid());
+        Assert.Equal((int)IsoDayOfWeek.Tuesday, only.GetProperty("dayOfWeek").GetInt32());
+        Assert.Equal("20:00", only.GetProperty("startTime").GetString());
+        Assert.Equal(180, only.GetProperty("durationMinutes").GetInt32());
+        Assert.False(string.IsNullOrWhiteSpace(only.GetProperty("zoneId").GetString()));
+        Assert.Equal(occurrenceDateText, only.GetProperty("effectiveFrom").GetString());
+    }
+
+    /// <summary>An empty series list serializes as <c>[]</c>, so the client never distinguishes absent from empty.</summary>
+    [Fact]
+    public async Task Calendar_SerializesAnEmptySeriesListRatherThanOmittingIt_D025()
+    {
+        UserId viewerId = await _factory.SeedUserAsync(email: $"cal-noseries-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession session = await SessionEndpointTestSupport.SignInAsync(_factory, viewerId);
+
+        Instant from = _factory.Clock.GetCurrentInstant();
+        Instant to = from + Duration.FromDays(7);
+        HttpResponseMessage calendar = await session.GetAsync(
+            $"/api/v1/calendar?from={Uri.EscapeDataString(Iso(from))}&to={Uri.EscapeDataString(Iso(to))}");
+        using JsonDocument body = await SessionEndpointTestSupport.SuccessJsonAsync(calendar);
+
+        JsonElement series = body.RootElement.GetProperty("myAvailability").GetProperty("series");
+        Assert.Equal(JsonValueKind.Array, series.ValueKind);
+        Assert.Empty(series.EnumerateArray());
+    }
+
+    private static LocalDate NextTuesday(LocalDate onOrAfter) =>
+        onOrAfter.DayOfWeek == IsoDayOfWeek.Tuesday ? onOrAfter : onOrAfter.Next(IsoDayOfWeek.Tuesday);
+
     private static string Iso(Instant instant) => InstantPattern.ExtendedIso.Format(instant);
 }

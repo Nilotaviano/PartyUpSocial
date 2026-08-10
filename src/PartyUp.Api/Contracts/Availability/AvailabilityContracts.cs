@@ -184,21 +184,25 @@ public sealed record MyAvailabilityOccurrenceView(
 }
 
 /// <summary>
-/// PHASE5_DESIGN.md §5.1/§8.1: <c>{occurrences, merged}</c>, D-101's two forms. <see cref="Range"/> is
-/// present only on the standalone <c>GET /me/availability</c> response — <c>GET /calendar</c> echoes
-/// one range for all four layers instead.
+/// PHASE5_DESIGN.md §5.1/§8.1: <c>{occurrences, merged}</c>, D-101's two forms, plus the owner's
+/// <see cref="Series"/> definitions (D-025's addressable rules). <see cref="Range"/> is present only on
+/// the standalone <c>GET /me/availability</c> response — <c>GET /calendar</c> echoes one range for all
+/// four layers instead. <see cref="Series"/> is never omitted: an empty list serializes as <c>[]</c> so
+/// a client never distinguishes absent from empty.
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record MyAvailabilityLayerResponse(
     IReadOnlyList<MyAvailabilityOccurrenceView> Occurrences,
     IReadOnlyList<TimeRangeView> Merged,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] TimeRangeView? Range)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] TimeRangeView? Range,
+    IReadOnlyList<AvailabilitySeriesView> Series)
 {
     public static MyAvailabilityLayerResponse From(MyAvailabilityLayer layer, bool includeRange) =>
         new(
             [.. layer.Occurrences.Select(MyAvailabilityOccurrenceView.From)],
             [.. layer.Merged.Select(TimeRangeView.From)],
-            includeRange ? TimeRangeView.From(layer.Range) : null);
+            includeRange ? TimeRangeView.From(layer.Range) : null,
+            [.. layer.Series.Select(AvailabilitySeriesView.From)]);
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

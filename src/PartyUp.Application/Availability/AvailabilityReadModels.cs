@@ -39,12 +39,15 @@ public sealed record MyAvailabilityOccurrence(TimeRange Range, AvailabilityOccur
 /// PHASE5_DESIGN.md §5.1: <c>myAvailability</c> carries both forms D-101 requires — the addressable
 /// <see cref="Occurrences"/> (the edit surface) and the bare <see cref="Merged"/> ranges the week grid
 /// paints (D-101's visual half) and that feed <c>OverlapEngine</c> for a friend owner (the algorithmic
-/// half). <see cref="Range"/> is the echoed request range.
+/// half). <see cref="Range"/> is the echoed request range. <see cref="Series"/> carries the owner's
+/// recurring rules themselves — D-025 addresses a rule, not a mark, and a series whose occurrences in
+/// this window are all skipped expands to nothing while still being deletable.
 /// </summary>
 public sealed record MyAvailabilityLayer(
     IReadOnlyList<MyAvailabilityOccurrence> Occurrences,
     IReadOnlyList<TimeRange> Merged,
-    TimeRange Range);
+    TimeRange Range,
+    IReadOnlyList<AvailabilitySeries> Series);
 
 /// <summary>
 /// PHASE5_DESIGN.md A-080: one calendar <c>friendAvailability</c> row — ranges and the owner's id only

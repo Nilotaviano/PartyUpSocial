@@ -2344,6 +2344,7 @@ export interface components {
             occurrences: components["schemas"]["MyAvailabilityOccurrenceView"][];
             merged: components["schemas"]["TimeRangeView"][];
             range: null | components["schemas"]["TimeRangeView"];
+            series: components["schemas"]["AvailabilitySeriesView"][];
         };
         MyAvailabilityOccurrenceView: {
             startTime: string;
