@@ -5,6 +5,7 @@ import { Link, useLocation } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
+import { Toast } from '../../components/ui/toast'
 import { getViewerProfile, viewerProfileKey } from '../sessions/sessionQueries'
 import { AgendaView, type AgendaEntry } from './AgendaView'
 import {
@@ -13,6 +14,7 @@ import {
 } from './AvailabilitySummary'
 import { BlockEditorDialog, type BlockEditorValue } from './BlockEditorDialog'
 import { CalendarLayers, type CalendarLayerState } from './CalendarLayers'
+import { CommitBlockDialog, type CommitRecurrence } from './CommitBlockDialog'
 import {
   OccurrenceScopeDialog,
   type OccurrenceScope,
@@ -29,6 +31,7 @@ import {
 import {
   availabilityKeys,
   createAvailabilityBlock,
+  createAvailabilitySeries,
   deleteAvailabilityBlock,
   deleteAvailabilityOccurrence,
   deleteAvailabilitySeries,
@@ -156,6 +159,9 @@ type EditingTarget =
   | { kind: 'block'; blockId: string }
   | { kind: 'occurrence'; seriesId: string; occurrenceDate: string }
 
+/** What the undo toast would delete, and the message announcing it. */
+type UndoTarget = { kind: 'block' | 'series'; id: string; message: string }
+
 export function WeekGridPage() {
   const { t, i18n } = useTranslation(['availability', 'errors'])
   const location = useLocation()
@@ -169,6 +175,8 @@ export function WeekGridPage() {
     start: '',
     end: '',
   })
+  const [pendingRange, setPendingRange] = useState<GridRange | null>(null)
+  const [undoTarget, setUndoTarget] = useState<UndoTarget | null>(null)
   const [layers, setLayers] = useState<CalendarLayerState | null>(null)
   const [showEarlyHours, setShowEarlyHours] = useState(false)
   const [earlyHoursMessage, setEarlyHoursMessage] = useState('')
@@ -201,7 +209,25 @@ export function WeekGridPage() {
 
   const createBlock = useMutation({
     mutationFn: createAvailabilityBlock,
-    onSuccess: invalidate,
+    onSuccess: (created) => {
+      setUndoTarget({
+        kind: 'block',
+        id: created.blockId,
+        message: t('commit.savedOnce'),
+      })
+      return invalidate()
+    },
+  })
+  const createSeries = useMutation({
+    mutationFn: createAvailabilitySeries,
+    onSuccess: (created) => {
+      setUndoTarget({
+        kind: 'series',
+        id: created.seriesId,
+        message: t('commit.savedWeekly'),
+      })
+      return invalidate()
+    },
   })
   const editBlock = useMutation({
     mutationFn: ({ blockId, body }: { blockId: string; body: { startTime: string; endTime: string } }) =>
@@ -438,11 +464,46 @@ export function WeekGridPage() {
     )
   }
 
+  // D-009/§7: a painted range is a proposal — the commit step asks whether it
+  // is one-time or weekly before anything reaches the API.
   function handleCreateBlock(range: GridRange) {
-    createBlock.mutate({
-      startTime: fakeLocalToInstant(range.start, timeZone),
-      endTime: fakeLocalToInstant(range.end, timeZone),
+    setPendingRange(range)
+  }
+
+  function handleCommit(recurrence: CommitRecurrence) {
+    const range = pendingRange
+    if (!range) return
+    setPendingRange(null)
+
+    if (recurrence === 'once') {
+      createBlock.mutate({
+        startTime: fakeLocalToInstant(range.start, timeZone),
+        endTime: fakeLocalToInstant(range.end, timeZone),
+      })
+      return
+    }
+
+    // Fake-local (D-046): the UTC accessors already read the viewer's own
+    // wall clock, so the weekday and time of day are taken straight off them.
+    const pad = (value: number) => String(value).padStart(2, '0')
+    createSeries.mutate({
+      dayOfWeek: ((range.start.getUTCDay() + 6) % 7) + 1, // ISO 1..7
+      startTime: `${pad(range.start.getUTCHours())}:${pad(range.start.getUTCMinutes())}`,
+      durationMinutes: Math.round((range.end.getTime() - range.start.getTime()) / 60_000),
+      effectiveFrom: datetimeLocalValue(range.start).slice(0, 10),
+      effectiveUntil: null,
     })
+  }
+
+  function handleUndo() {
+    const target = undoTarget
+    setUndoTarget(null)
+    if (!target) return
+    if (target.kind === 'series') {
+      deleteSeries.mutate(target.id)
+    } else {
+      deleteBlock.mutate(target.id)
+    }
   }
 
   function handleEditOccurrence(occurrenceId: string) {
@@ -545,6 +606,7 @@ export function WeekGridPage() {
   const activeError =
     calendar.error ??
     createBlock.error ??
+    createSeries.error ??
     editBlock.error ??
     deleteBlock.error ??
     deleteSeries.error ??
@@ -682,6 +744,34 @@ export function WeekGridPage() {
           </div>
         </div>
       )}
+
+      {pendingRange && (
+        <CommitBlockDialog
+          pending={createBlock.isPending || createSeries.isPending}
+          range={pendingRange}
+          onCancel={() => setPendingRange(null)}
+          onConfirm={handleCommit}
+        />
+      )}
+
+      <Toast.Provider swipeDirection="right">
+        <Toast.Root
+          open={undoTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) setUndoTarget(null)
+          }}
+        >
+          <Toast.Description>{undoTarget?.message}</Toast.Description>
+          <Toast.Action
+            altText={t('commit.undo')}
+            className={`mt-2 inline-flex min-h-11 items-center px-3 text-ink bg-card ${raisedInteractiveClasses}`}
+            onClick={handleUndo}
+          >
+            {t('commit.undo')}
+          </Toast.Action>
+        </Toast.Root>
+        <Toast.Viewport />
+      </Toast.Provider>
 
       <OccurrenceScopeDialog
         open={scopeDialogOpen}

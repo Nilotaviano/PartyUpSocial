@@ -37,6 +37,17 @@
     "deleteSeriesBody": "Esto elimina la ventana semanal completa, incluidas las ocurrencias que ya cambiaste por separado.",
     "deleteSeriesConfirm": "Eliminar serie"
   },
+  "commit": {
+    "title": "¿Agregar esta disponibilidad?",
+    "recurrenceLegend": "Con qué frecuencia",
+    "once": "Solo esta vez",
+    "weekly": "Se repite cada semana",
+    "save": "Guardar",
+    "discard": "Descartar",
+    "savedOnce": "Disponibilidad agregada.",
+    "savedWeekly": "Disponibilidad semanal agregada.",
+    "undo": "Deshacer"
+  },
   "block": {
     "editHeading": "Editar disponibilidad",
     "start": "Hora de inicio",

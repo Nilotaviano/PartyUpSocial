@@ -37,6 +37,17 @@
     "deleteSeriesBody": "This removes the whole weekly window, including occurrences you already changed on their own.",
     "deleteSeriesConfirm": "Delete series"
   },
+  "commit": {
+    "title": "Add this availability?",
+    "recurrenceLegend": "How often",
+    "once": "Just this time",
+    "weekly": "Repeats weekly",
+    "save": "Save",
+    "discard": "Discard",
+    "savedOnce": "Availability added.",
+    "savedWeekly": "Weekly availability added.",
+    "undo": "Undo"
+  },
   "block": {
     "editHeading": "Edit availability",
     "start": "Start time",

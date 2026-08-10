@@ -483,6 +483,117 @@ describe('WeekGridPage viewport', () => {
   })
 })
 
+describe('WeekGridPage commit step', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-08-10T12:00:00.000Z'))
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve({ data: profileResponse() })
+      if (path === '/api/v1/calendar') {
+        return Promise.resolve({
+          data: calendarResponse({
+            start: '2026-08-10T13:00:00.000Z',
+            end: '2026-08-10T13:30:00.000Z',
+          }),
+        })
+      }
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    api.post.mockResolvedValue({
+      data: {
+        blockId: 'block-new',
+        seriesId: 'series-new',
+        startTime: '2026-08-10T09:00:00.000Z',
+        endTime: '2026-08-10T09:45:00.000Z',
+        source: null,
+      },
+    })
+    api.del.mockResolvedValue({ data: undefined })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // The same mouse drag the pointer suite paints with, driven against the
+  // page (startHour 7) rather than a bare grid — 9:00 AM is free in the
+  // fixture, whose only occurrence sits at 13:00.
+  async function paintRange() {
+    await screen.findAllByRole('gridcell', { name: /Busy/ }, { timeout: 5000 })
+    const dragStart = screen.getAllByRole('gridcell', { name: /^9:00\s?AM$/ })[0]
+    const dragEnd = screen.getAllByRole('gridcell', { name: /^9:30\s?AM$/ })[0]
+    fireEvent.mouseDown(dragStart, { button: 0 })
+    fireEvent.mouseEnter(dragEnd)
+    fireEvent.mouseUp(screen.getByRole('grid'))
+  }
+
+  it('asks for a recurrence choice before saving a painted range_D009', async () => {
+    renderPage()
+    await paintRange()
+
+    expect(await screen.findByRole('dialog')).toHaveTextContent(
+      'Add this availability?',
+    )
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('creates a weekly series when the range repeats_D009', async () => {
+    renderPage()
+    await paintRange()
+
+    fireEvent.click(await screen.findByRole('radio', { name: 'Repeats weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1))
+    const [path, options] = api.post.mock.calls[0]
+    expect(path).toBe('/api/v1/me/availability/series')
+    expect(options.body).toEqual({
+      // `en` starts its week on Sunday, so the first painted column is
+      // 2026-08-09 — ISO 1..7 (NodaTime IsoDayOfWeek), Sunday = 7.
+      dayOfWeek: 7,
+      startTime: '09:00',
+      durationMinutes: 45,
+      effectiveFrom: '2026-08-09',
+      effectiveUntil: null,
+    })
+  })
+
+  it('creates a one-time block by default_D009', async () => {
+    renderPage()
+    await paintRange()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1))
+    expect(api.post.mock.calls[0][0]).toBe('/api/v1/me/availability/blocks')
+  })
+
+  it('discards the range when the commit step is dismissed_D009', async () => {
+    renderPage()
+    await paintRange()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Discard' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('undoes a just-created weekly series_D009', async () => {
+    renderPage()
+    await paintRange()
+
+    fireEvent.click(await screen.findByRole('radio', { name: 'Repeats weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Undo' }))
+
+    await waitFor(() => expect(api.del).toHaveBeenCalledTimes(1))
+    const [path, options] = api.del.mock.calls[0]
+    expect(path).toBe('/api/v1/me/availability/series/{seriesId}')
+    expect(options.params.path).toEqual({ seriesId: 'series-new' })
+  })
+})
+
 describe('WeekGridPage occurrence editing', () => {
   beforeEach(() => {
     // Only `Date` is faked — leaving real timers so `findBy*`/`waitFor`
