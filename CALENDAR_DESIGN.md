@@ -58,13 +58,21 @@ stays in the grid, where "this one" is the natural gesture.
 Desktop: beside the grid. Mobile: a collapsible section **above** it, so a phone user meets the
 summary before the scroll.
 
-**Contract change.** `GET /me/availability` returns expanded occurrences carrying
-`origin.seriesId`, not series definitions, and no `GET /series` endpoint exists. Deriving rules by
-grouping a visible week's occurrences would silently omit a series whose `effectiveFrom` is in the
-future or whose only occurrence that week is skipped — a summary that hides rules fails at its one
-job. So **the series list joins the `GET /me/availability` response**; `AvailabilitySeriesView`
-already carries `dayOfWeek`, `startTime`, `durationMinutes`, `zoneId`, `effectiveFrom`,
-`effectiveUntil`. Requires `gen:api` and the op-id/antiforgery inventory check.
+**Contract change.** Both `GET /me/availability` and `GET /calendar` return expanded occurrences
+carrying `origin.seriesId`, not series definitions, and no `GET /series` endpoint exists. Deriving
+rules by grouping a visible week's occurrences would silently omit a series whose `effectiveFrom` is
+in the future or whose only occurrence that week is skipped — a summary that hides rules fails at
+its one job.
+
+So **`MyAvailabilityLayer` gains a `Series` list, surfaced on `MyAvailabilityLayerResponse`**. That
+one addition serves both endpoints: `GetCalendarViewUseCase` *calls* `ReadMyAvailabilityUseCase`
+rather than re-implementing it, and the calendar page is the consumer that matters here — it queries
+`getCalendarView`, not `getMyAvailability` (`WeekGridPage.tsx:178`). The data is already in hand:
+`ReadMyAvailabilityUseCase` holds `data.Series` and passes it to the projection today, so no new
+query is added. `AvailabilitySeriesView` already carries `dayOfWeek`, `startTime`,
+`durationMinutes`, `zoneId`, `effectiveFrom`, `effectiveUntil`.
+
+No new route, so the op-id and antiforgery inventories are unchanged; `gen:api` must be rerun.
 
 ## 5. Direct manipulation (fixes "adjusting an existing window")
 
