@@ -96,8 +96,10 @@ describe('WeekGrid keyboard flow', () => {
     const [committed] = onCreateBlock.mock.calls[0]
     expect(committed.start.getTime()).toBe(localDate(9, 0).getTime())
     expect(committed.end.getTime()).toBe(localDate(9, 30).getTime())
+    // The commit step still has to be confirmed, so the live region must not
+    // claim the availability already exists.
     expect(screen.getByRole('status')).toHaveTextContent(
-      'Availability created from 9:00 to 9:30.',
+      'Selected 9:00 to 9:30. Confirm how often it repeats.',
     )
 
     const another = screen.getAllByRole('gridcell', { name: '10:00' })[0]
@@ -592,6 +594,38 @@ describe('WeekGridPage commit step', () => {
     expect(path).toBe('/api/v1/me/availability/series/{seriesId}')
     expect(options.params.path).toEqual({ seriesId: 'series-new' })
   })
+
+  it('names the toast region through i18next and offers an explicit dismiss', async () => {
+    renderPage()
+    await paintRange()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Save' }))
+    await screen.findByRole('button', { name: 'Undo' })
+
+    expect(screen.getByRole('region', { name: 'Notifications (F8)' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument(),
+    )
+  })
+
+  // Radix auto-closes a toast after 5s by default; the undo affordance lives
+  // only here, so it must survive that (WCAG 2.2.1). Real timers: the toast
+  // timer is Radix-internal, so the only honest check is to outlast it.
+  it('keeps the undo toast open past the default toast timeout', async () => {
+    renderPage()
+    await paintRange()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Save' }))
+    await screen.findByRole('button', { name: 'Undo' })
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 5_500)
+    })
+
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
+  }, 20_000)
 })
 
 describe('WeekGridPage occurrence editing', () => {

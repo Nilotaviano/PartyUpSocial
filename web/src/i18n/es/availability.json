@@ -46,7 +46,10 @@
     "discard": "Descartar",
     "savedOnce": "Disponibilidad agregada.",
     "savedWeekly": "Disponibilidad semanal agregada.",
-    "undo": "Deshacer"
+    "undo": "Deshacer",
+    "dismiss": "Cerrar",
+    "notificationLabel": "Notificación",
+    "notificationsRegion": "Notificaciones ({hotkey})"
   },
   "block": {
     "editHeading": "Editar disponibilidad",
@@ -98,7 +101,7 @@
     "busy": "Ocupado",
     "selectionStarted": "Selección iniciada a las {{time}}.",
     "selectionExtent": "Seleccionado de {{start}} a {{end}}.",
-    "selectionCommitted": "Disponibilidad creada de {{start}} a {{end}}.",
+    "selectionReady": "Seleccionado de {{start}} a {{end}}. Confirma con qué frecuencia se repite.",
     "selectionCanceled": "Selección cancelada.",
     "friendAvailable": "{{name}} disponible",
     "friendsAvailable": "{{count}} amistades disponibles",

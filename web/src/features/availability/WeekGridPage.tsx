@@ -754,23 +754,33 @@ export function WeekGridPage() {
         />
       )}
 
-      <Toast.Provider swipeDirection="right">
+      <Toast.Provider label={t('commit.notificationLabel')} swipeDirection="right">
+        {/* The toast carries the only Undo affordance and is reached by the F8
+            hotkey, so it must not expire on a timer (WCAG 2.2.1). */}
         <Toast.Root
+          duration={Infinity}
           open={undoTarget !== null}
           onOpenChange={(open) => {
             if (!open) setUndoTarget(null)
           }}
         >
           <Toast.Description>{undoTarget?.message}</Toast.Description>
-          <Toast.Action
-            altText={t('commit.undo')}
-            className={`mt-2 inline-flex min-h-11 items-center px-3 text-ink bg-card ${raisedInteractiveClasses}`}
-            onClick={handleUndo}
-          >
-            {t('commit.undo')}
-          </Toast.Action>
+          <div className="mt-2 flex gap-2">
+            <Toast.Action
+              altText={t('commit.undo')}
+              className={`inline-flex min-h-11 items-center px-3 text-ink bg-card ${raisedInteractiveClasses}`}
+              onClick={handleUndo}
+            >
+              {t('commit.undo')}
+            </Toast.Action>
+            <Toast.Close
+              className={`inline-flex min-h-11 items-center px-3 text-ink bg-card ${raisedInteractiveClasses}`}
+            >
+              {t('commit.dismiss')}
+            </Toast.Close>
+          </div>
         </Toast.Root>
-        <Toast.Viewport />
+        <Toast.Viewport label={t('commit.notificationsRegion')} />
       </Toast.Provider>
 
       <OccurrenceScopeDialog

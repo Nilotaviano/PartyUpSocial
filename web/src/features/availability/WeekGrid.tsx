@@ -221,7 +221,7 @@ export function WeekGrid({
     const end = cellTime(weekStart, current.day, hi + 1, startHour)
     onCreateBlock({ start, end })
     setLiveMessage(
-      t('a11y.selectionCommitted', {
+      t('a11y.selectionReady', {
         start: timeLabelFormatter(start),
         end: timeLabelFormatter(end),
       }),

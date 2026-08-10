@@ -46,7 +46,10 @@
     "discard": "Discard",
     "savedOnce": "Availability added.",
     "savedWeekly": "Weekly availability added.",
-    "undo": "Undo"
+    "undo": "Undo",
+    "dismiss": "Dismiss",
+    "notificationLabel": "Notification",
+    "notificationsRegion": "Notifications ({hotkey})"
   },
   "block": {
     "editHeading": "Edit availability",
@@ -98,7 +101,7 @@
     "busy": "Busy",
     "selectionStarted": "Selection started at {{time}}.",
     "selectionExtent": "Selected {{start}} to {{end}}.",
-    "selectionCommitted": "Availability created from {{start}} to {{end}}.",
+    "selectionReady": "Selected {{start}} to {{end}}. Confirm how often it repeats.",
     "selectionCanceled": "Selection canceled.",
     "friendAvailable": "{{name}} available",
     "friendsAvailable": "{{count}} friends available",
