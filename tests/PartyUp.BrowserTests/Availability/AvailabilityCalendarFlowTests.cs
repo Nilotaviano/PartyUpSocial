@@ -183,17 +183,41 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         ILocator busyCells = page.GetByRole(AriaRole.Gridcell, new() { NameRegex = new Regex("Busy") });
         int baselineBusyCount = await busyCells.CountAsync();
 
+        // The same cells addressed structurally. While the modal commit dialog is open Radix
+        // marks the rest of the page `aria-hidden`, which removes it from the accessibility tree
+        // and therefore from every role-based locator — so the "nothing is created yet" check
+        // below, the only one that runs with the dialog up, has to read the DOM instead.
+        ILocator busyCellsInDom = page.Locator("[role=gridcell][data-busy=true]");
+        int baselineBusyInDom = await busyCellsInDom.CountAsync();
+
         // Create: focus the grid's one tab stop (07:00 on the week's first day, the clamped
         // viewport's first row — always earlier than the sibling fact's fixed 10:00 series, so
         // it sorts first in DOM order below regardless of run order), then keyboard alone —
         // Enter starts a selection, Shift+ArrowDown extends it by one 15-minute slot (a
-        // 07:00–07:30 range, two grid rows), Enter commits (P5-CAL-01).
+        // 07:00–07:30 range, two grid rows), Enter ends the paint (P5-CAL-01).
         ILocator firstCell = page.GetByRole(AriaRole.Gridcell).First;
         await firstCell.FocusAsync();
         await Assertions.Expect(firstCell).ToBeFocusedAsync();
         await page.Keyboard.PressAsync("Enter");
         await page.Keyboard.PressAsync("Shift+ArrowDown");
         await page.Keyboard.PressAsync("Enter");
+
+        // D-009/§7: the painted range is only a proposal — nothing is created until the commit
+        // dialog's one-time/weekly choice is confirmed. Keyboard-only, so the choice is left at
+        // its "Just this time" default (a one-time block, which the edit half below depends on)
+        // and Save is reached and activated without a pointer.
+        ILocator commitDialog = page.GetByRole(AriaRole.Dialog);
+        await commitDialog.GetByText("Add this availability?").WaitForAsync();
+        await Assertions.Expect(busyCellsInDom).ToHaveCountAsync(baselineBusyInDom);
+        await Assertions
+            .Expect(commitDialog.GetByRole(AriaRole.Radio, new() { Name = "Just this time" }))
+            .ToBeCheckedAsync();
+
+        ILocator commitSave = commitDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true });
+        await commitSave.FocusAsync();
+        await Assertions.Expect(commitSave).ToBeFocusedAsync();
+        await page.Keyboard.PressAsync("Enter");
+        await Assertions.Expect(commitDialog).Not.ToBeVisibleAsync();
 
         // Two busy gridcells for one 30-minute block — each 15-minute row it spans paints
         // separately (`mergedAt` in `WeekGrid.tsx`), never a single merged DOM cell.
@@ -209,8 +233,11 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         ILocator editDialog = page.GetByRole(AriaRole.Dialog);
         await editDialog.GetByText("Edit availability").WaitForAsync();
 
-        ILocator startField = page.GetByLabel("Start time");
-        ILocator endField = page.GetByLabel("End time");
+        // Dialog-scoped and label-exact: the grid's own edge-resize handles are labelled
+        // "Change start time"/"Change end time", which a page-wide substring label match also
+        // resolves (strict-mode violation), and `aria-hidden` does not filter label locators.
+        ILocator startField = editDialog.GetByLabel("Start time", new() { Exact = true });
+        ILocator endField = editDialog.GetByLabel("End time", new() { Exact = true });
         DateTime originalStart = DateTime.ParseExact(
             await startField.InputValueAsync(), "yyyy-MM-dd\\THH:mm", CultureInfo.InvariantCulture);
         DateTime editedStart = originalStart.AddHours(2);
@@ -229,8 +256,12 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         // Delete: focus the (moved) busy cell, open it, reach Delete with the keyboard alone.
         await busyCells.First.FocusAsync();
         await page.Keyboard.PressAsync("Enter");
-        await page.GetByRole(AriaRole.Dialog).GetByText("Edit availability").WaitForAsync();
-        ILocator deleteButton = page.GetByRole(AriaRole.Button, new() { Name = "Delete" });
+        ILocator deleteDialog = page.GetByRole(AriaRole.Dialog);
+        await deleteDialog.GetByText("Edit availability").WaitForAsync();
+        // Scoped to the editor and name-exact: the availability summary panel renders a per-row
+        // delete button whose accessible name is "Delete <rule>", which a page-wide, non-exact
+        // "Delete" match would also resolve (strict-mode violation).
+        ILocator deleteButton = deleteDialog.GetByRole(AriaRole.Button, new() { Name = "Delete", Exact = true });
         await deleteButton.FocusAsync();
         await page.Keyboard.PressAsync("Enter");
 

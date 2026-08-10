@@ -83,6 +83,19 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
     /// <summary>Row-major gridcell index for (day, slot) — 7 gridcells per row (see `WeekGrid.tsx`).</summary>
     private static int CellIndex(int day, int slot) => (slot * 7) + day;
 
+    /// <summary>
+    /// D-009/§7: a painted range is a proposal — the commit dialog's one-time/weekly choice is
+    /// what actually creates anything. The touch facts below care about the geometry the drag
+    /// produced, not about recurrence, so each confirms at the dialog's "Just this time" default.
+    /// </summary>
+    private static async Task ConfirmCommitDialogAsync(IPage page)
+    {
+        ILocator dialog = page.GetByRole(AriaRole.Dialog);
+        await dialog.GetByText("Add this availability?").WaitForAsync();
+        await dialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await Assertions.Expect(dialog).Not.ToBeVisibleAsync();
+    }
+
     [Fact]
     public async Task TouchLongPressSelectsWithoutBreakingScroll_D139()
     {
@@ -113,6 +126,9 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
 
             await DispatchTouchPointerEventAsync(page, "pointerup", cellIndex);
 
+            // The commit dialog is settled first: it is modal, so while it is up Radix marks the
+            // rest of the page `aria-hidden` and the grid drops out of every role-based locator.
+            await ConfirmCommitDialogAsync(page);
             await Assertions.Expect(grid).ToHaveAttributeAsync("data-touch-dragging", "false");
             await Assertions.Expect(page.GetByRole(AriaRole.Gridcell).Nth(cellIndex))
                 .ToHaveAttributeAsync("data-state", "busy");
@@ -160,6 +176,16 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
                 $"Expected the grid to auto-scroll past {initialScrollTop}, stayed at {scrolledScrollTop}.");
 
             await DispatchTouchPointerEventAsync(page, "pointerup", startCellIndex);
+
+            // The drag painted a range, so the D-009 commit dialog now opens on pointerup. This
+            // fact is about the auto-scroll, not about creating anything, so the proposal is
+            // discarded — and it has to be dismissed before the grid is asserted against at all:
+            // while that modal is up Radix `aria-hidden`s the page and no role locator resolves.
+            ILocator commitDialog = page.GetByRole(AriaRole.Dialog);
+            await commitDialog.GetByText("Add this availability?").WaitForAsync();
+            await commitDialog.GetByRole(AriaRole.Button, new() { Name = "Discard" }).ClickAsync();
+            await Assertions.Expect(commitDialog).Not.ToBeVisibleAsync();
+
             await Assertions.Expect(grid).ToHaveAttributeAsync("data-touch-dragging", "false");
         }
         finally
@@ -200,11 +226,19 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             await Assertions.Expect(grid).ToHaveAttributeAsync("data-touch-dragging", "false");
             await Assertions.Expect(page.GetByRole(AriaRole.Gridcell).Nth(cellIndex))
                 .ToHaveAttributeAsync("data-state", "free");
-            // Scoped to the calendar screen: the app chrome carries its own role="status" live
-            // region (the notification bell), so the bare-page locator is ambiguous.
+            // The grid's own live region announced nothing — no "Selection started". Addressed by
+            // CSS rather than by role alone: the app chrome carries a role="status" region (the
+            // notification bell) and the calendar screen itself now carries two (the grid's and
+            // the early-hours announcement, `data-testid="early-hours-status"`), so both the
+            // bare-page and the screen-scoped role locators are ambiguous.
             await Assertions.Expect(
-                    page.GetByTestId("screen-calendar").GetByRole(AriaRole.Status))
+                    page.Locator(
+                        "[data-testid='screen-calendar'] [role='status']:not([data-testid='early-hours-status'])"))
                 .ToHaveTextAsync("");
+
+            // And nothing was proposed either: a reclaimed gesture never reaches the D-009 commit
+            // step, so no commit dialog is waiting to be confirmed.
+            await Assertions.Expect(page.GetByRole(AriaRole.Dialog)).ToHaveCountAsync(0);
         }
         finally
         {
@@ -231,6 +265,7 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             await page.WaitForTimeoutAsync(LongPressSettleMs);
             await DispatchTouchPointerEventAsync(page, "pointermove", endCellIndex);
             await DispatchTouchPointerEventAsync(page, "pointerup", endCellIndex);
+            await ConfirmCommitDialogAsync(page);
 
             // Exactly the five slots the drag spanned are now busy — a touch drag lands on the
             // same 15-minute grid the keyboard path is quantized to by construction

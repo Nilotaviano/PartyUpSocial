@@ -76,7 +76,11 @@ No new route, so the op-id and antiforgery inventories are unchanged; `gen:api` 
 
 ## 5. Direct manipulation (fixes "adjusting an existing window")
 
-Drag the top or bottom edge to resize, drag the body to move; both snap to the 15-minute grid.
+Drag the top or bottom edge to resize, snapping to the 15-minute grid.
+
+**Moving a block by dragging its body is out of scope** (owner, 2026-08-10): resize covers the stated
+complaint, and a body-drag would be a second drag model competing with the paint gesture on the same
+surface, with real touch risk. A block is moved by editing its times.
 
 **Handles appear only on a selected block** (tapped or focused). A bare finger-drag across the grid
 must remain a page scroll — permanent edge handles would turn every block into a scroll trap. This
