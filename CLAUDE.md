@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 PartyUp (partyup.social) — friends scheduling multiplayer game sessions. Four documents are authoritative, in this order:
 
-1. **PRODUCT_SPEC.md** — product behavior as 186 numbered decisions (D-001..D-186). Confirmed decisions are settled; code that contradicts one is wrong, not a judgment call. Propose spec changes before implementing them.
+1. **PRODUCT_SPEC.md** — product behavior as 187 numbered decisions (D-001..D-187). Confirmed decisions are settled; code that contradicts one is wrong, not a judgment call. Propose spec changes before implementing them.
 2. **ARCHITECTURE.md** — binding technical conventions and the architecture decision record (A-001..A-020). Read §3 (cross-cutting conventions) before writing backend code.
 3. **DOMAIN_MODEL.md** — the ratified domain design the Phase 1 code implements: aggregates, state machines, visibility rules, and the §12 interpretation notes that resolve spec-silent points. Domain changes must stay consistent with it (update it in the same commit when behavior legitimately changes).
 4. **IMPLEMENTATION_PLAN.md** — phase ordering and what each phase owns. **TRACEABILITY.md** maps every decision to its test or owning phase — keep it current when adding D-numbered tests.
