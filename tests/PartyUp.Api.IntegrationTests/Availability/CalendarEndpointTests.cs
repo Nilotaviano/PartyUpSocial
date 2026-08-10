@@ -316,6 +316,82 @@ public sealed class CalendarEndpointTests : IAsyncLifetime, IDisposable
         Assert.Empty(series.EnumerateArray());
     }
 
+    /// <summary>
+    /// D-025: the rule list is not window-scoped. A series whose first occurrence is a year out has
+    /// no occurrence in the requested week and is also outside A-076's padded series fetch, so it can
+    /// only appear if the layer reads the owner's rules independently of the window.
+    /// </summary>
+    [Fact]
+    public async Task Calendar_ReturnsASeriesWhoseFirstOccurrenceIsBeyondTheWindow_D025()
+    {
+        UserId viewerId = await _factory.SeedUserAsync(email: $"cal-future-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession session = await SessionEndpointTestSupport.SignInAsync(_factory, viewerId);
+
+        LocalDate farFuture = NextTuesday(
+            _factory.Clock.GetCurrentInstant().InUtc().Date.PlusDays(365));
+        HttpResponseMessage createdSeries = await session.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/me/availability/series",
+            JsonContent.Create(new
+            {
+                dayOfWeek = (int)IsoDayOfWeek.Tuesday,
+                startTime = "20:00",
+                durationMinutes = 180,
+                effectiveFrom = LocalDatePattern.Iso.Format(farFuture),
+                effectiveUntil = (string?)null,
+            }));
+        Assert.Equal(HttpStatusCode.Created, createdSeries.StatusCode);
+        using JsonDocument createdBody = await SessionEndpointTestSupport.SuccessJsonAsync(createdSeries);
+        Guid seriesId = createdBody.RootElement.GetProperty("seriesId").GetGuid();
+
+        Instant from = _factory.Clock.GetCurrentInstant();
+        Instant to = from + Duration.FromDays(7);
+        HttpResponseMessage calendar = await session.GetAsync(
+            $"/api/v1/calendar?from={Uri.EscapeDataString(Iso(from))}&to={Uri.EscapeDataString(Iso(to))}");
+        using JsonDocument body = await SessionEndpointTestSupport.SuccessJsonAsync(calendar);
+
+        JsonElement myAvailability = body.RootElement.GetProperty("myAvailability");
+        Assert.Empty(myAvailability.GetProperty("occurrences").EnumerateArray());
+
+        JsonElement only = Assert.Single(myAvailability.GetProperty("series").EnumerateArray());
+        Assert.Equal(seriesId, only.GetProperty("seriesId").GetGuid());
+        Assert.Equal(LocalDatePattern.Iso.Format(farFuture), only.GetProperty("effectiveFrom").GetString());
+    }
+
+    /// <summary>
+    /// The trailing bound stays: a series that already ended is history, not a rule the owner can
+    /// still act on, so dropping the window's upper bound must not resurrect expired rules.
+    /// </summary>
+    [Fact]
+    public async Task Calendar_OmitsASeriesThatEndedBeforeTheWindow_D025()
+    {
+        UserId viewerId = await _factory.SeedUserAsync(email: $"cal-expired-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession session = await SessionEndpointTestSupport.SignInAsync(_factory, viewerId);
+
+        LocalDate today = _factory.Clock.GetCurrentInstant().InUtc().Date;
+        LocalDate startedLongAgo = NextTuesday(today.PlusDays(-400));
+        HttpResponseMessage createdSeries = await session.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/me/availability/series",
+            JsonContent.Create(new
+            {
+                dayOfWeek = (int)IsoDayOfWeek.Tuesday,
+                startTime = "20:00",
+                durationMinutes = 180,
+                effectiveFrom = LocalDatePattern.Iso.Format(startedLongAgo),
+                effectiveUntil = LocalDatePattern.Iso.Format(startedLongAgo.PlusDays(7)),
+            }));
+        Assert.Equal(HttpStatusCode.Created, createdSeries.StatusCode);
+
+        Instant from = _factory.Clock.GetCurrentInstant();
+        Instant to = from + Duration.FromDays(7);
+        HttpResponseMessage calendar = await session.GetAsync(
+            $"/api/v1/calendar?from={Uri.EscapeDataString(Iso(from))}&to={Uri.EscapeDataString(Iso(to))}");
+        using JsonDocument body = await SessionEndpointTestSupport.SuccessJsonAsync(calendar);
+
+        Assert.Empty(body.RootElement.GetProperty("myAvailability").GetProperty("series").EnumerateArray());
+    }
+
     private static LocalDate NextTuesday(LocalDate onOrAfter) =>
         onOrAfter.DayOfWeek == IsoDayOfWeek.Tuesday ? onOrAfter : onOrAfter.Next(IsoDayOfWeek.Tuesday);
 

@@ -288,6 +288,11 @@ internal sealed class FakeAvailabilityReads : IAvailabilityReadRepository
         return Task.FromResult<IReadOnlyList<AvailabilityOwnerData>>(
             [.. Owners.Where(o => ids.Contains(o.OwnerId))]);
     }
+
+    public Task<IReadOnlyList<AvailabilitySeries>> ReadOwnerSeriesAsync(
+        UserId ownerId, Instant notEndedBefore, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<AvailabilitySeries>>(
+            [.. Owners.Where(o => o.OwnerId == ownerId).SelectMany(o => o.Series)]);
 }
 
 internal sealed class FixedClock(Instant now) : IClock

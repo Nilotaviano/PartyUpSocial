@@ -12,7 +12,9 @@ namespace PartyUp.Application.Availability;
 /// call for the single owner; <see cref="AvailabilityExpansion.Expand"/> supplies the addressable
 /// <c>occurrences</c> form (edit surface) and <see cref="AvailabilityProjection.Project"/> the
 /// <c>merged</c> ranges the week grid paints — D-101's two forms, neither re-derived from the other
-/// (A-076: no Domain change, adapter composition only).
+/// (A-076: no Domain change, adapter composition only). One further
+/// <see cref="IAvailabilityReadRepository.ReadOwnerSeriesAsync"/> call carries the owner's rule set,
+/// which is window-independent by definition and so cannot come from the windowed read.
 /// </summary>
 public sealed class ReadMyAvailabilityUseCase(
     IAvailabilityReadRepository availabilityReads,
@@ -59,6 +61,12 @@ public sealed class ReadMyAvailabilityUseCase(
         IReadOnlyList<TimeRange> merged = AvailabilityProjection.Project(
             data.Blocks, data.Series, data.Skips, range, zoneProvider, data.ZoneId);
 
-        return new MyAvailabilityLayer(occurrences, merged, range, data.Series);
+        // Not data.Series: that set is bounded above by A-076's padded window, so a rule whose first
+        // occurrence falls after the requested week would be missing from a surface whose whole job
+        // is listing rules (D-025).
+        IReadOnlyList<AvailabilitySeries> rules =
+            await availabilityReads.ReadOwnerSeriesAsync(ownerId, range.Start, cancellationToken);
+
+        return new MyAvailabilityLayer(occurrences, merged, range, rules);
     }
 }

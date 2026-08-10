@@ -40,8 +40,9 @@ public sealed record MyAvailabilityOccurrence(TimeRange Range, AvailabilityOccur
 /// <see cref="Occurrences"/> (the edit surface) and the bare <see cref="Merged"/> ranges the week grid
 /// paints (D-101's visual half) and that feed <c>OverlapEngine</c> for a friend owner (the algorithmic
 /// half). <see cref="Range"/> is the echoed request range. <see cref="Series"/> carries the owner's
-/// recurring rules themselves — D-025 addresses a rule, not a mark, and a series whose occurrences in
-/// this window are all skipped expands to nothing while still being deletable.
+/// recurring rules themselves — D-025 addresses a rule, not a mark, so unlike every other member it
+/// is not scoped to <see cref="Range"/>: a series is listed whether its occurrences here are all
+/// skipped or its first occurrence has not arrived yet.
 /// </summary>
 public sealed record MyAvailabilityLayer(
     IReadOnlyList<MyAvailabilityOccurrence> Occurrences,

@@ -79,5 +79,30 @@ public sealed class AvailabilityReadRepository(AppDbContext context) : IAvailabi
         return result;
     }
 
+    public async Task<IReadOnlyList<AvailabilitySeries>> ReadOwnerSeriesAsync(
+        UserId ownerId, Instant notEndedBefore, CancellationToken cancellationToken)
+    {
+        Guid[] ids = [ownerId.Value];
+
+        // Only the trailing half of A-076's predicate: an owner's own rule list has no upper bound,
+        // so a series that starts after the requested window is still returned. The `AT TIME ZONE
+        // 'UTC'` cast is required for the same reason it is above — a bare `::date` resolves under
+        // the session's `TimeZone` GUC.
+        List<AvailabilitySeries> series = await context.AvailabilitySeries
+            .FromSqlInterpolated($"""
+                SELECT *
+                FROM availability_series
+                WHERE owner_id = ANY({ids})
+                  AND (effective_until IS NULL OR effective_until > (({notEndedBefore} AT TIME ZONE 'UTC')::date - 3))
+                """)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        return [.. series
+            .Where(s => !s.IsEmpty)
+            .OrderBy(s => s.DayOfWeek)
+            .ThenBy(s => s.StartTime)];
+    }
+
     private sealed record OwnerZoneRow(UserId OwnerId, DateTimeZone Zone);
 }
