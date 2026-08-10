@@ -353,7 +353,9 @@ public sealed class Poll : AggregateRoot
     /// D-033/D-051: any voter suggests, guests included, and the option appears immediately without
     /// organizer approval. Resolution order under the poll row lock (§6.2): an identical instant
     /// <em>merges</em> — the existing option is returned with no error, even at the twelfth option
-    /// (D-080) — and only a genuinely new instant meets the cap (D-171).
+    /// (D-080) — and only a genuinely new instant meets the cap (D-171). D-185: suggesting also
+    /// records the suggester's own Available vote on the resulting option, overwriting any prior
+    /// vote there — this applies on the dedup path too, not only to newly created options.
     /// </summary>
     public PollOption SuggestOption(ParticipantRef suggester, Instant startTime, IClock clock)
     {
@@ -361,10 +363,11 @@ public sealed class Poll : AggregateRoot
 
         Instant now = clock.GetCurrentInstant();
         RequireVotingOpen(now, "suggest an option");
-        RequireActiveParticipant(suggester);
+        PollParticipant row = RequireActiveParticipant(suggester);
 
         if (_options.Find(o => o.StartTime == startTime) is { } duplicate)
         {
+            CastVote(suggester, duplicate.Id, VoteChoice.Available, now, row);
             return duplicate;
         }
 
@@ -380,6 +383,7 @@ public sealed class Poll : AggregateRoot
 
         PollOption option = PollOption.Create(Id, startTime, suggester, now);
         _options.Add(option);
+        CastVote(suggester, option.Id, VoteChoice.Available, now, row);
         Raise(new PollOptionSuggested(Id, option.Id, suggester));
 
         return option;
@@ -440,6 +444,16 @@ public sealed class Poll : AggregateRoot
             throw new DomainException(DomainError.NotFound, "No such option on this poll.");
         }
 
+        CastVote(participant, optionId, choice, now, row);
+    }
+
+    /// <summary>
+    /// The single place that writes a vote: revise-vs-add and the D-172 first-response stamp, shared
+    /// by <see cref="Vote"/> and the D-185 auto-vote in <see cref="SuggestOption"/> so those two
+    /// details never drift apart.
+    /// </summary>
+    private void CastVote(ParticipantRef participant, PollOptionId optionId, VoteChoice choice, Instant now, PollParticipant row)
+    {
         if (_votes.Find(v => v.Matches(optionId, participant)) is { } existing)
         {
             existing.Revise(choice, now);
