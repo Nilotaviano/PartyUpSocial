@@ -193,6 +193,7 @@ builder.Services.AddPartyUpAuthorization();
 builder.Services.AddSingleton<ProviderCapabilities>();
 builder.Services.AddExceptionHandler<RequestBindingExceptionMapper>();
 builder.Services.AddExceptionHandler<DomainExceptionMapper>();
+builder.Services.AddExceptionHandler<TransientConflictExceptionMapper>();
 builder.Services.AddExceptionHandler<InternalExceptionMapper>();
 builder.Services.AddProblemDetails();
 // Outside Development, binding failures short-circuit an empty 400 that never

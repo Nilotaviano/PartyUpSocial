@@ -146,6 +146,8 @@ internal sealed class FriendGraphDatabase
     private readonly PostgreSqlContainer _postgres =
         new PostgreSqlBuilder("postgres:17-alpine").Build();
 
+    internal string ConnectionString => _postgres.GetConnectionString();
+
     internal Task StartAsync() => _postgres.StartAsync();
 
     internal Task DisposeAsync() => _postgres.DisposeAsync().AsTask();

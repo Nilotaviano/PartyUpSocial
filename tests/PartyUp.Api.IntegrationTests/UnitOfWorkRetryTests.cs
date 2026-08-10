@@ -8,7 +8,8 @@ namespace PartyUp.Api.IntegrationTests;
 
 /// <summary>
 /// A-069's bounded retry gate: <see cref="IUnitOfWork.ExecuteAsync{T}"/> retries a serialization
-/// failure (<c>40001</c>) or deadlock (<c>40P01</c>) a bounded number of times, in a fresh transaction
+/// failure (<c>40001</c>), deadlock (<c>40P01</c>) or expired <c>lock_timeout</c> (<c>55P03</c>, the
+/// friend pair lock's bounded wait) a bounded number of times, in a fresh transaction
 /// each attempt, and surfaces the failure once the bound is exhausted rather than looping forever.
 /// Each attempt forces a real <see cref="PostgresException"/> deterministically (a PL/pgSQL
 /// <c>RAISE EXCEPTION ... USING ERRCODE</c>) rather than relying on racy real contention, so the
@@ -28,6 +29,7 @@ public sealed class UnitOfWorkRetryTests : IAsyncLifetime, IDisposable
     [Theory]
     [InlineData("40001")]
     [InlineData("40P01")]
+    [InlineData("55P03")]
     public async Task DeadlockAndSerializationFailureRetryThriceThenSurface_A069(string sqlState)
     {
         await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();

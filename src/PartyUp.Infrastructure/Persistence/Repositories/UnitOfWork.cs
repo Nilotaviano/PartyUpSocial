@@ -8,8 +8,10 @@ namespace PartyUp.Infrastructure.Persistence.Repositories;
 /// <summary>
 /// A-069: session/user row locks under Phase 4 paths use <c>FOR NO KEY UPDATE</c>, which still
 /// conflicts with the friend path's <c>FOR UPDATE</c> — so a residual deadlock class remains between
-/// them. <see cref="ExecuteAsync{T}"/> therefore retries a serialization failure (<c>40001</c>) or
-/// deadlock (<c>40P01</c>) a bounded number of times, in a fresh transaction each attempt, rather than
+/// them. <see cref="ExecuteAsync{T}"/> therefore retries a serialization failure (<c>40001</c>),
+/// deadlock (<c>40P01</c>) or expired <c>lock_timeout</c> (<c>55P03</c>, raised by
+/// <see cref="FriendPairLocker"/>'s bounded pair lock)
+/// a bounded number of times, in a fresh transaction each attempt, rather than
 /// surfacing the first one as an unhandled 500. The retry predicate matches the error both as an EF
 /// <see cref="DbUpdateException"/>-wrapped <see cref="PostgresException"/> (ordinary <c>SaveChanges</c>
 /// failures) and as a bare <see cref="PostgresException"/> (the raw lock/<c>ON CONFLICT</c> SQL of
@@ -71,7 +73,11 @@ public sealed class UnitOfWork(AppDbContext context) : IUnitOfWork
         }
     }
 
-    /// <summary>SQL state <c>40001</c> (serialization failure) or <c>40P01</c> (deadlock detected), either shape.</summary>
+    /// <summary>
+    /// SQL state <c>40001</c> (serialization failure), <c>40P01</c> (deadlock detected) or
+    /// <c>55P03</c> (lock not available — a bounded <c>lock_timeout</c> expired, e.g. the friend
+    /// pair lock), either shape.
+    /// </summary>
     private static bool IsTransientConflict(Exception exception) => exception switch
     {
         DbUpdateException { InnerException: PostgresException inner } => IsTransientSqlState(inner),
@@ -80,7 +86,9 @@ public sealed class UnitOfWork(AppDbContext context) : IUnitOfWork
     };
 
     private static bool IsTransientSqlState(PostgresException exception) =>
-        exception.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected;
+        exception.SqlState is PostgresErrorCodes.SerializationFailure
+            or PostgresErrorCodes.DeadlockDetected
+            or PostgresErrorCodes.LockNotAvailable;
 
     private static TimeSpan JitteredBackoff(int attempt)
     {

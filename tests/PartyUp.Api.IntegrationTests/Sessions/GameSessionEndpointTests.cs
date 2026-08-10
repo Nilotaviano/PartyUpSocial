@@ -1333,8 +1333,10 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
             "not_waitlisted", // PromoteAndRejectWaitlistRequireOrganizerAndAWaitlistedRow_D084
             "no_session_capacity", // PromoteAndRejectWaitlistRequireOrganizerAndAWaitlistedRow_D084
         };
-        // transient_conflict needs a genuine SQL 40001/40P01 retry-exhaustion under contention; not
-        // deterministically reproducible over HTTP, so it stays an accepted untested residual.
+        // transient_conflict needs a genuine 40001/40P01/55P03 retry-exhaustion under contention, which
+        // no session endpoint reproduces deterministically over HTTP. Its emitter is covered directly
+        // by TransientConflictExceptionMapperTests (status, code and Retry-After for every state the
+        // A-069 ladder retries), so what stays untested here is only this file's HTTP arm.
         HashSet<string> acceptedUntestedResiduals = new(StringComparer.Ordinal) { "transient_conflict" };
 
         HashSet<string> covered = new(exercisedInThisTest, StringComparer.Ordinal);
