@@ -99,4 +99,38 @@ public sealed class BlockEndpointTests : IAsyncLifetime, IDisposable
         JsonElement item = Assert.Single(list.RootElement.GetProperty("items").EnumerateArray());
         Assert.Equal(target.Username, item.GetProperty("username").GetString());
     }
+
+    /// <summary>
+    /// D-192: the blocked-users list renders a neutral disc from the stored username snapshot and
+    /// carries NO avatar. A live avatar there would turn blocking into a monitoring channel — the
+    /// D-076 leak class pointed the other way — so BlockedUserResponse keeps exactly its three
+    /// members while every other read surface gains one in this wave.
+    /// </summary>
+    [Fact]
+    public async Task BlockList_CarriesNoAvatarOnAnyRow_D192()
+    {
+        FriendEndpointUser actor = await FriendEndpointTest.SeedAsync(_factory);
+        FriendEndpointUser target = await FriendEndpointTest.SeedAsync(_factory);
+        using FriendEndpointSession session = await FriendEndpointTest.SignInAsync(_factory, actor.Id);
+
+        HttpResponseMessage created = await session.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/blocks",
+            JsonContent.Create(new { targetUsername = target.Username }));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        using JsonDocument createdBody = await FriendEndpointTest.SuccessJsonAsync(created);
+        Assert.False(createdBody.RootElement.TryGetProperty("avatar", out _));
+
+        using JsonDocument list = await FriendEndpointTest.SuccessJsonAsync(
+            await session.GetAsync("/api/v1/blocks"));
+        JsonElement rows = list.RootElement.GetProperty("items");
+        Assert.Equal(1, rows.GetArrayLength());
+        Assert.All(
+            rows.EnumerateArray(),
+            row =>
+            {
+                Assert.Equal(3, row.EnumerateObject().Count());
+                Assert.False(row.TryGetProperty("avatar", out _));
+            });
+    }
 }

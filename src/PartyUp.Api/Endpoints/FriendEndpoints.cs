@@ -700,9 +700,10 @@ public sealed record UpstreamFailureSteamFriendImportResponse(
     string InvitationUrl) : SteamFriendImportResponse;
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record SteamMatchedUserResponse(string Username)
+public sealed record SteamMatchedUserResponse(string Username, AvatarResponse Avatar)
 {
-    public static SteamMatchedUserResponse From(SteamMatchedUser user) => new(user.Username);
+    public static SteamMatchedUserResponse From(SteamMatchedUser user) =>
+        new(user.Username, AvatarResponse.From(user.Avatar));
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

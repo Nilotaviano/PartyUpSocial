@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using PartyUp.Api.Contracts.Sessions;
+using PartyUp.Api.Endpoints;
 using PartyUp.Application.Notifications;
 using PartyUp.Domain.Notifications;
 
@@ -35,6 +36,7 @@ public sealed record NotificationResponse(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ReadAt,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? ActorUserId,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ActorDisplayName,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AvatarResponse? ActorAvatar,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SubjectKind,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? SubjectId,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SubjectTitle,
@@ -53,6 +55,10 @@ public sealed record NotificationResponse(
             // exactly in ActorUserId).
             row.ActorUserId,
             row.Actor is { DisplayName: { } displayName } ? displayName.Value : null,
+            // D-188: the avatar comes off the same MaskedIdentity as the name. MaskedIdentity.Anonymous
+            // carries a null avatar, so masking here is structural rather than a rule this mapper could
+            // forget. Deriving it from row.ActorUserId instead would route around the mask entirely.
+            row.Actor is { Avatar: { } actorAvatar } ? AvatarResponse.From(actorAvatar) : null,
             row.HasSubject ? NotificationWireFormat.SubjectKind(row.SubjectKind) : null,
             row.SubjectId,
             row.SubjectTitle?.Value,
