@@ -22,6 +22,8 @@ import { FriendCodeInput } from '../friends/FriendCodeInput'
 import { FriendCodeResolution } from '../friends/AddFriendPage'
 import { ProfileResolution } from '../friends/ProfilePage'
 import { ShareCard } from '../friends/ShareCard'
+import { AVATAR_CATALOG } from '../profile/avatarCatalog'
+import { AvatarPicker } from '../profile/AvatarPicker'
 
 type ProfileDraft = components['schemas']['ProfileDraft']
 type AvatarDraft = components['schemas']['AvatarDraft']
@@ -199,23 +201,10 @@ function AvatarStep({
   onNext: (avatar: AvatarDraft) => void
 }) {
   const { t } = useTranslation('onboarding')
-  const [emoji, setEmoji] = useState(value?.emoji ?? 'game')
+  const [emoji, setEmoji] = useState(value?.emoji ?? AVATAR_CATALOG[0].glyph)
   return (
-    <div className="space-y-4" role="radiogroup" aria-label={t('fields.avatar')}>
-      <div className="flex flex-wrap gap-2">
-        {['game', 'dice', 'arcade'].map((option) => (
-          <button
-            key={option}
-            aria-checked={emoji === option}
-            className="min-h-11 rounded-full border-2 border-ink px-4 py-2 font-display text-sm font-bold text-ink aria-checked:bg-accent aria-checked:text-accent-ink dark:aria-checked:border-accent-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            role="radio"
-            type="button"
-            onClick={() => setEmoji(option)}
-          >
-            {option}
-          </button>
-        ))}
-      </div>
+    <div className="space-y-4">
+      <AvatarPicker idPrefix="onboarding-avatar" value={emoji} onChange={setEmoji} />
       <Button
         variant="primary"
         onClick={() => onNext({ kind: 'emoji', emoji, platformLinkId: null })}
