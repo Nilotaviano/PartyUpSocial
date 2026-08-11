@@ -1,7 +1,10 @@
 # Calendar / availability rework — design
 
-**Status:** Approved by owner 2026-08-10. No new D-numbers: every behavior here implements
-decisions already Confirmed.
+**Status:** SHIPPED 2026-08-10 (commits `6527873`..`bd180f7`, lane repaired in `c1ce6bf`), pushed and
+gate-green. No new D-numbers: every behavior here implements decisions already Confirmed. Body-drag to
+move was descoped by the owner (see §5). Remaining from the owner's original report: the styling/
+"unpolished" half, and whether a focused grid cell should also activate on Space — both tracked in
+TODO.md's calendar item, not here.
 
 ## 1. Why
 
