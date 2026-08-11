@@ -12,7 +12,11 @@ import {
 } from './friendGraph'
 
 type MatchState = 'actionable' | 'outgoing_pending' | 'accepted'
-type MatchCard = { username: string; state: MatchState }
+type MatchCard = {
+  username: string
+  state: MatchState
+  avatar: { emoji: string | null }
+}
 type ImportView = {
   result: SteamImportResult
   matches: MatchCard[]
@@ -48,6 +52,7 @@ export function SteamImportPage() {
             ? result.matches.map((match) => ({
                 username: match.username,
                 state: 'actionable' as const,
+                avatar: match.avatar,
               }))
             : [],
       })
@@ -182,9 +187,16 @@ export function SteamImportPage() {
               {view.matches.map((match, index) => (
                 <li key={`${match.username}:${index}`}>
                   <article className="rounded-card border-2 border-ink bg-card p-4 shadow-offset-card">
-                    <h3 className="font-mono font-semibold text-ink">
-                      @{match.username}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <AvatarDisc
+                        emoji={match.avatar.emoji}
+                        seed={match.username}
+                        size="sm"
+                      />
+                      <h3 className="min-w-0 truncate font-mono font-semibold text-ink">
+                        @{match.username}
+                      </h3>
+                    </div>
                     <p className="mt-1 text-ink-soft">
                       {t('steam.matchDescription', {
                         username: match.username,

@@ -743,6 +743,35 @@ describe('PollDetailPage', () => {
       ).toBeInTheDocument()
       expect(screen.queryByText('Choose a time')).not.toBeInTheDocument()
     })
+
+    it('the finalization preview renders no disc in wave A_D188', async () => {
+      // Rows carrying an avatar, so the assertion proves a deliberate
+      // non-render rather than an empty field.
+      const preview = previewResponse()
+      const previewWithAvatars = {
+        options: preview.options.map((option) => ({
+          ...option,
+          roster: option.roster.map((row) => ({
+            ...row,
+            avatar: { kind: 'emoji', emoji: '🦄', sourcePlatformLinkId: null },
+          })),
+        })),
+      }
+      api.get.mockImplementation((path: string) =>
+        Promise.resolve({
+          data: path.includes('finalization-preview')
+            ? previewWithAvatars
+            : awaitingSelectionPoll(),
+        }),
+      )
+      renderPage()
+
+      const option = await screen.findByTestId('finalize-option-option-1')
+      // The preview's names live inside a <label> wrapping the radio input;
+      // a disc there would rewrite the radio's accessible name.
+      expect(option.querySelector('[aria-hidden="true"]')).toBeNull()
+      expect(within(option).getByRole('radio')).not.toHaveAccessibleName(/🦄/)
+    })
   })
 
   describe('organizer guest panel continued (S6, D-044)', () => {
@@ -955,5 +984,39 @@ describe('PollDetailPage', () => {
       await screen.findByText('Raid night poll')
       expect(screen.queryByRole('button', { name: 'Leave poll' })).not.toBeInTheDocument()
     })
+  })
+
+  it('renders an avatar disc on each poll roster row_D188', async () => {
+    api.get.mockResolvedValue({
+      data: pollDetail({
+        roster: [
+          {
+            participationId: 'pp-1',
+            userId: 'user-7',
+            guestIdentityId: null,
+            displayName: 'Ada',
+            isActive: true,
+            avatar: { kind: 'emoji', emoji: '🐙', sourcePlatformLinkId: null },
+          },
+          {
+            participationId: 'pp-masked',
+            userId: 'user-blocked',
+            guestIdentityId: null,
+            displayName: null,
+            isActive: true,
+            avatar: { kind: 'emoji', emoji: '⚡', sourcePlatformLinkId: null },
+          },
+        ],
+      }),
+    })
+    renderPage()
+
+    const named = await screen.findByTestId('poll-roster-entry-pp-1')
+    expect(named.querySelector('[aria-hidden="true"]')).toHaveTextContent('🐙')
+
+    const masked = screen.getByTestId('poll-roster-entry-pp-masked')
+    const maskedDisc = masked.querySelector('[aria-hidden="true"]')
+    expect(maskedDisc).toHaveTextContent('●')
+    expect(maskedDisc).not.toHaveTextContent('⚡')
   })
 })

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { AvatarDisc } from '../friends/AvatarDisc'
 import {
   FRIEND_TYPES,
   getNotificationList,
@@ -79,7 +80,8 @@ function NotificationRow({
   // session/poll rows show the subject title when it is reachable — a
   // minimal-form row (unreachable subject) has neither and renders no
   // detail line at all.
-  const detail = FRIEND_TYPES.has(notification.type)
+  const namesAPerson = FRIEND_TYPES.has(notification.type)
+  const detail = namesAPerson
     ? (notification.actorDisplayName ?? t('item.anonymous'))
     : (notification.subjectTitle ?? null)
   const timestamp = new Intl.DateTimeFormat(i18n.language, {
@@ -108,9 +110,21 @@ function NotificationRow({
   )
 
   return (
-    <li className="rounded-card border-2 border-ink bg-card p-4 shadow-offset-card">
+    <li
+      className="rounded-card border-2 border-ink bg-card p-4 shadow-offset-card"
+      data-testid={`notification-${notification.id}`}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2">
+          {namesAPerson && (
+            <AvatarDisc
+              className="notification-actor-disc"
+              emoji={notification.actorAvatar?.emoji}
+              masked={notification.actorDisplayName === null}
+              seed={notification.actorUserId ?? notification.id}
+              size="xs"
+            />
+          )}
           {isUnread && (
             <span
               aria-hidden="true"

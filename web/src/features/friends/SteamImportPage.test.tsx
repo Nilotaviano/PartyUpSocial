@@ -210,4 +210,28 @@ describe('SteamImportPageTests', () => {
       body: { targetUsername: 'block.one' },
     })
   })
+
+  it('a matched card carries the avatar disc and the heading name excludes it_D188', async () => {
+    api.post.mockResolvedValueOnce({
+      data: {
+        state: 'ready',
+        matches: [
+          {
+            username: 'ready.one',
+            avatar: { kind: 'emoji', emoji: '🎮', sourcePlatformLinkId: null },
+          },
+        ],
+        unmatched: [],
+        invitationUrl: 'https://links.test/add/23456789AB',
+      },
+    })
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Find Steam friends' }))
+
+    const heading = await screen.findByRole('heading', { name: '@ready.one' })
+    const card = heading.closest('article') as HTMLElement
+    expect(card.querySelector('[aria-hidden="true"]')).toHaveTextContent('🎮')
+    expect(heading).not.toHaveTextContent('🎮')
+  })
 })
