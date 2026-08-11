@@ -20,7 +20,7 @@ public sealed class CompleteOnboardingUseCaseTests
             new ProfileDraft(
                 "player",
                 "Player",
-                new AvatarDraft("emoji", "🙂", null),
+                new AvatarDraft("emoji", "\U0001F3AE", null),
                 null,
                 "en"),
             default);
@@ -81,7 +81,7 @@ public sealed class CompleteOnboardingUseCaseTests
         new(
             username,
             "Player",
-            new AvatarDraft("emoji", "🙂", null),
+            new AvatarDraft("emoji", "\U0001F3AE", null),
             "America/Fortaleza",
             "en");
 

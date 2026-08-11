@@ -34,7 +34,7 @@ vi.mock('../../auth/useSession', () => ({
 import '../../i18n'
 import { SessionDetailPage } from './SessionDetailPage'
 
-function detail() {
+function detail(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: 'session-1',
     organizerId: 'organizer-1',
@@ -73,6 +73,7 @@ function detail() {
     ],
     version: 'v1',
     muted: false,
+    ...overrides,
   }
 }
 
@@ -423,5 +424,89 @@ describe('SessionDetailPage', () => {
     expect(
       screen.queryByText('11111111-1111-1111-1111-111111111111'),
     ).not.toBeInTheDocument()
+  })
+
+  it('renders an avatar disc on each roster row, decoration only_D188', async () => {
+    mockedUseSession.mockReturnValue({ data: { userId: 'organizer-1' } })
+    api.get.mockResolvedValue({
+      data: detail({
+        roster: [
+          {
+            participationId: 'p-named',
+            userId: 'user-9',
+            guestIdentityId: null,
+            displayName: 'Ada',
+            status: 'going',
+            isWaitlisted: false,
+            origin: 'invited',
+            reminderChoice: null,
+            avatar: { kind: 'emoji', emoji: '🦊', sourcePlatformLinkId: null },
+          },
+        ],
+      }),
+    })
+    renderPage()
+
+    const row = await screen.findByTestId('roster-entry-p-named')
+    const disc = row.querySelector('[aria-hidden="true"]')
+    expect(disc).toHaveTextContent('🦊')
+    // Decoration: the row still reads as the name alone to a screen reader.
+    expect(row).toHaveTextContent('Ada')
+  })
+
+  it('a masked roster row renders the neutral disc and leaks no emoji_D188_D076', async () => {
+    mockedUseSession.mockReturnValue({ data: { userId: 'organizer-1' } })
+    api.get.mockResolvedValue({
+      data: detail({
+        roster: [
+          {
+            participationId: 'p-masked',
+            userId: 'user-blocked',
+            guestIdentityId: null,
+            displayName: null,
+            // Even if the server ever emitted one, the render must not show it.
+            avatar: { kind: 'emoji', emoji: '🐉', sourcePlatformLinkId: null },
+            status: 'going',
+            isWaitlisted: false,
+            origin: 'invited',
+            reminderChoice: null,
+          },
+        ],
+      }),
+    })
+    renderPage()
+
+    const row = await screen.findByTestId('roster-entry-p-masked')
+    const disc = row.querySelector('[aria-hidden="true"]')
+    expect(disc).toHaveTextContent('●')
+    expect(disc).not.toHaveTextContent('🐉')
+    expect(disc).toHaveClass('bg-busy')
+  })
+
+  it('the remove-guest control keeps its own accessible name, disc excluded_D188', async () => {
+    mockedUseSession.mockReturnValue({ data: { userId: 'organizer-1' } })
+    api.get.mockResolvedValue({
+      data: detail({
+        roster: [
+          {
+            participationId: 'p-guest',
+            userId: null,
+            guestIdentityId: 'guest-1',
+            displayName: 'Guest Bob',
+            status: 'going',
+            isWaitlisted: false,
+            origin: 'guestLink',
+            reminderChoice: null,
+            avatar: { kind: 'emoji', emoji: '🍕', sourcePlatformLinkId: null },
+          },
+        ],
+      }),
+    })
+    renderPage()
+
+    const row = await screen.findByTestId('roster-entry-p-guest')
+    const remove = within(row).getByRole('button')
+    expect(remove).toHaveAccessibleName('Remove guest Guest Bob')
+    expect(remove).not.toHaveAccessibleName(/🍕/)
   })
 })

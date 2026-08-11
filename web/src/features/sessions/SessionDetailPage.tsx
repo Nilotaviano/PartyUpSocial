@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, Navigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
+import { AvatarDisc } from '../friends/AvatarDisc'
 import { Button } from '../../components/ui/button'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
@@ -551,7 +552,17 @@ export function SessionDetailPage() {
                       className="flex items-center justify-between gap-2 py-1"
                       data-testid={`roster-entry-${entry.participationId}`}
                     >
-                      <span className="text-ink">{entry.displayName ?? t('detail.anonymous')}</span>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <AvatarDisc
+                          emoji={entry.avatar?.emoji}
+                          masked={entry.displayName === null}
+                          seed={entry.userId ?? entry.guestIdentityId ?? entry.participationId}
+                          size="xs"
+                        />
+                        <span className="truncate text-ink">
+                          {entry.displayName ?? t('detail.anonymous')}
+                        </span>
+                      </span>
                       {isOrganizer && entry.origin === 'guestLink' && (
                         <RemoveGuestDialog
                           displayName={entry.displayName ?? t('detail.anonymous')}
@@ -579,7 +590,17 @@ export function SessionDetailPage() {
                     key={entry.participationId}
                     className="flex items-center justify-between gap-2 py-1"
                   >
-                    <span className="text-ink">{entry.displayName ?? t('detail.anonymous')}</span>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <AvatarDisc
+                        emoji={entry.avatar?.emoji}
+                        masked={entry.displayName === null}
+                        seed={entry.userId ?? entry.guestIdentityId ?? entry.participationId}
+                        size="xs"
+                      />
+                      <span className="truncate text-ink">
+                        {entry.displayName ?? t('detail.anonymous')}
+                      </span>
+                    </span>
                     {isOrganizer && (
                       <span className="flex gap-2">
                         <Button

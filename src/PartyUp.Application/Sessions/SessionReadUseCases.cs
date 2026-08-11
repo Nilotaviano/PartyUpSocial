@@ -70,7 +70,7 @@ public sealed class SessionReadUseCases(
 
         List<RosterEntry> roster = [.. detail.Roster.Select(entry =>
             entry.Participant.UserId is { } userId && viewer.BlockedCounterpartIds.Contains(userId)
-                ? entry with { MaskedForViewer = true, DisplayName = null }
+                ? entry with { MaskedForViewer = true, DisplayName = null, Avatar = null }
                 : entry)];
 
         return detail with { Roster = roster };

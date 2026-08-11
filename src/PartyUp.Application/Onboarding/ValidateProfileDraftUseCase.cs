@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Application.Accounts;
+using PartyUp.Application.Profile;
 using PartyUp.Application.Text;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Users;
@@ -57,13 +58,26 @@ public sealed class ValidateProfileDraftUseCase(
     internal static Avatar ToAvatar(AvatarDraft draft) =>
         draft.Kind.Trim().ToLowerInvariant() switch
         {
-            "emoji" => Avatar.FromEmoji(draft.Emoji),
+            "emoji" => FromCatalogEmoji(draft.Emoji),
             "platform" when draft.PlatformLinkId is { } id =>
                 Avatar.FromPlatformLink(PlatformLinkId.From(id)),
             _ => throw new DomainException(
                 DomainError.ValidationFailed,
                 "The avatar shape is invalid."),
         };
+
+    /// <summary>
+    /// <see cref="Avatar.FromEmoji"/> trims, so the catalog check runs on the stored glyph.
+    /// </summary>
+    private static Avatar FromCatalogEmoji(string? emoji)
+    {
+        Avatar avatar = Avatar.FromEmoji(emoji);
+        return AvatarCatalog.Contains(avatar.Emoji)
+            ? avatar
+            : throw new DomainException(
+                DomainError.ValidationFailed,
+                "The avatar glyph is not in the catalog.");
+    }
 
     internal static Locale ToLocale(string locale) => AccountInput.Locale(locale);
 

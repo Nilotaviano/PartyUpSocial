@@ -88,6 +88,11 @@ public sealed class SteamImportEndpointTests : IAsyncLifetime, IDisposable
         Assert.Equal(
             candidate.Username,
             readyBody.RootElement.GetProperty("matches")[0].GetProperty("username").GetString());
+        // D-188: a matched user is a real, visible PartyUp account (LookupVisibility.CanMatchSteamImport
+        // already rejected blocked and incomplete candidates), so the match card carries their avatar.
+        JsonElement matchAvatar = readyBody.RootElement.GetProperty("matches")[0].GetProperty("avatar");
+        Assert.Equal("emoji", matchAvatar.GetProperty("kind").GetString());
+        Assert.Equal("🙂", matchAvatar.GetProperty("emoji").GetString());
     }
 
     [Fact]

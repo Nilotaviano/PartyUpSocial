@@ -12,7 +12,16 @@ public sealed class ChangeAvatarUseCase(IUserRepository users, IUnitOfWork unitO
         AvatarDraft draft,
         CancellationToken cancellationToken)
     {
-        Avatar avatar = ValidateProfileDraftUseCase.ToAvatar(draft);
+        Avatar avatar;
+        try
+        {
+            avatar = ValidateProfileDraftUseCase.ToAvatar(draft);
+        }
+        catch (DomainException)
+        {
+            return Task.FromResult(ProfileMutationResult.Failed("errors.avatar.invalid"));
+        }
+
         return unitOfWork.ExecuteAsync(
             async ct =>
             {

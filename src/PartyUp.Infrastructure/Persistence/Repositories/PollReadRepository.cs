@@ -19,26 +19,25 @@ namespace PartyUp.Infrastructure.Persistence.Repositories;
 /// </summary>
 public sealed class PollReadRepository(AppDbContext context) : IPollReadRepository
 {
-    public async Task<IReadOnlyDictionary<Guid, DisplayName?>> FindDisplayNamesAsync(
+    public async Task<IReadOnlyDictionary<Guid, UserNameplate>> FindNameplatesAsync(
         IReadOnlyCollection<UserId> userIds,
         CancellationToken cancellationToken)
     {
         if (userIds.Count == 0)
         {
-            return new Dictionary<Guid, DisplayName?>();
+            return new Dictionary<Guid, UserNameplate>();
         }
 
         List<UserId> ids = [.. userIds.Distinct()];
-        var rows = await context.DomainUsers
+        List<User> rows = await context.DomainUsers
             .AsNoTracking()
             .Where(u => ids.Contains(u.Id))
-            .Select(u => new { u.Id, u.DisplayName })
             .ToListAsync(cancellationToken);
 
-        Dictionary<Guid, DisplayName?> result = [];
-        foreach (var row in rows)
+        Dictionary<Guid, UserNameplate> result = [];
+        foreach (User row in rows)
         {
-            result[row.Id.Value] = row.DisplayName;
+            result[row.Id.Value] = new UserNameplate(row.DisplayName, row.Avatar);
         }
 
         return result;

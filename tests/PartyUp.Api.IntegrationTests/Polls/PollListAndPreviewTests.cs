@@ -5,8 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
 using PartyUp.Api.IntegrationTests.Sessions;
+using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
+using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Jobs;
 using PartyUp.Infrastructure.Persistence;
@@ -694,6 +696,99 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
         // (design §5) is a same-inputs-same-outputs claim over the roster/waitlist split itself, not
         // over an unrelated endpoint's incidental wire order.
         Assert.Equal(previewRoster.OrderBy(r => r.UserId), finalizedRoster.OrderBy(r => r.UserId));
+    }
+
+    /// <summary>
+    /// D-188: the preview roster is organizer-only to reach, but a registered row can still be a
+    /// blocked counterpart (D-076/D-086 test below), so this only proves the unmasked case -- every
+    /// unmasked registered row carries the participant's avatar, resolved from the same prefetched
+    /// nameplate dictionary the display name comes from, not a second lookup.
+    /// </summary>
+    [Fact]
+    public async Task PreviewRosterEntriesCarryTheParticipantAvatar_D188()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"pl-preview-avatar-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+
+        (Guid pollId, _) = await CreatePollWithFirstOptionAsync(organizerSession);
+
+        using JsonDocument preview = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}/finalization-preview"));
+
+        JsonElement organizerRow = preview.RootElement.GetProperty("options")[0].GetProperty("roster")
+            .EnumerateArray()
+            .Single(entry => entry.GetProperty("userId").GetGuid() == organizerId.Value);
+        JsonElement avatar = organizerRow.GetProperty("avatar");
+        Assert.Equal("emoji", avatar.GetProperty("kind").GetString());
+        Assert.Equal("🙂", avatar.GetProperty("emoji").GetString());
+    }
+
+    /// <summary>
+    /// D-076/D-086: masking is presentation, not removal, so a participant can be blocked with the
+    /// organizer while remaining Active on the poll (built directly against the aggregate here,
+    /// bypassing <c>BlockUserUseCase</c>'s effects executor -- exactly what <c>SessionRosterMaskingWireTests</c>
+    /// does for sessions -- so the Blocks row exists without the block command's own side effect of
+    /// removing the participant). The same organizer sees this participant masked on
+    /// <c>GET /polls/{id}</c> (PollReadUseCases), so the preview -- reachable for the same person on
+    /// the same poll -- must mask identically: neither <c>displayName</c> nor <c>avatar</c> present on
+    /// the wire.
+    /// </summary>
+    [Fact]
+    public async Task Preview_BlockedCounterpartRow_CarriesNoDisplayNameOrAvatar_D076()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"pl-preview-blocked-org-{Guid.NewGuid():N}@example.test");
+        UserId blockedFriendId = await _factory.SeedUserAsync(email: $"pl-preview-blocked-friend-{Guid.NewGuid():N}@example.test");
+
+        Guid pollId;
+        await using (AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            Poll poll = Poll.Create(
+                organizerId,
+                new PollDetails(
+                    SessionTitle.Create("Blocked-counterpart preview fixture"),
+                    Duration15.FromMinutes(60),
+                    Platform.NotApplicable,
+                    null,
+                    SessionNotes.Empty,
+                    minAttendance: 1,
+                    maxCapacity: null,
+                    isPrivate: false),
+                PollDeadlineChoice.Hours24,
+                [
+                    _factory.Clock.GetCurrentInstant() + Duration.FromDays(1),
+                    _factory.Clock.GetCurrentInstant() + Duration.FromDays(2),
+                ],
+                [blockedFriendId],
+                _factory.Clock);
+            _ = poll.DequeueEvents();
+            pollId = poll.Id.Value;
+
+            context.Polls.Add(poll);
+            await context.SaveChangesAsync();
+
+            User blockedFriendUser = await context.DomainUsers.SingleAsync(u => u.Id == blockedFriendId);
+            context.Blocks.Add(Block.Create(
+                organizerId, blockedFriendId, blockedFriendUser.Username!.Value, _factory.Clock));
+            await context.SaveChangesAsync();
+        }
+
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        using JsonDocument preview = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}/finalization-preview"));
+
+        JsonElement organizerRow = preview.RootElement.GetProperty("options")[0].GetProperty("roster")
+            .EnumerateArray()
+            .Single(entry => entry.TryGetProperty("userId", out JsonElement id) && id.GetGuid() == organizerId.Value);
+        Assert.True(organizerRow.TryGetProperty("displayName", out _));
+        Assert.True(organizerRow.TryGetProperty("avatar", out _));
+
+        JsonElement blockedRow = preview.RootElement.GetProperty("options")[0].GetProperty("roster")
+            .EnumerateArray()
+            .Single(entry => !entry.TryGetProperty("userId", out _));
+        Assert.False(blockedRow.TryGetProperty("displayName", out _));
+        Assert.False(blockedRow.TryGetProperty("avatar", out _));
     }
 
     // ---- fixture helpers ----------------------------------------------------------------------------

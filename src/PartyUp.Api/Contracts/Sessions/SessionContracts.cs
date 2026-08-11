@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using NodaTime;
 using NodaTime.Text;
 using PartyUp.Api.Contracts.Availability;
+using PartyUp.Api.Endpoints;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
@@ -254,7 +255,9 @@ public sealed record RosterEntryResponse(
     string Status,
     bool IsWaitlisted,
     string Origin,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ReminderChoice)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ReminderChoice,
+    // D-188: absent for a masked row, a tombstoned row and every guest row (D-017: guests have no avatar).
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AvatarResponse? Avatar)
 {
     public static RosterEntryResponse From(RosterEntry entry) =>
         new(
@@ -267,7 +270,8 @@ public sealed record RosterEntryResponse(
             SessionWireFormat.ParticipationStatus(entry.Status),
             entry.IsWaitlisted,
             SessionWireFormat.Origin(entry.Origin),
-            SessionWireFormat.ReminderChoice(entry.ReminderChoice));
+            SessionWireFormat.ReminderChoice(entry.ReminderChoice),
+            entry.MaskedForViewer || entry.Avatar is not { } avatar ? null : AvatarResponse.From(avatar));
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

@@ -413,4 +413,73 @@ describe('NotificationCenterPage — empty states and scope toggle', () => {
       ),
     )
   })
+
+  it('a friend-graph row carries the actor disc and the link name excludes it_D188', async () => {
+    mockNotifications({
+      items: [
+        notification({
+          id: 'n-friend',
+          type: 'friendRequestReceived',
+          actorUserId: 'user-3',
+          actorDisplayName: 'Ada',
+          actorAvatar: { kind: 'emoji', emoji: '🦉', sourcePlatformLinkId: null },
+        }),
+      ],
+    })
+    renderPage()
+
+    const row = await screen.findByTestId('notification-n-friend')
+    expect(row.querySelector('.notification-actor-disc')).toHaveTextContent('🦉')
+
+    // The disc must never enter a control's accessible name. This is the
+    // hazard the Tier 1 sweep found: getByLabelText saw the disc, but
+    // computeAccessibleName did not. The name is the sr-only unread prefix
+    // plus the type label (`NotificationCenterPage.tsx:104-107`), which for
+    // `friendRequestReceived` is en's `item.types.friendRequestReceived`.
+    const link = within(row).getByRole('link')
+    expect(link).toHaveAccessibleName('Unread New friend request')
+    expect(link).not.toHaveAccessibleName(/🦉/)
+  })
+
+  it('a session row shows its subject title and no person disc_D188', async () => {
+    mockNotifications({
+      items: [
+        notification({
+          id: 'n-session',
+          type: 'sessionInvitation',
+          subjectKind: 'session',
+          subjectId: '11111111-1111-1111-1111-111111111111',
+          subjectTitle: 'Raid night',
+          actorUserId: 'user-3',
+          actorAvatar: { kind: 'emoji', emoji: '🔥', sourcePlatformLinkId: null },
+        }),
+      ],
+    })
+    renderPage()
+
+    const row = await screen.findByTestId('notification-n-session')
+    expect(row).toHaveTextContent('Raid night')
+    // No person is named on this row, so nothing is decorated.
+    expect(row.querySelector('.notification-actor-disc')).toBeNull()
+  })
+
+  it('a masked friend-graph row renders the neutral disc_D188_D076', async () => {
+    mockNotifications({
+      items: [
+        notification({
+          id: 'n-masked',
+          type: 'friendRequestReceived',
+          actorUserId: 'user-blocked',
+          actorDisplayName: null,
+          actorAvatar: { kind: 'emoji', emoji: '🌵', sourcePlatformLinkId: null },
+        }),
+      ],
+    })
+    renderPage()
+
+    const row = await screen.findByTestId('notification-n-masked')
+    const disc = row.querySelector('.notification-actor-disc')
+    expect(disc).toHaveTextContent('●')
+    expect(disc).not.toHaveTextContent('🌵')
+  })
 })

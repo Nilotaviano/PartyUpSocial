@@ -9,6 +9,8 @@ import { SettingsNavigation } from '../settings/BlockedUsersPage'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { TimeZoneField, isKnownTimeZone } from '../../components/TimeZoneField'
+import { AVATAR_CATALOG } from './avatarCatalog'
+import { AvatarPicker } from './AvatarPicker'
 
 const profileQueryKey = ['my-profile'] as const
 const methodsQueryKey = ['auth-methods'] as const
@@ -32,6 +34,21 @@ function ProfileError({ error }: { error: unknown }) {
   if (!error) return null
   const key = isApiError(error) && error.code === 'username_cooldown' ? 'username.cooldown' : 'generic'
   return <p role="alert">{t(key)}</p>
+}
+
+function AvatarField({ defaultGlyph }: { defaultGlyph: string }) {
+  const [glyph, setGlyph] = useState(defaultGlyph)
+  return (
+    <>
+      <AvatarPicker
+        idPrefix="profile-avatar"
+        labelledBy="profile-avatar-label"
+        value={glyph}
+        onChange={setGlyph}
+      />
+      <input name="emoji" type="hidden" value={glyph} />
+    </>
+  )
 }
 
 export function ProfileSettingsPage() {
@@ -121,8 +138,8 @@ export function ProfileSettingsPage() {
         <Button disabled={saving} type="submit" variant="neutral">{t('actions.saveDisplayName')}</Button>
       </form>
       <form className="space-y-2" onSubmit={(event) => void save(event, '/api/v1/me/avatar')}>
-        <Label htmlFor="profile-avatar">{t('fields.avatar')}</Label>
-        <Input id="profile-avatar" name="emoji" defaultValue={profile?.avatar?.emoji ?? 'game'} required />
+        <p className="font-display text-sm font-bold text-ink" id="profile-avatar-label">{t('fields.avatar')}</p>
+        <AvatarField defaultGlyph={profile?.avatar?.emoji ?? AVATAR_CATALOG[0].glyph} />
         <Button disabled={saving} type="submit" variant="neutral">{t('actions.saveAvatar')}</Button>
       </form>
       <form className="space-y-2" noValidate onSubmit={(event) => void save(event, '/api/v1/me/time-zone')}>

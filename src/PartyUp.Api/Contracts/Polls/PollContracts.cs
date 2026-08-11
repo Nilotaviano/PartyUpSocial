@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using NodaTime;
 using NodaTime.Text;
 using PartyUp.Api.Contracts.Sessions;
+using PartyUp.Api.Endpoints;
 using PartyUp.Application.Polls;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
@@ -150,7 +151,10 @@ public sealed record PollRosterEntryResponse(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? UserId,
     Guid? GuestIdentityId,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DisplayName,
-    bool IsActive)
+    bool IsActive,
+    // D-188: absent for a masked row, and absent on every row of the guest arm (D-150), which shares
+    // this type and builds its rows without an avatar.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AvatarResponse? Avatar)
 {
     public static PollRosterEntryResponse From(PollRosterEntry entry) =>
         new(
@@ -158,7 +162,8 @@ public sealed record PollRosterEntryResponse(
             entry.MaskedForViewer ? null : entry.Participant.UserId?.Value,
             entry.Participant.GuestIdentityId?.Value,
             entry.DisplayName?.Value,
-            entry.IsActive);
+            entry.IsActive,
+            entry.MaskedForViewer || entry.Avatar is not { } avatar ? null : AvatarResponse.From(avatar));
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -262,19 +267,25 @@ public sealed record PollSummaryResponse(
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record PollFinalizationPreviewRosterEntryResponse(
-    Guid? UserId,
+    // D-076: a masked entry's userId is absent, mirroring RosterEntryResponse/PollRosterEntryResponse.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? UserId,
     Guid? GuestIdentityId,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DisplayName,
     string Status,
-    bool IsWaitlisted)
+    bool IsWaitlisted,
+    // D-076/D-188: a blocked counterpart is still a participant (D-086), so this preview masks like
+    // every other surface -- absent for a masked row, and absent for a guest row or a tombstoned
+    // participant.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AvatarResponse? Avatar)
 {
     public static PollFinalizationPreviewRosterEntryResponse From(PollFinalizationPreviewRosterEntry entry) =>
         new(
-            entry.Participant.UserId?.Value,
+            entry.MaskedForViewer ? null : entry.Participant.UserId?.Value,
             entry.Participant.GuestIdentityId?.Value,
             entry.DisplayName?.Value,
             SessionWireFormat.ParticipationStatus(entry.Status),
-            entry.IsWaitlisted);
+            entry.IsWaitlisted,
+            entry.MaskedForViewer || entry.Avatar is not { } avatar ? null : AvatarResponse.From(avatar));
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

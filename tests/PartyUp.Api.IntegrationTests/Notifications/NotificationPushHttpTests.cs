@@ -314,6 +314,39 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
             .Single(item => item.GetProperty("type").GetString() == "friendRequestReceived");
         Assert.False(row.TryGetProperty("actorUserId", out _));
         Assert.False(row.TryGetProperty("actorDisplayName", out _));
+        // D-188: MaskedIdentity.Anonymous carries a null avatar, so the third channel is absent too.
+        Assert.False(row.TryGetProperty("actorAvatar", out _));
+    }
+
+    /// <summary>
+    /// D-188: an unmasked actor's avatar reaches the notification center from row.Actor.Avatar — the
+    /// MaskedIdentity the projection already built — never from a second lookup keyed on ActorUserId,
+    /// which would bypass the masking rule entirely.
+    /// </summary>
+    [Fact]
+    public async Task NotificationWireShape_NamedActorCarriesTheirAvatar_D188()
+    {
+        SessionHttpUser recipient = await SessionEndpointTestSupport.SeedAsync(_factory);
+        SessionHttpUser actor = await SessionEndpointTestSupport.SeedAsync(_factory);
+        using SessionHttpSession recipientSession = await SessionEndpointTestSupport.SignInAsync(_factory, recipient.Id);
+        using SessionHttpSession actorSession = await SessionEndpointTestSupport.SignInAsync(_factory, actor.Id);
+
+        HttpResponseMessage sent = await actorSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/friend-requests",
+            JsonContent.Create(new { targetUsername = recipient.Username }));
+        Assert.True(sent.IsSuccessStatusCode, await sent.Content.ReadAsStringAsync());
+
+        using JsonDocument page = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await recipientSession.GetAsync("/api/v1/notifications?scope=all"));
+        JsonElement row = page.RootElement.GetProperty("items")
+            .EnumerateArray()
+            .Single(item => item.GetProperty("type").GetString() == "friendRequestReceived");
+
+        Assert.True(row.TryGetProperty("actorUserId", out _));
+        JsonElement avatar = row.GetProperty("actorAvatar");
+        Assert.Equal("emoji", avatar.GetProperty("kind").GetString());
+        Assert.Equal("🙂", avatar.GetProperty("emoji").GetString());
     }
 
     // ---- session/poll mute -------------------------------------------------------------------------

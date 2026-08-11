@@ -64,7 +64,7 @@ const storageKey = 'partyup.onboarding-draft'
 const completeDraft = {
   username: 'partyup',
   displayName: 'Party Up',
-  avatar: { kind: 'emoji', emoji: 'game', platformLinkId: null },
+  avatar: { kind: 'emoji', emoji: '🎮', platformLinkId: null },
   timeZone: 'UTC',
   locale: null,
 }
@@ -114,7 +114,7 @@ function activeSession(continuation: string | null = null) {
     profile: {
       username: 'partyup',
       displayName: 'Party Up',
-      avatar: { kind: 'emoji', emoji: 'game', sourcePlatformLinkId: null },
+      avatar: { kind: 'emoji', emoji: '🎮', sourcePlatformLinkId: null },
       timeZone: 'UTC',
       locale: 'en',
       friendCode: '23456789AB',
@@ -197,8 +197,22 @@ describe('OnboardingWizard', () => {
     )
     await expectHeading('Choose an avatar')
 
+    expect(
+      screen.getByRole('radiogroup', { name: 'Choose an avatar' }),
+    ).toBeInTheDocument()
+    expect(screen.getAllByRole('radio')).toHaveLength(24)
+    fireEvent.click(screen.getByRole('radio', { name: 'Fox' }))
+    expect(screen.getByRole('radio', { name: 'Fox' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
     await expectHeading('Choose your time zone')
+    expect(
+      JSON.parse(sessionStorage.getItem(storageKey)!) as {
+        avatar: { emoji: string }
+      },
+    ).toMatchObject({ avatar: { kind: 'emoji', emoji: '🦊', platformLinkId: null } })
 
     fireEvent.submit(
       screen.getByRole('button', { name: 'Continue' }).closest('form')!,
@@ -225,6 +239,31 @@ describe('OnboardingWizard', () => {
     expect(refreshOrder).toBeLessThan(sessionOrder)
     expect(sessionOrder).toBeLessThan(firstFriendOrder)
     expect(screen.getByRole('heading', { level: 1 })).toHaveFocus()
+  })
+
+  it('lets the avatar step be driven entirely from the keyboard_APG', async () => {
+    sessionStorage.setItem(
+      storageKey,
+      JSON.stringify({ username: 'partyup', displayName: 'Party Up' }),
+    )
+    renderWizard('/onboarding/avatar')
+
+    await expectHeading('Choose an avatar')
+    const first = screen.getByRole('radio', { name: 'Game controller' })
+    expect(first).toHaveAttribute('tabindex', '0')
+    fireEvent.keyDown(first, { key: 'ArrowLeft' })
+
+    const last = screen.getByRole('radio', { name: 'Coffee' })
+    expect(last).toHaveAttribute('aria-checked', 'true')
+    expect(last).toHaveFocus()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await expectHeading('Choose your time zone')
+    expect(
+      JSON.parse(sessionStorage.getItem(storageKey)!) as {
+        avatar: { emoji: string }
+      },
+    ).toMatchObject({ avatar: { kind: 'emoji', emoji: '☕', platformLinkId: null } })
   })
 
   it('redirects an incomplete deep link to the first incomplete step while retaining next_D127', async () => {
@@ -298,7 +337,7 @@ describe('OnboardingWizard', () => {
       JSON.stringify({
         username: 'partyup',
         displayName: 'Party Up',
-        avatar: { kind: 'emoji', emoji: 'game', platformLinkId: null },
+        avatar: { kind: 'emoji', emoji: '🎮', platformLinkId: null },
         timeZone: null,
       }),
     )
@@ -321,7 +360,7 @@ describe('OnboardingWizard', () => {
       body: {
         username: 'partyup',
         displayName: 'Party Up',
-        avatar: { kind: 'emoji', emoji: 'game', platformLinkId: null },
+        avatar: { kind: 'emoji', emoji: '🎮', platformLinkId: null },
         timeZone: 'America/Sao_Paulo',
         locale: 'en',
       },

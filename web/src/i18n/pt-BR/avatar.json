@@ -1,0 +1,29 @@
+{
+  "picker": { "label": "Escolha um avatar" },
+  "catalog": {
+    "gameController": "Controle de videogame",
+    "dice": "Dado",
+    "joystick": "Joystick",
+    "alien": "Alienígena",
+    "jokerCard": "Carta coringa",
+    "chessPawn": "Peão de xadrez",
+    "dart": "Dardo",
+    "trophy": "Troféu",
+    "rocket": "Foguete",
+    "dragon": "Dragão",
+    "fox": "Raposa",
+    "octopus": "Polvo",
+    "penguin": "Pinguim",
+    "owl": "Coruja",
+    "bee": "Abelha",
+    "cactus": "Cacto",
+    "mushroom": "Cogumelo",
+    "moon": "Lua",
+    "star": "Estrela",
+    "fire": "Fogo",
+    "bolt": "Raio",
+    "headphones": "Fones de ouvido",
+    "pizza": "Pizza",
+    "coffee": "Café"
+  }
+}

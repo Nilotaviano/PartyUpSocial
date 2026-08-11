@@ -2,6 +2,7 @@ using NodaTime;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Sessions;
+using PartyUp.Domain.Users;
 
 namespace PartyUp.Application.Sessions;
 
@@ -62,7 +63,8 @@ public sealed record RosterEntry(
     bool IsWaitlisted,
     ParticipationOrigin Origin,
     ReminderOffset? ReminderChoice,
-    bool MaskedForViewer = false);
+    bool MaskedForViewer = false,
+    Avatar? Avatar = null);
 
 /// <summary>
 /// The full session read (§8: <c>SessionDetail</c>). <see cref="ConcurrencyToken"/> is the raw

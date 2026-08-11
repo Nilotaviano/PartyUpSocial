@@ -214,10 +214,15 @@ public sealed class PollEndpointTests : IAsyncLifetime, IDisposable
         JsonElement maskedEntry = roster.EnumerateArray()
             .Single(entry => !entry.TryGetProperty("userId", out _) && !entry.TryGetProperty("displayName", out _));
         Assert.False(maskedEntry.TryGetProperty("userId", out _));
+        // D-188: the avatar is masked with the name, in one expression — absent, not null.
+        Assert.False(maskedEntry.TryGetProperty("avatar", out _));
 
         JsonElement organizerEntry = roster.EnumerateArray()
             .Single(entry => entry.TryGetProperty("userId", out JsonElement id) && id.GetGuid() == organizerId.Value);
         Assert.True(organizerEntry.TryGetProperty("displayName", out _));
+        JsonElement organizerAvatar = organizerEntry.GetProperty("avatar");
+        Assert.Equal("emoji", organizerAvatar.GetProperty("kind").GetString());
+        Assert.Equal("🙂", organizerAvatar.GetProperty("emoji").GetString());
     }
 
     /// <summary>
@@ -310,6 +315,8 @@ public sealed class PollEndpointTests : IAsyncLifetime, IDisposable
         JsonElement maskedEntry = roster.EnumerateArray()
             .Single(entry => !entry.TryGetProperty("userId", out _) && !entry.TryGetProperty("displayName", out _));
         Assert.NotEqual(Guid.Empty, maskedEntry.GetProperty("participationId").GetGuid());
+        // D-188: the row key survives masking; the face does not.
+        Assert.False(maskedEntry.TryGetProperty("avatar", out _));
     }
 
     /// <summary>

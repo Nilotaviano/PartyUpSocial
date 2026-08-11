@@ -2,6 +2,7 @@ using NodaTime;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Polls;
+using PartyUp.Domain.Users;
 
 namespace PartyUp.Application.Polls;
 
@@ -17,6 +18,12 @@ public sealed record PollForUpdate(Poll Poll, IReadOnlyList<NotificationMute> Mu
 // ---- PHASE6_DESIGN.md §4 "GET /{id}": the voter-grid read -----------------------------------------
 
 /// <summary>
+/// How one registered user renders on a poll read: the display name and the avatar, resolved in the
+/// same prefetch so a masking site nulls both in one expression instead of two.
+/// </summary>
+public sealed record UserNameplate(DisplayName? DisplayName, Avatar? Avatar);
+
+/// <summary>
 /// One roster row as the voter-grid view renders it (mirrors <c>RosterEntry</c>).
 /// <see cref="MaskedForViewer"/> is set only by <see cref="PollReadUseCases"/> applying the D-076
 /// blocked-pair rule — never by the repository. <see cref="ParticipationId"/> (session precedent
@@ -28,7 +35,8 @@ public sealed record PollRosterEntry(
     ParticipantRef Participant,
     DisplayName? DisplayName,
     bool IsActive,
-    bool MaskedForViewer = false);
+    bool MaskedForViewer = false,
+    Avatar? Avatar = null);
 
 /// <summary>
 /// One candidate option with its tallies and the requesting viewer's own vote, if any.
@@ -96,14 +104,17 @@ public sealed record PollSummary(
 /// <summary>
 /// One roster row as the preview renders it -- the shared <c>Poll.Finalize</c> allocation function's
 /// own output (a created, never-persisted <c>Session</c>'s <c>Participation</c> rows), carrying a
-/// resolved display name the same way <see cref="PollRosterEntry"/> does. No masking is applied here:
-/// the preview is organizer-only (never rendered to a blocked counterpart).
+/// resolved display name the same way <see cref="PollRosterEntry"/> does. The organizer can still be
+/// blocked with a participant (D-086: masking is presentation, not removal), so this carries the same
+/// D-076 <see cref="MaskedForViewer"/> flag <see cref="PollRosterEntry"/> does.
 /// </summary>
 public sealed record PollFinalizationPreviewRosterEntry(
     ParticipantRef Participant,
     DisplayName? DisplayName,
     ParticipationStatus Status,
-    bool IsWaitlisted);
+    bool IsWaitlisted,
+    Avatar? Avatar,
+    bool MaskedForViewer = false);
 
 /// <summary>
 /// One candidate option's preview: what finalizing on this option, right now, would produce --

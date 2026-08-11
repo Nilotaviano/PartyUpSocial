@@ -2373,6 +2373,7 @@ export interface components {
             /** Format: uuid */
             actorUserId: null | string;
             actorDisplayName: null | string;
+            actorAvatar: null | components["schemas"]["AvatarResponse"];
             subjectKind: null | string;
             /** Format: uuid */
             subjectId: null | string;
@@ -2488,6 +2489,7 @@ export interface components {
             displayName: null | string;
             status: string;
             isWaitlisted: boolean;
+            avatar: null | components["schemas"]["AvatarResponse"];
         };
         PollJoinRequestViewResponse: {
             /** Format: uuid */
@@ -2522,6 +2524,7 @@ export interface components {
             guestIdentityId: null | string;
             displayName: null | string;
             isActive: boolean;
+            avatar: null | components["schemas"]["AvatarResponse"];
         };
         PollSummaryResponse: {
             /** Format: uuid */
@@ -2645,6 +2648,7 @@ export interface components {
             isWaitlisted: boolean;
             origin: string;
             reminderChoice: null | string;
+            avatar: null | components["schemas"]["AvatarResponse"];
         };
         SessionDetailResponse: {
             /** Format: uuid */
@@ -2789,6 +2793,7 @@ export interface components {
         };
         SteamMatchedUserResponse: {
             username: string;
+            avatar: components["schemas"]["AvatarResponse"];
         };
         SteamUnmatchedFriendResponse: {
             steamId64: string;

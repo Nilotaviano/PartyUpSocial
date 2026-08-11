@@ -47,7 +47,7 @@ describe('ProfileSettingsPage', () => {
         return Promise.resolve({ data: {
           username: 'player',
           displayName: 'Player',
-          avatar: { kind: 'emoji', emoji: 'game', platformLinkId: null },
+          avatar: { kind: 'emoji', emoji: '🎮', platformLinkId: null },
           timeZone: 'America/Fortaleza',
           platformLinks: [{ id: 'steam-link', platform: 'Steam', handle: 'player' }],
         } })
@@ -76,7 +76,7 @@ describe('ProfileSettingsPage', () => {
         return Promise.resolve({ data: {
           username: 'player',
           displayName: 'Player',
-          avatar: { kind: 'emoji', emoji: 'game', platformLinkId: null },
+          avatar: { kind: 'emoji', emoji: '🎮', platformLinkId: null },
           timeZone: 'America/Fortaleza',
           platformLinks: [{ id: 'steam-link', platform: 'Steam', handle: 'player' }],
         } })
@@ -107,7 +107,7 @@ describe('ProfileSettingsPage', () => {
         return Promise.resolve({ data: {
           username: 'player',
           displayName: 'Player',
-          avatar: { kind: 'emoji', emoji: 'game', platformLinkId: null },
+          avatar: { kind: 'emoji', emoji: '🎮', platformLinkId: null },
           timeZone: 'America/Fortaleza',
           platformLinks: [],
         } })
@@ -131,7 +131,7 @@ describe('ProfileSettingsPage', () => {
         return Promise.resolve({ data: {
           username: 'player',
           displayName: 'Player',
-          avatar: { kind: 'emoji', emoji: 'game', platformLinkId: null },
+          avatar: { kind: 'emoji', emoji: '🎮', platformLinkId: null },
           timeZone: 'America/Fortaleza',
           platformLinks: [],
         } })
@@ -150,6 +150,38 @@ describe('ProfileSettingsPage', () => {
     await waitFor(() => expect(api.put).toHaveBeenCalledWith('/api/v1/me/time-zone', expect.objectContaining({
       body: { timeZone: 'America/Sao_Paulo' },
     })))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('saves a catalog glyph chosen in the avatar picker through the existing form path', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') {
+        return Promise.resolve({ data: {
+          username: 'player',
+          displayName: 'Player',
+          avatar: { kind: 'emoji', emoji: '🎮', platformLinkId: null },
+          timeZone: 'America/Fortaleza',
+          platformLinks: [],
+        } })
+      }
+      return Promise.resolve({ data: { methods: [] } })
+    })
+    api.put.mockResolvedValue({ data: {} })
+
+    renderPage()
+
+    const group = await screen.findByRole('radiogroup', { name: 'Avatar' })
+    expect(group).toHaveAttribute('aria-labelledby', 'profile-avatar-label')
+    expect(screen.getByRole('radio', { name: 'Game controller' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByRole('textbox', { name: 'Avatar' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Dragon' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save avatar' }))
+
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/api/v1/me/avatar', {
+      params: { header: { 'X-CSRF-TOKEN': '' } },
+      body: { kind: 'emoji', emoji: '🐉', platformLinkId: null },
+    }))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

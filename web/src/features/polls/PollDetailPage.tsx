@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link, Navigate, useNavigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { useSession } from '../../auth/useSession'
+import { AvatarDisc } from '../friends/AvatarDisc'
 import { Button } from '../../components/ui/button'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
@@ -862,8 +863,16 @@ export function PollDetailPage() {
                   className="flex items-center justify-between gap-2 py-1"
                   data-testid={`poll-roster-entry-${entry.participationId}`}
                 >
-                  <span className="text-ink">
-                    {entry.displayName ?? t('detail.anonymous')}
+                  <span className="flex min-w-0 items-center gap-2">
+                    <AvatarDisc
+                      emoji={entry.avatar?.emoji}
+                      masked={entry.displayName === null}
+                      seed={entry.userId ?? entry.guestIdentityId ?? entry.participationId}
+                      size="xs"
+                    />
+                    <span className="truncate text-ink">
+                      {entry.displayName ?? t('detail.anonymous')}
+                    </span>
                   </span>
                   {!entry.isActive && (
                     <span className="text-ink-soft">{t('detail.removed')}</span>

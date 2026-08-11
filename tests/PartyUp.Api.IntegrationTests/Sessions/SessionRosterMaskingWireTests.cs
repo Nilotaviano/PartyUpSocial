@@ -82,17 +82,98 @@ public sealed class SessionRosterMaskingWireTests : IAsyncLifetime, IDisposable
             .Single(entry => !entry.TryGetProperty("userId", out _)
                 && !entry.TryGetProperty("displayName", out _));
         Assert.False(maskedEntry.TryGetProperty("userId", out _));
+        // D-188/D-076: the avatar is a third identity channel and must be ABSENT, not null.
+        Assert.False(maskedEntry.TryGetProperty("avatar", out _));
 
         JsonElement tombstonedEntry = roster.EnumerateArray()
             .Single(entry => entry.TryGetProperty("userId", out JsonElement id) && id.GetGuid() == tombstonedId.Value);
         Assert.True(tombstonedEntry.TryGetProperty("userId", out JsonElement tombstonedUserIdElement));
         Assert.Equal(tombstonedId.Value, tombstonedUserIdElement.GetGuid());
         Assert.False(tombstonedEntry.TryGetProperty("displayName", out _));
+        // D-092: MarkDeleted nulls User.Avatar, so a tombstoned row has no avatar either.
+        Assert.False(tombstonedEntry.TryGetProperty("avatar", out _));
 
         // Every other entry (organizer, viewer's own row) keeps its userId — masking is scoped, not global.
         Assert.Equal(4, roster.GetArrayLength());
         int withUserId = roster.EnumerateArray().Count(entry => entry.TryGetProperty("userId", out _));
         Assert.Equal(3, withUserId);
+    }
+
+    /// <summary>
+    /// D-188: every unmasked roster row carries the participant's avatar as an object, so the roster
+    /// can render a face without a second round trip. Seeded users carry Avatar.FromEmoji("🙂")
+    /// (PartyUpApiFactory.SeedUserAsync:99).
+    /// </summary>
+    [Fact]
+    public async Task AnUnmaskedRosterEntryCarriesTheParticipantAvatar_D188()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"av-org-{Guid.NewGuid():N}@example.test");
+        UserId participantId = await _factory.SeedUserAsync(email: $"av-part-{Guid.NewGuid():N}@example.test");
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, participantId);
+
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        HttpResponseMessage created = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Avatar fan-out fixture",
+                startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
+                isPrivate = false,
+                minAttendance = 1,
+                inviteeUserIds = new[] { participantId.Value },
+            }));
+        Guid sessionId = (await SessionEndpointTestSupport.SuccessJsonAsync(created))
+            .RootElement.GetProperty("session").GetProperty("id").GetGuid();
+
+        using JsonDocument detail = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/sessions/{sessionId:D}"));
+
+        JsonElement roster = detail.RootElement.GetProperty("roster");
+        JsonElement organizerEntry = roster.EnumerateArray()
+            .Single(entry => entry.TryGetProperty("userId", out JsonElement id) && id.GetGuid() == organizerId.Value);
+        JsonElement avatar = organizerEntry.GetProperty("avatar");
+        Assert.Equal("emoji", avatar.GetProperty("kind").GetString());
+        Assert.Equal("🙂", avatar.GetProperty("emoji").GetString());
+
+        JsonElement inviteeEntry = roster.EnumerateArray()
+            .Single(entry => entry.TryGetProperty("userId", out JsonElement id) && id.GetGuid() == participantId.Value);
+        Assert.Equal("emoji", inviteeEntry.GetProperty("avatar").GetProperty("kind").GetString());
+    }
+
+    /// <summary>
+    /// AVATARS_DESIGN.md §2.4/§5 (D-188/D-076): MaskedParticipant stays excluded from the fan-out. It
+    /// is the ordinal-plus-optional-name shape a viewer gets for someone they may not see, and a face
+    /// there would defeat the ordinal that exists in its place. This pins the omission on the
+    /// session-list organizer so a later wave cannot quietly add one.
+    /// </summary>
+    [Fact]
+    public async Task TheSessionListOrganizerMaskedParticipantCarriesNoAvatar_D188_D076()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"av-mp-org-{Guid.NewGuid():N}@example.test");
+        UserId participantId = await _factory.SeedUserAsync(email: $"av-mp-part-{Guid.NewGuid():N}@example.test");
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, participantId);
+
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        HttpResponseMessage created = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "MaskedParticipant fixture",
+                startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
+                isPrivate = false,
+                minAttendance = 1,
+                inviteeUserIds = new[] { participantId.Value },
+            }));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        using JsonDocument list = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync("/api/v1/sessions?scope=upcoming"));
+        JsonElement organizer = list.RootElement.GetProperty("items").EnumerateArray()
+            .Single().GetProperty("organizer");
+        Assert.True(organizer.TryGetProperty("ordinal", out _));
+        Assert.False(organizer.TryGetProperty("avatar", out _));
     }
 
     [Fact]
