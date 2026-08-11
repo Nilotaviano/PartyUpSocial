@@ -10,6 +10,7 @@ function notification(overrides: Partial<NotificationItem> = {}): NotificationIt
     readAt: null,
     actorUserId: null,
     actorDisplayName: null,
+    actorAvatar: null,
     subjectKind: null,
     subjectId: null,
     subjectTitle: null,

@@ -37,7 +37,12 @@ function result(state: SteamImportResult['state']): SteamImportResult {
     case 'ready':
       return {
         state,
-        matches: [{ username: 'ready.one' }],
+        matches: [
+          {
+            username: 'ready.one',
+            avatar: { kind: 'emoji', emoji: '🙂', sourcePlatformLinkId: null },
+          },
+        ],
         unmatched: [],
         invitationUrl,
       }
@@ -142,9 +147,18 @@ describe('SteamImportPageTests', () => {
     const imported: SteamImportResult = {
       state: 'ready',
       matches: [
-        { username: 'player.one' },
-        { username: 'player.one' },
-        { username: 'block.one' },
+        {
+          username: 'player.one',
+          avatar: { kind: 'emoji', emoji: '🙂', sourcePlatformLinkId: null },
+        },
+        {
+          username: 'player.one',
+          avatar: { kind: 'emoji', emoji: '🙂', sourcePlatformLinkId: null },
+        },
+        {
+          username: 'block.one',
+          avatar: { kind: 'emoji', emoji: '🙂', sourcePlatformLinkId: null },
+        },
       ],
       unmatched: [],
       invitationUrl: 'https://links.test/add/23456789AB',

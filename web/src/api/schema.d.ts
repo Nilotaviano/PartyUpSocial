@@ -2373,6 +2373,7 @@ export interface components {
             /** Format: uuid */
             actorUserId: null | string;
             actorDisplayName: null | string;
+            actorAvatar: null | components["schemas"]["AvatarResponse"];
             subjectKind: null | string;
             /** Format: uuid */
             subjectId: null | string;
@@ -2792,6 +2793,7 @@ export interface components {
         };
         SteamMatchedUserResponse: {
             username: string;
+            avatar: components["schemas"]["AvatarResponse"];
         };
         SteamUnmatchedFriendResponse: {
             steamId64: string;
