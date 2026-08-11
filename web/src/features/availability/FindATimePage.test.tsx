@@ -254,7 +254,7 @@ describe('FindATimePage', () => {
     })
     renderPage()
 
-    const durationInput = await screen.findByLabelText('Duration')
+    const durationInput = await screen.findByLabelText('Duration (minutes)')
     fireEvent.change(durationInput, { target: { value: '90' } })
 
     // The window is still rendered — the warning augments it, never

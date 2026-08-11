@@ -65,7 +65,31 @@ describe('SessionCreatePage', () => {
     expect(await screen.findByText(/4 minimum, 4 maximum, 2 hours/i)).toBeInTheDocument()
     expect(screen.getByLabelText('Minimum attendance')).toHaveValue(4)
     expect(screen.getByLabelText('Maximum capacity')).toHaveValue(4)
-    expect(screen.getByLabelText('Duration')).toHaveValue(120)
+    expect(screen.getByLabelText('Duration (minutes)')).toHaveValue(120)
+  })
+
+  it('states the minutes unit in the duration field accessible name', async () => {
+    renderPage()
+
+    const duration = await screen.findByRole('spinbutton', {
+      name: /minutes/i,
+    })
+
+    expect(duration).toHaveAttribute('id', 'field-duration')
+    expect(duration).toHaveValue(120)
+  })
+
+  it('keeps the duration error wiring after the unit label change', async () => {
+    renderPage()
+
+    const duration = screen.getByRole('spinbutton', { name: /minutes/i })
+    fireEvent.change(duration, { target: { value: '10' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
+
+    await screen.findByText('There were problems with your submission')
+    expect(duration).toHaveAttribute('aria-invalid', 'true')
+    expect(duration).toHaveAttribute('aria-describedby', 'duration-error')
+    expect(document.getElementById('duration-error')).toBeInTheDocument()
   })
 
   it('rejects a duration outside the 15-minute increment and blocks submission_D129', async () => {
@@ -77,7 +101,7 @@ describe('SessionCreatePage', () => {
     fireEvent.change(screen.getByLabelText('Start time'), {
       target: { value: '2026-09-01T18:00' },
     })
-    fireEvent.change(screen.getByLabelText('Duration'), {
+    fireEvent.change(screen.getByLabelText('Duration (minutes)'), {
       target: { value: '10' },
     })
 
@@ -135,7 +159,7 @@ describe('SessionCreatePage', () => {
   it('links every validation-summary entry to an existing field id_H2', async () => {
     renderPage()
 
-    fireEvent.change(screen.getByLabelText('Duration'), { target: { value: '10' } })
+    fireEvent.change(screen.getByLabelText('Duration (minutes)'), { target: { value: '10' } })
     fireEvent.change(screen.getByLabelText('Minimum attendance'), { target: { value: '0' } })
     fireEvent.change(screen.getByLabelText('Guest links'), { target: { value: '25' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
@@ -252,7 +276,7 @@ describe('SessionCreatePage', () => {
     ])
     vi.useRealTimers()
 
-    expect(await screen.findByLabelText('Duration')).toHaveValue(90)
+    expect(await screen.findByLabelText('Duration (minutes)')).toHaveValue(90)
     expect(screen.getByLabelText('Start time')).toHaveValue(expectedStart)
     expect(
       screen.getByText(
@@ -264,7 +288,7 @@ describe('SessionCreatePage', () => {
   it('does not surface a clamp message when the prefilled start is already far enough ahead_D102', async () => {
     renderPage(['/sessions/new?startTime=2035-06-01T12%3A00%3A00.000Z&durationMinutes=60'])
 
-    expect(await screen.findByLabelText('Duration')).toHaveValue(60)
+    expect(await screen.findByLabelText('Duration (minutes)')).toHaveValue(60)
     expect(
       screen.queryByText(
         'The start time was moved to the earliest time allowed (15 minutes from now).',

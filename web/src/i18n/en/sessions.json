@@ -8,7 +8,7 @@
     "heading": "New session",
     "title": "Title",
     "start": "Start time",
-    "duration": "Duration",
+    "duration": "Duration (minutes)",
     "platform": "Platform",
     "game": "Game",
     "gameCatalog": "Choose from Steam",

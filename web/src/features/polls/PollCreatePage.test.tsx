@@ -52,6 +52,16 @@ describe('PollCreatePage', () => {
     ).toHaveValue('hours24')
   })
 
+  it('states the minutes unit in the duration field accessible name', async () => {
+    api.get.mockResolvedValue({ data: { items: [] } })
+    renderPage()
+
+    const duration = await screen.findByRole('spinbutton', { name: /minutes/i })
+
+    expect(duration).toHaveAttribute('id', 'field-duration')
+    expect(duration).toHaveValue(120)
+  })
+
   it('requires at least two options before submit_D131', async () => {
     api.get.mockResolvedValue({ data: { items: [] } })
     renderPage()

@@ -8,7 +8,7 @@
     "heading": "Nueva sesión",
     "title": "Título",
     "start": "Hora de inicio",
-    "duration": "Duración",
+    "duration": "Duración (minutos)",
     "platform": "Plataforma",
     "game": "Juego",
     "gameCatalog": "Elegir de Steam",

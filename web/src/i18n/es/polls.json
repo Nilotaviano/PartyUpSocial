@@ -17,7 +17,7 @@
       "hours24": "24 horas",
       "hours48": "48 horas"
     },
-    "duration": "Duración",
+    "duration": "Duración (minutos)",
     "platform": "Plataforma",
     "game": "Juego",
     "gameCatalog": "Elegir de Steam",
