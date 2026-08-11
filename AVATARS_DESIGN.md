@@ -80,6 +80,15 @@ avatar is nulled **in the same expression that nulls the display name**:
 `PollReadUseCases.cs:63-76`. `NotificationResponse` derives its avatar from `row.Actor.Avatar`,
 never from a second lookup keyed on `row.ActorUserId`.
 
+The finalization preview is organizer-only to *reach* (`poll.OrganizerId != organizerId` is a 404),
+but a registered row in it can still be a blocked counterpart — masking is presentation, not
+removal (D-086) — so it is not exempt from masking. `PollFinalizationPreviewUseCase` builds its
+own `Viewer` from the organizer's friend/block pairs (mirroring `PollReadUseCases.BuildViewerAsync`)
+and nulls `DisplayName`/`Avatar` together for a blocked counterpart, exactly like every other
+surface. The wire mapper (`PollFinalizationPreviewRosterEntryResponse.From`) also re-masks `UserId`
+and `Avatar` against the same `MaskedForViewer` flag, matching the `RosterEntryResponse`/
+`PollRosterEntryResponse` defense-in-depth pattern.
+
 Guest poll rows carry **no avatar at all**. `PollRosterEntryResponse` is shared with
 `GuestPollContracts.cs:41,64`, and `GuestPollReadUseCases` builds every row unmasked by
 construction (D-150) — guests sit outside the visibility engine, and a guest link has no expiry.
