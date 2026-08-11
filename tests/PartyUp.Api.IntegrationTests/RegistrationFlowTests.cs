@@ -60,7 +60,7 @@ public sealed class RegistrationFlowTests : IAsyncLifetime, IDisposable
             {
                 username = "FlowPlayer",
                 displayName = "Flow Player",
-                avatar = new { kind = "emoji", emoji = "🙂" },
+                avatar = new { kind = "emoji", emoji = "\U0001F3AE" },
                 timeZone = "America/Fortaleza",
                 locale = "pt-BR",
             }),

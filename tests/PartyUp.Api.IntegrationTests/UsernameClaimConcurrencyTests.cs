@@ -108,7 +108,7 @@ public sealed class UsernameClaimConcurrencyTests : IAsyncLifetime, IDisposable
             {
                 username,
                 displayName = "Claim Player",
-                avatar = new { kind = "emoji", emoji = "🙂" },
+                avatar = new { kind = "emoji", emoji = "\U0001F3AE" },
                 timeZone = "America/Fortaleza",
                 locale = "en",
             }),
