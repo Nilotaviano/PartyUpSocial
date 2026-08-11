@@ -163,7 +163,7 @@ public sealed record PollRosterEntryResponse(
             entry.Participant.GuestIdentityId?.Value,
             entry.DisplayName?.Value,
             entry.IsActive,
-            entry.Avatar is { } avatar ? AvatarResponse.From(avatar) : null);
+            entry.MaskedForViewer || entry.Avatar is not { } avatar ? null : AvatarResponse.From(avatar));
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -267,23 +267,25 @@ public sealed record PollSummaryResponse(
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record PollFinalizationPreviewRosterEntryResponse(
-    Guid? UserId,
+    // D-076: a masked entry's userId is absent, mirroring RosterEntryResponse/PollRosterEntryResponse.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? UserId,
     Guid? GuestIdentityId,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DisplayName,
     string Status,
     bool IsWaitlisted,
-    // D-188: organizer-only and never masked, so this is absent only for a guest row or a
-    // tombstoned participant.
+    // D-076/D-188: a blocked counterpart is still a participant (D-086), so this preview masks like
+    // every other surface -- absent for a masked row, and absent for a guest row or a tombstoned
+    // participant.
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AvatarResponse? Avatar)
 {
     public static PollFinalizationPreviewRosterEntryResponse From(PollFinalizationPreviewRosterEntry entry) =>
         new(
-            entry.Participant.UserId?.Value,
+            entry.MaskedForViewer ? null : entry.Participant.UserId?.Value,
             entry.Participant.GuestIdentityId?.Value,
             entry.DisplayName?.Value,
             SessionWireFormat.ParticipationStatus(entry.Status),
             entry.IsWaitlisted,
-            entry.Avatar is { } avatar ? AvatarResponse.From(avatar) : null);
+            entry.MaskedForViewer || entry.Avatar is not { } avatar ? null : AvatarResponse.From(avatar));
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

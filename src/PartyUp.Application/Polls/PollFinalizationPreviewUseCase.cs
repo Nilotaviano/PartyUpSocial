@@ -1,9 +1,11 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users;
+using PartyUp.Domain.Visibility;
 
 namespace PartyUp.Application.Polls;
 
@@ -30,6 +32,8 @@ public sealed record PollFinalizationPreviewResult(
 public sealed class PollFinalizationPreviewUseCase(
     IPollRepository polls,
     IPollReadRepository reads,
+    IFriendshipRepository friendships,
+    IBlockRepository blocks,
     IClock clock)
 {
     public async Task<PollFinalizationPreviewResult> PreviewAsync(
@@ -78,6 +82,8 @@ public sealed class PollFinalizationPreviewUseCase(
         IReadOnlyDictionary<Guid, UserNameplate> nameplates =
             await reads.FindNameplatesAsync(registeredIds, cancellationToken);
 
+        Viewer viewer = await BuildViewerAsync(organizerId, poll, cancellationToken);
+
         List<PollFinalizationPreviewOption> previews = [];
         foreach (PollOption option in poll.Options)
         {
@@ -104,8 +110,19 @@ public sealed class PollFinalizationPreviewUseCase(
                         ? poll.GuestIdentities.FirstOrDefault(g => g.Id == guestId)?.DisplayName
                         : null;
 
+                bool masked = entry.Participant.UserId is { } participantUserId &&
+                    viewer.BlockedCounterpartIds.Contains(participantUserId);
+
+                // PHASE5_DESIGN.md §5.1 (D-076): mirrors PollReadUseCases -- a blocked counterpart's
+                // display name and avatar are nulled together, in the same expression, for every
+                // surface that renders this row.
                 roster.Add(new PollFinalizationPreviewRosterEntry(
-                    entry.Participant, displayName, entry.Status, entry.IsWaitlisted, nameplate?.Avatar));
+                    entry.Participant,
+                    masked ? null : displayName,
+                    entry.Status,
+                    entry.IsWaitlisted,
+                    masked ? null : nameplate?.Avatar,
+                    masked));
             }
 
             previews.Add(new PollFinalizationPreviewOption(
@@ -113,5 +130,35 @@ public sealed class PollFinalizationPreviewUseCase(
         }
 
         return PollFinalizationPreviewResult.Ok(previews);
+    }
+
+    /// <summary>Mirrors <c>PollReadUseCases.BuildViewerAsync</c>: no row lock, a GET-shaped preview.</summary>
+    private async Task<Viewer> BuildViewerAsync(UserId viewerId, Poll poll, CancellationToken cancellationToken)
+    {
+        HashSet<UserId> counterparts = [poll.OrganizerId];
+        foreach (PollParticipant participant in poll.Participants)
+        {
+            if (participant.UserId is { } userId && userId != viewerId)
+            {
+                counterparts.Add(userId);
+            }
+        }
+
+        counterparts.Remove(viewerId);
+
+        if (counterparts.Count == 0)
+        {
+            return Viewer.Create(viewerId);
+        }
+
+        IReadOnlyList<Friendship> pairFriendships =
+            await friendships.FindPairsAmongAsync(viewerId, counterparts, cancellationToken);
+        IReadOnlyList<Block> pairBlocks =
+            await blocks.FindPairsAmongAsync(viewerId, counterparts, cancellationToken);
+
+        List<UserId> friendIds = [.. pairFriendships.Where(f => f.IsAccepted).Select(f => f.Counterpart(viewerId))];
+        List<UserId> blockedIds = [.. pairBlocks.Select(b => b.BlockerId == viewerId ? b.BlockedId : b.BlockerId)];
+
+        return Viewer.Create(viewerId, friendIds, blockedIds);
     }
 }

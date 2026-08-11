@@ -104,15 +104,17 @@ public sealed record PollSummary(
 /// <summary>
 /// One roster row as the preview renders it -- the shared <c>Poll.Finalize</c> allocation function's
 /// own output (a created, never-persisted <c>Session</c>'s <c>Participation</c> rows), carrying a
-/// resolved display name the same way <see cref="PollRosterEntry"/> does. No masking is applied here:
-/// the preview is organizer-only (never rendered to a blocked counterpart).
+/// resolved display name the same way <see cref="PollRosterEntry"/> does. The organizer can still be
+/// blocked with a participant (D-086: masking is presentation, not removal), so this carries the same
+/// D-076 <see cref="MaskedForViewer"/> flag <see cref="PollRosterEntry"/> does.
 /// </summary>
 public sealed record PollFinalizationPreviewRosterEntry(
     ParticipantRef Participant,
     DisplayName? DisplayName,
     ParticipationStatus Status,
     bool IsWaitlisted,
-    Avatar? Avatar);
+    Avatar? Avatar,
+    bool MaskedForViewer = false);
 
 /// <summary>
 /// One candidate option's preview: what finalizing on this option, right now, would produce --

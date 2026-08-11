@@ -271,7 +271,7 @@ public sealed record RosterEntryResponse(
             entry.IsWaitlisted,
             SessionWireFormat.Origin(entry.Origin),
             SessionWireFormat.ReminderChoice(entry.ReminderChoice),
-            entry.Avatar is { } avatar ? AvatarResponse.From(avatar) : null);
+            entry.MaskedForViewer || entry.Avatar is not { } avatar ? null : AvatarResponse.From(avatar));
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
