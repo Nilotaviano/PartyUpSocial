@@ -75,8 +75,8 @@ public sealed class PollFinalizationPreviewUseCase(
             }
         }
 
-        IReadOnlyDictionary<Guid, DisplayName?> displayNames =
-            await reads.FindDisplayNamesAsync(registeredIds, cancellationToken);
+        IReadOnlyDictionary<Guid, UserNameplate> nameplates =
+            await reads.FindNameplatesAsync(registeredIds, cancellationToken);
 
         List<PollFinalizationPreviewOption> previews = [];
         foreach (PollOption option in poll.Options)
@@ -94,14 +94,18 @@ public sealed class PollFinalizationPreviewUseCase(
             List<PollFinalizationPreviewRosterEntry> roster = [];
             foreach (FinalizedParticipation entry in projection.Roster)
             {
-                DisplayName? displayName = entry.Participant.UserId is { } userId
-                    ? displayNames.GetValueOrDefault(userId.Value)
+                UserNameplate? nameplate = entry.Participant.UserId is { } userId
+                    ? nameplates.GetValueOrDefault(userId.Value)
+                    : null;
+
+                DisplayName? displayName = entry.Participant.UserId is not null
+                    ? nameplate?.DisplayName
                     : entry.Participant.GuestIdentityId is { } guestId
                         ? poll.GuestIdentities.FirstOrDefault(g => g.Id == guestId)?.DisplayName
                         : null;
 
                 roster.Add(new PollFinalizationPreviewRosterEntry(
-                    entry.Participant, displayName, entry.Status, entry.IsWaitlisted));
+                    entry.Participant, displayName, entry.Status, entry.IsWaitlisted, nameplate?.Avatar));
             }
 
             previews.Add(new PollFinalizationPreviewOption(

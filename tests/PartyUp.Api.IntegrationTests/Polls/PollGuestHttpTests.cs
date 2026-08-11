@@ -377,6 +377,28 @@ public sealed class PollGuestHttpTests : IAsyncLifetime, IDisposable
             BaseAddress = new Uri("https://localhost"),
         });
 
+    /// <summary>
+    /// D-150/D-188: PollRosterEntryResponse is shared with the guest poll view, and GuestPollReadUseCases
+    /// builds every row unmasked by construction — so the guest arm must carry NO avatar at all, on any
+    /// row, rather than relying on a masking rule that structurally cannot fire for a guest viewer.
+    /// </summary>
+    [Fact]
+    public async Task GuestPollRoster_CarriesNoAvatarOnAnyRow_D150_D188()
+    {
+        (_, _, _, Guid guestLinkId, string token) = await SeedPollWithGuestLinkAsync();
+        using HttpClient guestClient = CreateGuestClient();
+        string cookieHeader = await ExchangeAsync(guestClient, token);
+
+        using JsonDocument claimed = await ClaimAsync(guestClient, guestLinkId, cookieHeader, "Avatarless Guest");
+        Assert.Equal("live", claimed.RootElement.GetProperty("state").GetString());
+
+        JsonElement roster = claimed.RootElement.GetProperty("roster");
+        Assert.NotEqual(0, roster.GetArrayLength());
+        Assert.All(
+            roster.EnumerateArray(),
+            entry => Assert.False(entry.TryGetProperty("avatar", out _)));
+    }
+
     private static async Task<string> ExchangeAsync(HttpClient client, string token)
     {
         HttpResponseMessage response = await client.GetAsync($"/g/{token}");

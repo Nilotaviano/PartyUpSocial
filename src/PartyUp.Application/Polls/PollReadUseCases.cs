@@ -2,6 +2,7 @@ using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
+using PartyUp.Domain.Users;
 using PartyUp.Domain.Visibility;
 
 namespace PartyUp.Application.Polls;
@@ -46,18 +47,23 @@ public sealed class PollReadUseCases(
             }
         }
 
-        IReadOnlyDictionary<Guid, DisplayName?> displayNames =
-            await reads.FindDisplayNamesAsync(registeredIds, cancellationToken);
+        IReadOnlyDictionary<Guid, UserNameplate> nameplates =
+            await reads.FindNameplatesAsync(registeredIds, cancellationToken);
 
         List<PollRosterEntry> roster = [];
         HashSet<UserId> maskedUserIds = [];
         foreach (PollParticipant participant in poll.Participants)
         {
             DisplayName? displayName = participant.UserId is { } userId
-                ? displayNames.GetValueOrDefault(userId.Value)
+                ? nameplates.GetValueOrDefault(userId.Value)?.DisplayName
                 : participant.GuestIdentityId is { } guestId
                     ? poll.GuestIdentities.FirstOrDefault(g => g.Id == guestId)?.DisplayName
                     : null;
+
+            // D-017: a guest has no avatar, so this resolves only for the registered arm.
+            Avatar? avatar = participant.UserId is { } avatarUserId
+                ? nameplates.GetValueOrDefault(avatarUserId.Value)?.Avatar
+                : null;
 
             bool masked = participant.UserId is { } participantUserId &&
                 viewer.BlockedCounterpartIds.Contains(participantUserId);
@@ -72,7 +78,8 @@ public sealed class PollReadUseCases(
                 participant.Participant,
                 masked ? null : displayName,
                 participant.IsActive,
-                masked));
+                masked,
+                masked ? null : avatar));
         }
 
         ParticipantRef viewerParticipant = ParticipantRef.ForUser(viewerId);

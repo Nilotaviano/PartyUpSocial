@@ -696,6 +696,30 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
         Assert.Equal(previewRoster.OrderBy(r => r.UserId), finalizedRoster.OrderBy(r => r.UserId));
     }
 
+    /// <summary>
+    /// D-188: the preview roster is organizer-only and never masked, so every registered row carries
+    /// the participant's avatar — resolved from the same prefetched nameplate dictionary the display
+    /// name comes from, not a second lookup.
+    /// </summary>
+    [Fact]
+    public async Task PreviewRosterEntriesCarryTheParticipantAvatar_D188()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"pl-preview-avatar-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+
+        (Guid pollId, _) = await CreatePollWithFirstOptionAsync(organizerSession);
+
+        using JsonDocument preview = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await organizerSession.GetAsync($"/api/v1/polls/{pollId:D}/finalization-preview"));
+
+        JsonElement organizerRow = preview.RootElement.GetProperty("options")[0].GetProperty("roster")
+            .EnumerateArray()
+            .Single(entry => entry.GetProperty("userId").GetGuid() == organizerId.Value);
+        JsonElement avatar = organizerRow.GetProperty("avatar");
+        Assert.Equal("emoji", avatar.GetProperty("kind").GetString());
+        Assert.Equal("🙂", avatar.GetProperty("emoji").GetString());
+    }
+
     // ---- fixture helpers ----------------------------------------------------------------------------
 
     /// <summary>

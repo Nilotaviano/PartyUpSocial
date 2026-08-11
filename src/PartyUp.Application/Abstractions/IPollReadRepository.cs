@@ -16,7 +16,11 @@ namespace PartyUp.Application.Abstractions;
 /// </summary>
 public interface IPollReadRepository
 {
-    Task<IReadOnlyDictionary<Guid, DisplayName?>> FindDisplayNamesAsync(
+    /// <summary>
+    /// Bulk name+avatar resolution for a poll's registered participants. One prefetch, both fields:
+    /// the avatar rides the display name so no read path can resolve one without the other.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, UserNameplate>> FindNameplatesAsync(
         IReadOnlyCollection<UserId> userIds,
         CancellationToken cancellationToken);
 

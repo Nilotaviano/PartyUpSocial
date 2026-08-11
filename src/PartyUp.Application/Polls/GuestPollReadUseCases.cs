@@ -38,21 +38,22 @@ public sealed class GuestPollReadUseCases(IPollRepository polls, IPollReadReposi
             }
         }
 
-        IReadOnlyDictionary<Guid, DisplayName?> displayNames =
-            await reads.FindDisplayNamesAsync(registeredIds, cancellationToken);
+        IReadOnlyDictionary<Guid, UserNameplate> nameplates =
+            await reads.FindNameplatesAsync(registeredIds, cancellationToken);
 
         List<PollRosterEntry> roster = [];
         foreach (PollParticipant participant in poll.Participants)
         {
             DisplayName? displayName = participant.UserId is { } userId
-                ? displayNames.GetValueOrDefault(userId.Value)
+                ? nameplates.GetValueOrDefault(userId.Value)?.DisplayName
                 : participant.GuestIdentityId is { } guestId
                     ? poll.GuestIdentities.FirstOrDefault(g => g.Id == guestId)?.DisplayName
                     : null;
 
             // A guest viewer never blocks or is blocked (D-076 masking is a User-to-User relation
             // only), so MaskedForViewer stays false throughout — every row renders exactly as the
-            // registered voter-grid view would for an unblocked viewer.
+            // registered voter-grid view would for an unblocked viewer. Avatar is left unset: a guest
+            // read is outside the visibility engine (D-150), so the shared response carries no face.
             roster.Add(new PollRosterEntry(participant.Id, participant.Participant, displayName, participant.IsActive));
         }
 
