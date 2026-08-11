@@ -2645,6 +2645,7 @@ export interface components {
             isWaitlisted: boolean;
             origin: string;
             reminderChoice: null | string;
+            avatar: null | components["schemas"]["AvatarResponse"];
         };
         SessionDetailResponse: {
             /** Format: uuid */
