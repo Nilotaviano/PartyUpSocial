@@ -1,0 +1,29 @@
+{
+  "picker": { "label": "Choose an avatar" },
+  "catalog": {
+    "gameController": "Game controller",
+    "dice": "Dice",
+    "joystick": "Joystick",
+    "alien": "Alien",
+    "jokerCard": "Joker card",
+    "chessPawn": "Chess pawn",
+    "dart": "Dart",
+    "trophy": "Trophy",
+    "rocket": "Rocket",
+    "dragon": "Dragon",
+    "fox": "Fox",
+    "octopus": "Octopus",
+    "penguin": "Penguin",
+    "owl": "Owl",
+    "bee": "Bee",
+    "cactus": "Cactus",
+    "mushroom": "Mushroom",
+    "moon": "Moon",
+    "star": "Star",
+    "fire": "Fire",
+    "bolt": "Lightning bolt",
+    "headphones": "Headphones",
+    "pizza": "Pizza",
+    "coffee": "Coffee"
+  }
+}

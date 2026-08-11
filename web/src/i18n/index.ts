@@ -4,6 +4,7 @@ import LanguageDetector from 'i18next-browser-languagedetector'
 
 import enAuth from './en/auth.json'
 import enAvailability from './en/availability.json'
+import enAvatar from './en/avatar.json'
 import enCommon from './en/common.json'
 import enErrors from './en/errors.json'
 import enFriends from './en/friends.json'
@@ -17,6 +18,7 @@ import enSettings from './en/settings.json'
 import enTour from './en/tour.json'
 import esAuth from './es/auth.json'
 import esAvailability from './es/availability.json'
+import esAvatar from './es/avatar.json'
 import esCommon from './es/common.json'
 import esErrors from './es/errors.json'
 import esFriends from './es/friends.json'
@@ -30,6 +32,7 @@ import esSettings from './es/settings.json'
 import esTour from './es/tour.json'
 import ptBRAuth from './pt-BR/auth.json'
 import ptBRAvailability from './pt-BR/availability.json'
+import ptBRAvatar from './pt-BR/avatar.json'
 import ptBRCommon from './pt-BR/common.json'
 import ptBRErrors from './pt-BR/errors.json'
 import ptBRFriends from './pt-BR/friends.json'
@@ -48,6 +51,7 @@ export const resources = {
     common: enCommon,
     auth: enAuth,
     onboarding: enOnboarding,
+    avatar: enAvatar,
     profile: enProfile,
     settings: enSettings,
     errors: enErrors,
@@ -63,6 +67,7 @@ export const resources = {
     common: ptBRCommon,
     auth: ptBRAuth,
     onboarding: ptBROnboarding,
+    avatar: ptBRAvatar,
     profile: ptBRProfile,
     settings: ptBRSettings,
     errors: ptBRErrors,
@@ -78,6 +83,7 @@ export const resources = {
     common: esCommon,
     auth: esAuth,
     onboarding: esOnboarding,
+    avatar: esAvatar,
     profile: esProfile,
     settings: esSettings,
     errors: esErrors,
@@ -102,6 +108,7 @@ void i18n
       'common',
       'auth',
       'onboarding',
+      'avatar',
       'profile',
       'settings',
       'errors',

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import i18n, { resources } from './index'
+import { AVATAR_CATALOG } from '../features/profile/avatarCatalog'
 
 type Resources = Record<string, unknown>
 
@@ -8,6 +9,7 @@ const namespaces = [
   'common',
   'auth',
   'onboarding',
+  'avatar',
   'profile',
   'settings',
   'errors',
@@ -335,6 +337,35 @@ describe('availability problem-code coverage D-060 (PHASE5_DESIGN.md §8/§10.2)
         expect(typeof codes[code]).toBe('string')
         expect(codes[code].length).toBeGreaterThan(0)
       }
+    })
+  }
+})
+
+describe('avatar namespace parity with the closed emoji catalog (AVATARS_DESIGN.md §2.1)', () => {
+  it('en catalog.* is exactly the AVATAR_CATALOG slug set', () => {
+    const labels = Object.keys(
+      (registeredResources.en.avatar as { catalog: Record<string, string> })
+        .catalog,
+    ).sort()
+    expect(labels).toEqual(AVATAR_CATALOG.map((entry) => entry.slug).sort())
+  })
+
+  for (const locale of locales) {
+    it(locale + ' names every catalog glyph with a non-empty distinct label', async () => {
+      await i18n.changeLanguage(locale)
+      const labels = AVATAR_CATALOG.map((entry) =>
+        i18n.t(`catalog.${entry.slug}`, { ns: 'avatar' }),
+      )
+      for (const label of labels) expect(label.trim().length).toBeGreaterThan(0)
+      expect(new Set(labels).size).toBe(AVATAR_CATALOG.length)
+    })
+
+    it(locale + ' has a radiogroup label for the picker', async () => {
+      await i18n.changeLanguage(locale)
+      expect(i18n.t('picker.label', { ns: 'avatar' })).toBe(
+        (registeredResources[locale].avatar as { picker: { label: string } })
+          .picker.label,
+      )
     })
   }
 })
