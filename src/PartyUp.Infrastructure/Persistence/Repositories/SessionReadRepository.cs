@@ -415,30 +415,33 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
 
     private async Task<SessionDetail> ToDetailAsync(Session session, uint xmin, CancellationToken cancellationToken)
     {
-        Dictionary<Guid, DisplayName?> userDisplayNames = [];
+        Dictionary<Guid, User> participantUsers = [];
         List<UserId> registeredIds = [.. session.Participations
             .Where(p => p.UserId.HasValue)
             .Select(p => p.UserId!.Value)];
 
         if (registeredIds.Count > 0)
         {
-            var users = await context.DomainUsers
+            List<User> users = await context.DomainUsers
                 .AsNoTracking()
                 .Where(u => registeredIds.Contains(u.Id))
-                .Select(u => new { u.Id, u.DisplayName })
                 .ToListAsync(cancellationToken);
 
-            foreach (var user in users)
+            foreach (User user in users)
             {
-                userDisplayNames[user.Id.Value] = user.DisplayName;
+                participantUsers[user.Id.Value] = user;
             }
         }
 
         List<RosterEntry> roster = [];
         foreach (Participation participation in session.Participations)
         {
-            DisplayName? displayName = participation.UserId is { } userId
-                ? userDisplayNames.GetValueOrDefault(userId.Value)
+            User? participantUser = participation.UserId is { } userId
+                ? participantUsers.GetValueOrDefault(userId.Value)
+                : null;
+
+            DisplayName? displayName = participation.UserId is not null
+                ? participantUser?.DisplayName
                 : participation.GuestIdentityId is { } guestId
                     ? session.GuestIdentities.FirstOrDefault(g => g.Id == guestId)?.DisplayName
                     : null;
@@ -450,7 +453,8 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
                 participation.Status,
                 participation.IsWaitlisted,
                 participation.Origin,
-                participation.ReminderChoice));
+                participation.ReminderChoice,
+                Avatar: participantUser?.Avatar));
         }
 
         return new SessionDetail(
