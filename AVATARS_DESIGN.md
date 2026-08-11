@@ -14,9 +14,9 @@ security posture the picture path is required to hold.
 | D-190 | Avatar sources include picture-bearing **auth** accounts (Google), not only gaming platform links. D-050's "linked platform account" reads "linked account". |
 | D-191 | A PartyUp user's avatar picture is served only through the first-party proxy, from bytes re-encoded server-side at capture. Upstream URLs are never emitted to clients. **Carve-out:** `SteamUnmatchedFriendResponse.AvatarUrl` (`FriendEndpoints.cs:709`) keeps its raw steamstatic URL — those people have no `User` row and therefore no avatar source. |
 | D-192 | The blocked-users list renders a neutral disc seeded from the stored username snapshot and carries no avatar. Amends D-188, which listed it as an avatar surface. |
-| A-021 | Avatar proxy tokens are plaintext capability slugs, carved out of A-015. SixLabors.ImageSharp is admitted under A-013 for capture-time re-encoding. |
+| A-084 | Avatar proxy tokens are plaintext capability slugs, carved out of A-015. SixLabors.ImageSharp is admitted under A-013 for capture-time re-encoding. |
 
-**A-021 rationale, stated plainly because the consequence is permanent:** an avatar proxy token
+**A-084 rationale, stated plainly because the consequence is permanent:** an avatar proxy token
 is minted once per source row, never rotated, and stored in plaintext. Possession of the URL is
 the authorization. An avatar picture is therefore *public-once-seen* — a viewer who was ever
 authorized keeps a working URL until the source row is deleted. Deletion of the source row
@@ -102,7 +102,7 @@ can supply a picture:
 | --- | --- |
 | `AvatarSourceId` | GuidV7 |
 | `Kind` | `SteamPlatform` \| `GoogleAccount` |
-| `Token` | plaintext capability slug, ≥256-bit CSPRNG, minted once, never rotated (A-021), unique index |
+| `Token` | plaintext capability slug, ≥256-bit CSPRNG, minted once, never rotated (A-084), unique index |
 | `Bytes` | `bytea`, re-encoded WebP, hard-capped |
 | `ContentType` | server-chosen, from a closed allowlist |
 | `FetchedAt` | staleness for the refresh job |
