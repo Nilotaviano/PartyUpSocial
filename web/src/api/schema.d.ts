@@ -2488,6 +2488,7 @@ export interface components {
             displayName: null | string;
             status: string;
             isWaitlisted: boolean;
+            avatar: null | components["schemas"]["AvatarResponse"];
         };
         PollJoinRequestViewResponse: {
             /** Format: uuid */
@@ -2522,6 +2523,7 @@ export interface components {
             guestIdentityId: null | string;
             displayName: null | string;
             isActive: boolean;
+            avatar: null | components["schemas"]["AvatarResponse"];
         };
         PollSummaryResponse: {
             /** Format: uuid */
