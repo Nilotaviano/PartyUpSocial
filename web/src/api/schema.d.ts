@@ -740,6 +740,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/steam-catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SearchSteamCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/onboarding/state": {
         parameters: {
             query?: never;
@@ -2802,6 +2818,15 @@ export interface components {
         SetSessionReminderRequest: {
             choice: null | string;
         };
+        SteamCatalogSearchResponse: {
+            catalogAvailable: boolean;
+            results: components["schemas"]["SteamCatalogSearchResultView"][];
+        };
+        SteamCatalogSearchResultView: {
+            /** Format: int64 */
+            appId: number | string;
+            name: string;
+        };
         SteamFriendImportResponse: components["schemas"]["SteamFriendImportResponseReadySteamFriendImportResponse"] | components["schemas"]["SteamFriendImportResponsePrivateProfileSteamFriendImportResponse"] | components["schemas"]["SteamFriendImportResponseZeroFriendsSteamFriendImportResponse"] | components["schemas"]["SteamFriendImportResponseZeroMatchesSteamFriendImportResponse"] | components["schemas"]["SteamFriendImportResponseNotConfiguredSteamFriendImportResponse"] | components["schemas"]["SteamFriendImportResponseUpstreamFailureSteamFriendImportResponse"];
         SteamFriendImportResponseNotConfiguredSteamFriendImportResponse: {
             /**
@@ -4428,6 +4453,28 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SearchSteamCatalog: {
+        parameters: {
+            query?: {
+                query?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SteamCatalogSearchResponse"];
                 };
             };
         };

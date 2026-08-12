@@ -23,7 +23,14 @@
     "submit": "Criar sessão",
     "platformOther": "Outra",
     "steamAppId": "ID do aplicativo Steam",
-    "steamAppIdHelp": "Opcional. O número na URL da loja Steam do jogo, por exemplo 730 para Counter-Strike 2."
+    "steamAppIdHelp": "Opcional. O número na URL da loja Steam do jogo, por exemplo 730 para Counter-Strike 2.",
+    "gamePicker": {
+      "label": "Buscar no catálogo da Steam",
+      "placeholder": "Busque ou digite o nome de um jogo",
+      "loading": "Buscando...",
+      "noResults": "Nenhum resultado. O nome digitado ainda será usado.",
+      "listboxLabel": "Resultados do catálogo da Steam"
+    }
   },
   "edit": {
     "heading": "Editar sessão",

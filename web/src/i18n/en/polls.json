@@ -32,7 +32,14 @@
     "submit": "Create poll",
     "platformOther": "Other",
     "steamAppId": "Steam app ID",
-    "steamAppIdHelp": "Optional. The number in the game's Steam store URL, e.g. 730 for Counter-Strike 2."
+    "steamAppIdHelp": "Optional. The number in the game's Steam store URL, e.g. 730 for Counter-Strike 2.",
+    "gamePicker": {
+      "label": "Search the Steam catalog",
+      "placeholder": "Search or type a game name",
+      "loading": "Searching...",
+      "noResults": "No matches. Your typed name will still be used.",
+      "listboxLabel": "Steam catalog matches"
+    }
   },
   "validation": {
     "required": "This field is required.",

@@ -37,6 +37,26 @@ function addOption(value: string) {
   fireEvent.click(screen.getByRole('button', { name: 'Add time' }))
 }
 
+// The Steam arm's SteamGamePicker fires its own `client.GET` calls against
+// `/api/v1/steam-catalog` once a game name reaches 2 characters. Dispatching
+// `api.get` by path (rather than one flat `mockResolvedValue`) keeps that
+// traffic from being mistaken for the friends-list fetch and lets each test
+// choose whether the catalog is available.
+function mockGet({
+  friends = { items: [] } as unknown,
+  catalogAvailable = false,
+  catalogResults = [] as { appId: number; name: string }[],
+} = {}) {
+  api.get.mockImplementation((path: string) => {
+    if (path === '/api/v1/steam-catalog') {
+      return Promise.resolve({
+        data: { catalogAvailable, results: catalogResults },
+      })
+    }
+    return Promise.resolve({ data: friends })
+  })
+}
+
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
@@ -179,17 +199,19 @@ describe('PollCreatePage', () => {
   })
 
   it('does not render a catalog/free-text radio choice for the game field_D176', async () => {
-    api.get.mockResolvedValue({ data: { items: [] } })
+    mockGet()
     renderPage()
 
     fireEvent.change(await screen.findByLabelText('Platform'), { target: { value: 'Steam' } })
 
     expect(screen.queryByRole('radio')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Steam app ID')).toBeInTheDocument()
+    expect(
+      screen.getByRole('combobox', { name: 'Search the Steam catalog' }),
+    ).toBeInTheDocument()
   })
 
-  it('submits steamAppId as null when the app id field is left blank_D176', async () => {
-    api.get.mockResolvedValue({ data: { items: [] } })
+  it('submits steamAppId as null when the free-typed game name is never selected from the catalog_D176_D194', async () => {
+    mockGet()
     api.post.mockResolvedValue({ data: { poll: { id: 'poll-1' }, guestLinks: [] } })
     renderPage()
 
@@ -200,7 +222,7 @@ describe('PollCreatePage', () => {
     addOption('2099-01-01T12:00')
     fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
-    fireEvent.change(screen.getByLabelText('Enter a game name'), {
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
       target: { value: 'Counter-Strike 2' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Create poll' }))
@@ -217,8 +239,8 @@ describe('PollCreatePage', () => {
     )
   })
 
-  it('submits the digits typed into the Steam app id field_D176', async () => {
-    api.get.mockResolvedValue({ data: { items: [] } })
+  it('selecting a catalog result fills name+appId and submits both_D194', async () => {
+    mockGet({ catalogAvailable: true, catalogResults: [{ appId: 730, name: 'Counter-Strike 2' }] })
     api.post.mockResolvedValue({ data: { poll: { id: 'poll-1' }, guestLinks: [] } })
     renderPage()
 
@@ -229,10 +251,10 @@ describe('PollCreatePage', () => {
     addOption('2099-01-01T12:00')
     fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
-    fireEvent.change(screen.getByLabelText('Enter a game name'), {
-      target: { value: 'Counter-Strike 2' },
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
+      target: { value: 'counter' },
     })
-    fireEvent.change(screen.getByLabelText('Steam app ID'), { target: { value: '730' } })
+    fireEvent.mouseDown(await screen.findByRole('option', { name: 'Counter-Strike 2' }))
     fireEvent.click(screen.getByRole('button', { name: 'Create poll' }))
 
     await waitFor(() =>
@@ -247,20 +269,9 @@ describe('PollCreatePage', () => {
     )
   })
 
-  it('extracts the app id from a pasted Steam store URL_D176', async () => {
-    api.get.mockResolvedValue({ data: { items: [] } })
-    renderPage()
-
-    fireEvent.change(await screen.findByLabelText('Platform'), { target: { value: 'Steam' } })
-    fireEvent.change(screen.getByLabelText('Steam app ID'), {
-      target: { value: 'https://store.steampowered.com/app/730/CounterStrike_2/' },
-    })
-
-    expect(screen.getByLabelText('Steam app ID')).toHaveValue('730')
-  })
-
-  it('rejects a non-digit Steam app id and blocks submission_D176', async () => {
-    api.get.mockResolvedValue({ data: { items: [] } })
+  it('degrades to the manual App ID field and submits the typed digits when the catalog is unavailable_D176_D194', async () => {
+    mockGet()
+    api.post.mockResolvedValue({ data: { poll: { id: 'poll-1' }, guestLinks: [] } })
     renderPage()
 
     fireEvent.change(await screen.findByLabelText('Title'), {
@@ -270,10 +281,56 @@ describe('PollCreatePage', () => {
     addOption('2099-01-01T12:00')
     fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
-    fireEvent.change(screen.getByLabelText('Enter a game name'), {
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
       target: { value: 'Counter-Strike 2' },
     })
-    fireEvent.change(screen.getByLabelText('Steam app ID'), { target: { value: 'abc' } })
+    fireEvent.change(await screen.findByLabelText('Steam app ID'), { target: { value: '730' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create poll' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/polls',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            game: { name: 'Counter-Strike 2', steamAppId: '730' },
+          }),
+        }),
+      ),
+    )
+  })
+
+  it('extracts the app id from a pasted Steam store URL in the degraded arm_D176_D194', async () => {
+    mockGet()
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
+      target: { value: 'Counter-Strike 2' },
+    })
+    const appIdField = await screen.findByLabelText('Steam app ID')
+
+    fireEvent.change(appIdField, {
+      target: { value: 'https://store.steampowered.com/app/730/CounterStrike_2/' },
+    })
+
+    expect(screen.getByLabelText('Steam app ID')).toHaveValue('730')
+  })
+
+  it('rejects a non-digit Steam app id and blocks submission in the degraded arm_D176_D194', async () => {
+    mockGet()
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Title'), {
+      target: { value: 'Weekend raid' },
+    })
+    addOption('2099-01-01T10:00')
+    addOption('2099-01-01T12:00')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
+      target: { value: 'Counter-Strike 2' },
+    })
+    fireEvent.change(await screen.findByLabelText('Steam app ID'), { target: { value: 'abc' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create poll' }))
 
     expect(
@@ -282,8 +339,8 @@ describe('PollCreatePage', () => {
     expect(api.post).not.toHaveBeenCalled()
   })
 
-  it('requires a game name when a Steam app id is typed with the name left blank_F1', async () => {
-    api.get.mockResolvedValue({ data: { items: [] } })
+  it('requires a game name when a Steam app id is typed with the name left blank in the degraded arm_F1_D194', async () => {
+    mockGet()
     renderPage()
 
     fireEvent.change(await screen.findByLabelText('Title'), {
@@ -293,6 +350,11 @@ describe('PollCreatePage', () => {
     addOption('2099-01-01T12:00')
     fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
+      target: { value: 'aa' },
+    })
+    const nameField = await screen.findByLabelText('Enter a game name')
+    fireEvent.change(nameField, { target: { value: '' } })
     fireEvent.change(screen.getByLabelText('Steam app ID'), { target: { value: '730' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create poll' }))
 

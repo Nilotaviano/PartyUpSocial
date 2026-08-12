@@ -9,7 +9,7 @@ import { Dialog } from '../../components/ui/dialog'
 import { useDirtyGuard } from '../../components/useDirtyGuard'
 import { friendKeys, getFriends } from '../friends/friendGraph'
 import { createSession, type CreateSessionRequest } from './sessionQueries'
-import { extractSteamAppId } from './steamAppIdField'
+import { SteamGamePicker } from './SteamGamePicker'
 
 type DiscardDialogProps = {
   open: boolean
@@ -220,10 +220,6 @@ export function SessionCreatePage() {
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((current) => ({ ...current, [key]: value }))
     setDirty(true)
-  }
-
-  function handleGameAppIdChange(value: string) {
-    update('gameAppId', extractSteamAppId(value))
   }
 
   function validate(): Record<string, string> {
@@ -467,50 +463,41 @@ export function SessionCreatePage() {
           <legend className="font-body font-semibold text-ink">
             {t('create.game')}
           </legend>
-          <label className="mt-2 block" htmlFor="field-game-name">
-            {t('create.gameFreeText')}
-          </label>
-          <input
-            aria-describedby={fieldErrors.gameName ? 'game-name-error' : undefined}
-            aria-invalid={Boolean(fieldErrors.gameName)}
-            className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            id="field-game-name"
-            value={form.gameName}
-            onChange={(event) => update('gameName', event.target.value)}
-          />
-          {fieldErrors.gameName && (
-            <p id="game-name-error" role="alert">
-              {fieldErrors.gameName}
-            </p>
-          )}
-          {form.platform === 'Steam' && (
-            <div className="mt-2">
-              <label
-                className="block font-body font-semibold text-ink"
-                htmlFor="field-game-app-id"
-              >
-                {t('create.steamAppId')}
+          {form.platform === 'Steam' ? (
+            <SteamGamePicker
+              appIdError={fieldErrors.gameAppId}
+              appIdId="field-game-app-id"
+              appIdValue={form.gameAppId}
+              nameError={fieldErrors.gameName}
+              nameId="field-game-name"
+              nameValue={form.gameName}
+              t={t}
+              onAppIdChange={(appId) => update('gameAppId', appId)}
+              onNameChange={(name) => update('gameName', name)}
+              onSelect={({ name, appId }) => {
+                setForm((current) => ({ ...current, gameName: name, gameAppId: appId }))
+                setDirty(true)
+              }}
+            />
+          ) : (
+            <>
+              <label className="mt-2 block" htmlFor="field-game-name">
+                {t('create.gameFreeText')}
               </label>
               <input
-                aria-describedby={
-                  fieldErrors.gameAppId ? 'game-app-id-error' : 'game-app-id-help'
-                }
-                aria-invalid={Boolean(fieldErrors.gameAppId)}
+                aria-describedby={fieldErrors.gameName ? 'game-name-error' : undefined}
+                aria-invalid={Boolean(fieldErrors.gameName)}
                 className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                id="field-game-app-id"
-                inputMode="numeric"
-                value={form.gameAppId}
-                onChange={(event) => handleGameAppIdChange(event.target.value)}
+                id="field-game-name"
+                value={form.gameName}
+                onChange={(event) => update('gameName', event.target.value)}
               />
-              <p className="mt-1 text-ink-soft" id="game-app-id-help">
-                {t('create.steamAppIdHelp')}
-              </p>
-              {fieldErrors.gameAppId && (
-                <p id="game-app-id-error" role="alert">
-                  {fieldErrors.gameAppId}
+              {fieldErrors.gameName && (
+                <p id="game-name-error" role="alert">
+                  {fieldErrors.gameName}
                 </p>
               )}
-            </div>
+            </>
           )}
         </fieldset>
 

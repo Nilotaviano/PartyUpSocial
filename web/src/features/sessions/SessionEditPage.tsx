@@ -17,7 +17,7 @@ import {
   type EditSessionRequest,
   type SessionDetail,
 } from './sessionQueries'
-import { extractSteamAppId } from './steamAppIdField'
+import { SteamGamePicker } from './SteamGamePicker'
 
 // Single source of truth for the validation-summary link targets: every
 // entry in `fieldErrors` must resolve to a real element id (H2).
@@ -165,10 +165,6 @@ export function SessionEditPage() {
   ) {
     setForm((current) => (current ? { ...current, [key]: value } : current))
     setDirty(true)
-  }
-
-  function handleGameAppIdChange(value: string) {
-    update('gameAppId', extractSteamAppId(value))
   }
 
   function validate(): Record<string, string> {
@@ -384,16 +380,42 @@ export function SessionEditPage() {
           </div>
 
           <div>
-            <label className="block font-body font-semibold text-ink" htmlFor="field-game">
-              {t('create.game')}
-            </label>
-            <input
-              className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:text-ink-soft disabled:opacity-100"
-              disabled={form.clearGame}
-              id="field-game"
-              value={form.gameName}
-              onChange={(event) => update('gameName', event.target.value)}
-            />
+            {form.platform === 'Steam' && !form.clearGame ? (
+              <p className="block font-body font-semibold text-ink">
+                {t('create.game')}
+              </p>
+            ) : (
+              <label className="block font-body font-semibold text-ink" htmlFor="field-game">
+                {t('create.game')}
+              </label>
+            )}
+            {form.platform === 'Steam' && !form.clearGame ? (
+              <SteamGamePicker
+                appIdError={fieldErrors.gameAppId}
+                appIdId="field-game-app-id"
+                appIdValue={form.gameAppId}
+                nameError={fieldErrors.gameName}
+                nameId="field-game"
+                nameValue={form.gameName}
+                t={t}
+                onAppIdChange={(appId) => update('gameAppId', appId)}
+                onNameChange={(name) => update('gameName', name)}
+                onSelect={({ name, appId }) => {
+                  setForm((current) =>
+                    current ? { ...current, gameName: name, gameAppId: appId } : current,
+                  )
+                  setDirty(true)
+                }}
+              />
+            ) : (
+              <input
+                className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:text-ink-soft disabled:opacity-100"
+                disabled={form.clearGame}
+                id="field-game"
+                value={form.gameName}
+                onChange={(event) => update('gameName', event.target.value)}
+              />
+            )}
             <label className="mt-2 inline-flex min-h-11 items-center gap-2">
               <input
                 checked={form.clearGame}
@@ -402,35 +424,6 @@ export function SessionEditPage() {
               />
               {t('edit.clearGame')}
             </label>
-            {form.platform === 'Steam' && !form.clearGame && (
-              <div className="mt-2">
-                <label
-                  className="block font-body font-semibold text-ink"
-                  htmlFor="field-game-app-id"
-                >
-                  {t('create.steamAppId')}
-                </label>
-                <input
-                  aria-describedby={
-                    fieldErrors.gameAppId ? 'game-app-id-error' : 'game-app-id-help'
-                  }
-                  aria-invalid={Boolean(fieldErrors.gameAppId)}
-                  className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                  id="field-game-app-id"
-                  inputMode="numeric"
-                  value={form.gameAppId}
-                  onChange={(event) => handleGameAppIdChange(event.target.value)}
-                />
-                <p className="mt-1 text-ink-soft" id="game-app-id-help">
-                  {t('create.steamAppIdHelp')}
-                </p>
-                {fieldErrors.gameAppId && (
-                  <p id="game-app-id-error" role="alert">
-                    {fieldErrors.gameAppId}
-                  </p>
-                )}
-              </div>
-            )}
           </div>
 
           <div>

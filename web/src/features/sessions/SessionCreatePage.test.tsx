@@ -42,8 +42,41 @@ function renderPage(initialEntries: string[] = ['/sessions/new']) {
   )
 }
 
+const friendsResponse = {
+  items: [
+    {
+      friendshipId: 'friendship-1',
+      userId: 'user-1',
+      username: 'friend.one',
+      displayName: 'Friend One',
+      avatar: { kind: 'emoji', emoji: '🎮', avatarSourceId: null, imgUrl: null },
+      platforms: [],
+    },
+  ],
+}
+
+// The Steam arm's SteamGamePicker fires its own `client.GET` calls against
+// `/api/v1/steam-catalog` once a game name reaches 2 characters. Dispatching
+// `api.get` by path (rather than one flat `mockResolvedValue`) keeps that
+// traffic from being mistaken for the friends-list fetch and lets each test
+// choose whether the catalog is available.
+function mockGet({
+  friends = { items: [] } as unknown,
+  catalogAvailable = false,
+  catalogResults = [] as { appId: number; name: string }[],
+} = {}) {
+  api.get.mockImplementation((path: string) => {
+    if (path === '/api/v1/steam-catalog') {
+      return Promise.resolve({
+        data: { catalogAvailable, results: catalogResults },
+      })
+    }
+    return Promise.resolve({ data: friends })
+  })
+}
+
 beforeEach(() => {
-  api.get.mockResolvedValue({ data: { items: [] } })
+  mockGet()
   api.post.mockResolvedValue({
     data: {
       session: { id: 'session-1' },
@@ -114,20 +147,7 @@ describe('SessionCreatePage', () => {
   })
 
   it('requires an invited friend for a non-private session and creates one_D129', async () => {
-    api.get.mockResolvedValue({
-      data: {
-        items: [
-          {
-            friendshipId: 'friendship-1',
-            userId: 'user-1',
-            username: 'friend.one',
-            displayName: 'Friend One',
-            avatar: { kind: 'emoji', emoji: '🎮', avatarSourceId: null, imgUrl: null },
-            platforms: [],
-          },
-        ],
-      },
-    })
+    mockGet({ friends: friendsResponse })
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Title'), {
@@ -173,12 +193,12 @@ describe('SessionCreatePage', () => {
     }
   })
 
-  it('renders the Steam app id field and the Other platform option through i18next_H5', async () => {
+  it('renders the Steam game picker combobox and the Other platform option through i18next_H5', async () => {
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
 
-    expect(screen.getByLabelText('Steam app ID')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Search the Steam catalog' })).toBeInTheDocument()
     expect(
       screen.getByRole('option', { name: 'Other' }),
     ).toBeInTheDocument()
@@ -192,21 +212,8 @@ describe('SessionCreatePage', () => {
     expect(screen.queryByRole('radio')).not.toBeInTheDocument()
   })
 
-  it('submits steamAppId as null when the app id field is left blank_D176', async () => {
-    api.get.mockResolvedValue({
-      data: {
-        items: [
-          {
-            friendshipId: 'friendship-1',
-            userId: 'user-1',
-            username: 'friend.one',
-            displayName: 'Friend One',
-            avatar: { kind: 'emoji', emoji: '🎮', avatarSourceId: null, imgUrl: null },
-            platforms: [],
-          },
-        ],
-      },
-    })
+  it('submits steamAppId as null when the free-typed game name is never selected from the catalog_D176_D194', async () => {
+    mockGet({ friends: friendsResponse })
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Raid night' } })
@@ -215,7 +222,7 @@ describe('SessionCreatePage', () => {
     })
     fireEvent.click(await screen.findByLabelText('Friend One (@friend.one)'))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
-    fireEvent.change(screen.getByLabelText('Enter a game name'), {
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
       target: { value: 'Counter-Strike 2' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
@@ -232,20 +239,11 @@ describe('SessionCreatePage', () => {
     )
   })
 
-  it('submits the digits typed into the Steam app id field_D176', async () => {
-    api.get.mockResolvedValue({
-      data: {
-        items: [
-          {
-            friendshipId: 'friendship-1',
-            userId: 'user-1',
-            username: 'friend.one',
-            displayName: 'Friend One',
-            avatar: { kind: 'emoji', emoji: '🎮', avatarSourceId: null, imgUrl: null },
-            platforms: [],
-          },
-        ],
-      },
+  it('selecting a catalog result fills name+appId and submits both_D194', async () => {
+    mockGet({
+      friends: friendsResponse,
+      catalogAvailable: true,
+      catalogResults: [{ appId: 730, name: 'Counter-Strike 2' }],
     })
     renderPage()
 
@@ -255,10 +253,8 @@ describe('SessionCreatePage', () => {
     })
     fireEvent.click(await screen.findByLabelText('Friend One (@friend.one)'))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
-    fireEvent.change(screen.getByLabelText('Enter a game name'), {
-      target: { value: 'Counter-Strike 2' },
-    })
-    fireEvent.change(screen.getByLabelText('Steam app ID'), { target: { value: '730' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), { target: { value: 'counter' } })
+    fireEvent.mouseDown(await screen.findByRole('option', { name: 'Counter-Strike 2' }))
     fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
 
     await waitFor(() =>
@@ -273,27 +269,63 @@ describe('SessionCreatePage', () => {
     )
   })
 
-  it('extracts the app id from a pasted Steam store URL_D176', async () => {
+  it('degrades to the manual App ID field and submits the typed digits when the catalog is unavailable_D176_D194', async () => {
+    mockGet({ friends: friendsResponse })
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Raid night' } })
+    fireEvent.change(screen.getByLabelText('Start time'), {
+      target: { value: '2026-09-01T18:00' },
+    })
+    fireEvent.click(await screen.findByLabelText('Friend One (@friend.one)'))
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
+      target: { value: 'Counter-Strike 2' },
+    })
+
+    fireEvent.change(await screen.findByLabelText('Steam app ID'), {
+      target: { value: '730' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/sessions',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            game: { name: 'Counter-Strike 2', steamAppId: '730' },
+          }),
+        }),
+      ),
+    )
+  })
+
+  it('extracts the app id from a pasted Steam store URL in the degraded arm_D176_D194', async () => {
+    mockGet()
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
-    fireEvent.change(screen.getByLabelText('Steam app ID'), {
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), { target: { value: 'Counter-Strike 2' } })
+    const appIdField = await screen.findByLabelText('Steam app ID')
+
+    fireEvent.change(appIdField, {
       target: { value: 'https://store.steampowered.com/app/730/CounterStrike_2/' },
     })
 
     expect(screen.getByLabelText('Steam app ID')).toHaveValue('730')
   })
 
-  it('rejects a non-digit Steam app id and blocks submission_D176', async () => {
+  it('rejects a non-digit Steam app id and blocks submission in the degraded arm_D176_D194', async () => {
+    mockGet()
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Raid night' } })
     fireEvent.click(screen.getByLabelText('Private session'))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
-    fireEvent.change(screen.getByLabelText('Enter a game name'), {
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
       target: { value: 'Counter-Strike 2' },
     })
-    fireEvent.change(screen.getByLabelText('Steam app ID'), { target: { value: 'abc' } })
+    fireEvent.change(await screen.findByLabelText('Steam app ID'), { target: { value: 'abc' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
 
     expect(
@@ -302,12 +334,16 @@ describe('SessionCreatePage', () => {
     expect(api.post).not.toHaveBeenCalled()
   })
 
-  it('requires a game name when a Steam app id is typed with the name left blank_F1', async () => {
+  it('requires a game name when a Steam app id is typed with the name left blank in the degraded arm_F1_D194', async () => {
+    mockGet()
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Raid night' } })
     fireEvent.click(screen.getByLabelText('Private session'))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), { target: { value: 'aa' } })
+    const nameField = await screen.findByLabelText('Enter a game name')
+    fireEvent.change(nameField, { target: { value: '' } })
     fireEvent.change(screen.getByLabelText('Steam app ID'), { target: { value: '730' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
 
@@ -318,20 +354,7 @@ describe('SessionCreatePage', () => {
   })
 
   it('posts the wire-format platform value, not the UI label', async () => {
-    api.get.mockResolvedValue({
-      data: {
-        items: [
-          {
-            friendshipId: 'friendship-1',
-            userId: 'user-1',
-            username: 'friend.one',
-            displayName: 'Friend One',
-            avatar: { kind: 'emoji', emoji: '🎮', avatarSourceId: null, imgUrl: null },
-            platforms: [],
-          },
-        ],
-      },
-    })
+    mockGet({ friends: friendsResponse })
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Title'), {

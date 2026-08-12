@@ -68,8 +68,28 @@ function renderPage() {
   )
 }
 
+// The mounted SteamGamePicker fires its own `client.GET` calls against
+// `/api/v1/steam-catalog` (300ms after mount, since the seeded game name is
+// already 2+ chars) through this same mocked `client.GET`. Dispatching by
+// path keeps those calls from consuming the session-detail response queue
+// tests below rely on (`mockResolvedValueOnce` chains, call-count asserts).
+// D-194's fallback-only degradation (catalogAvailable: false) is exercised
+// directly in SteamGamePicker.test.tsx and the picker-select tests below;
+// every other test here wants the pre-D-194 manual App ID field, which is
+// exactly what a stable `catalogAvailable: false` response yields.
+function mockSessionDetail(next: (call: number) => unknown) {
+  let call = 0
+  api.get.mockImplementation((path: string) => {
+    if (path === '/api/v1/steam-catalog') {
+      return Promise.resolve({ data: { catalogAvailable: false, results: [] } })
+    }
+    call += 1
+    return Promise.resolve({ data: next(call) })
+  })
+}
+
 beforeEach(() => {
-  api.get.mockResolvedValue({ data: detail() })
+  mockSessionDetail(() => detail())
 })
 
 afterEach(() => {
@@ -104,7 +124,7 @@ describe('SessionEditPage', () => {
   })
 
   it('routes the unlimited-capacity control through the A-070 clear list with no competing maxCapacity value_A070', async () => {
-    api.get.mockResolvedValue({ data: detail({ maxCapacity: 5 }) })
+    mockSessionDetail(() => detail({ maxCapacity: 5 }))
     api.patch.mockResolvedValue({ data: detail({ maxCapacity: null }) })
     renderPage()
 
@@ -130,6 +150,48 @@ describe('SessionEditPage', () => {
       }),
     )
     expect(api.patch.mock.calls[0][1].body).not.toHaveProperty('maxCapacity')
+  })
+
+  it('selecting a catalog result fills name+appId and submits both in the game payload_D194', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/steam-catalog') {
+        return Promise.resolve({
+          data: {
+            catalogAvailable: true,
+            results: [{ appId: 1091500, name: 'Cyberpunk 2077' }],
+          },
+        })
+      }
+      return Promise.resolve({ data: detail() })
+    })
+    api.patch.mockResolvedValue({ data: detail() })
+    renderPage()
+
+    const input = await screen.findByRole('combobox')
+    fireEvent.change(input, { target: { value: 'cyberpunk' } })
+    const option = await screen.findByRole('option', { name: 'Cyberpunk 2077' })
+    fireEvent.mouseDown(option)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith(
+        '/api/v1/sessions/{sessionId}',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            game: { name: 'Cyberpunk 2077', steamAppId: '1091500' },
+          }),
+        }),
+      ),
+    )
+  })
+
+  it('degrades to the manual App ID field once the catalog search reports catalogAvailable false_D194', async () => {
+    mockSessionDetail(() => detail())
+    renderPage()
+
+    expect(await screen.findByLabelText('Steam app ID')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   })
 
   it('preserves the stored Steam app id on save instead of silently dropping it_D176', async () => {
@@ -176,9 +238,7 @@ describe('SessionEditPage', () => {
   })
 
   it('does not anchor the validation summary at the hidden app-id field when Clear game is ticked_F4_H2', async () => {
-    api.get.mockResolvedValue({
-      data: detail({ game: { name: 'Deep Rock Galactic', steamAppId: 548430 } }),
-    })
+    mockSessionDetail(() => detail({ game: { name: 'Deep Rock Galactic', steamAppId: 548430 } }))
     renderPage()
 
     fireEvent.click(await screen.findByLabelText('Remove game'))
@@ -197,9 +257,7 @@ describe('SessionEditPage', () => {
   })
 
   it('clears a stale Steam app id error the moment Clear game hides the field_F4', async () => {
-    api.get.mockResolvedValue({
-      data: detail({ game: { name: 'Deep Rock Galactic', steamAppId: 548430 } }),
-    })
+    mockSessionDetail(() => detail({ game: { name: 'Deep Rock Galactic', steamAppId: 548430 } }))
     renderPage()
 
     fireEvent.change(await screen.findByLabelText('Steam app ID'), { target: { value: 'abc' } })
@@ -242,7 +300,7 @@ describe('SessionEditPage', () => {
     api.patch
       .mockRejectedValueOnce(new ApiError(409, 'session_conflict'))
       .mockRejectedValueOnce(new ApiError(409, 'session_conflict'))
-    api.get.mockResolvedValue({ data: detail() })
+    mockSessionDetail(() => detail())
 
     renderPage()
 
@@ -258,9 +316,7 @@ describe('SessionEditPage', () => {
   })
 
   it('succeeds after exactly one automatic refetch-and-retry on conflict_A071', async () => {
-    api.get
-      .mockResolvedValueOnce({ data: detail({ version: 'v1' }) })
-      .mockResolvedValueOnce({ data: detail({ version: 'v2' }) })
+    mockSessionDetail((call) => detail({ version: call === 1 ? 'v1' : 'v2' }))
     api.patch
       .mockRejectedValueOnce(new ApiError(409, 'session_conflict'))
       .mockResolvedValueOnce({ data: detail({ version: 'v2' }) })
