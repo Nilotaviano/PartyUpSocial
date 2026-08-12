@@ -69,6 +69,11 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         ApiOperationIds.UnmuteSession, ApiOperationIds.MutePoll, ApiOperationIds.UnmutePoll,
     ];
 
+    private static readonly string[] NewEmailNotificationOperationIds =
+    [
+        ApiOperationIds.ChangeMyEmailNotifications, ApiOperationIds.UnsubscribeEmailNotifications,
+    ];
+
     /// <summary>
     /// S8 hardening (closes the round-1/round-2 "swap-hole": a bare count anchor passes even when one
     /// operation is silently swapped for another, so nothing short of the full set closes it).
@@ -158,7 +163,7 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         [
             .. PreExistingOperationIds, .. NewPhase5OperationIds, .. NewPollOperationIds,
             .. NewGuestPollOperationIds, .. NewPollListOperationIds, .. NewPollLeaveOperationIds,
-            .. NewPushNotificationOperationIds,
+            .. NewPushNotificationOperationIds, .. NewEmailNotificationOperationIds,
         ];
         Assert.Equal(
             expectedOperationIds.OrderBy(id => id, StringComparer.Ordinal).ToArray(),

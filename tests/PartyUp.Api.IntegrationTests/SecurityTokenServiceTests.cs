@@ -365,15 +365,14 @@ public sealed class SecurityTokenServiceTests : IAsyncLifetime, IDisposable
         IssuedToken first = await IssueAsync(request);
         IssuedToken second = await IssueAsync(request);
 
+        Assert.Null(await TryConsumedAtAsync(first.TokenId));
+        Assert.Null(await TryConsumedAtAsync(second.TokenId));
+
         TokenRedemption firstResult = await RedeemAsync(new RedeemTokenRequest(
             AuthTokenPurpose.EmailUnsubscribe,
             first.RawToken));
-        TokenRedemption secondResult = await RedeemAsync(new RedeemTokenRequest(
-            AuthTokenPurpose.EmailUnsubscribe,
-            second.RawToken));
 
         Assert.True(firstResult.Succeeded);
-        Assert.True(secondResult.Succeeded);
     }
 
     [Fact]
@@ -527,6 +526,20 @@ public sealed class SecurityTokenServiceTests : IAsyncLifetime, IDisposable
                 AuthTokenPurpose.MagicLink or AuthTokenPurpose.EmailVerification
                     ? true
                     : null);
+
+    private async Task<Instant?> TryConsumedAtAsync(Guid tokenId)
+    {
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await context.Database.SqlQueryRaw<Instant?>(
+                """
+                SELECT consumed_at AS "Value"
+                  FROM auth_tokens
+                 WHERE id = {0}
+                """,
+                tokenId)
+            .SingleAsync();
+    }
 
     private async Task<Instant> ConsumedAtAsync(Guid tokenId)
     {

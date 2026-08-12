@@ -713,11 +713,11 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
             "UnmutePoll",
         ];
 
-        // Pinned against the live op-id total this test's own factory serves (verified: 136 after
-        // D-186's LeavePoll op-id, which includes the test-only `_slice2` debug sign-in endpoints
-        // the production host never registers) -- a grown-by-one total fails here even though every
-        // named id is still individually present.
-        const int expectedTotalOperationIdCount = 136;
+        // Pinned against the live op-id total this test's own factory serves (verified: 138 after
+        // D-189's ChangeMyEmailNotifications + UnsubscribeEmailNotifications op-ids, which includes
+        // the test-only `_slice2` debug sign-in endpoints the production host never registers) -- a
+        // grown-by-one total fails here even though every named id is still individually present.
+        const int expectedTotalOperationIdCount = 138;
 
         using HttpClient client = _factory.CreateClient();
         using HttpResponseMessage response = await client.GetAsync("/openapi/v1.json");
