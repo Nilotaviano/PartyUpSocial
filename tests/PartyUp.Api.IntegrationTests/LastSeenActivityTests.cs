@@ -51,6 +51,23 @@ public sealed class LastSeenActivityTests : IAsyncLifetime, IDisposable
         Assert.Equal(thirdRequestAt, await LastSeenAsync(userId));
     }
 
+    /// <summary>
+    /// The unauthenticated path: no projection is resolved, so the middleware writes nothing and
+    /// throws nothing — an anonymous request is served exactly as it was before the touch existed.
+    /// </summary>
+    [Fact]
+    public async Task LastSeen_IsNotTouchedByAnAnonymousRequest_D178()
+    {
+        UserId userId = await _factory.SeedUserAsync(email: "last-seen-anonymous@example.test");
+        using HttpClient client = Slice5HttpTest.CreateClient(_factory);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/me");
+        HttpResponseMessage response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Null(await LastSeenAsync(userId));
+    }
+
     private static async Task GetMeAsync(HttpClient client, string cookie)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/me");

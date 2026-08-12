@@ -79,11 +79,17 @@ describe('D-161 analytics policy', () => {
     expect(offenders).toEqual([])
   })
 
+  // devDependencies are scanned too: a tracker declared there is still importable from client code
+  // and would still ship in the bundle Vite builds.
   it('declares no analytics or session-replay dependency_D161', () => {
     const manifest = JSON.parse(packageJsonRaw) as {
       dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
     }
-    const declared = Object.keys(manifest.dependencies ?? {})
+    const declared = [
+      ...Object.keys(manifest.dependencies ?? {}),
+      ...Object.keys(manifest.devDependencies ?? {}),
+    ]
     const offenders = declared.filter((name) =>
       trackerPackages.some((tracker) => name.toLowerCase().includes(tracker)),
     )
