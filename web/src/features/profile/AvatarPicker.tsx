@@ -1,4 +1,4 @@
-import { type JSX, type KeyboardEvent, type ReactNode } from 'react'
+import { type JSX, type KeyboardEvent, type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { AVATAR_CATALOG } from './avatarCatalog'
@@ -38,6 +38,10 @@ export function AvatarPicker({
   sources?: AvatarSourceOption[]
 }): JSX.Element {
   const { t } = useTranslation('avatar')
+  // AVATARS_DESIGN.md §3.5's onError contract (also AvatarDisc): a source
+  // thumbnail that fails to load falls back to the neutral '●' glyph rather
+  // than the browser's broken-image icon or a blank radio.
+  const [failedSourceIds, setFailedSourceIds] = useState<Set<string>>(new Set())
 
   const catalogOptions: PickerOption[] = AVATAR_CATALOG.map((entry) => ({
     key: entry.slug,
@@ -53,7 +57,18 @@ export function AvatarPicker({
     }),
     node: (
       <span aria-hidden="true">
-        <img alt="" className="h-6 w-6 rounded-full object-cover" src={source.imgUrl} />
+        {failedSourceIds.has(source.avatarSourceId) ? (
+          '●'
+        ) : (
+          <img
+            alt=""
+            className="h-6 w-6 rounded-full object-cover"
+            src={source.imgUrl}
+            onError={() =>
+              setFailedSourceIds((current) => new Set(current).add(source.avatarSourceId))
+            }
+          />
+        )}
       </span>
     ),
   }))

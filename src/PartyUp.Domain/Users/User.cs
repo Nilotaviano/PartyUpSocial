@@ -355,6 +355,20 @@ public sealed class User : AggregateRoot
     }
 
     /// <summary>
+    /// AVATARS_DESIGN.md §3.4: stamps a failed or empty refresh attempt on the named
+    /// <see cref="AvatarSourceKind"/>'s source, if this user still holds one, so the daily refresh
+    /// job's staleest-first queue rotates past it instead of retrying the same poison candidate every
+    /// run. A no-op when the source is gone (e.g. the platform was unlinked concurrently).
+    /// </summary>
+    public void MarkAvatarRefreshAttempt(AvatarSourceKind kind, IClock clock)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+
+        AvatarSource? existing = _avatarSources.Find(candidate => candidate.Kind == kind);
+        existing?.MarkRefreshAttempt(clock.GetCurrentInstant());
+    }
+
+    /// <summary>
     /// AVATARS_DESIGN.md §3.4: removes the source row and, if the avatar draws from it, resets to
     /// <see cref="Avatar.Fallback"/> so the <c>Active</c> profile never loses a required field.
     /// </summary>

@@ -56,20 +56,7 @@ public sealed class HomeSuggestionTests
     private static Instant BaseInstant() => Monday.PlusDays(-3).AtMidnight().InZoneStrictly(Utc).ToInstant();
 
     private static AcceptedFriendProjection AcceptedProjection(UserId friendId) =>
-        new(FriendshipId.New(), TestUser(friendId));
-
-    private static User TestUser(UserId id)
-    {
-        User user = User.BeginOnboarding(id, FriendCode.Create($"PU-{Guid.NewGuid():N}"[..9]), AgeGateSource.SelfAttested, SystemClock.Instance);
-        user.CompleteOnboarding(
-            Username.Create($"u{Guid.NewGuid():N}"[..12]),
-            DisplayName.Create("Fixture Friend"),
-            Avatar.FromEmoji("🙂"),
-            DateTimeZoneProviders.Tzdb["Etc/UTC"],
-            Locale.Create("en"),
-            SystemClock.Instance);
-        return user;
-    }
+        new(FriendshipId.New(), new FriendCounterpart(friendId, null, null, null, []));
 
     private static AvailabilityOwnerData OwnerWithBlock(UserId ownerId, int startHour, int endHour) =>
         OwnerWithBlockMinutes(ownerId, startHour * 60, endHour * 60);

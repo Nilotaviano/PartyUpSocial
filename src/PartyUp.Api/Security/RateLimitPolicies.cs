@@ -73,6 +73,7 @@ public static class RateLimitPolicies
 
     private static int _registerIpPermitLimit = 5;
     private static IReadOnlyList<RateLimitDimension>? _cachedDimensions;
+    private static IReadOnlySet<string>? _cachedClaimedOperationIds;
 
     /// <summary>
     /// register-ip's permit count (5/hour/IP in production, unconditionally). Overridable via
@@ -95,10 +96,24 @@ public static class RateLimitPolicies
         {
             _registerIpPermitLimit = value;
             _cachedDimensions = null;
+            _cachedClaimedOperationIds = null;
         }
     }
 
     public static IReadOnlyList<RateLimitDimension> Dimensions => _cachedDimensions ??= BuildDimensions();
+
+    /// <summary>
+    /// Every operation id an explicit (non-<see cref="RateLimitDimension.CoversEveryApiOperation"/>)
+    /// dimension already claims — <c>default</c> excludes them in <see cref="PartitionFor"/> so a
+    /// dimension like <c>avatar-proxy</c> (600/min) is not also throttled by <c>default</c>'s 300/min,
+    /// which would make the wider ceiling inert.
+    /// </summary>
+    private static IReadOnlySet<string> ClaimedOperationIds => _cachedClaimedOperationIds ??=
+        new HashSet<string>(
+            Dimensions
+                .Where(dimension => !dimension.CoversEveryApiOperation)
+                .SelectMany(dimension => dimension.OperationIds),
+            StringComparer.Ordinal);
 
     private static IReadOnlyList<RateLimitDimension> BuildDimensions() =>
     [
@@ -487,8 +502,11 @@ public static class RateLimitPolicies
         byte[] pepper)
     {
         string? operationId = OperationId(context);
-        if (!dimension.CoversEveryApiOperation &&
-            (operationId is null || !dimension.OperationIds.Contains(operationId)))
+        bool operationMatchesDimension = dimension.CoversEveryApiOperation
+            ? operationId is null || !ClaimedOperationIds.Contains(operationId)
+            : operationId is not null && dimension.OperationIds.Contains(operationId);
+
+        if (!operationMatchesDimension)
         {
             return RateLimitPartition.GetNoLimiter(string.Empty);
         }

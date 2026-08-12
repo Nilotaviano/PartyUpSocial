@@ -99,8 +99,7 @@ export function ProfileSettingsPage() {
         await client.PUT(endpoint, { params: { header: { 'X-CSRF-TOKEN': '' } }, body: { displayName: String(values.get('displayName') ?? '') } })
       } else if (endpoint === '/api/v1/me/avatar') {
         const selection = decodeAvatarSelection(String(values.get('avatarSelection') ?? ''))
-        // GEN_API_PENDING: AvatarDraft.avatarSourceId (AVATARS_DESIGN.md §3.5) — see avatarSources.ts.
-        await client.PUT(endpoint, { params: { header: { 'X-CSRF-TOKEN': '' } }, body: avatarDraftBody(selection) as never })
+        await client.PUT(endpoint, { params: { header: { 'X-CSRF-TOKEN': '' } }, body: avatarDraftBody(selection) })
       } else {
         await client.PUT(endpoint, { params: { header: { 'X-CSRF-TOKEN': '' } }, body: { timeZone: String(values.get('timeZone') ?? '') } })
       }

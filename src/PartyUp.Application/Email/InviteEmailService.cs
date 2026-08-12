@@ -175,11 +175,16 @@ public sealed partial class InviteEmailService(
                     model["StartTime"] = LocalizedInstantFormatter.FormatInstant(startTime, zone, locale);
                 }
 
-                dispatcher.TryDispatch(new EmailMessage(
+                bool dispatched = dispatcher.TryDispatch(new EmailMessage(
                     recipient.Email!,
                     Domain.Users.Locale.Create(locale),
                     target.Template,
                     model));
+
+                if (!dispatched)
+                {
+                    LogDispatchDeclined(logger, linkSegment, subjectId, target.RecipientId.Value);
+                }
             }
         }
         catch (Exception exception)
@@ -196,6 +201,15 @@ public sealed partial class InviteEmailService(
         string linkSegment,
         Guid subjectId,
         Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "D-189 invite email declined by the dispatcher for {LinkSegment}/{SubjectId}, recipient {RecipientId}.")]
+    private static partial void LogDispatchDeclined(
+        ILogger logger,
+        string linkSegment,
+        Guid subjectId,
+        Guid recipientId);
 
     private sealed record Target(UserId RecipientId, EmailTemplate Template, bool IncludeStartTime);
 }

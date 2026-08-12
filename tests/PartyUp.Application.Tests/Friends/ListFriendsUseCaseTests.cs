@@ -14,7 +14,7 @@ public sealed class ListFriendsUseCaseTests
         friend.LinkPlatform(Platform.Steam, GamingHandle.Create("alex-steam"));
         var repository = new FriendTestFriendshipRepository
         {
-            Accepted = [new AcceptedFriendProjection(FriendshipId.New(), friend)],
+            Accepted = [new AcceptedFriendProjection(FriendshipId.New(), FriendTestData.Counterpart(friend))],
         };
 
         FriendList result = await new ListFriendsUseCase(repository)

@@ -206,9 +206,16 @@ export function WeekGridPage() {
   })
   const timeZone = profile.data?.timeZone ?? 'UTC'
 
-  const zonedNow = instantToFakeLocal(new Date().toISOString(), timeZone)
-  const anchor = new Date(zonedNow.getTime() + weekOffset * 7 * DAY_MS)
-  const weekStart = startOfLocaleWeek(anchor, weekStartsOnIso(i18n.language))
+  // Captured once per mount: `weekStart` must keep a stable identity across
+  // renders that don't change weekOffset/timeZone/language, since WeekGrid's
+  // bandMeta memo is keyed on that identity (§8) — a fresh `new Date()` per
+  // render would defeat it on every render regardless of the deps below.
+  const [mountInstant] = useState(() => new Date().toISOString())
+  const weekStart = useMemo(() => {
+    const zonedNow = instantToFakeLocal(mountInstant, timeZone)
+    const anchor = new Date(zonedNow.getTime() + weekOffset * 7 * DAY_MS)
+    return startOfLocaleWeek(anchor, weekStartsOnIso(i18n.language))
+  }, [mountInstant, timeZone, weekOffset, i18n.language])
   const weekEnd = new Date(weekStart.getTime() + 7 * DAY_MS)
   const from = fakeLocalToInstant(weekStart, timeZone)
   const to = fakeLocalToInstant(weekEnd, timeZone)

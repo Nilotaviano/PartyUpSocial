@@ -13,6 +13,11 @@ export default defineConfig({
       // PHASE4_DESIGN.md §8.1: the A-064 guest bearer-link exchange lives outside /api/v1.
       // Regex key: a bare '/g' prefix-matches /guest/* SPA routes and would proxy them too.
       '^/g/': { target: 'http://localhost:5000', changeOrigin: true },
+      // AvatarProxyEndpoints.cs: '/a/{token}' serves external avatar images
+      // outside /api/v1. Same rationale as '^/g/' above: a bare '/a' prefix
+      // would also match SPA routes like /account-deletion, so this needs
+      // the trailing-slash regex form.
+      '^/a/': { target: 'http://localhost:5000', changeOrigin: true },
     },
   },
   test: {

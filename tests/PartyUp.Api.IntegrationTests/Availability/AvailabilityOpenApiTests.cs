@@ -156,6 +156,7 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         }
 
         Assert.DoesNotContain(ApiOperationIds.ExchangeGuestLink, operationIds);
+        Assert.DoesNotContain(ApiOperationIds.GetAvatarProxy, operationIds);
 
         // S8 hardening: the exact shipped set, not merely its count — a swap (one operation added,
         // a different one silently removed) leaves the count anchor green while this catches it.

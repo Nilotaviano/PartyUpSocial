@@ -66,6 +66,27 @@ namespace PartyUp.Infrastructure.Migrations
                 columns: AvatarSourceUniqueColumns,
                 unique: true);
 
+            // A row written between the AddUserAggregate and this deploy can still carry an
+            // avatar_source_id left over from the renamed avatar_source_platform_link_id column --
+            // pointing at a platform_links row, not an avatar_sources one -- and the AddForeignKey
+            // below would abort startup migration on it. Idempotent and re-runnable: reset any such
+            // row to a catalog glyph first, deterministically (AssignCatalogAvatars' own idiom), so
+            // the constraint always finds a clean column.
+            migrationBuilder.Sql("""
+                UPDATE users
+                   SET avatar_kind = 0,
+                       avatar_emoji = (ARRAY[
+                           E'\U0001F3AE', E'\U0001F3B2', E'\U0001F579\uFE0F', E'\U0001F47E',
+                           E'\U0001F0CF', E'\u265F\uFE0F', E'\U0001F3AF', E'\U0001F3C6',
+                           E'\U0001F680', E'\U0001F409', E'\U0001F98A', E'\U0001F419',
+                           E'\U0001F427', E'\U0001F989', E'\U0001F41D', E'\U0001F335',
+                           E'\U0001F344', E'\U0001F319', E'\u2B50', E'\U0001F525',
+                           E'\u26A1', E'\U0001F3A7', E'\U0001F355', E'\u2615'
+                       ])[(abs(('x' || substr(md5(id::text), 1, 8))::bit(32)::bigint) % 24) + 1],
+                       avatar_source_id = NULL
+                 WHERE avatar_source_id IS NOT NULL;
+                """);
+
             migrationBuilder.AddForeignKey(
                 name: "fk_users_avatar_sources_avatar_source_id",
                 table: "users",

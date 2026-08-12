@@ -50,6 +50,7 @@ public sealed partial class AvatarRefreshJob(
                 // A poison candidate (Steam outage, a decode failure) must not block the rest of the
                 // batch -- contain per row and let the next daily run retry, same as PushDispatchJob.
                 LogRefreshFailed(logger, candidate.UserId.Value, exception.GetType().Name);
+                await TryStampAttemptAsync(candidate.UserId, cancellationToken);
             }
         }
     }
@@ -57,28 +58,63 @@ public sealed partial class AvatarRefreshJob(
     private async Task RefreshAsync(Candidate candidate, CancellationToken cancellationToken)
     {
         SteamProfile? profile = await steamProfiles.GetProfileAsync(candidate.SteamId64, cancellationToken);
-        if (string.IsNullOrWhiteSpace(profile?.AvatarUrl))
-        {
-            return;
-        }
-
-        AvatarCapture? capture = await avatarCapture.CaptureAsync(
-            profile.AvatarUrl,
-            AvatarSourceKind.SteamPlatform,
-            cancellationToken);
-        if (capture is null)
-        {
-            return;
-        }
+        AvatarCapture? capture = string.IsNullOrWhiteSpace(profile?.AvatarUrl)
+            ? null
+            : await avatarCapture.CaptureAsync(profile.AvatarUrl, AvatarSourceKind.SteamPlatform, cancellationToken);
 
         await unitOfWork.ExecuteAsync(
             async ct =>
             {
                 User? user = await users.FindForUpdateAsync(candidate.UserId, ct);
-                user?.CaptureAvatarSource(AvatarSourceKind.SteamPlatform, capture.Bytes, capture.ContentType, clock);
+                // The user may have unlinked Steam (which also removes the avatar source, D-050)
+                // between this batch's candidate scan and this row's lock -- re-check inside the lock
+                // so a captured picture never resurrects for a platform link that is gone.
+                bool stillLinked = user?.PlatformLinks.Any(link => link.Platform == Platform.Steam) ?? false;
+                if (!stillLinked)
+                {
+                    return true;
+                }
+
+                if (capture is not null)
+                {
+                    user!.CaptureAvatarSource(AvatarSourceKind.SteamPlatform, capture.Bytes, capture.ContentType, clock);
+                }
+                else
+                {
+                    // No picture (Steam has none) or the capture pipeline rejected it -- stamp the
+                    // attempt anyway so this source rotates to the back of the staleest-first queue
+                    // rather than starving every other user's refresh (AVATARS_DESIGN.md §3.4).
+                    user!.MarkAvatarRefreshAttempt(AvatarSourceKind.SteamPlatform, clock);
+                }
+
                 return true;
             },
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Best-effort: a candidate that threw before reaching <see cref="RefreshAsync"/>'s own stamping
+    /// (a decode exception, an unexpected client error) still must not retry ahead of every other
+    /// candidate on tomorrow's run. Swallows its own failures -- the batch's per-row containment
+    /// already logged the original exception.
+    /// </summary>
+    private async Task TryStampAttemptAsync(UserId userId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await unitOfWork.ExecuteAsync(
+                async ct =>
+                {
+                    User? user = await users.FindForUpdateAsync(userId, ct);
+                    user?.MarkAvatarRefreshAttempt(AvatarSourceKind.SteamPlatform, clock);
+                    return true;
+                },
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            LogRefreshFailed(logger, userId.Value, exception.GetType().Name);
+        }
     }
 
     private sealed record Candidate(UserId UserId, string SteamId64, Instant FetchedAt);

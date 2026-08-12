@@ -3,6 +3,7 @@ using PartyUp.Domain.Availability;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Users.DeletionExecution;
+using PartyUp.Infrastructure.Persistence;
 
 namespace PartyUp.Infrastructure.Friends;
 
@@ -34,10 +35,18 @@ namespace PartyUp.Infrastructure.Friends;
 /// <para>
 /// AVATARS_DESIGN.md §3.4 extends the tail once more: <see cref="UserDataScope.AvatarSources"/> is
 /// purged through <see cref="IAvatarSourceRepository"/>, deleting every captured picture the user's
-/// linked accounts ever supplied.
+/// linked accounts ever supplied. <c>User.MarkDeleted</c> already nulled the tracked user's
+/// <c>avatar_source_id</c> reference in memory, but that change is only flushed to the database by
+/// the SaveChanges the caller's <c>IUnitOfWork.ExecuteAsync</c> issues at the very end of the
+/// transaction. <c>avatar_sources.ExecuteDeleteAsync</c> below is a raw SQL DELETE that runs
+/// immediately, so without an explicit flush first, the DB-only <c>ON DELETE SET NULL</c> foreign key
+/// on <c>users.avatar_source_id</c> would still see the old (non-null) value, fire, and bump the
+/// user row's <c>xmin</c> behind the tracked entity's back -- turning the deferred SaveChanges into a
+/// spurious concurrency failure.
 /// </para>
 /// </summary>
 public sealed class DeletionResultApplier(
+    AppDbContext context,
     IFriendshipRepository friendships,
     IBlockRepository blocks,
     INotificationRepository notifications,
@@ -65,6 +74,9 @@ public sealed class DeletionResultApplier(
 
         if (result.PurgedData.Contains(UserDataScope.AvatarSources))
         {
+            // Flush the tracked user's (now-nulled) avatar_source_id to the database before the raw
+            // delete below, so the FK's ON DELETE SET NULL trigger has nothing left to mutate.
+            await context.SaveChangesAsync(cancellationToken);
             await avatarSources.DeleteForUserAsync(subject, cancellationToken);
         }
 

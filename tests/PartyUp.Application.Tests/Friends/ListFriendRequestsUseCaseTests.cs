@@ -17,9 +17,15 @@ public sealed class ListFriendRequestsUseCaseTests
             Pending =
             [
                 new PendingFriendProjection(
-                    FriendshipId.New(), FriendTestData.Active("incoming", "Hidden One"), UserId.New(), now),
+                    FriendshipId.New(),
+                    FriendTestData.Counterpart(FriendTestData.Active("incoming", "Hidden One")),
+                    UserId.New(),
+                    now),
                 new PendingFriendProjection(
-                    FriendshipId.New(), FriendTestData.Active("outgoing", "Hidden Two"), viewer, now - Duration.FromMinutes(1)),
+                    FriendshipId.New(),
+                    FriendTestData.Counterpart(FriendTestData.Active("outgoing", "Hidden Two")),
+                    viewer,
+                    now - Duration.FromMinutes(1)),
             ],
         };
 

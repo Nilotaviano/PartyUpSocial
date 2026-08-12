@@ -95,7 +95,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.ApplyConfiguration(new SteamIdentityConfiguration());
         builder.ApplyConfiguration(new UsernameRegistryEntryConfiguration());
         builder.Entity<User>().Navigation(user => user.PlatformLinks).AutoInclude();
-        builder.Entity<User>().Navigation(user => user.AvatarSources).AutoInclude();
 
         builder.Entity<AuthRole>().ToTable("auth_roles");
         builder.Entity<IdentityUserRole<Guid>>().ToTable("auth_user_roles");

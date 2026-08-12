@@ -9,7 +9,9 @@ namespace PartyUp.Infrastructure.Persistence.Repositories;
 public sealed class UserRepository(AppDbContext context) : IUserRepository
 {
     public Task<User?> FindAsync(UserId id, CancellationToken cancellationToken) =>
-        context.DomainUsers.SingleOrDefaultAsync(user => user.Id == id, cancellationToken);
+        context.DomainUsers
+            .Include(user => user.AvatarSources)
+            .SingleOrDefaultAsync(user => user.Id == id, cancellationToken);
 
     public async Task<User?> FindForUpdateAsync(UserId id, CancellationToken cancellationToken)
     {

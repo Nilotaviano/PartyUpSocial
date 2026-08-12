@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { AvatarDisc } from './AvatarDisc'
+import { AvatarDisc, type AvatarDiscProps } from './AvatarDisc'
 
 afterEach(() => {
   cleanup()
@@ -59,5 +59,21 @@ describe('AvatarDisc', () => {
 
     expect(container.querySelector('img')).toBeNull()
     expect(container.querySelector('span[aria-hidden="true"]')).toHaveTextContent('●')
+  })
+
+  it('retries a new imgUrl after a previous one failed, instead of staying on the glyph', () => {
+    const { container, rerender } = render(
+      <AvatarDisc emoji="🎲" imgUrl="/a/broken-token" seed="user-1" />,
+    )
+
+    fireEvent.error(container.querySelector('img')!)
+    expect(container.querySelector('img')).toBeNull()
+
+    const rerenderWith = (props: AvatarDiscProps) => rerender(<AvatarDisc {...props} />)
+    rerenderWith({ emoji: '🎲', imgUrl: '/a/fresh-token', seed: 'user-1' })
+
+    const img = container.querySelector('img')
+    expect(img).not.toBeNull()
+    expect(img).toHaveAttribute('src', '/a/fresh-token')
   })
 })

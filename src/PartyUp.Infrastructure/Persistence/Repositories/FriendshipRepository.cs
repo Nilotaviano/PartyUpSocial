@@ -103,10 +103,23 @@ public sealed class FriendshipRepository(AppDbContext context) : IFriendshipRepo
             let counterpartId = friendship.UserLoId == userId ? friendship.UserHiId : friendship.UserLoId
             join counterpart in context.DomainUsers.AsNoTracking() on counterpartId equals counterpart.Id
             orderby counterpart.DisplayName, counterpart.Username, friendship.Id
-            select new { friendship.Id, Counterpart = counterpart })
+            select new
+            {
+                FriendshipId = friendship.Id,
+                CounterpartId = counterpart.Id,
+                counterpart.Username,
+                counterpart.DisplayName,
+                counterpart.Avatar,
+                Platforms = context.PlatformLinks.AsNoTracking()
+                    .Where(link => link.UserId == counterpart.Id)
+                    .ToList(),
+            })
             .ToListAsync(cancellationToken);
 
-        return rows.Select(row => new AcceptedFriendProjection(row.Id, row.Counterpart)).ToArray();
+        return rows.Select(row => new AcceptedFriendProjection(
+            row.FriendshipId,
+            new FriendCounterpart(row.CounterpartId, row.Username, row.DisplayName, row.Avatar, row.Platforms)))
+            .ToArray();
     }
 
     public async Task<IReadOnlyList<PendingFriendProjection>> ListPendingAsync(
@@ -120,12 +133,19 @@ public sealed class FriendshipRepository(AppDbContext context) : IFriendshipRepo
             let counterpartId = friendship.UserLoId == userId ? friendship.UserHiId : friendship.UserLoId
             join counterpart in context.DomainUsers.AsNoTracking() on counterpartId equals counterpart.Id
             orderby friendship.RequestedAt descending, friendship.Id descending
-            select new { friendship.Id, Counterpart = counterpart, friendship.RequestedBy, friendship.RequestedAt })
+            select new
+            {
+                FriendshipId = friendship.Id,
+                CounterpartId = counterpart.Id,
+                counterpart.Username,
+                friendship.RequestedBy,
+                friendship.RequestedAt,
+            })
             .ToListAsync(cancellationToken);
 
         return rows.Select(row => new PendingFriendProjection(
-            row.Id,
-            row.Counterpart,
+            row.FriendshipId,
+            new FriendCounterpart(row.CounterpartId, row.Username, null, null, []),
             row.RequestedBy,
             row.RequestedAt)).ToArray();
     }

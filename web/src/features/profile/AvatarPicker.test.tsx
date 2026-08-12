@@ -145,4 +145,27 @@ describe('AvatarPicker', () => {
     expect(steamRadio).toHaveFocus()
     expect(steamRadio).toHaveAttribute('aria-checked', 'true')
   })
+
+  it('falls back to the glyph placeholder when a source thumbnail fails to load', () => {
+    function SourceHarness() {
+      const [value, setValue] = useState('🎮')
+      return (
+        <AvatarPicker
+          idPrefix="test-avatar"
+          sources={[{ avatarSourceId: 'src-1', kind: 'SteamPlatform', imgUrl: '/a/broken-token' }]}
+          value={value}
+          onChange={setValue}
+        />
+      )
+    }
+    render(<SourceHarness />)
+
+    const steamRadio = screen.getByRole('radio', { name: 'Steam picture' })
+    const img = steamRadio.querySelector('img')
+    expect(img).not.toBeNull()
+    fireEvent.error(img!)
+
+    expect(steamRadio.querySelector('img')).toBeNull()
+    expect(steamRadio).toHaveTextContent('●')
+  })
 })

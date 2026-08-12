@@ -65,7 +65,37 @@ public sealed partial class AvatarCaptureService : IAvatarCaptureService, IDispo
     {
         AllowAutoRedirect = false,
         ConnectTimeout = ConnectTimeout,
+        // Step 3's host resolution above only vets a snapshot; the OS resolver could hand the actual
+        // connect a different (rebound) address for the same hostname a moment later. Pinning the
+        // connect itself to a freshly re-vetted address closes that TOCTOU/DNS-rebinding gap.
+        // SocketsHttpHandler still layers TLS with SNI/Host from the original hostname on top of the
+        // stream this returns, so nothing about the request's identity changes.
+        ConnectCallback = ConnectToVettedAddressAsync,
     };
+
+    private static async ValueTask<Stream> ConnectToVettedAddressAsync(
+        SocketsHttpConnectionContext context,
+        CancellationToken cancellationToken)
+    {
+        IPAddress[] addresses = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
+        IPAddress? vetted = Array.Find(addresses, address => !IsDisallowedAddress(address));
+        if (vetted is null)
+        {
+            throw new HttpRequestException("No allowed address resolved for the upstream host.");
+        }
+
+        var socket = new Socket(vetted.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+        try
+        {
+            await socket.ConnectAsync(new IPEndPoint(vetted, context.DnsEndPoint.Port), cancellationToken);
+            return new NetworkStream(socket, ownsSocket: true);
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
+    }
 
     public async Task<AvatarCapture?> CaptureAsync(
         string upstreamUrl,
@@ -101,34 +131,33 @@ public sealed partial class AvatarCaptureService : IAvatarCaptureService, IDispo
         }
 
         byte[]? body;
-        using (var request = new HttpRequestMessage(HttpMethod.Get, uri))
+        try
         {
-            HttpResponseMessage response;
-            try
-            {
-                response = await _http.SendAsync(
-                    request,
-                    HttpCompletionOption.ResponseHeadersRead,
-                    cancellationToken);
-            }
-            catch (Exception exception) when (
-                exception is HttpRequestException or TaskCanceledException or TimeoutException)
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            using HttpResponseMessage response = await _http.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+
+            // AllowAutoRedirect = false means a redirect never gets followed; it just surfaces
+            // here as a non-success (3xx) status, indistinguishable in handling from any other
+            // upstream rejection.
+            if (!response.IsSuccessStatusCode)
             {
                 return null;
             }
 
-            using (response)
-            {
-                // AllowAutoRedirect = false means a redirect never gets followed; it just surfaces
-                // here as a non-success (3xx) status, indistinguishable in handling from any other
-                // upstream rejection.
-                if (!response.IsSuccessStatusCode)
-                {
-                    return null;
-                }
-
-                body = await ReadBoundedAsync(response, cancellationToken);
-            }
+            body = await ReadBoundedAsync(response, cancellationToken);
+        }
+        catch (Exception exception) when (
+            exception is HttpRequestException or TaskCanceledException or TimeoutException &&
+            !cancellationToken.IsCancellationRequested)
+        {
+            // A stalled body read (Steam/Google connection idle mid-response) surfaces here too --
+            // TaskCanceledException derives from OperationCanceledException, so callers filtering on
+            // "not OperationCanceledException" (sign-in, the nightly refresh batch) must never see it
+            // unless it was the caller's own cancellationToken that fired.
+            return null;
         }
 
         // Step 4: the cap was exceeded and the read aborted.
@@ -197,11 +226,16 @@ public sealed partial class AvatarCaptureService : IAvatarCaptureService, IDispo
         byte[] octets = address.GetAddressBytes();
         return octets[0] switch
         {
+            0 => true, // 0.0.0.0/8 "this network"
             10 => true, // 10.0.0.0/8
+            100 when octets[1] is >= 64 and <= 127 => true, // 100.64.0.0/10 CGNAT
             127 => true, // loopback, redundant with IsLoopback above but kept explicit
             169 when octets[1] == 254 => true, // 169.254.0.0/16 link-local
             172 when octets[1] is >= 16 and <= 31 => true, // 172.16.0.0/12
+            192 when octets[1] == 0 && octets[2] == 0 => true, // 192.0.0.0/24 IETF protocol assignments
             192 when octets[1] == 168 => true, // 192.168.0.0/16
+            198 when octets[1] is 18 or 19 => true, // 198.18.0.0/15 benchmarking
+            >= 224 => true, // 224.0.0.0/4 multicast, 240.0.0.0/4 reserved (incl. 255.255.255.255)
             _ => false,
         };
     }
@@ -235,7 +269,7 @@ public sealed partial class AvatarCaptureService : IAvatarCaptureService, IDispo
 
             using var output = new MemoryStream();
             image.Save(output, new WebpEncoder());
-            return new AvatarCapture(output.ToArray(), "image/webp");
+            return new AvatarCapture(output.ToArray(), AvatarSource.AllowedContentType);
         }
         catch (Exception exception) when (exception is UnknownImageFormatException or InvalidImageContentException)
         {

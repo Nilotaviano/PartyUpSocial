@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Polls;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
@@ -415,28 +416,29 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
 
     private async Task<SessionDetail> ToDetailAsync(Session session, uint xmin, CancellationToken cancellationToken)
     {
-        Dictionary<Guid, User> participantUsers = [];
+        Dictionary<Guid, UserNameplate> participantUsers = [];
         List<UserId> registeredIds = [.. session.Participations
             .Where(p => p.UserId.HasValue)
             .Select(p => p.UserId!.Value)];
 
         if (registeredIds.Count > 0)
         {
-            List<User> users = await context.DomainUsers
+            var users = await context.DomainUsers
                 .AsNoTracking()
                 .Where(u => registeredIds.Contains(u.Id))
+                .Select(u => new { u.Id, u.DisplayName, u.Avatar })
                 .ToListAsync(cancellationToken);
 
-            foreach (User user in users)
+            foreach (var user in users)
             {
-                participantUsers[user.Id.Value] = user;
+                participantUsers[user.Id.Value] = new UserNameplate(user.DisplayName, user.Avatar);
             }
         }
 
         List<RosterEntry> roster = [];
         foreach (Participation participation in session.Participations)
         {
-            User? participantUser = participation.UserId is { } userId
+            UserNameplate? participantUser = participation.UserId is { } userId
                 ? participantUsers.GetValueOrDefault(userId.Value)
                 : null;
 

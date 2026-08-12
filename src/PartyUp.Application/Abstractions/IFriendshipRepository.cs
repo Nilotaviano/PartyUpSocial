@@ -88,11 +88,24 @@ public interface IFriendshipRepository
 
 public sealed record FriendshipPair(UserId UserLoId, UserId UserHiId);
 
-public sealed record AcceptedFriendProjection(FriendshipId FriendshipId, User Counterpart);
+/// <summary>
+/// The counterpart-facing columns a friend list/request row renders — never the full <see cref="User"/>
+/// aggregate, so a bulk friend read never materializes each counterpart's <c>AvatarSources</c> or
+/// tracks the entity. <see cref="Platforms"/> is empty for a <see cref="PendingFriendProjection"/> row
+/// (only <see cref="Username"/> renders there).
+/// </summary>
+public sealed record FriendCounterpart(
+    UserId Id,
+    Username? Username,
+    DisplayName? DisplayName,
+    Avatar? Avatar,
+    IReadOnlyList<PlatformLink> Platforms);
+
+public sealed record AcceptedFriendProjection(FriendshipId FriendshipId, FriendCounterpart Counterpart);
 
 public sealed record PendingFriendProjection(
     FriendshipId FriendshipId,
-    User Counterpart,
+    FriendCounterpart Counterpart,
     UserId RequestedBy,
     Instant RequestedAt);
 

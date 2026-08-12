@@ -16,6 +16,13 @@ public sealed class AvatarSource
     /// <summary>A-084: ≥256 bits of entropy, carved out of A-015's hash-only rule.</summary>
     public const int TokenByteLength = 32;
 
+    /// <summary>
+    /// AVATARS_DESIGN.md §3.2 step 6: the capture pipeline always re-encodes to WebP before it ever
+    /// reaches this aggregate, so this is the only content type an <see cref="AvatarSource"/> may ever
+    /// carry -- never the upstream's declared type.
+    /// </summary>
+    public const string AllowedContentType = "image/webp";
+
     private AvatarSource()
     {
         Token = string.Empty;
@@ -78,6 +85,13 @@ public sealed class AvatarSource
         FetchedAt = fetchedAt;
     }
 
+    /// <summary>
+    /// AVATARS_DESIGN.md §3.4: stamps a failed or empty refresh attempt (Steam outage, no picture,
+    /// a decode failure) so this source rotates to the back of the staleest-first refresh queue
+    /// instead of starving every other user's refresh forever. The picture itself is untouched.
+    /// </summary>
+    internal void MarkRefreshAttempt(Instant attemptedAt) => FetchedAt = attemptedAt;
+
     /// <summary>A-084: <see cref="TokenByteLength"/> CSPRNG bytes, URL-safe base64, stored in plaintext.</summary>
     public static string CreateToken() => Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(TokenByteLength));
 
@@ -93,9 +107,11 @@ public sealed class AvatarSource
 
     private static string ValidatedContentType(string contentType)
     {
-        if (string.IsNullOrWhiteSpace(contentType))
+        if (!string.Equals(contentType, AllowedContentType, StringComparison.Ordinal))
         {
-            throw new DomainException(DomainError.ValidationFailed, "An avatar source requires a content type.");
+            throw new DomainException(
+                DomainError.ValidationFailed,
+                FormattableString.Invariant($"An avatar source's content type must be '{AllowedContentType}'."));
         }
 
         return contentType;

@@ -21,7 +21,7 @@ public sealed class AvatarCaptureServiceTests
     private static readonly IPAddress PublicAddress = IPAddress.Parse("93.184.216.34");
 
     [Fact]
-    public async Task CaptureAsync_RejectsNonHttps()
+    public async Task CaptureAsync_RejectsNonHttps_D191()
     {
         AvatarCapture? result = await ExecuteAsync(
             "http://img.steamstatic.com/avatar.png",
@@ -35,7 +35,7 @@ public sealed class AvatarCaptureServiceTests
     [InlineData("https://evil.example.com/avatar.png", AvatarSourceKind.SteamPlatform)]
     [InlineData("https://lh3.googleusercontent.com/a/pic.png", AvatarSourceKind.SteamPlatform)]
     [InlineData("https://avatars.steamstatic.com/a/pic.png", AvatarSourceKind.GoogleAccount)]
-    public async Task CaptureAsync_RejectsOffAllowlistHosts(string url, AvatarSourceKind kind)
+    public async Task CaptureAsync_RejectsOffAllowlistHosts_D191(string url, AvatarSourceKind kind)
     {
         AvatarCapture? result = await ExecuteAsync(url, kind, _ => PngResponse());
 
@@ -43,7 +43,7 @@ public sealed class AvatarCaptureServiceTests
     }
 
     [Fact]
-    public async Task CaptureAsync_RejectsARedirectResponse()
+    public async Task CaptureAsync_RejectsARedirectResponse_D191()
     {
         AvatarCapture? result = await ExecuteAsync(
             "https://avatars.steamstatic.com/a/pic.png",
@@ -94,7 +94,7 @@ public sealed class AvatarCaptureServiceTests
     }
 
     [Fact]
-    public async Task CaptureAsync_RejectsAPrivateResolvedAddress()
+    public async Task CaptureAsync_RejectsAPrivateResolvedAddress_D191()
     {
         AvatarCapture? result = await ExecuteAsync(
             "https://avatars.steamstatic.com/a/pic.png",

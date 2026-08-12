@@ -39,7 +39,7 @@ function stableFillVariant(seed: string): FillVariant {
   return FILL_VARIANTS[Math.abs(hash) % FILL_VARIANTS.length]
 }
 
-type AvatarDiscProps = {
+export type AvatarDiscProps = {
   seed: string
   emoji?: string | null
   /** AVATARS_DESIGN.md §3.5: the proxy URL (`AvatarResponse.imgUrl`/`AvatarSourceOptionResponse.imgUrl`), never an upstream one (D-191). */
@@ -64,9 +64,9 @@ export function AvatarDisc({
   className,
   masked = false,
 }: AvatarDiscProps) {
-  const [imgFailed, setImgFailed] = useState(false)
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
   const variant = stableFillVariant(seed)
-  const showImg = !masked && !!imgUrl && !imgFailed
+  const showImg = !masked && !!imgUrl && imgUrl !== failedUrl
   const classes = [
     'grid shrink-0 place-items-center overflow-hidden rounded-full border-2 font-display',
     SIZE_CLASSES[size],
@@ -83,7 +83,7 @@ export function AvatarDisc({
           alt=""
           className="h-full w-full object-cover"
           src={imgUrl}
-          onError={() => setImgFailed(true)}
+          onError={() => setFailedUrl(imgUrl ?? null)}
         />
       ) : (
         (masked ? '●' : (emoji ?? '●'))

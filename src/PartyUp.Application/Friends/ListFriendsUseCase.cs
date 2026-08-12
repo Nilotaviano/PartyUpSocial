@@ -17,14 +17,14 @@ public sealed class ListFriendsUseCase(IFriendshipRepository friendships)
 
     private static FriendItem Map(AcceptedFriendProjection row)
     {
-        User user = row.Counterpart;
+        FriendCounterpart counterpart = row.Counterpart;
         return new FriendItem(
             row.FriendshipId,
-            user.Id,
-            user.Username!.Value.Value,
-            user.DisplayName!.Value.Value,
-            user.Avatar!.Value,
-            user.PlatformLinks
+            counterpart.Id,
+            counterpart.Username!.Value.Value,
+            counterpart.DisplayName!.Value.Value,
+            counterpart.Avatar!.Value,
+            counterpart.Platforms
                 .Select(link => new PublicPlatform(link.Platform, link.Handle.Value))
                 .ToArray());
     }

@@ -35,11 +35,14 @@ public sealed class ChangeAvatarUseCase(IUserRepository users, IUnitOfWork unitO
                 {
                     user.ChangeAvatar(avatar);
                 }
-                catch (DomainException)
+                catch (DomainException exception) when (exception.Error == DomainError.NotFound)
                 {
                     // A source draft that names another user's avatar source (or one that no
-                    // longer exists) fails User.ChangeAvatar's D-050 ownership check, not the
-                    // pure ToAvatar catalog check above -- same client-facing code either way.
+                    // longer exists) fails User.ChangeAvatar's D-050 ownership check (Avatar's
+                    // RequireAvatar, DomainError.NotFound), not the pure ToAvatar catalog check
+                    // above -- same client-facing code either way. Any other DomainError (e.g. a
+                    // lifecycle InvalidTransition) is not this failure and must reach the
+                    // endpoint's DomainExceptionMapper unmapped, not be relabeled as an avatar error.
                     return ProfileMutationResult.Failed("errors.avatar.invalid");
                 }
 

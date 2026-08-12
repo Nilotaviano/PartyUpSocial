@@ -29,13 +29,14 @@ public sealed class PollReadRepository(AppDbContext context) : IPollReadReposito
         }
 
         List<UserId> ids = [.. userIds.Distinct()];
-        List<User> rows = await context.DomainUsers
+        var rows = await context.DomainUsers
             .AsNoTracking()
             .Where(u => ids.Contains(u.Id))
+            .Select(u => new { u.Id, u.DisplayName, u.Avatar })
             .ToListAsync(cancellationToken);
 
         Dictionary<Guid, UserNameplate> result = [];
-        foreach (User row in rows)
+        foreach (var row in rows)
         {
             result[row.Id.Value] = new UserNameplate(row.DisplayName, row.Avatar);
         }

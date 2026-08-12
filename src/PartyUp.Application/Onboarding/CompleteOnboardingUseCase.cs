@@ -110,12 +110,15 @@ public sealed class CompleteOnboardingUseCase(
                         locale,
                         clock);
                 }
-                catch (DomainException) when (avatar.IsExternal)
+                catch (DomainException exception) when (exception.Error == DomainError.NotFound)
                 {
                     // AVATARS_DESIGN.md §2.1: onboarding renders no source chooser and no avatar
                     // source can exist this early, so a source draft always fails
-                    // User.CompleteOnboarding's D-050 ownership check -- map it the same way
-                    // ChangeAvatarUseCase does rather than let it escape unmapped.
+                    // User.CompleteOnboarding's D-050 ownership check (Avatar's RequireAvatar,
+                    // DomainError.NotFound) -- map it the same way ChangeAvatarUseCase does rather
+                    // than let it escape unmapped. Any other DomainError (e.g. a lifecycle
+                    // InvalidTransition) is not this failure and must reach the endpoint's
+                    // DomainExceptionMapper unmapped, not be relabeled as an avatar error.
                     return OnboardingCompletionResult.Invalid(
                         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
                         {

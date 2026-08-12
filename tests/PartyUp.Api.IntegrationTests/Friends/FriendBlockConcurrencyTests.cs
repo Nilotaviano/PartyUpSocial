@@ -183,6 +183,7 @@ public sealed class FriendBlockConcurrencyTests : IAsyncLifetime
         var counts = new BlockEffectCounts();
         await using AppDbContext context = _database.CreateContext();
         var applier = new DeletionResultApplier(
+            context,
             new FriendshipRepository(context),
             new BlockRepository(context),
             new NotificationRepository(context),

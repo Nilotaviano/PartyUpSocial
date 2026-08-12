@@ -1,8 +1,10 @@
 # Avatars — design
 
-Status: ratified 2026-08-11. Wave A shipped 2026-08-11; waves B and C shipped 2026-08-12
-(§4 folded into wave B per its own text — the client source chooser and `AvatarDisc`'s `<img>` arm
-remain, tracked in TODO.md). Supersedes nothing; extends D-032/D-050/D-127/D-188.
+Status: ratified 2026-08-11. Wave A shipped 2026-08-11; waves B and C shipped end-to-end
+2026-08-12, client included (§4 folded into wave B per its own text). Remaining, tracked in
+TODO.md: onboarding stays emoji-only by design (§2.1, not debt), a `ProfilePage`/`AccountMenu`
+username-seed residual (their DTOs carry no `userId`), and owner ratification items. Supersedes
+nothing; extends D-032/D-050/D-127/D-188.
 
 An avatar is one of two things: a glyph the user picked from a fixed catalog, or a picture
 supplied by an account they linked. Users never upload bytes (D-032). This document binds the
@@ -188,15 +190,15 @@ five minutely jobs) re-reads Steam avatars from `steamId64` via `ISteamProfileCl
 bounded batch size in the `DeletionSweepOptions` idiom. Google is capture-time only; its picture
 claim is read at sign-in.
 
-### 3.5 Client
+### 3.5 Client — shipped 2026-08-12 (809ef47)
 
-`AvatarDisc` gains an `<img>` arm inside its existing `aria-hidden` span — it stays decoration
+`AvatarDisc` gained an `<img>` arm inside its existing `aria-hidden` span — it stays decoration
 and never becomes a control's accessible name. It takes an `onError` fallback to the glyph:
 without one, a failed image renders `'●'`, which is exactly the masked treatment, and a
 transient failure would read as an anonymized user.
 
-The settings picker gains a source chooser listing the user's avatar sources alongside the
-emoji catalog. Onboarding does not (§2.1).
+The settings picker gained a source chooser listing the user's avatar sources alongside the
+emoji catalog. Onboarding stays emoji-only (§2.1), by design, not debt.
 
 ## 4. Wave C — Google picture capture
 

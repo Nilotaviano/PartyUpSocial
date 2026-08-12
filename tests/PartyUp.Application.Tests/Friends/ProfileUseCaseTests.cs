@@ -126,6 +126,9 @@ internal static class FriendTestData
         return user;
     }
 
+    public static FriendCounterpart Counterpart(User user) =>
+        new(user.Id, user.Username, user.DisplayName, user.Avatar, user.PlatformLinks);
+
     public static ResolvedUserGraph Resolved(
         User user,
         ProfileDisclosure disclosure,

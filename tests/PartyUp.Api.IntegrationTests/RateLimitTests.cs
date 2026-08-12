@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -168,7 +169,6 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
     [Fact]
     public void EveryDimensionCoversItsDocumentedRoutes()
     {
-        // AVATARS_DESIGN.md §3.3: one new Ip-partitioned dimension, 33 -> 34.
         Assert.Equal(34, RateLimitPolicies.Dimensions.Count);
         Assert.Equal(ExpectedRoutes.Keys, RateLimitPolicies.Dimensions.Select(value => value.Name));
         foreach (RateLimitDimension dimension in RateLimitPolicies.Dimensions)
@@ -184,6 +184,37 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
         Assert.DoesNotContain(
             dataSources.SelectMany(source => source.Endpoints),
             endpoint => endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>() is not null);
+    }
+
+    /// <summary>
+    /// AVATARS_DESIGN.md §3.3: <c>avatar-proxy</c>'s wider 600/min ceiling is only real if
+    /// <c>default</c> (300/min) does not also throttle <c>GetAvatarProxy</c> — the chained limiter
+    /// requires every partition to grant a lease, so the narrower dimension would otherwise be the
+    /// one actually observed. <c>default</c> must skip a claimed operation entirely (no limiter, not
+    /// merely a wider one), and <c>avatar-proxy</c> must be the dimension actually applying a bucket.
+    /// </summary>
+    [Fact]
+    public void AvatarProxy_IsBoundedByItsOwnDimensionNotTheDefaultCeiling()
+    {
+        RateLimitDimension defaultDimension = RateLimitPolicies.Dimensions.Single(d => d.Name == "default");
+        RateLimitDimension avatarProxy = RateLimitPolicies.Dimensions.Single(d => d.Name == "avatar-proxy");
+        byte[] pepper = "test-pepper"u8.ToArray();
+
+        var context = new DefaultHttpContext();
+        context.Connection.RemoteIpAddress = IPAddress.Parse("203.0.113.9");
+        context.SetEndpoint(new Endpoint(
+            _ => Task.CompletedTask,
+            new EndpointMetadataCollection(new EndpointNameMetadata(ApiOperationIds.GetAvatarProxy)),
+            "avatar-proxy-test"));
+
+        RateLimitPartition<string> defaultPartition =
+            RateLimitPolicies.PartitionFor(context, defaultDimension, pepper);
+        Assert.Equal(string.Empty, defaultPartition.PartitionKey);
+
+        RateLimitPartition<string> avatarProxyPartition =
+            RateLimitPolicies.PartitionFor(context, avatarProxy, pepper);
+        string expectedKey = RateLimitPolicies.HashPartitionKey("avatar-proxy", "203.0.113.9", pepper);
+        Assert.Equal(expectedKey, avatarProxyPartition.PartitionKey);
     }
 
     /// <summary>

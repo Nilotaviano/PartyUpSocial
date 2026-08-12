@@ -96,20 +96,5 @@ public sealed class AvailabilityLoadShapeTests
     }
 
     private static AcceptedFriendProjection AcceptedProjection(UserId friendId) =>
-        new(FriendshipId.New(), TestUser(friendId));
-
-    private static PartyUp.Domain.Users.User TestUser(UserId id)
-    {
-        PartyUp.Domain.Users.User user = PartyUp.Domain.Users.User.BeginOnboarding(
-            id, PartyUp.Domain.Users.FriendCode.Create($"PU-{Guid.NewGuid():N}"[..9]),
-            PartyUp.Domain.Users.AgeGateSource.SelfAttested, SystemClock.Instance);
-        user.CompleteOnboarding(
-            Username.Create($"u{Guid.NewGuid():N}"[..12]),
-            DisplayName.Create("Fixture Friend"),
-            PartyUp.Domain.Users.Avatar.FromEmoji("🙂"),
-            Utc,
-            PartyUp.Domain.Users.Locale.Create("en"),
-            SystemClock.Instance);
-        return user;
-    }
+        new(FriendshipId.New(), new FriendCounterpart(friendId, null, null, null, []));
 }

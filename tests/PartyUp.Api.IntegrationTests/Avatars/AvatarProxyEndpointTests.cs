@@ -26,7 +26,7 @@ public sealed class AvatarProxyEndpointTests : IAsyncLifetime, IDisposable
     public void Dispose() => _factory.Dispose();
 
     [Fact]
-    public async Task ServesACapturedAvatarByToken_D190()
+    public async Task ServesACapturedAvatarByToken_D191()
     {
         UserId userId = await _factory.SeedUserAsync(email: $"avatar-proxy-{Guid.NewGuid():N}@example.test");
         byte[] bytes = [1, 2, 3, 4];
