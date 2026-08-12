@@ -61,10 +61,18 @@ While Q1/Q2/Q6 answers are pending, the startable work is S4's e2e half and S10'
   issuing flow's own UI is itself under audit. Each case still navigates in a throwaway context (tokens are
   single-use; some routes mutate the account). Documented manual audit only for `/auth/callback` (external
   redirect leg).
-- **Q5 — k6 target + thresholds (blocks S10 execution, not authoring).** Environment (prod VM / clone /
+- **Q5 — RATIFIED 2026-08-12: WSL-compose dress rehearsal first** (prod-VM run decided after rehearsal
+  results); S10's threshold proposal ratified as-is (`http_req_failed` <1%; my-participation p95 <800ms burst
+  / <1000ms under sweeper; overlaps p95 <500ms / <700ms; sweeper tick within the 55s window) — record as
+  ratified in `deploy/load/README.md`. Seed execution + any limiter override remain owner-gated at run time. Environment (prod VM / clone /
   WSL-compose rehearsal), rate-limit override, seed SQL execution, and pass/fail thresholds (spec §11 has none)
   are owner calls. S10 authors scripts + seed SQL + a threshold proposal; the run is owner-gated.
-- **Q6 — legal inputs (blocks S4's backup-age-out half, S5 closure, and S5's footer contact link).** LGPD
+- **Q6 — INPUTS RATIFIED 2026-08-12** (final sign-off of the nine drafted documents still pending after S5
+  drafts them): retention = **30-day backup retention** (matches the shipped nightly pg_dump rotation) and
+  **shared session content persists until account deletion / D-092 effects** — closes PRODUCT_SPEC.md:464's
+  TBD with a spec row in S5; LGPD controller = **the owner as natural person**, contact
+  **privacy@partyup.social** (owner creates the mailbox/alias before S5 drafts flip from draft status; the
+  footer contact link publishes it). LGPD
   controller identity and contact point for the pt-BR text (this is what the footer contact link publishes —
   §8.6's "published support/contact info" is a mobile-store-submission requirement and stays deferred with the
   mobile phase), **the data-retention periods** — both backup retention (the IMPLEMENTATION_PLAN.md:147
