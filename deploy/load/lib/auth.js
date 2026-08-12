@@ -22,7 +22,7 @@
 // src/PartyUp.Api/ApiRoutes.cs:5 ("/api/v1").
 
 import http from 'k6/http';
-import { check, fail } from 'k6';
+import { check, fail, sleep } from 'k6';
 
 /**
  * @param {string} baseUrl
@@ -71,6 +71,9 @@ export function login(baseUrl, credentials) {
 
   check(res, { 'login: 200': (r) => r.status === 200 });
   if (res.status !== 200) {
+    // Back off 60s before failing -- otherwise a 429'd VU's iteration ends immediately and k6
+    // retries login next iteration with no delay, hammering an already-throttled auth-ip window.
+    sleep(60);
     fail(`POST /api/v1/auth/login failed for ${credentials.email}: ${res.status} ${res.body}`);
   }
 

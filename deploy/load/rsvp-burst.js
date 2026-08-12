@@ -26,7 +26,7 @@ import { login, writeHeaders } from './lib/auth.js';
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:5000';
 const SESSION_ID = __ENV.SESSION_ID; // uuid of the seeded contended session (see seed.sql)
 const CREDENTIALS_FILE = __ENV.CREDENTIALS_FILE || './credentials/rsvp-burst.json';
-const VUS = Number(__ENV.VUS || 20);
+const VUS = Number(__ENV.VUS || 15);
 const DURATION = __ENV.DURATION || '30s';
 
 const credentials = new SharedArray('rsvp-burst-users', () => JSON.parse(open(CREDENTIALS_FILE)));

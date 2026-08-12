@@ -33,14 +33,22 @@ import { login, writeHeaders } from './lib/auth.js';
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:5000';
 const CREDENTIALS_FILE = __ENV.CREDENTIALS_FILE || './credentials/sweeper-load.json';
+// Read lane logs in as the load-viewer-N pool overlap.js uses (seed.sql's :overlap_viewer_count
+// rows) -- those accounts already carry the large accepted-friend graph + availability seed the
+// overlaps route needs to exercise a real fan-out, instead of one account with an empty friend set.
+const READ_CREDENTIALS_FILE = __ENV.READ_CREDENTIALS_FILE || './credentials/overlap-viewer.json';
 // Comma-separated uuids of the seeded sessions scheduled to fall due mid-run (seed.sql's
 // due-batch). RSVP traffic is spread across all of them so the sweeper's 500-candidate tick has
 // real contention to walk into, not a single hot row.
 const SESSION_IDS = (__ENV.SESSION_IDS || '').split(',').filter(Boolean);
-const VUS = Number(__ENV.VUS || 30);
+// RSVP_VUS + READ_VUS logins/run must fit auth-ip's 20 requests/15min/IP (RateLimitPolicies.cs) --
+// 12 + 4 = 16, leaving headroom instead of exhausting the window outright.
+const RSVP_VUS = Number(__ENV.VUS || 12);
+const READ_VUS = Number(__ENV.READ_VUS || 4);
 const DURATION = __ENV.DURATION || '3m'; // must span at least one due-batch crossing + one tick
 
 const credentials = new SharedArray('sweeper-load-users', () => JSON.parse(open(CREDENTIALS_FILE)));
+const readCredentials = new SharedArray('sweeper-load-readers', () => JSON.parse(open(READ_CREDENTIALS_FILE)));
 
 const RESPONSES = ['Going', 'Maybe', 'Declined'];
 
@@ -58,13 +66,13 @@ export const options = {
   scenarios: {
     sustained_rsvp: {
       executor: 'constant-vus',
-      vus: VUS,
+      vus: RSVP_VUS,
       duration: DURATION,
       exec: 'rsvpTraffic',
     },
     sustained_reads: {
       executor: 'constant-vus',
-      vus: Math.max(1, Math.floor(VUS / 3)),
+      vus: READ_VUS,
       duration: DURATION,
       exec: 'readTraffic',
     },
@@ -112,12 +120,14 @@ export function rsvpTraffic(data) {
     'my-participation: expected status': (r) => r.status === 200 || r.status === 422,
   });
 
-  sleep(1);
+  // sleep(1) put a 12-VU lane near 60 writes/min/user against session-write's 30/min/user budget
+  // (RateLimitPolicies.cs); sleep(2) keeps sustained iterations at ~30/min/user.
+  sleep(2);
 }
 
 export function readTraffic() {
   if (cachedReadCsrfToken === null) {
-    const vuCredentials = credentials[0];
+    const vuCredentials = readCredentials[(__VU - 1) % readCredentials.length];
     cachedReadCsrfToken = login(BASE_URL, vuCredentials);
   }
 

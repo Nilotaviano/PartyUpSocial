@@ -98,7 +98,7 @@ k6 run deploy/load/rsvp-burst.js \
   -e BASE_URL=https://<target> \
   -e SESSION_ID=<rsvp-burst target session uuid> \
   -e CREDENTIALS_FILE=./credentials/rsvp-burst.json \
-  -e VUS=20 -e DURATION=30s
+  -e VUS=15 -e DURATION=30s
 
 # overlap.js -- sustained reads against the omitted-friendIds overlap endpoint
 k6 run deploy/load/overlap.js \
@@ -111,8 +111,15 @@ k6 run deploy/load/sweeper-load.js \
   -e BASE_URL=https://<target> \
   -e SESSION_IDS=<uuid1>,<uuid2>,...,<uuidN> \
   -e CREDENTIALS_FILE=./credentials/sweeper-load.json \
-  -e VUS=30 -e DURATION=3m
+  -e READ_CREDENTIALS_FILE=./credentials/overlap-viewer.json \
+  -e VUS=12 -e READ_VUS=4 -e DURATION=3m
 ```
+
+`sweeper-load.js`'s read lane logs in as the `load-viewer-N` pool (`credentials/overlap-viewer.json`,
+the same accounts `overlap.js` uses) instead of a single seeded account, so the `overlaps` p95<700ms
+threshold measures the viewer pool's real `:friend_count`-owner fan-out rather than an
+unauthenticated or empty-friend-set request. 12 RSVP VUs + 4 read VUs = 16 logins/run, fitting
+inside `auth-ip`'s 20/15min/IP budget with headroom instead of exhausting it.
 
 All three read `BASE_URL` (default `http://localhost:5000`), so pointing at a WSL-compose
 rehearsal vs. a clone vs. prod is a single env-var swap -- the environment choice itself is Q5's
@@ -161,6 +168,11 @@ own permit window. The two that matter here:
   scripts (accounts are pre-seeded, never registered live), noted here only because it is the
   tightest dimension in the file and the most likely one to bite if a future script variant adds
   live registration.
+
+`rsvp-burst.js`, `overlap.js`, and `sweeper-load.js` all share the one `auth-ip` 20 requests/15min/IP
+login window when run from the same load-generator IP -- wait out the window (or change source IP)
+between script runs inside the same 15 minutes, or a later script's logins will 429 against budget
+the earlier script already spent.
 
 **Any of these three IP-partitioned dimensions (`default`, `auth-ip`, and by extension every
 route sharing an IP with the load generator) will throttle a genuinely concurrent single-IP
