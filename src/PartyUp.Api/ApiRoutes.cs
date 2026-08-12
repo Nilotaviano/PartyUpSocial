@@ -116,6 +116,9 @@ public static class ApiOperationIds
     public const string ApprovePollJoinRequest = "ApprovePollJoinRequest";
     public const string RejectPollJoinRequest = "RejectPollJoinRequest";
 
+    /// <summary>D-193: the organizer's mid-flight registered-invite route on the poll surface.</summary>
+    public const string InvitePollUsers = "InvitePollUsers";
+
     // PHASE6_DESIGN.md §4.1: reserved here (poll-list-read dimension membership only) — S4c maps
     // the routes these ids name.
     public const string ListPolls = "ListPolls";

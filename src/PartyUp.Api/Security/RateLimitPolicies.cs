@@ -346,7 +346,9 @@ public static class RateLimitPolicies
                 ApiOperationIds.RevokePollGuestLink,
                 ApiOperationIds.RemovePollGuest,
                 // D-186: the poll-local analogue of LeaveSession's place in session-write.
-                ApiOperationIds.LeavePoll)),
+                ApiOperationIds.LeavePoll,
+                // D-193: the poll-local analogue of InviteSessionUsers's place in session-write.
+                ApiOperationIds.InvitePollUsers)),
         new(
             "poll-attach",
             60,

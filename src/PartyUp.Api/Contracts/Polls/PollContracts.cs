@@ -115,6 +115,10 @@ public sealed record FinalizePollRequest(Guid OptionId);
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CreatePollGuestLinksRequest(int Count);
 
+/// <summary>D-193: the poll analogue of <c>InviteSessionUsersRequest</c> (same wire shape).</summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record InvitePollUsersRequest(IReadOnlyList<Guid> UserIds);
+
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record PollOptionResponse(
     Guid Id,

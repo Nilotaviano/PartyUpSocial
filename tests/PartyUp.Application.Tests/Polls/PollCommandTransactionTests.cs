@@ -110,9 +110,21 @@ internal sealed class FakePollRepository : IPollRepository
 
 internal sealed class FakePollLockRepository : IPollLockRepository
 {
-    public Task LockUsersAsync(IReadOnlyCollection<UserId> userIds, CancellationToken cancellationToken) => Task.CompletedTask;
+    internal List<IReadOnlyCollection<UserId>> LockedUserBatches { get; } = [];
 
-    public Task LockPollsAsync(IReadOnlyCollection<PollId> pollIds, CancellationToken cancellationToken) => Task.CompletedTask;
+    internal List<IReadOnlyCollection<PollId>> LockedPollBatches { get; } = [];
+
+    public Task LockUsersAsync(IReadOnlyCollection<UserId> userIds, CancellationToken cancellationToken)
+    {
+        LockedUserBatches.Add(userIds);
+        return Task.CompletedTask;
+    }
+
+    public Task LockPollsAsync(IReadOnlyCollection<PollId> pollIds, CancellationToken cancellationToken)
+    {
+        LockedPollBatches.Add(pollIds);
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class RollbackAwarePollUnitOfWork(FakePollRepository polls) : IUnitOfWork
@@ -170,6 +182,31 @@ internal sealed class FakeFriendshipRepository : IFriendshipRepository
         _ = friendship.DequeueEvents();
         Items.Add(friendship);
         return (a.Id, b.Id);
+    }
+
+    /// <summary>
+    /// Adds an Accepted friendship between an already-existing user id (e.g. the fixture's organizer)
+    /// and a brand-new counterpart, returning the counterpart's id — mirrors
+    /// <c>SessionCommandTransactionTests</c>' fake of the same name.
+    /// </summary>
+    internal UserId MakeAcceptedWith(UserId existingUserId, IClock clock)
+    {
+        User existingStandIn = User.BeginOnboarding(
+            existingUserId, FriendCode.Create("23456789AB"), AgeGateSource.SelfAttested, clock);
+        existingStandIn.CompleteOnboarding(
+            Username.Create($"u{Guid.NewGuid():N}"[..12]),
+            DisplayName.Create("Existing"),
+            Avatar.FromEmoji("🎮"),
+            DateTimeZoneProviders.Tzdb["America/Fortaleza"],
+            Locale.Create("en"),
+            clock);
+
+        User counterpart = FriendTestData.Active($"u{Guid.NewGuid():N}"[..12], "Counterpart");
+        Friendship friendship = Friendship.Request(existingStandIn, counterpart, clock);
+        friendship.Accept(counterpart.Id, clock);
+        _ = friendship.DequeueEvents();
+        Items.Add(friendship);
+        return counterpart.Id;
     }
 }
 

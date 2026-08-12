@@ -59,6 +59,9 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
     /// <summary>D-186: the one operation id the poll self-removal route added.</summary>
     private static readonly string[] NewPollLeaveOperationIds = [ApiOperationIds.LeavePoll];
 
+    /// <summary>D-193: the one operation id the poll mid-flight-invite route added.</summary>
+    private static readonly string[] NewPollInviteOperationIds = [ApiOperationIds.InvitePollUsers];
+
     /// <summary>PHASE7_DESIGN.md §4 (ticket-P7-S4): the eleven operation ids the S4 HTTP surface added.</summary>
     private static readonly string[] NewPushNotificationOperationIds =
     [
@@ -85,8 +88,10 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
     /// <c>Program.cs</c> only registers under that environment name): the 89 operation ids the Phase 5
     /// surface was built on top of, plus the 12 new ones in <see cref="NewPhase5OperationIds"/>, the
     /// 15 poll ones in <see cref="NewPollOperationIds"/>, the 5 poll guest-arm ones in
-    /// <see cref="NewGuestPollOperationIds"/> (ticket-P6-S4b), and the 2 list/preview ones in
-    /// <see cref="NewPollListOperationIds"/> (ticket-P6-S4c) — 123 total. A deliberate future change
+    /// <see cref="NewGuestPollOperationIds"/> (ticket-P6-S4b), the 2 list/preview ones in
+    /// <see cref="NewPollListOperationIds"/> (ticket-P6-S4c), the 1 self-removal one in
+    /// <see cref="NewPollLeaveOperationIds"/> (D-186), and the 1 mid-flight-invite one in
+    /// <see cref="NewPollInviteOperationIds"/> (D-193) — 124 total. A deliberate future change
     /// to the shipped surface must update this list explicitly; it is not meant to silently absorb an
     /// added, removed, or renamed operation.
     /// </summary>
@@ -165,6 +170,7 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
             .. PreExistingOperationIds, .. NewPhase5OperationIds, .. NewPollOperationIds,
             .. NewGuestPollOperationIds, .. NewPollListOperationIds, .. NewPollLeaveOperationIds,
             .. NewPushNotificationOperationIds, .. NewEmailNotificationOperationIds,
+            .. NewPollInviteOperationIds,
         ];
         Assert.Equal(
             expectedOperationIds.OrderBy(id => id, StringComparer.Ordinal).ToArray(),

@@ -467,6 +467,56 @@ public sealed class Poll : AggregateRoot
     }
 
     /// <summary>
+    /// D-193: the organizer adds registered friends to the poll after creation, while it is still
+    /// <c>Polling</c> — the guard is status, not clock, because a poll past its deadline has already
+    /// left <c>Polling</c> through the due Close (§1). Mid-flight invitees get exactly the
+    /// creation-time treatment (D-033): an Active participant with no votes and no
+    /// <see cref="PollParticipant.FirstResponseAt"/> until they actually vote — D-119 is otherwise
+    /// untouched, so a late invitee only pays for it in allocation order. Unlike sessions, a poll has
+    /// no Declined arm to revive: an existing <c>Active</c> row is <see cref="DomainError.Duplicate"/>
+    /// and a <c>Removed</c> one is never invited over (the same RemovalIsPermanent posture as
+    /// sessions §5.2).
+    /// </summary>
+    public PollParticipant Invite(UserId invitee, IClock clock, Func<UserId, bool>? isBlocked = null)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        ApplyDueTransitions(clock);
+
+        RequireStatus(PollStatus.Polling, "invite");
+
+        if (invitee == OrganizerId)
+        {
+            throw new DomainException(DomainError.Conflict, "The organizer is already a poll participant.");
+        }
+
+        if (isBlocked?.Invoke(invitee) == true)
+        {
+            throw new DomainException(DomainError.Blocked, "A blocked counterpart cannot be invited (D-065/D-077).");
+        }
+
+        ParticipantRef participant = ParticipantRef.ForUser(invitee);
+        PollParticipant? existing = FindParticipant(participant);
+
+        if (existing is not null)
+        {
+            if (existing.IsRemoved)
+            {
+                throw new DomainException(
+                    DomainError.RemovalIsPermanent,
+                    "A removed participant is never re-invited over (§5.2).");
+            }
+
+            throw new DomainException(DomainError.Duplicate, "That user has already been invited.");
+        }
+
+        PollParticipant created = PollParticipant.Create(Id, participant, clock.GetCurrentInstant());
+        _participants.Add(created);
+        Raise(new PollInvitationSent(Id, invitee));
+
+        return created;
+    }
+
+    /// <summary>
     /// Not an organizer command: this is what the block executor (§4) and the deletion executor
     /// (§11 step 3) call — a removed participant's votes are excluded from finalization mapping and
     /// allocation (§6.3). Idempotent.

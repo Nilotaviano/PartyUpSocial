@@ -131,6 +131,8 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
                 "RemovePollGuest",
                 // D-186: the poll-local analogue of LeaveSession's place in session-write.
                 "LeavePoll",
+                // D-193: the poll-local analogue of InviteSessionUsers's place in session-write.
+                "InvitePollUsers",
             ],
             ["poll-attach"] =
             [

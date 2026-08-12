@@ -86,6 +86,14 @@ public static class PollEndpoints
             .ProducesPartyUpProblem(StatusCodes.Status409Conflict)
             .ProducesPartyUpProblem(StatusCodes.Status422UnprocessableEntity);
 
+        // D-193: mid-flight registered invites, organizer-only, valid only while Polling (the guard
+        // is status, not clock -- a poll past its deadline has already left Polling, §1).
+        BodyOperation(polls.MapPost("/polls/{pollId:guid}/invites", InvitePollUsersAsync)
+                .WithName(ApiOperationIds.InvitePollUsers)
+                .Produces<PollDetailResponse>())
+            .ProducesPartyUpProblem(StatusCodes.Status404NotFound)
+            .ProducesPartyUpProblem(StatusCodes.Status422UnprocessableEntity);
+
         BodyOperation(polls.MapPost("/polls/{pollId:guid}/guest-links", CreatePollGuestLinksAsync)
                 .WithName(ApiOperationIds.CreatePollGuestLinks)
                 .Produces<IReadOnlyList<GuestLinkInvitationResponse>>())
@@ -299,6 +307,62 @@ public static class PollEndpoints
         return Results.Created(
             $"{ApiRoutes.V1}/polls/{result.Poll.Id.Value}",
             new CreatePollResponse(PollDetailResponse.From(detail), guestLinks));
+    }
+
+    /// <summary>
+    /// D-193, mirroring <c>SessionEndpoints.InviteSessionUsersAsync</c>: the domain guard is status,
+    /// so <see cref="DomainError.TerminalState"/>/<see cref="DomainError.InvalidTransition"/> (a poll
+    /// no longer <c>Polling</c>) both map to 422 <c>poll_invites_closed</c>, and a domain-level
+    /// <see cref="DomainError.Blocked"/> maps to the same fail-closed <c>user_not_found</c> the
+    /// application layer's own pre-check already returns in the ordinary path.
+    /// </summary>
+    private static async Task<IResult> InvitePollUsersAsync(
+        Guid pollId,
+        InvitePollUsersRequest request,
+        ICurrentUserAccessor currentUser,
+        PollInvitationUseCases useCase,
+        PollReadUseCases reads,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Problem(context, StatusCodes.Status401Unauthorized, "unauthorized");
+        }
+
+        var id = PollId.From(pollId);
+        PollCommandResult result;
+        try
+        {
+            result = await useCase.InviteRegisteredUsersAsync(
+                id,
+                actorId.Value,
+                request.UserIds.Select(UserId.From).ToArray(),
+                cancellationToken);
+        }
+        catch (DomainException ex)
+        {
+            (int status, string code) = ex.Error switch
+            {
+                DomainError.TerminalState or DomainError.InvalidTransition =>
+                    (StatusCodes.Status422UnprocessableEntity, "poll_invites_closed"),
+                DomainError.Blocked => (StatusCodes.Status404NotFound, "user_not_found"),
+                _ => (StatusCodes.Status400BadRequest, "poll_validation"),
+            };
+            return Problem(context, status, code);
+        }
+
+        if (!result.Succeeded)
+        {
+            int status = result.Code == "user_not_found" || result.Code == "poll_not_found"
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest;
+            return Problem(context, status, result.Code!);
+        }
+
+        PollDetail detail = (await reads.GetPollDetailAsync(id, actorId.Value, cancellationToken))!;
+        return Results.Ok(PollDetailResponse.From(detail));
     }
 
     private static async Task<IResult> GetPollAsync(
