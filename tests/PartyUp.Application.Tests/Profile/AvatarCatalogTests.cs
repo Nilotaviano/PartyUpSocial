@@ -67,6 +67,41 @@ public sealed class AvatarCatalogTests
     }
 
     [Fact]
+    public void Validate_RejectsAPlatformKindDraft_D050()
+    {
+        var validator = new ValidateProfileDraftUseCase(new ProfanityFilter(), DateTimeZoneProviders.Tzdb);
+
+        ProfileDraftValidation validation = validator.Execute(
+            new ProfileDraft(
+                "player",
+                "Player",
+                new AvatarDraft("platform", null, Guid.NewGuid()),
+                "America/Fortaleza",
+                "en"));
+
+        Assert.Equal(["errors.avatar.invalid"], validation.Errors["avatar"]);
+    }
+
+    [Fact]
+    public async Task ChangeAvatar_RejectsAPlatformKindDraft_D050()
+    {
+        var clock = new TestClock(Instant.FromUtc(2026, 8, 11, 12, 0));
+        User user = ActiveUser(clock);
+        var users = new FakeUserRepository();
+        users.Users[user.Id] = user;
+        var useCase = new ChangeAvatarUseCase(users, new FakeUnitOfWork());
+
+        ProfileMutationResult result = await useCase.ExecuteAsync(
+            user.Id,
+            new AvatarDraft("platform", null, Guid.NewGuid()),
+            default);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("errors.avatar.invalid", result.Code);
+        Assert.Equal("\U0001F642", user.Avatar!.Value.Emoji);
+    }
+
+    [Fact]
     public async Task ChangeAvatar_AcceptsACatalogGlyph_D050()
     {
         var clock = new TestClock(Instant.FromUtc(2026, 8, 11, 12, 0));

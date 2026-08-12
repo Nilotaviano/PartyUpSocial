@@ -55,12 +55,14 @@ public sealed class ValidateProfileDraftUseCase(
         return new ProfileDraftValidation(errors);
     }
 
+    /// <summary>
+    /// Emoji is the only draft kind a client can set: picture sources are captured
+    /// server-side from linked accounts (AVATARS_DESIGN.md §3), never chosen by draft.
+    /// </summary>
     internal static Avatar ToAvatar(AvatarDraft draft) =>
         draft.Kind.Trim().ToLowerInvariant() switch
         {
             "emoji" => FromCatalogEmoji(draft.Emoji),
-            "platform" when draft.PlatformLinkId is { } id =>
-                Avatar.FromPlatformLink(PlatformLinkId.From(id)),
             _ => throw new DomainException(
                 DomainError.ValidationFailed,
                 "The avatar shape is invalid."),
