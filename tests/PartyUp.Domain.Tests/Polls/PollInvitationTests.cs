@@ -61,6 +61,25 @@ public class PollInvitationTests
         Assert.Equal(DomainError.InvalidTransition, error.Error);
     }
 
+    /// <summary>
+    /// Invite applies its own due transitions (§1) rather than trusting a stale stored status —
+    /// a poll that sat unswept past its deadline must still close before the status gate rejects it.
+    /// </summary>
+    [Fact]
+    public void Invite_AppliesTheDueCloseBeforeTheStatusGate_D193()
+    {
+        FakeClock clock = TestPolls.Clock();
+        PollUnderTest fixture = TestPolls.New(clock);
+        clock.Advance(Duration.FromHours(24));
+        Assert.Equal(PollStatus.Polling, fixture.Poll.Status);
+
+        DomainException error = Assert.Throws<DomainException>(
+            () => fixture.Poll.Invite(UserId.New(), clock));
+
+        Assert.Equal(DomainError.InvalidTransition, error.Error);
+        Assert.Equal(PollStatus.Closed, fixture.Poll.Status);
+    }
+
     [Fact]
     public void Invite_RejectsAnExpiredPoll_D193()
     {
