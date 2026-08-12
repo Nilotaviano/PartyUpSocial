@@ -2,6 +2,7 @@ import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
 
+import enAdmin from './en/admin.json'
 import enAuth from './en/auth.json'
 import enAvailability from './en/availability.json'
 import enAvatar from './en/avatar.json'
@@ -16,6 +17,7 @@ import enProfile from './en/profile.json'
 import enSessions from './en/sessions.json'
 import enSettings from './en/settings.json'
 import enTour from './en/tour.json'
+import esAdmin from './es/admin.json'
 import esAuth from './es/auth.json'
 import esAvailability from './es/availability.json'
 import esAvatar from './es/avatar.json'
@@ -30,6 +32,7 @@ import esProfile from './es/profile.json'
 import esSessions from './es/sessions.json'
 import esSettings from './es/settings.json'
 import esTour from './es/tour.json'
+import ptBRAdmin from './pt-BR/admin.json'
 import ptBRAuth from './pt-BR/auth.json'
 import ptBRAvailability from './pt-BR/availability.json'
 import ptBRAvatar from './pt-BR/avatar.json'
@@ -62,6 +65,7 @@ export const resources = {
     polls: enPolls,
     notifications: enNotifications,
     tour: enTour,
+    admin: enAdmin,
   },
   'pt-BR': {
     common: ptBRCommon,
@@ -78,6 +82,7 @@ export const resources = {
     polls: ptBRPolls,
     notifications: ptBRNotifications,
     tour: ptBRTour,
+    admin: ptBRAdmin,
   },
   es: {
     common: esCommon,
@@ -94,6 +99,7 @@ export const resources = {
     polls: esPolls,
     notifications: esNotifications,
     tour: esTour,
+    admin: esAdmin,
   },
 }
 
@@ -119,6 +125,7 @@ void i18n
       'polls',
       'notifications',
       'tour',
+      'admin',
     ],
     resources,
     interpolation: {

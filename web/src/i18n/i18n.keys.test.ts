@@ -20,6 +20,7 @@ const namespaces = [
   'polls',
   'notifications',
   'tour',
+  'admin',
 ] as const
 
 // Closed problem-code inventory for the S5/S6-owned surface (PHASE7_DESIGN.md
@@ -109,6 +110,21 @@ const problemCodes = [
   'transient_conflict',
   'rate_limited',
 ] as const
+// Closed problem-code inventory for the admin surface (PHASE8_DESIGN.md §3
+// S1/S2/S3): the three codes the admin endpoints answer with
+// (`AdminEndpoints.cs` — list validation, an unknown/forbidden subject, the
+// bounded scope-retry exhaustion on content removal) plus the two blanket
+// codes every route can answer with. `not_found` doubles as the D-177
+// fail-closed copy each admin page renders, so its wording must never name an
+// admin-only surface.
+const adminProblemCodes = [
+  'not_found',
+  'invalid_request',
+  'scope_contended',
+  'rate_limited',
+  'transient_conflict',
+] as const
+
 const registeredResources = resources as Record<
   string,
   Record<string, Resources>
@@ -369,4 +385,55 @@ describe('avatar namespace parity with the closed emoji catalog (AVATARS_DESIGN.
       )
     })
   }
+})
+
+describe('admin namespace parity and rendering D-060 (PHASE8_DESIGN.md §3 S3)', () => {
+  for (const locale of locales) {
+    it(locale + ' renders admin.dashboard.heading', async () => {
+      await i18n.changeLanguage(locale)
+      expect(i18n.t('dashboard.heading', { ns: 'admin' })).toBe(
+        (resources[locale].admin as { dashboard: { heading: string } }).dashboard
+          .heading,
+      )
+    })
+  }
+
+  it('errors.codes contains exactly the closed admin problem-code inventory', () => {
+    const codes = Object.keys(
+      (
+        registeredResources.en.admin as {
+          errors: { codes: Record<string, string> }
+        }
+      ).errors.codes,
+    ).sort()
+    expect(codes).toEqual([...adminProblemCodes].sort())
+  })
+
+  for (const locale of locales) {
+    it(locale + ' has one message per documented admin problem code', () => {
+      const codes = (
+        registeredResources[locale].admin as {
+          errors: { codes: Record<string, string> }
+        }
+      ).errors.codes
+      for (const code of adminProblemCodes) {
+        expect(typeof codes[code]).toBe('string')
+        expect(codes[code].length).toBeGreaterThan(0)
+      }
+    })
+  }
+
+  // D-177/Q2: the admin surface is URL-only and its fail-closed copy is
+  // indistinguishable from a nonexistent page — no admin string may leak into
+  // it, in any locale.
+  it('never names the admin surface in its fail-closed not-found copy_D177', () => {
+    for (const locale of locales) {
+      const codes = (
+        registeredResources[locale].admin as {
+          errors: { codes: Record<string, string> }
+        }
+      ).errors.codes
+      expect(codes.not_found.toLowerCase()).not.toContain('admin')
+    }
+  })
 })

@@ -1,0 +1,113 @@
+{
+  "dashboard": {
+    "heading": "Painel de uso",
+    "generatedAt": "Medido em {{timestamp}}",
+    "loading": "Carregando o painel…",
+    "windows": {
+      "last7Days": "Últimos 7 dias",
+      "last30Days": "Últimos 30 dias",
+      "since": "Desde {{date}}"
+    },
+    "metrics": {
+      "registrations": "Cadastros",
+      "activeUsers": "Pessoas ativas",
+      "sessionsCreated": "Sessões criadas",
+      "pollsCreated": "Enquetes criadas",
+      "proposals": "Propostas",
+      "confirmed": "Confirmadas",
+      "confirmationRate": "Taxa de confirmação"
+    },
+    "notes": {
+      "sessionsCreated": "Sessões criadas já inclui as sessões geradas por enquetes finalizadas, então nunca some esse número com enquetes criadas.",
+      "proposals": "Propostas é o denominador da confirmação: sessões de horário fixo sem enquete de origem, mais as enquetes. Uma enquete finalizada conta uma vez, nunca duas.",
+      "repeat": "Quem começou a organizar há pouco tempo teve menos janela para agendar de novo, e isso derruba a taxa por si só — leia sempre junto com os números brutos."
+    },
+    "repeat": {
+      "heading": "Reincidência de agendamento",
+      "window": "Agendou de novo em até {{days}} dias da primeira criação",
+      "rate": "Taxa de reincidência",
+      "organizers": "Organizadores",
+      "repeatOrganizers": "Organizadores reincidentes"
+    },
+    "noValue": "—",
+    "noValueLabel": "Ainda sem valor"
+  },
+  "users": {
+    "heading": "Gestão de contas",
+    "searchLabel": "Buscar por nome de usuário ou nome de exibição",
+    "searchAction": "Buscar",
+    "loading": "Carregando a lista de contas…",
+    "empty": "Nenhuma conta corresponde a essa busca.",
+    "total": "Mostrando {{shown}} de {{total}} contas",
+    "open": "Abrir {{name}}",
+    "pagination": {
+      "previous": "Página anterior",
+      "next": "Próxima página",
+      "page": "Página {{page}}"
+    }
+  },
+  "user": {
+    "loading": "Carregando a conta…",
+    "back": "Voltar para a lista de contas",
+    "statsHeading": "Atividade",
+    "fields": {
+      "username": "Nome de usuário",
+      "displayName": "Nome de exibição",
+      "email": "E-mail (mascarado)",
+      "registered": "Cadastro",
+      "lastActivity": "Última atividade",
+      "sessionsOrganized": "Sessões organizadas",
+      "sessionsJoined": "Sessões em que participou",
+      "friendCount": "Amizades",
+      "lifecycle": "Situação da conta",
+      "banState": "Situação do banimento"
+    },
+    "neverActive": "Nenhuma atividade registrada",
+    "unknown": "Não informado",
+    "banned": "Banida em {{date}}",
+    "notBanned": "Sem banimento",
+    "lifecycles": {
+      "onboarding": "Em configuração",
+      "active": "Ativa",
+      "pending_deletion": "Exclusão pendente",
+      "deleted": "Excluída",
+      "unknown": "Desconhecida"
+    },
+    "ban": {
+      "action": "Banir esta conta",
+      "title": "Banir esta conta?",
+      "body": "A conta é desconectada em todos os dispositivos, deixa de conseguir entrar e some da busca e da descoberta. As sessões, enquetes e o histórico ficam exatamente como estão.",
+      "confirm": "Banir",
+      "cancel": "Manter a conta ativa",
+      "done": "A conta foi banida."
+    },
+    "unban": {
+      "action": "Retirar o banimento",
+      "title": "Retirar o banimento?",
+      "body": "A conta volta a conseguir entrar e a aparecer na busca e na descoberta.",
+      "confirm": "Retirar o banimento",
+      "cancel": "Manter o banimento",
+      "done": "O banimento foi retirado."
+    },
+    "removeContent": {
+      "action": "Banir e remover o conteúdo",
+      "title": "Banir e remover o conteúdo desta conta?",
+      "warning": "A remoção do conteúdo não tem volta, e retirar o banimento depois não traz nada de volta.",
+      "body": "Além do banimento, isto cancela as sessões da conta que ainda não começaram, expira as enquetes abertas dela, tira a participação futura e os pedidos de entrada pendentes e cancela os lembretes. O histórico concluído, as amizades e os bloqueios não são tocados.",
+      "acknowledge": "Entendo que a remoção do conteúdo é permanente.",
+      "confirm": "Banir e remover o conteúdo",
+      "cancel": "Não remover nada",
+      "done": "A conta foi banida e o conteúdo dela removido."
+    }
+  },
+  "errors": {
+    "generic": "A solicitação falhou. Tente de novo.",
+    "codes": {
+      "not_found": "Esta página não está disponível.",
+      "invalid_request": "A solicitação não era válida.",
+      "scope_contended": "Alguém alterou os dados desta conta enquanto a solicitação rodava. Nada foi aplicado — tente de novo.",
+      "rate_limited": "Solicitações demais. Espere um momento e tente de novo.",
+      "transient_conflict": "A solicitação esbarrou em um conflito. Tente de novo."
+    }
+  }
+}

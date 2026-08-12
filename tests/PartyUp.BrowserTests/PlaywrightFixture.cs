@@ -348,6 +348,66 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         return Convert.ToInt32(result, System.Globalization.CultureInfo.InvariantCulture);
     }
 
+    /// <summary>
+    /// PHASE8_DESIGN.md §3 S3's prescribed admin-fixture mechanism. <c>AdminSeeder</c> is an
+    /// <c>IHostedService</c> keyed off <c>Admin:SeedUserIds</c>/<c>Admin:SeedEmails</c> and runs once at
+    /// host startup — before any browser-lane account exists — so the lane cannot reach the role through
+    /// configuration at all. It grants the role over this fixture's own connection instead (the same
+    /// backdoor idiom as <see cref="BackdatePollPastDeadlineAsync"/>, against the exact connection string
+    /// the running API was handed): the <c>auth_roles</c> row is guaranteed present because that same
+    /// seeder calls <c>EnsureRoleExistsAsync</c> on every startup, and <c>auth_users.id</c> is the user's
+    /// own id (<c>fk_auth_users_users_id</c>), so the join needs no second lookup.
+    /// <para>
+    /// Admin status resolves per request from the database (<c>CurrentUserProjectionReader</c> joins the
+    /// role tables live), so the grant takes effect on the very next request no matter when the caller's
+    /// cookie was issued — no re-login. The real constraint is that the account must already be onboarded
+    /// and profile-complete, or <c>RequireAdmin</c> still answers 404; every account this fixture returns
+    /// from <see cref="RegisterAndOnboardAsync"/> is. Callers still reload the page afterwards so cached
+    /// TanStack queries refetch under the new role.
+    /// </para>
+    /// </summary>
+    public async Task<Guid> GrantAdminRoleAsync(string username)
+    {
+        await using var connection = new NpgsqlConnection(_dbConnectionString);
+        await connection.OpenAsync();
+
+        await using var lookup = new NpgsqlCommand(
+            "SELECT id FROM users WHERE username = @username",
+            connection);
+        lookup.Parameters.AddWithValue("username", username);
+        if (await lookup.ExecuteScalarAsync() is not Guid userId)
+        {
+            throw new InvalidOperationException(
+                $"No user row exists for '{username}'; the admin grant has nothing to target.");
+        }
+
+        await using var grant = new NpgsqlCommand(
+            "INSERT INTO auth_user_roles (user_id, role_id) " +
+            "SELECT @userId, r.id FROM auth_roles r WHERE r.normalized_name = 'ADMIN' " +
+            "ON CONFLICT DO NOTHING",
+            connection);
+        grant.Parameters.AddWithValue("userId", userId);
+        await grant.ExecuteNonQueryAsync();
+
+        await using var verify = new NpgsqlCommand(
+            "SELECT COUNT(*) FROM auth_user_roles ur " +
+            "JOIN auth_roles r ON r.id = ur.role_id " +
+            "WHERE ur.user_id = @userId AND r.normalized_name = 'ADMIN'",
+            connection);
+        verify.Parameters.AddWithValue("userId", userId);
+        long granted = Convert.ToInt64(
+            await verify.ExecuteScalarAsync(),
+            System.Globalization.CultureInfo.InvariantCulture);
+        if (granted != 1)
+        {
+            throw new InvalidOperationException(
+                $"The admin role grant for '{username}' left {granted} role row(s); expected exactly one. " +
+                "AdminSeeder.EnsureRoleExistsAsync should have created the ADMIN role row at startup.");
+        }
+
+        return userId;
+    }
+
     public async Task DisposeAsync()
     {
         // F3: export every still-live traced context's trace BEFORE closing the browser (closing

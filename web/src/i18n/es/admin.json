@@ -1,0 +1,113 @@
+{
+  "dashboard": {
+    "heading": "Panel de uso",
+    "generatedAt": "Medido el {{timestamp}}",
+    "loading": "Cargando el panel…",
+    "windows": {
+      "last7Days": "Últimos 7 días",
+      "last30Days": "Últimos 30 días",
+      "since": "Desde {{date}}"
+    },
+    "metrics": {
+      "registrations": "Registros",
+      "activeUsers": "Personas activas",
+      "sessionsCreated": "Sesiones creadas",
+      "pollsCreated": "Encuestas creadas",
+      "proposals": "Propuestas",
+      "confirmed": "Confirmadas",
+      "confirmationRate": "Tasa de confirmación"
+    },
+    "notes": {
+      "sessionsCreated": "Sesiones creadas ya incluye las sesiones que generaron las encuestas finalizadas, así que nunca sumes ese número con encuestas creadas.",
+      "proposals": "Propuestas es el denominador de la confirmación: sesiones de horario fijo sin encuesta de origen, más las encuestas. Una encuesta finalizada cuenta una vez, nunca dos.",
+      "repeat": "Quien empezó a organizar hace poco tuvo menos ventana para volver a agendar, y eso baja la tasa por sí solo: léela junto a los números en bruto."
+    },
+    "repeat": {
+      "heading": "Reincidencia al agendar",
+      "window": "Volvió a agendar dentro de {{days}} días de su primera creación",
+      "rate": "Tasa de reincidencia",
+      "organizers": "Organizadores",
+      "repeatOrganizers": "Organizadores reincidentes"
+    },
+    "noValue": "—",
+    "noValueLabel": "Todavía sin valor"
+  },
+  "users": {
+    "heading": "Gestión de cuentas",
+    "searchLabel": "Buscar por nombre de usuario o nombre visible",
+    "searchAction": "Buscar",
+    "loading": "Cargando la lista de cuentas…",
+    "empty": "Ninguna cuenta coincide con esa búsqueda.",
+    "total": "Mostrando {{shown}} de {{total}} cuentas",
+    "open": "Abrir {{name}}",
+    "pagination": {
+      "previous": "Página anterior",
+      "next": "Página siguiente",
+      "page": "Página {{page}}"
+    }
+  },
+  "user": {
+    "loading": "Cargando la cuenta…",
+    "back": "Volver a la lista de cuentas",
+    "statsHeading": "Actividad",
+    "fields": {
+      "username": "Nombre de usuario",
+      "displayName": "Nombre visible",
+      "email": "Correo (enmascarado)",
+      "registered": "Registro",
+      "lastActivity": "Última actividad",
+      "sessionsOrganized": "Sesiones organizadas",
+      "sessionsJoined": "Sesiones en las que participó",
+      "friendCount": "Amistades",
+      "lifecycle": "Situación de la cuenta",
+      "banState": "Situación del bloqueo"
+    },
+    "neverActive": "Sin actividad registrada",
+    "unknown": "Sin definir",
+    "banned": "Bloqueada el {{date}}",
+    "notBanned": "Sin bloqueo",
+    "lifecycles": {
+      "onboarding": "En configuración",
+      "active": "Activa",
+      "pending_deletion": "Eliminación pendiente",
+      "deleted": "Eliminada",
+      "unknown": "Desconocida"
+    },
+    "ban": {
+      "action": "Bloquear esta cuenta",
+      "title": "¿Bloquear esta cuenta?",
+      "body": "La cuenta se cierra en todos los dispositivos, deja de poder entrar y desaparece de la búsqueda y del descubrimiento. Sus sesiones, encuestas e historial quedan tal cual están.",
+      "confirm": "Bloquear",
+      "cancel": "Mantener la cuenta activa",
+      "done": "La cuenta quedó bloqueada."
+    },
+    "unban": {
+      "action": "Quitar el bloqueo",
+      "title": "¿Quitar el bloqueo?",
+      "body": "La cuenta vuelve a poder entrar y a aparecer en la búsqueda y el descubrimiento.",
+      "confirm": "Quitar el bloqueo",
+      "cancel": "Dejar el bloqueo",
+      "done": "El bloqueo quedó quitado."
+    },
+    "removeContent": {
+      "action": "Bloquear y eliminar el contenido",
+      "title": "¿Bloquear y eliminar el contenido de esta cuenta?",
+      "warning": "Eliminar el contenido no tiene vuelta atrás, y quitar el bloqueo después no recupera nada.",
+      "body": "Además del bloqueo, esto cancela las sesiones de la cuenta que aún no empezaron, expira sus encuestas abiertas, quita su participación futura y sus solicitudes de ingreso pendientes, y cancela sus recordatorios. El historial completado, las amistades y los bloqueos entre personas quedan intactos.",
+      "acknowledge": "Entiendo que la eliminación del contenido es permanente.",
+      "confirm": "Bloquear y eliminar el contenido",
+      "cancel": "No eliminar nada",
+      "done": "La cuenta quedó bloqueada y su contenido eliminado."
+    }
+  },
+  "errors": {
+    "generic": "La solicitud falló. Inténtalo de nuevo.",
+    "codes": {
+      "not_found": "Esta página no está disponible.",
+      "invalid_request": "La solicitud no era válida.",
+      "scope_contended": "Alguien cambió los datos de esta cuenta mientras corría la solicitud. No se aplicó nada: inténtalo de nuevo.",
+      "rate_limited": "Demasiadas solicitudes. Espera un momento e inténtalo de nuevo.",
+      "transient_conflict": "La solicitud se topó con un conflicto. Inténtalo de nuevo."
+    }
+  }
+}

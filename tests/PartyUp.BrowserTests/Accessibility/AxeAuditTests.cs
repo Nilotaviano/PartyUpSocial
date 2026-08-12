@@ -60,6 +60,8 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
 
     private sealed record AuditContext(
         RegisteredUser Organizer,
+        RegisteredUser Admin,
+        string AdminUserId,
         string SessionId,
         string GuestLinkUrl,
         string OwnFriendCode,
@@ -73,20 +75,18 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
     /// to resolve every dynamic-segment route in <see cref="AuditedRoutes"/>. Built once and shared
     /// across every axe fact the same way the flow-test classes share their setup.
     /// <para>
-    /// Deliberately a single registration, and a <b>private</b> session (D-099 exempts private
-    /// sessions from needing an invited friend): the flow-test classes sharing this fixture's one
-    /// API process already spend three of the five allowed `register-ip` calls
-    /// (`RateLimitPolicies.cs`, 5/user-IP/hour) on <c>SessionRegisteredFlowTests</c> and one more on
-    /// <c>SessionGuestFlowTests</c>. A second axe-only account would push the shared process to six
-    /// registrations inside the same rolling hour and 429 — this class stays at exactly one so the
-    /// whole collection's total (five) never crosses the ceiling. `{username}`/`{code}` routes below
-    /// resolve against the organizer's own identity rather than a second party's.
+    /// One organizer plus one admin audit account (Phase 8 S3 — the `/admin*` routes render their
+    /// D-177 fail-closed branch for anyone without the role, so they cannot share the organizer),
+    /// and a <b>private</b> session (D-099 exempts private sessions from needing an invited friend).
+    /// `{username}`/`{code}` routes below resolve against the organizer's own identity rather than a
+    /// second party's; `{adminUserId}` resolves against the admin account's own id.
     /// </para>
     /// <para>
     /// The lane overrides `register-ip` to 100 (`PlaywrightFixture.cs`'s
-    /// <c>RegisterPerIpPerHourOverride</c>), not production's 5 — the five registrations this
-    /// collection already ships (three here, one in each flow class) leave well over ninety
-    /// remaining, and <see cref="Tour.TourFlowTests"/>'s own registration fits comfortably inside it.
+    /// <c>RegisterPerIpPerHourOverride</c>), not production's 5 — the registrations this collection
+    /// ships (two here, plus each flow class's own) leave well over ninety remaining, and
+    /// <see cref="Tour.TourFlowTests"/>'s own registration fits comfortably inside it. Each one still
+    /// pays the fixture's 65-second shared-rate-window barrier.
     /// </para>
     /// </summary>
     private async Task<AuditContext> GetContextAsync()
@@ -190,8 +190,24 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
             await organizer.Page.GetByText("Your vote was saved.").WaitForAsync();
             await fixture.BackdatePollPastDeadlineAsync(pollAwaitingSelectionId);
 
+            // Phase 8 S3 (PHASE8_DESIGN.md §3 S3): a dedicated admin audit account — the three
+            // `/admin*` routes render their D-177 fail-closed branch for anyone else, so scanning
+            // them on the organizer's context would audit a one-paragraph not-found page. The role
+            // is granted over the fixture's own connection (see `GrantAdminRoleAsync`); the reload
+            // below is what makes the already-open context's cached queries refetch under it.
+            RegisteredUser admin = await fixture.RegisterAndOnboardAsync(
+                await fixture.NewContextAsync(),
+                "axeadmin",
+                // Never a display name whose tokens include "admin": `all.txt` holds it as an
+                // exact token term, so `ProfanityFilter` rejects the draft outright.
+                "Axe Operator");
+            Guid adminUserId = await fixture.GrantAdminRoleAsync(admin.Username);
+            await admin.Page.ReloadAsync();
+
             return new AuditContext(
                 organizer,
+                admin,
+                adminUserId.ToString(),
                 sessionId,
                 guestLinkUrl,
                 ownFriendCode,
@@ -383,13 +399,17 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
                     .Replace(
                         "{pollAwaitingSelectionId}",
                         context.PollAwaitingSelectionId,
-                        StringComparison.Ordinal);
-                // A fresh tab on the organizer's own authenticated context (never the organizer's
+                        StringComparison.Ordinal)
+                    .Replace("{adminUserId}", context.AdminUserId, StringComparison.Ordinal);
+                // A fresh tab on the account's own authenticated context — the admin audit account
+                // for a `RequiresAdmin` route, the organizer otherwise (never either account's
                 // persistent page) — shares its cookies so the route still renders signed-in, but
                 // never navigated before, so the theme seed below is guaranteed to land before this
                 // page's first paint. Closed in the finally below so per-theme runs don't accumulate
                 // open tabs on that context across the route loop.
-                page = await context.Organizer.Page.Context.NewPageAsync();
+                page = route.RequiresAdmin
+                    ? await context.Admin.Page.Context.NewPageAsync()
+                    : await context.Organizer.Page.Context.NewPageAsync();
                 await SeedThemeBeforeFirstNavigationAsync(page, theme);
                 await page.GotoAsync(PlaywrightFixture.WebBaseUrl + path);
             }

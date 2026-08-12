@@ -24,12 +24,18 @@ public enum GuestLinkKind
 /// external-auth callback) stays out of S1's seed — "reachable in the fixture" (PHASE5_DESIGN.md §9)
 /// excludes only what the fixture genuinely has no way to reach.
 /// </summary>
+/// <param name="RequiresAdmin">
+/// Phase 8 S3 (PHASE8_DESIGN.md §3): the route is behind <c>RequireAdmin</c>, which answers 404 to
+/// everyone else — <see cref="Accessibility.AxeAuditTests"/> navigates it on the dedicated admin audit
+/// account's context rather than the shared organizer's, or it would scan the fail-closed branch.
+/// </param>
 public sealed record AuditedRoute(
     string Name,
     string PathTemplate,
     bool RequiresGuestLink = false,
     string? OnboardingStepKey = null,
-    GuestLinkKind GuestLinkKind = GuestLinkKind.Session);
+    GuestLinkKind GuestLinkKind = GuestLinkKind.Session,
+    bool RequiresAdmin = false);
 
 /// <summary>
 /// Checked-in route inventory for the S1 axe lane (A-082, PHASE5_DESIGN.md §9, §11 "Browser lane
@@ -98,5 +104,11 @@ public static class AuditedRoutes
         new AuditedRoute("notifications", "/notifications"),
         // Phase 7 S6 (PHASE7_DESIGN.md §5/§6, ticket-P7-S6): push/reminder/mute preferences.
         new AuditedRoute("settings-notifications", "/settings/notifications"),
+        // Phase 8 S3 (PHASE8_DESIGN.md §3 S3, Q2 ratified): the three URL-only admin routes. No
+        // navigation entry renders for them anywhere, so they are reached by direct navigation on
+        // the admin audit account's own context.
+        new AuditedRoute("admin-dashboard", "/admin", RequiresAdmin: true),
+        new AuditedRoute("admin-users", "/admin/users", RequiresAdmin: true),
+        new AuditedRoute("admin-user-detail", "/admin/users/{adminUserId}", RequiresAdmin: true),
     ];
 }

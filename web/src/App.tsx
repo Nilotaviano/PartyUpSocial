@@ -4,6 +4,9 @@ import { RequireAuth } from './auth/RequireAuth'
 import { RequireOnboarded } from './auth/RequireOnboarded'
 import { useSession } from './auth/useSession'
 import { AccountMenu } from './features/account/AccountMenu'
+import { AdminDashboardPage } from './features/admin/AdminDashboardPage'
+import { AdminUserDetailPage } from './features/admin/AdminUserDetailPage'
+import { AdminUsersPage } from './features/admin/AdminUsersPage'
 import {
   AgeGate,
   AuthCallback,
@@ -245,6 +248,18 @@ function App() {
             <Route path="/polls" element={<PollListPage />} />
             <Route path="/polls/:pollId" element={<PollDetailPage />} />
             <Route path="/polls/:pollId/invite" element={<PollInvitePage />} />
+
+            {/*
+              PHASE8_DESIGN.md §2 Q2 (ratified 2026-08-12): the admin surface is
+              reached by URL only — no navigation entry is rendered for anyone,
+              here or in AuthenticatedShell above. D-177's 404 posture makes nav
+              gating unnecessary: a non-admin who guesses these URLs gets the
+              page-local not-found branch each page renders for a 404, which
+              names nothing admin-specific.
+            */}
+            <Route path="/admin" element={<AdminDashboardPage />} />
+            <Route path="/admin/users" element={<AdminUsersPage />} />
+            <Route path="/admin/users/:userId" element={<AdminUserDetailPage />} />
           </Route>
         </Route>
       </Route>
