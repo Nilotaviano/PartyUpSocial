@@ -12,4 +12,5 @@ public sealed record CurrentUserProjection(
     bool IsAdmin,
     bool IsProfileComplete,
     Locale? Locale,
-    string SecurityStamp);
+    string SecurityStamp,
+    Instant? LastSeenAt = null);

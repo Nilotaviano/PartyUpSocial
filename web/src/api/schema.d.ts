@@ -676,6 +676,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetAdminDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/maintenance/deletion-sweep": {
         parameters: {
             query?: never;
@@ -1964,8 +1980,43 @@ export interface components {
             requester: components["schemas"]["MaskedParticipant"];
             requestedAt: string;
         };
+        AdminDashboardResponse: {
+            generatedAt: string;
+            last7Days: components["schemas"]["AdminUsageWindowResponse"];
+            last30Days: components["schemas"]["AdminUsageWindowResponse"];
+            repeatScheduling: components["schemas"]["AdminRepeatSchedulingResponse"];
+        };
         AdminMutationResponse: {
             status: string;
+        };
+        AdminRepeatSchedulingResponse: {
+            /** Format: int32 */
+            days: number | string;
+            /** Format: int32 */
+            organizers: number | string;
+            /** Format: int32 */
+            repeatOrganizers: number | string;
+            /** Format: double */
+            rate: null | number | string;
+        };
+        AdminUsageWindowResponse: {
+            /** Format: int32 */
+            days: number | string;
+            since: string;
+            /** Format: int32 */
+            registrations: number | string;
+            /** Format: int32 */
+            activeUsers: number | string;
+            /** Format: int32 */
+            sessionsCreated: number | string;
+            /** Format: int32 */
+            pollsCreated: number | string;
+            /** Format: int32 */
+            confirmationDenominator: number | string;
+            /** Format: int32 */
+            confirmationSuccesses: number | string;
+            /** Format: double */
+            confirmationRate: null | number | string;
         };
         AdminUserResponse: {
             /** Format: uuid */
@@ -4332,6 +4383,26 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetAdminDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDashboardResponse"];
                 };
             };
         };

@@ -91,7 +91,7 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
     /// <see cref="NewGuestPollOperationIds"/> (ticket-P6-S4b), the 2 list/preview ones in
     /// <see cref="NewPollListOperationIds"/> (ticket-P6-S4c), the 1 self-removal one in
     /// <see cref="NewPollLeaveOperationIds"/> (D-186), and the 1 mid-flight-invite one in
-    /// <see cref="NewPollInviteOperationIds"/> (D-193) — 124 total. A deliberate future change
+    /// <see cref="NewPollInviteOperationIds"/> (D-193), and the D-178 admin usage dashboard — 125 total. A deliberate future change
     /// to the shipped surface must update this list explicitly; it is not meant to silently absorb an
     /// added, removed, or renamed operation.
     /// </summary>
@@ -105,7 +105,7 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         "CompleteOnboarding", "CompleteSteamDeletion", "CompleteSteamExternal", "CompleteTour",
         "ConfirmAccountDeletion", "ConsumeMagicLink", "CreateSession", "CreateSessionGuestLinks",
         "DeleteAuthMethod", "DeleteMe", "DeletePlatformLink", "EditSession", "ForgotPassword",
-        "GetAdminUser", "GetAntiforgery", "GetAuthMethods", "GetFriendShare", "GetGuestSession",
+        "GetAdminDashboard", "GetAdminUser", "GetAntiforgery", "GetAuthMethods", "GetFriendShare", "GetGuestSession",
         "GetMyProfile", "GetOnboardingState", "GetPlatformLinks", "GetSession", "GetSessionDetail",
         "GetUserProfile", "ImportSteamFriends", "InviteSessionUsers", "IssueExternalIntent",
         "LeaveSession", "LinkPlatform", "ListAdminUsers", "ListBlocks", "ListFriendRequests",

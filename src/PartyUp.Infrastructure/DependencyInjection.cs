@@ -63,6 +63,8 @@ public static class DependencyInjection
         services.AddScoped<IAccountSessionService, AccountSessionService>();
         services.AddScoped<ICurrentUserProjectionReader, CurrentUserProjectionReader>();
         services.AddScoped<IAdminUserReader, AdminUserReader>();
+        services.AddScoped<IUsageDashboardReader, UsageDashboardReader>();
+        services.AddScoped<IUserActivityWriter, UserActivityWriter>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IAvatarSourceRepository, AvatarSourceRepository>();
         services.AddScoped<IUsernameRegistryRepository, UsernameRegistryRepository>();

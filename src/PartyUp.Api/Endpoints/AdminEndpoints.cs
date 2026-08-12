@@ -39,6 +39,10 @@ public static class AdminEndpoints
             .Produces<AdminMutationResponse>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
+        api.MapGet("/admin/dashboard", GetDashboardAsync)
+            .WithName("GetAdminDashboard")
+            .RequireAuthorization(AuthorizationPolicies.RequireAdmin)
+            .Produces<AdminDashboardResponse>();
         api.MapPost("/admin/maintenance/deletion-sweep", RunDeletionSweepAsync)
             .WithName("RunDeletionSweep")
             .RequireAuthorization(AuthorizationPolicies.RequireAdmin)
@@ -86,6 +90,14 @@ public static class AdminEndpoints
         return user is null
             ? Problem(context, StatusCodes.Status404NotFound, "not_found")
             : Results.Ok(AdminUserResponse.From(user));
+    }
+
+    private static async Task<IResult> GetDashboardAsync(
+        GetUsageDashboardUseCase useCase,
+        CancellationToken cancellationToken)
+    {
+        UsageDashboard dashboard = await useCase.ExecuteAsync(cancellationToken);
+        return Results.Ok(AdminDashboardResponse.From(dashboard));
     }
 
     private static async Task<IResult> BanUserAsync(
@@ -238,6 +250,54 @@ public sealed record AdminUserResponse(
         _ => throw new ArgumentOutOfRangeException(nameof(lifecycle)),
     };
 }
+
+public sealed record AdminDashboardResponse(
+    string GeneratedAt,
+    AdminUsageWindowResponse Last7Days,
+    AdminUsageWindowResponse Last30Days,
+    AdminRepeatSchedulingResponse RepeatScheduling)
+{
+    internal static AdminDashboardResponse From(UsageDashboard dashboard) =>
+        new(
+            InstantPattern.ExtendedIso.Format(dashboard.GeneratedAt),
+            AdminUsageWindowResponse.From(dashboard.Last7Days),
+            AdminUsageWindowResponse.From(dashboard.Last30Days),
+            new AdminRepeatSchedulingResponse(
+                dashboard.RepeatScheduling.Days,
+                dashboard.RepeatScheduling.Organizers,
+                dashboard.RepeatScheduling.RepeatOrganizers,
+                dashboard.RepeatScheduling.Rate));
+}
+
+public sealed record AdminUsageWindowResponse(
+    int Days,
+    string Since,
+    int Registrations,
+    int ActiveUsers,
+    int SessionsCreated,
+    int PollsCreated,
+    int ConfirmationDenominator,
+    int ConfirmationSuccesses,
+    double? ConfirmationRate)
+{
+    internal static AdminUsageWindowResponse From(UsageWindow window) =>
+        new(
+            window.Days,
+            InstantPattern.ExtendedIso.Format(window.Since),
+            window.Registrations,
+            window.ActiveUsers,
+            window.SessionsCreated,
+            window.PollsCreated,
+            window.ConfirmationDenominator,
+            window.ConfirmationSuccesses,
+            window.ConfirmationRate);
+}
+
+public sealed record AdminRepeatSchedulingResponse(
+    int Days,
+    int Organizers,
+    int RepeatOrganizers,
+    double? Rate);
 
 public sealed record DeletionJournalResponse(
     IReadOnlyList<DeletionJournalItemResponse> Entries);

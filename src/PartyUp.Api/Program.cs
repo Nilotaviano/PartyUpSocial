@@ -108,6 +108,7 @@ builder.Services.AddScoped<ExecuteDueDeletionsUseCase>();
 builder.Services.AddScoped<PurgeExpiredAuthTokensUseCase>();
 builder.Services.AddScoped<ListUsersUseCase>();
 builder.Services.AddScoped<GetUserUseCase>();
+builder.Services.AddScoped<GetUsageDashboardUseCase>();
 builder.Services.AddScoped<BanUserUseCase>();
 builder.Services.AddScoped<UnbanUserUseCase>();
 builder.Services.AddScoped<ReadDeletionJournalUseCase>();
@@ -325,6 +326,7 @@ app.UseWhen(
     branch => branch.UseRateLimiter());
 app.UseAuthorization();
 app.UseMiddleware<RequestContentTypeMiddleware>();
+app.UseMiddleware<LastSeenTouchMiddleware>();
 
 // /health/live is process-only (no registered checks run) so the proxy/container layer can tell
 // a dead app from a reachable app with an unhealthy dependency; /health includes Postgres.

@@ -1225,6 +1225,10 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("grace_ends_at");
 
+                    b.Property<Instant?>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
                     b.Property<int>("Lifecycle")
                         .HasColumnType("integer")
                         .HasColumnName("lifecycle");

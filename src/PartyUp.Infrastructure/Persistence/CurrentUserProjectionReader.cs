@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Kernel;
 using PartyUp.Infrastructure.Identity;
@@ -24,6 +25,7 @@ public sealed class CurrentUserProjectionReader(AppDbContext context)
                 user.GraceEndsAt,
                 HasUsername = user.Username != null,
                 user.Locale,
+                LastSeenAt = EF.Property<Instant?>(user, UserActivityWriter.LastSeenProperty),
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (user is null)
@@ -57,6 +59,7 @@ public sealed class CurrentUserProjectionReader(AppDbContext context)
             authUser.IsAdmin,
             user.HasUsername,
             user.Locale,
-            authUser.SecurityStamp ?? string.Empty);
+            authUser.SecurityStamp ?? string.Empty,
+            user.LastSeenAt);
     }
 }

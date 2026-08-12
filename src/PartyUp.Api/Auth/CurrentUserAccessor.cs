@@ -56,6 +56,13 @@ public sealed class CurrentUserAccessor(
         return _projection;
     }
 
+    /// <summary>
+    /// The projection this request already resolved, or null when none has been — reading it never
+    /// starts a query, which is what keeps <see cref="LastSeenTouchMiddleware"/> free.
+    /// </summary>
+    internal CurrentUserProjection? LoadedProjection =>
+        _projection is { IsCompletedSuccessfully: true } projection ? projection.Result : null;
+
     internal void InvalidateProjection() =>
         _projection = Task.FromResult<CurrentUserProjection?>(null);
 

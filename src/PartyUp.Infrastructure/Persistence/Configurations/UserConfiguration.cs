@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using NodaTime;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Users;
 using PartyUp.Infrastructure.Persistence.Converters;
@@ -46,6 +47,13 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(user => user.BannedAt)
             .HasColumnType("timestamp with time zone");
         builder.Property(user => user.TourCompletedAt)
+            .HasColumnType("timestamp with time zone");
+
+        // PHASE8_DESIGN.md §2 Q1: last-seen is operator telemetry the D-178 dashboard reads, never a
+        // domain input — it stays a shadow property so no aggregate invariant can come to depend on
+        // it, and the throttled touch writes it with SQL outside the change tracker.
+        builder.Property<Instant?>(UserActivityWriter.LastSeenProperty)
+            .HasColumnName("last_seen_at")
             .HasColumnType("timestamp with time zone");
 
         builder.ComplexProperty(user => user.Avatar, avatar =>
