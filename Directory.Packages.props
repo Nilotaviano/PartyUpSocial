@@ -47,6 +47,9 @@
     <!-- Hangfire.Core asks for Newtonsoft.Json >= 11.0.1, which GHSA-5crp-9r3c-p9vr rates high
          severity; 13.0.3 is the first version NU1903 accepts. -->
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <!-- Testcontainers.PostgreSql 4.13.0 resolves SSH.NET 2025.1.0, which carries a high-severity
+         advisory NU1903 rejects; 2026.0.0 is the current patched release. -->
+    <PackageVersion Include="SSH.NET" Version="2026.0.0" />
   </ItemGroup>
 
 </Project>
