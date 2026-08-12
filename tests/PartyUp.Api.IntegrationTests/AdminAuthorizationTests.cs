@@ -103,17 +103,37 @@ public sealed class AdminAuthorizationTests : IAsyncLifetime, IDisposable
         Assert.Equal(HttpStatusCode.OK, unban.StatusCode);
         Assert.Null(await BannedAtAsync(targetId));
 
+        // D-180 (Phase 8 S2): the content-removal arm of the same route bans and removes; its own
+        // effects are proven over a seeded graph by ContentRemovalTests.
         HttpResponseMessage contentRemoval = await AntiforgeryTestClient.PostAsync(
             client,
             $"/api/v1/admin/users/{targetId.Value:D}/ban",
             JsonContent.Create(new { removeContent = true }),
             cookie);
-        Assert.Equal(HttpStatusCode.NotImplemented, contentRemoval.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, contentRemoval.StatusCode);
         Assert.Contains(
-            "not_implemented_in_phase",
+            "banned_content_removed",
             await contentRemoval.Content.ReadAsStringAsync(),
             StringComparison.Ordinal);
-        Assert.Null(await BannedAtAsync(targetId));
+        Assert.NotNull(await BannedAtAsync(targetId));
+    }
+
+    [Fact]
+    public async Task Admin_ContentRemovalForAnUnknownUser_Returns404_D180()
+    {
+        UserId adminId = await _factory.SeedUserAsync(
+            admin: true,
+            email: "admin-removal-404@example.test");
+        using HttpClient client = Slice5HttpTest.CreateClient(_factory);
+        string cookie = await SignInAsync(client, adminId);
+
+        HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
+            client,
+            $"/api/v1/admin/users/{Guid.CreateVersion7():D}/ban",
+            JsonContent.Create(new { removeContent = true }),
+            cookie);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]

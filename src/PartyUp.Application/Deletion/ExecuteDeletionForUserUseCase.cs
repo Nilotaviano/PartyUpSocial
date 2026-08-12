@@ -9,20 +9,17 @@ using PartyUp.Domain.Users.DeletionExecution;
 namespace PartyUp.Application.Deletion;
 
 /// <summary>
-/// The §6.2 pre-lock/reload protocol: discover the complete affected user set with no locks held, then
-/// lock the deduplicated union of the subject and every discovered counterpart in **one**
-/// A-068-ordered statement — never the subject alone followed by a lower-ordered counterpart, which is
-/// exactly the inversion §6.2 forbids. <see cref="IUserRepository.FindForUpdateAsync"/> runs only
-/// *after* that statement, to load the tracked entity; re-locking an already-locked row in the same
-/// transaction is harmless. The scope is then reloaded, and the whole transaction aborts if the
-/// reload's recomputed candidate set differs from what was discovered. A changed set cannot retry
-/// inside the poisoned transaction, so it surfaces as <see cref="DeletionScopeChangedException"/> and
-/// <see cref="ExecuteAsync"/> retries the entire attempt — discovery included — in a fresh transaction,
-/// at most 3 attempts with a jittered 20/50/100 ms backoff. <paramref name="sessionLocks"/>,
-/// <paramref name="materializer"/> and <paramref name="pollMaterializer"/> default to
-/// <see langword="null"/> for callers that construct this type directly without the widened session/poll
-/// scope (the bulk lock and event materialization are simply skipped, falling back to the single-row
-/// subject lock); production resolution always supplies all three through DI.
+/// Grace-expiry deletion, run inside the shared <see cref="LockedSubjectScopeRunner"/> lock envelope
+/// (§6.2's pre-lock/reload protocol with its bounded <see cref="DeletionScopeChangedException"/>
+/// retry). This use case supplies the three things that make the envelope a deletion: the
+/// PendingDeletion + elapsed-grace eligibility predicate, the body (executor, notification
+/// materialization, applier, credential purge, journal append), and the post-commit NDJSON journal
+/// ship. It installs no post-lock subject hook — deletion mutates the subject only inside the
+/// executor. <paramref name="sessionLocks"/>, <paramref name="materializer"/> and
+/// <paramref name="pollMaterializer"/> default to <see langword="null"/> for callers that construct
+/// this type directly without the widened session/poll scope (the bulk lock and event materialization
+/// are simply skipped, falling back to the single-row subject lock); production resolution always
+/// supplies all three through DI.
 /// </summary>
 public sealed class ExecuteDeletionForUserUseCase(
     IUserRepository users,
@@ -37,66 +34,29 @@ public sealed class ExecuteDeletionForUserUseCase(
     ISessionNotificationMaterializer? materializer = null,
     IPollNotificationMaterializer? pollMaterializer = null)
 {
-    private const int MaxAttempts = 3;
-    private static readonly int[] BackoffFloorsMilliseconds = [20, 50, 100];
+    private readonly LockedSubjectScopeRunner _runner =
+        new(users, scopeProvider, unitOfWork, sessionLocks);
 
     public async Task<bool> ExecuteAsync(UserId userId, CancellationToken cancellationToken)
     {
-        for (int attempt = 1; attempt <= MaxAttempts; attempt++)
-        {
-            try
-            {
-                bool executed = await unitOfWork.ExecuteAsync(
-                    ct => ExecuteOnceAsync(userId, ct),
-                    cancellationToken);
-
-                if (executed)
-                {
-                    await shipper.ShipPendingAsync(cancellationToken);
-                }
-
-                return executed;
-            }
-            catch (DeletionScopeChangedException)
-            {
-                if (attempt >= MaxAttempts)
-                {
-                    break;
-                }
-
-                await Task.Delay(JitteredBackoff(attempt), cancellationToken);
-            }
-        }
-
         // Exhaustion abandons this user for this tick; the Phase 2 grace-expiry sweep's next cadence
         // re-discovers and retries, so no user is permanently stuck (PHASE4_DESIGN.md §6.2).
-        return false;
+        LockedScopeOutcome outcome = await _runner.RunAsync(
+            userId,
+            new LockedSubjectScopeOperation(
+                user => user.IsPendingDeletion && user.IsGraceElapsed(clock),
+                (user, scope, ct) => ExecuteOnceAsync(user, scope, ct))
+            {
+                OnCommittedAsync = shipper.ShipPendingAsync,
+            },
+            cancellationToken);
+
+        return outcome == LockedScopeOutcome.Executed;
     }
 
-    private async Task<bool> ExecuteOnceAsync(UserId userId, CancellationToken cancellationToken)
+    private async Task ExecuteOnceAsync(User user, DeletionScope scope, CancellationToken cancellationToken)
     {
-        IReadOnlyCollection<UserId> discovered =
-            await scopeProvider.DiscoverAffectedUserIdsAsync(userId, cancellationToken);
-
-        if (sessionLocks is not null)
-        {
-            HashSet<UserId> union = [userId, .. discovered];
-            await sessionLocks.LockUsersAsync(union, cancellationToken);
-        }
-
-        User? user = await users.FindForUpdateAsync(userId, cancellationToken);
-        if (user is null || !user.IsPendingDeletion || !user.IsGraceElapsed(clock))
-        {
-            return false;
-        }
-
-        DeletionScope scope = await scopeProvider.LoadForUpdateAsync(userId, cancellationToken);
-        IReadOnlyCollection<UserId> recomputed = IDeletionScopeProvider.ExtractAffectedUserIds(userId, scope);
-        if (!SetsEqual(discovered, recomputed))
-        {
-            throw new DeletionScopeChangedException(userId);
-        }
-
+        UserId userId = user.Id;
         DeletionExecutionResult result = DeletionExecutor.Execute(user, scope, clock);
 
         if (materializer is not null)
@@ -130,24 +90,13 @@ public sealed class ExecuteDeletionForUserUseCase(
         await resultApplier.ApplyAsync(result, userId, cancellationToken);
         await accounts.PurgeCredentialsAsync(userId, cancellationToken);
         journal.Append(result.Journal);
-        return true;
-    }
-
-    private static bool SetsEqual(IReadOnlyCollection<UserId> first, IReadOnlyCollection<UserId> second) =>
-        first.Count == second.Count && first.ToHashSet().SetEquals(second);
-
-    private static TimeSpan JitteredBackoff(int attempt)
-    {
-        int floor = BackoffFloorsMilliseconds[Math.Min(attempt - 1, BackoffFloorsMilliseconds.Length - 1)];
-        int jitterMilliseconds = Random.Shared.Next(0, floor / 2 + 1);
-        return TimeSpan.FromMilliseconds(floor + jitterMilliseconds);
     }
 }
 
 /// <summary>
 /// PHASE4_DESIGN.md §6.2: the reload's recomputed candidate user set differed from what discovery
 /// locked, so the transaction performed no writes. The already-poisoned transaction cannot retry
-/// itself; <see cref="ExecuteDeletionForUserUseCase.ExecuteAsync"/> is the outer, bounded retry.
+/// itself; <see cref="LockedSubjectScopeRunner.RunAsync"/> is the outer, bounded retry.
 /// </summary>
 public sealed class DeletionScopeChangedException(UserId subject)
     : Exception($"The deletion candidate set for {subject} changed between discovery and reload.")

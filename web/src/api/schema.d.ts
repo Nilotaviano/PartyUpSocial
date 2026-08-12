@@ -2027,6 +2027,13 @@ export interface components {
             created: string;
             lifecycle: string;
             bannedAt: null | string;
+            lastSeenAt: null | string;
+            /** Format: int32 */
+            sessionsOrganized: number | string;
+            /** Format: int32 */
+            sessionsJoined: number | string;
+            /** Format: int32 */
+            friendCount: number | string;
         };
         AdminUsersResponse: {
             users: components["schemas"]["AdminUserResponse"][];
@@ -4333,8 +4340,8 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
-            /** @description Not Implemented */
-            501: {
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

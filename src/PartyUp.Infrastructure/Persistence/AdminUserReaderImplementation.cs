@@ -12,6 +12,27 @@ namespace PartyUp.Infrastructure.Persistence;
 
 public sealed class AdminUserReader(AppDbContext context) : IAdminUserReader
 {
+    /// <summary>
+    /// D-179's projection. The three counts are correlated scalar subqueries rather than joins so a
+    /// page stays one round trip and a user with no sessions still yields 0 instead of dropping out.
+    /// "Joined" deliberately excludes the sessions the user organizes (those are the organized count)
+    /// and the participations they were removed from (<c>status = 4</c>); the friend count reads both
+    /// canonical sides of the accepted friendship pair (<c>status = 1</c>).
+    /// </summary>
+    private const string ProjectionColumns = """
+        u.id, u.username, u.display_name, a.email, u.created_at,
+               u.lifecycle, u.banned_at, u.last_seen_at,
+               (SELECT count(*)::int FROM sessions AS os
+                 WHERE os.organizer_id = u.id) AS sessions_organized,
+               (SELECT count(*)::int FROM session_participations AS jp
+                  JOIN sessions AS js ON js.id = jp.session_id
+                 WHERE jp.user_id = u.id AND jp.status <> 4
+                   AND js.organizer_id <> u.id) AS sessions_joined,
+               (SELECT count(*)::int FROM friendships AS f
+                 WHERE f.status = 1
+                   AND (f.user_lo_id = u.id OR f.user_hi_id = u.id)) AS friend_count
+        """;
+
     public async Task<AdminUserPage> ListAsync(
         string? query,
         int page,
@@ -63,9 +84,8 @@ public sealed class AdminUserReader(AppDbContext context) : IAdminUserReader
         {
             await using DbCommand command = CreateCommand(
                 connection,
-                """
-                SELECT u.id, u.username, u.display_name, a.email, u.created_at,
-                       u.lifecycle, u.banned_at
+                $"""
+                SELECT {ProjectionColumns}
                 FROM users AS u
                 LEFT JOIN auth_users AS a ON a.id = u.id
                 WHERE u.id = @id
@@ -113,9 +133,8 @@ public sealed class AdminUserReader(AppDbContext context) : IAdminUserReader
     {
         await using DbCommand command = CreateCommand(
             connection,
-            """
-            SELECT u.id, u.username, u.display_name, a.email, u.created_at,
-                   u.lifecycle, u.banned_at
+            $"""
+            SELECT {ProjectionColumns}
             FROM users AS u
             LEFT JOIN auth_users AS a ON a.id = u.id
             WHERE @pattern IS NULL
@@ -168,7 +187,11 @@ public sealed class AdminUserReader(AppDbContext context) : IAdminUserReader
             reader.IsDBNull(3) ? null : reader.GetString(3),
             reader.GetFieldValue<Instant>(4),
             (UserLifecycle)reader.GetInt32(5),
-            reader.IsDBNull(6) ? null : reader.GetFieldValue<Instant>(6));
+            reader.IsDBNull(6) ? null : reader.GetFieldValue<Instant>(6),
+            reader.IsDBNull(7) ? null : reader.GetFieldValue<Instant>(7),
+            reader.GetInt32(8),
+            reader.GetInt32(9),
+            reader.GetInt32(10));
 
     private static string EscapeLikePattern(string value) =>
         value.Replace("\\", "\\\\", StringComparison.Ordinal)

@@ -421,4 +421,10 @@ internal sealed class CountingDeletionResultApplier(
         counts.Add(result);
         return inner.ApplyAsync(result, subject, cancellationToken);
     }
+
+    public Task ApplyContentRemovalAsync(
+        ContentRemovalResult result,
+        UserId subject,
+        CancellationToken cancellationToken) =>
+        inner.ApplyContentRemovalAsync(result, subject, cancellationToken);
 }

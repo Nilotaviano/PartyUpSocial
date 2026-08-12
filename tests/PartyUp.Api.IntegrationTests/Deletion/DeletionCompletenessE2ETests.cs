@@ -101,6 +101,12 @@ public sealed class DeletionCompletenessE2ETests : IAsyncLifetime, IDisposable
         Assert.Null(subject.GraceEndsAt);
         Assert.Equal(executionInstant, subject.DeletedAt);
         Assert.Empty(subject.PlatformLinks);
+        // PHASE8_DESIGN.md §2 Q1: last_seen_at is PII-adjacent telemetry and a tombstone must never
+        // keep counting as an active user, so deletion nulls it with the rest.
+        Assert.Null(await verify.DomainUsers.AsNoTracking()
+            .Where(user => user.Id == seed.SubjectId)
+            .Select(user => EF.Property<Instant?>(user, UserActivityWriter.LastSeenProperty))
+            .SingleAsync());
 
         // 2. D-145: the username enters a thirty-day, owner-less reservation.
         UsernameRegistryEntry username = await verify.UsernameRegistry.AsNoTracking()
@@ -499,6 +505,13 @@ public sealed class DeletionCompletenessE2ETests : IAsyncLifetime, IDisposable
             await context.Database.ExecuteSqlInterpolatedAsync($"""
                 INSERT INTO notification_mutes (id, user_id, poll_id, created_at)
                 VALUES ({Guid.CreateVersion7()}, {subjectId.Value}, {Guid.CreateVersion7()}, now())
+                """);
+
+            // PHASE8_DESIGN.md §2 Q1: the subject has been seen, so the tombstone assertion below can
+            // actually fail if deletion ever stops clearing the activity column.
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE users SET last_seen_at = {_factory.Clock.GetCurrentInstant()}
+                WHERE id = {subjectId.Value}
                 """);
         }
 

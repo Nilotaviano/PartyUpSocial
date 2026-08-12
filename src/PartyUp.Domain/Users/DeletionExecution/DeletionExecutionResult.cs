@@ -50,4 +50,18 @@ public sealed record DeletionExecutionResult(
     IReadOnlyList<Block> DeletedBlocks,
     IReadOnlyList<UserDataScope> PurgedData,
     UsernameRegistryEntry? ReservedUsername,
-    DeletionJournalEntry Journal);
+    DeletionJournalEntry Journal)
+{
+    /// <summary>
+    /// The §11 steps 1–3 half of this result, in the shape the D-180 content-removal action produces
+    /// on its own — so the applier's removal tail has exactly one implementation and the deletion
+    /// overload delegates to it instead of duplicating the reminder-cancel loop.
+    /// </summary>
+    public ContentRemovalResult ContentRemoval => new(
+        CanceledSessions,
+        ExpiredPolls,
+        RemovedFromSessions,
+        RemovedFromPolls,
+        LapsedJoinRequests,
+        CanceledReminders);
+}

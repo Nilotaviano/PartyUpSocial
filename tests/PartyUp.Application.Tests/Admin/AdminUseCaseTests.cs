@@ -109,18 +109,7 @@ public sealed class ListUsersUseCaseTests
         Instant bannedAt = Instant.FromUtc(2026, 7, 30, 12, 0);
         var reader = new FakeAdminUserReader
         {
-            Page = new AdminUserPage(
-            [
-                new AdminUserRecord(
-                    id,
-                    "player",
-                    "Player One",
-                    "owner@example.test",
-                    createdAt,
-                    UserLifecycle.Active,
-                    bannedAt),
-            ],
-            1),
+            Page = new AdminUserPage([Record(id, createdAt, bannedAt)], 1),
         };
         var useCase = new ListUsersUseCase(reader);
 
@@ -137,6 +126,76 @@ public sealed class ListUsersUseCaseTests
         Assert.Equal("player", reader.Query);
         Assert.Equal(1, result.Total);
     }
+
+    /// <summary>
+    /// D-179's per-user stats reach the projection unchanged — registered date, last activity, and
+    /// the three counts — while the email stays masked. The reader's own SQL is proven against a real
+    /// database by <c>AdminUserStatsTests</c>.
+    /// </summary>
+    [Fact]
+    public async Task Execute_ProjectsEveryPerUserStat_D179()
+    {
+        UserId id = UserId.New();
+        Instant createdAt = Instant.FromUtc(2026, 7, 1, 12, 0);
+        Instant lastSeenAt = Instant.FromUtc(2026, 8, 11, 9, 30);
+        var reader = new FakeAdminUserReader
+        {
+            Page = new AdminUserPage(
+                [Record(id, createdAt, bannedAt: null, lastSeenAt, 3, 5, 7)],
+                1),
+        };
+
+        AdminUsersResult listed = await new ListUsersUseCase(reader).ExecuteAsync(null, 1, 25, default);
+        AdminUser? fetched = await new GetUserUseCase(reader).ExecuteAsync(id, default);
+
+        Assert.NotNull(fetched);
+        foreach (AdminUser user in new AdminUser[] { Assert.Single(listed.Users), fetched })
+        {
+            Assert.Equal(createdAt, user.CreatedAt);
+            Assert.Equal(lastSeenAt, user.LastSeenAt);
+            Assert.Equal(3, user.SessionsOrganized);
+            Assert.Equal(5, user.SessionsJoined);
+            Assert.Equal(7, user.FriendCount);
+            Assert.Equal("o***@example.test", user.Email);
+        }
+    }
+
+    [Fact]
+    public async Task Execute_ReportsANeverSeenUserAsNullLastActivity_D179()
+    {
+        UserId id = UserId.New();
+        var reader = new FakeAdminUserReader
+        {
+            Page = new AdminUserPage(
+                [Record(id, Instant.FromUtc(2026, 7, 1, 12, 0), bannedAt: null, lastSeenAt: null)],
+                1),
+        };
+
+        AdminUsersResult result = await new ListUsersUseCase(reader).ExecuteAsync(null, 1, 25, default);
+
+        Assert.Null(Assert.Single(result.Users).LastSeenAt);
+    }
+
+    private static AdminUserRecord Record(
+        UserId id,
+        Instant createdAt,
+        Instant? bannedAt,
+        Instant? lastSeenAt = null,
+        int sessionsOrganized = 0,
+        int sessionsJoined = 0,
+        int friendCount = 0) =>
+        new(
+            id,
+            "player",
+            "Player One",
+            "owner@example.test",
+            createdAt,
+            UserLifecycle.Active,
+            bannedAt,
+            lastSeenAt,
+            sessionsOrganized,
+            sessionsJoined,
+            friendCount);
 }
 
 public sealed class ReadDeletionJournalUseCaseTests

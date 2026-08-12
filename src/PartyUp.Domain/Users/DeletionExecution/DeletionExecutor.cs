@@ -1,8 +1,6 @@
 using NodaTime;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
-using PartyUp.Domain.Polls;
-using PartyUp.Domain.Sessions;
 
 namespace PartyUp.Domain.Users.DeletionExecution;
 
@@ -33,95 +31,11 @@ public static class DeletionExecutor
 
         Instant now = clock.GetCurrentInstant();
         UserId subject = user.Id;
-        ParticipantRef self = ParticipantRef.ForUser(subject);
 
-        List<SessionId> canceledSessions = [];
-        List<PollId> expiredPolls = [];
-        List<SessionId> removedFromSessions = [];
-        List<PollId> removedFromPolls = [];
-        List<JoinRequestId> lapsedJoinRequests = [];
-        List<SessionReminderCanceled> canceledReminders = [];
-
-        // 1. Cancel owned sessions that have not started. Owned in-progress sessions run to
-        //    completion (§12-35 — canceling would yank live guests) and owned Completed sessions stay
-        //    in history (D-092).
-        foreach (Session session in scope.Sessions)
-        {
-            if (session.OrganizerId != subject || session.IsTerminal || now >= session.StartTime)
-            {
-                continue;
-            }
-
-            session.Cancel(clock);
-            canceledSessions.Add(session.Id);
-        }
-
-        // 2. Expire owned Polling/Closed polls — the deletion-expiry transition, D-170 notifications,
-        //    guest links to ExpiredPoll.
-        foreach (Poll poll in scope.Polls)
-        {
-            if (poll.OrganizerId != subject || poll.IsTerminal)
-            {
-                continue;
-            }
-
-            poll.ExpireForOrganizerDeletion(clock);
-            expiredPolls.Add(poll.Id);
-        }
-
-        // 3. Remove self from other people's content. "Future" is uniformly not-started (§12-35): an
-        //    in-progress participation completes, and confirmation is re-evaluated by the session
-        //    itself (D-074) with the pending reminder canceled (§9).
-        foreach (Session session in scope.Sessions)
-        {
-            if (session.OrganizerId == subject)
-            {
-                continue;
-            }
-
-            CollectPending(session.JoinRequests, subject, lapsedJoinRequests);
-            session.LapseJoinRequestsFrom(subject, clock);
-
-            if (session.IsTerminal || now >= session.StartTime)
-            {
-                continue;
-            }
-
-            if (session.Find(self) is not { IsRemoved: false })
-            {
-                continue;
-            }
-
-            session.RemoveParticipation(self, clock);
-            removedFromSessions.Add(session.Id);
-            canceledReminders.Add(new SessionReminderCanceled(session.Id, subject));
-        }
-
-        foreach (Poll poll in scope.Polls)
-        {
-            if (poll.OrganizerId == subject)
-            {
-                continue;
-            }
-
-            CollectPending(poll.JoinRequests, subject, lapsedJoinRequests);
-            poll.LapseJoinRequestsFrom(subject, clock);
-
-            // A deleted user must never be mapped into a session finalized later (D-092); a poll
-            // that is logically past its selection window can no longer finalize anything.
-            if (poll.IsTerminal || now >= poll.SelectionWindowEndsAt)
-            {
-                continue;
-            }
-
-            if (poll.FindParticipant(self) is not { IsRemoved: false })
-            {
-                continue;
-            }
-
-            poll.RemoveParticipant(self, clock);
-            removedFromPolls.Add(poll.Id);
-        }
+        // 1–3. Cancel owned not-started sessions, expire owned live polls, remove the subject from
+        //      other people's not-started content. Shared with the D-180 content-removal action,
+        //      which runs exactly these three and stops.
+        ContentRemovalResult contentRemoval = ContentRemovalExecutor.Execute(subject, scope, clock);
 
         // 4. Friendships (accepted and still-pending requests alike) and blocks in both directions.
         List<Friendship> deletedFriendships = [];
@@ -157,12 +71,12 @@ public static class DeletionExecutor
         DeletionJournalEntry journal = new(subject, user.DeletedAt ?? now);
 
         return new DeletionExecutionResult(
-            canceledSessions,
-            expiredPolls,
-            removedFromSessions,
-            removedFromPolls,
-            lapsedJoinRequests,
-            canceledReminders,
+            contentRemoval.CanceledSessions,
+            contentRemoval.ExpiredPolls,
+            contentRemoval.RemovedFromSessions,
+            contentRemoval.RemovedFromPolls,
+            contentRemoval.LapsedJoinRequests,
+            contentRemoval.CanceledReminders,
             deletedFriendships,
             deletedBlocks,
             AllDataScopes,
@@ -195,20 +109,6 @@ public static class DeletionExecutor
                 DomainError.WindowClosed,
                 FormattableString.Invariant(
                     $"The deletion grace period runs until {user.GraceEndsAt}; the domain stays untouched until then (D-148)."));
-        }
-    }
-
-    private static void CollectPending(
-        IReadOnlyList<JoinRequest> requests,
-        UserId requesterId,
-        List<JoinRequestId> into)
-    {
-        foreach (JoinRequest request in requests)
-        {
-            if (request.RequesterId == requesterId && request.IsPending)
-            {
-                into.Add(request.Id);
-            }
         }
     }
 }

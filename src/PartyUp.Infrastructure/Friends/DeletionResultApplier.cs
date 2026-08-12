@@ -1,7 +1,10 @@
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Availability;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Users;
 using PartyUp.Domain.Users.DeletionExecution;
 using PartyUp.Infrastructure.Persistence;
 
@@ -88,14 +91,50 @@ public sealed class DeletionResultApplier(
             notifications,
             cancellationToken);
 
-        foreach (SessionReminderCanceled cancellation in result.CanceledReminders)
-        {
-            await reminderSchedule.ApplyAsync(cancellation, cancellationToken);
-        }
+        await ApplyContentRemovalAsync(result.ContentRemoval, subject, cancellationToken);
 
         if (result.PurgedData.Contains(UserDataScope.Availability))
         {
             await ApplyAvailabilityDeletionAsync(subject, cancellationToken);
+        }
+
+        ClearLastSeen(subject);
+    }
+
+    /// <summary>
+    /// The §11 steps 1–3 tail on its own, which is the whole of what D-180's content removal has to
+    /// persist beyond the tracked aggregate mutations: the reminder handoff each participation
+    /// removal orphaned. No purge scopes, no friendship or block removal, no availability cascade and
+    /// no last-seen clearing — a banned account stays live and countable as active.
+    /// </summary>
+    public async Task ApplyContentRemovalAsync(
+        ContentRemovalResult result,
+        UserId subject,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        foreach (SessionReminderCanceled cancellation in result.CanceledReminders)
+        {
+            await reminderSchedule.ApplyAsync(cancellation, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// PHASE8_DESIGN.md §2 Q1: a tombstone must not keep counting as an active user, so the deletion
+    /// path nulls <c>users.last_seen_at</c> with the rest of the PII. It is a shadow property, so it
+    /// is cleared on the tracked entity the executor just tombstoned — a raw UPDATE here would bump
+    /// the row's <c>xmin</c> behind that entity's back and turn the caller's deferred SaveChanges into
+    /// a spurious concurrency failure.
+    /// </summary>
+    private void ClearLastSeen(UserId subject)
+    {
+        foreach (EntityEntry<User> entry in context.ChangeTracker.Entries<User>())
+        {
+            if (entry.Entity.Id == subject)
+            {
+                entry.Property<Instant?>(UserActivityWriter.LastSeenProperty).CurrentValue = null;
+            }
         }
     }
 

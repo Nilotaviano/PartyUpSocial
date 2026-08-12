@@ -349,6 +349,75 @@ public class DeletionExecutorTests
     }
 
     /// <summary>
+    /// D-180's optional content removal is exactly §11 steps 1–3 over the same world: all five
+    /// effects, produced by the shared function the deletion executor itself now calls.
+    /// </summary>
+    [Fact]
+    public void RemoveContent_ProducesTheFiveEffects_D180()
+    {
+        DeletionWorld world = DeletionWorld.Build();
+
+        ContentRemovalResult result = world.RemoveContent();
+
+        Assert.Equal(world.OwnedFuture.Id, Assert.Single(result.CanceledSessions));
+        Assert.Equal(SessionStatus.Canceled, world.OwnedFuture.Status);
+        Assert.Equal(world.OwnedPoll.Id, Assert.Single(result.ExpiredPolls));
+        Assert.Equal(PollStatus.Expired, world.OwnedPoll.Status);
+        Assert.Contains(world.OthersFuture.Id, result.RemovedFromSessions);
+        Assert.True(LifecycleFixtures.RowOf(world.OthersFuture, world.Subject.Id).IsRemoved);
+        Assert.Contains(world.OthersPoll.Id, result.RemovedFromPolls);
+        Assert.Contains(world.OwnJoinRequest.Id, result.LapsedJoinRequests);
+        Assert.Equal(JoinRequestStatus.Lapsed, world.OwnJoinRequest.Status);
+        Assert.Contains(
+            result.CanceledReminders,
+            reminder => reminder.SessionId == world.OthersFuture.Id &&
+                reminder.UserId == world.Subject.Id);
+    }
+
+    /// <summary>
+    /// The exclusions D-180 names, asserted as absences: the account stays a normal live account with
+    /// its friend graph, blocks, username and Completed history intact — a removal is not a deletion.
+    /// </summary>
+    [Fact]
+    public void RemoveContent_TouchesNoFriendshipBlockUsernameOrHistory_D180()
+    {
+        DeletionWorld world = DeletionWorld.Build();
+
+        world.RemoveContent();
+
+        Assert.Equal(FriendshipStatus.Accepted, world.OwnFriendship.Status);
+        Assert.True(world.BlockAgainstSubject.Involves(world.Subject.Id));
+        Assert.True(world.UsernameEntry.IsActive);
+        Assert.Equal(world.Subject.Id, world.UsernameEntry.OwnerId);
+        Assert.Equal(SessionStatus.Completed, world.OwnedCompleted.Status);
+        Assert.True(world.OwnedCompleted.IsRetainedInHistory);
+        Assert.Equal(SessionStatus.Confirmed, world.OwnedInProgress.Status);
+        Assert.False(world.Subject.IsTombstoned);
+        Assert.NotNull(world.Subject.Username);
+        Assert.NotNull(world.Subject.DisplayName);
+    }
+
+    [Fact]
+    public void RemoveContent_RunTwiceLeavesTheSameEndState_D180()
+    {
+        DeletionWorld world = DeletionWorld.Build();
+        world.RemoveContent();
+        world.DrainEvents();
+
+        ContentRemovalResult second = world.RemoveContent();
+
+        Assert.Empty(second.CanceledSessions);
+        Assert.Empty(second.ExpiredPolls);
+        Assert.Empty(second.RemovedFromSessions);
+        Assert.Empty(second.RemovedFromPolls);
+        Assert.Empty(second.LapsedJoinRequests);
+        Assert.Empty(second.CanceledReminders);
+        Assert.Equal(SessionStatus.Canceled, world.OwnedFuture.Status);
+        Assert.Equal(PollStatus.Expired, world.OwnedPoll.Status);
+        Assert.Empty(world.DrainEvents());
+    }
+
+    /// <summary>
     /// The D-092 clause walk in one world: the deleting user simultaneously organizes a future, an
     /// in-progress and a Completed session, participates in and is waitlisted on other people's
     /// content, holds an open join request, owns guest links, owns a live poll and has voted in
@@ -494,6 +563,12 @@ public class DeletionExecutorTests
 
         internal DeletionExecutionResult Execute() =>
             DeletionExecutor.Execute(Subject, Scope, LifecycleFixtures.At(LifecycleFixtures.GraceEnd));
+
+        internal ContentRemovalResult RemoveContent() =>
+            ContentRemovalExecutor.Execute(
+                Subject.Id,
+                Scope,
+                LifecycleFixtures.At(LifecycleFixtures.GraceEnd));
 
         internal List<IDomainEvent> DrainEvents()
         {

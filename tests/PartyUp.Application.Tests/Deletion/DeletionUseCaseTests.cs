@@ -455,6 +455,8 @@ internal sealed class FakeDeletionResultApplier(FakeAccountGateway accounts)
 {
     internal List<CapturedDeletionApplication> Applications { get; } = [];
 
+    internal List<ContentRemovalResult> ContentRemovals { get; } = [];
+
     public Task ApplyAsync(
         DeletionExecutionResult result,
         UserId subject,
@@ -464,6 +466,15 @@ internal sealed class FakeDeletionResultApplier(FakeAccountGateway accounts)
             result,
             subject,
             accounts.PurgedCredentials.Count == 0));
+        return Task.CompletedTask;
+    }
+
+    public Task ApplyContentRemovalAsync(
+        ContentRemovalResult result,
+        UserId subject,
+        CancellationToken cancellationToken)
+    {
+        ContentRemovals.Add(result);
         return Task.CompletedTask;
     }
 }

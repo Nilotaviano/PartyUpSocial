@@ -110,6 +110,7 @@ builder.Services.AddScoped<ListUsersUseCase>();
 builder.Services.AddScoped<GetUserUseCase>();
 builder.Services.AddScoped<GetUsageDashboardUseCase>();
 builder.Services.AddScoped<BanUserUseCase>();
+builder.Services.AddScoped<BanAndRemoveContentUseCase>();
 builder.Services.AddScoped<UnbanUserUseCase>();
 builder.Services.AddScoped<ReadDeletionJournalUseCase>();
 builder.Services.AddScoped<GetOnboardingStateUseCase>();

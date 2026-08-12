@@ -32,7 +32,7 @@ public static class AdminEndpoints
             .Produces<AdminMutationResponse>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status501NotImplemented);
+            .ProducesProblem(StatusCodes.Status409Conflict);
         api.MapPost("/admin/users/{id:guid}/unban", UnbanUserAsync)
             .WithName("UnbanAdminUser")
             .RequireAuthorization(AuthorizationPolicies.RequireAdmin)
@@ -105,22 +105,26 @@ public static class AdminEndpoints
         BanUserRequest request,
         HttpContext context,
         BanUserUseCase useCase,
+        BanAndRemoveContentUseCase removeContentUseCase,
         CancellationToken cancellationToken)
     {
-        if (request.RemoveContent)
+        UserId subject = UserId.From(id);
+
+        // D-180: content removal is a separate, optional action that also bans — one transaction, so
+        // a failed removal leaves no ban behind (PHASE8_DESIGN.md §3 S2).
+        AdminUserMutationResult result = request.RemoveContent
+            ? await removeContentUseCase.ExecuteAsync(subject, cancellationToken)
+            : await useCase.ExecuteAsync(subject, cancellationToken);
+
+        if (result.Succeeded)
         {
-            return Problem(
-                context,
-                StatusCodes.Status501NotImplemented,
-                "not_implemented_in_phase");
+            return Results.Ok(new AdminMutationResponse(
+                request.RemoveContent ? "banned_content_removed" : "banned"));
         }
 
-        AdminUserMutationResult result = await useCase.ExecuteAsync(
-            UserId.From(id),
-            cancellationToken);
-        return result.Succeeded
-            ? Results.Ok(new AdminMutationResponse("banned"))
-            : Problem(context, StatusCodes.Status404NotFound, result.Code!);
+        return result.Code == "not_found"
+            ? Problem(context, StatusCodes.Status404NotFound, result.Code)
+            : Problem(context, StatusCodes.Status409Conflict, result.Code!);
     }
 
     private static async Task<IResult> UnbanUserAsync(
@@ -192,7 +196,7 @@ public static class AdminEndpoints
         {
             StatusCodes.Status400BadRequest => "Bad Request",
             StatusCodes.Status404NotFound => "Not Found",
-            StatusCodes.Status501NotImplemented => "Not Implemented",
+            StatusCodes.Status409Conflict => "Conflict",
             _ => "Request Failed",
         };
         return Results.Json(
@@ -227,7 +231,11 @@ public sealed record AdminUserResponse(
     string? Email,
     string Created,
     string Lifecycle,
-    string? BannedAt)
+    string? BannedAt,
+    string? LastSeenAt,
+    int SessionsOrganized,
+    int SessionsJoined,
+    int FriendCount)
 {
     internal static AdminUserResponse From(AdminUser user) =>
         new(
@@ -239,7 +247,13 @@ public sealed record AdminUserResponse(
             LifecycleName(user.Lifecycle),
             user.BannedAt is { } bannedAt
                 ? InstantPattern.ExtendedIso.Format(bannedAt)
-                : null);
+                : null,
+            user.LastSeenAt is { } lastSeenAt
+                ? InstantPattern.ExtendedIso.Format(lastSeenAt)
+                : null,
+            user.SessionsOrganized,
+            user.SessionsJoined,
+            user.FriendCount);
 
     private static string LifecycleName(UserLifecycle lifecycle) => lifecycle switch
     {
