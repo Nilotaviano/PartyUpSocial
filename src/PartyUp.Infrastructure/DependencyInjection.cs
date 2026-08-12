@@ -13,6 +13,7 @@ using PartyUp.Application.Notifications;
 using PartyUp.Application.Polls;
 using PartyUp.Application.Push;
 using PartyUp.Application.Sessions;
+using PartyUp.Application.SteamCatalog;
 using PartyUp.Application.Text;
 using PartyUp.Infrastructure.Accounts;
 using PartyUp.Infrastructure.Auth;
@@ -173,7 +174,12 @@ public static class DependencyInjection
         services.AddScoped<IDeletionJournalShipper, FileDeletionJournalShipper>();
         services.AddSingleton(new DeletionJournalOptions(
             configuration["Deletion:JournalPath"] ?? "/data/deletion-journal"));
-        services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(15) });
+        services.AddSingleton(_ =>
+        {
+            var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("PartyUp/1.0 (+https://partyup.social)");
+            return httpClient;
+        });
         services.AddSingleton<SteamOpenIdVerifier>();
         services.AddSingleton<SteamApiClient>();
         services.AddSingleton<ISteamProfileClient>(provider =>
@@ -184,6 +190,13 @@ public static class DependencyInjection
             new SteamFriendListClient(
                 provider.GetRequiredService<SteamApiClient>(),
                 configuration["Steam:ApiKey"]));
+        services.AddSingleton<ISteamAppListClient>(provider =>
+            new SteamAppListClient(
+                provider.GetRequiredService<SteamApiClient>(),
+                configuration["Steam:ApiKey"]));
+        services.AddScoped<ISteamCatalogRepository, SteamCatalogRepository>();
+        services.AddScoped<SteamCatalogRefreshJob>();
+        services.AddScoped<SearchSteamCatalogUseCase>();
         // A dedicated instance, never the shared singleton HttpClient above -- AVATARS_DESIGN.md §3.2.
         services.AddSingleton<IAvatarCaptureService, AvatarCaptureService>();
         services.AddScoped<AvatarRefreshJob>();

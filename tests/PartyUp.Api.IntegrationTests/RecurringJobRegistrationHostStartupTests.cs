@@ -116,15 +116,16 @@ public sealed class RecurringJobRegistrationServiceRetryTests
     /// S3 adds the poll analogues (PHASE6_DESIGN.md §3) — the due sweep and the D-120
     /// deadline-approaching notice — bringing the registered set to four. Phase 7 S3 adds the push
     /// dispatch job and the send-log prune job (PHASE7_DESIGN.md §3), bringing it to six.
-    /// AVATARS_DESIGN.md §3.4 adds the daily Steam avatar refresh, bringing it to seven. Asserted
+    /// AVATARS_DESIGN.md §3.4 adds the daily Steam avatar refresh, bringing it to seven.
+    /// STEAM_CATALOG_DESIGN.md §1 adds the 6-hour catalog refresh, bringing it to eight. Asserted
     /// here, against the same real <see cref="RecurringJobRegistrationService"/> production
     /// registration path the retry tests above drive — no host, no environment name, no Hangfire
     /// storage — rather than from an integration test under the "Testing" host, which observes an
     /// empty registration set by construction (<c>Program.cs</c>, <c>PartyUpApiFactory.cs</c>,
-    /// ARCHITECTURE.md:217) and so could never fail if a slice added an eighth job.
+    /// ARCHITECTURE.md:217) and so could never fail if a slice added a ninth job.
     /// </summary>
     [Fact]
-    public async Task RegistersExactlyTheSevenRecurringJobs_A066()
+    public async Task RegistersExactlyTheEightRecurringJobs_A066_D194()
     {
         var manager = new RecordingRecurringJobManager();
         ServiceProvider provider = new ServiceCollection()
@@ -135,7 +136,7 @@ public sealed class RecurringJobRegistrationServiceRetryTests
             NullLogger<RecurringJobRegistrationService>.Instance);
 
         await service.StartAsync(CancellationToken.None);
-        await WaitUntilAsync(() => manager.RegisteredJobIds.Count >= 7, TimeSpan.FromSeconds(5));
+        await WaitUntilAsync(() => manager.RegisteredJobIds.Count >= 8, TimeSpan.FromSeconds(5));
         await service.StopAsync(CancellationToken.None);
 
         Assert.Equal(
@@ -148,6 +149,7 @@ public sealed class RecurringJobRegistrationServiceRetryTests
                 "push-dispatch",
                 "push-send-log-prune",
                 "avatar-refresh",
+                "steam-catalog-refresh",
             },
             manager.RegisteredJobIds);
     }

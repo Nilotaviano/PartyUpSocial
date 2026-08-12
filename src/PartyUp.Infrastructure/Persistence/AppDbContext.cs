@@ -13,6 +13,7 @@ using PartyUp.Infrastructure.Deletion;
 using PartyUp.Infrastructure.Notifications;
 using PartyUp.Infrastructure.Persistence.Configurations;
 using PartyUp.Infrastructure.Steam;
+using PartyUp.Infrastructure.SteamCatalog;
 
 namespace PartyUp.Infrastructure.Persistence;
 
@@ -72,6 +73,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<PollParticipant> PollParticipants => Set<PollParticipant>();
 
     public DbSet<PollVote> PollVotes => Set<PollVote>();
+
+    public DbSet<SteamCatalogApp> SteamApps => Set<SteamCatalogApp>();
+
+    public DbSet<SteamCatalogStateRow> SteamCatalogState => Set<SteamCatalogStateRow>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -137,5 +142,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.ApplyConfiguration(new PollOptionConfiguration());
         builder.ApplyConfiguration(new PollParticipantConfiguration());
         builder.ApplyConfiguration(new PollVoteConfiguration());
+        builder.ApplyConfiguration(new SteamCatalogAppConfiguration());
+        builder.ApplyConfiguration(new SteamCatalogStateRowConfiguration());
     }
 }

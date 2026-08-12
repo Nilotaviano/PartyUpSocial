@@ -157,6 +157,8 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
                 "UnmutePoll",
             ],
             ["push-subscribe"] = ["CreatePushSubscription", "DeletePushSubscription"],
+            // STEAM_CATALOG_DESIGN.md §3: typeahead traffic must not eat the general read budget.
+            ["steam-catalog-search"] = ["SearchSteamCatalog"],
             ["default"] = [],
         };
 
@@ -171,7 +173,7 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
     [Fact]
     public void EveryDimensionCoversItsDocumentedRoutes()
     {
-        Assert.Equal(34, RateLimitPolicies.Dimensions.Count);
+        Assert.Equal(35, RateLimitPolicies.Dimensions.Count);
         Assert.Equal(ExpectedRoutes.Keys, RateLimitPolicies.Dimensions.Select(value => value.Name));
         foreach (RateLimitDimension dimension in RateLimitPolicies.Dimensions)
         {

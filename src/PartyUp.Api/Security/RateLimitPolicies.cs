@@ -402,6 +402,13 @@ public static class RateLimitPolicies
             TimeSpan.FromMinutes(1),
             RateLimitPartitionKind.User,
             Operations(ApiOperationIds.CreatePushSubscription, ApiOperationIds.DeletePushSubscription)),
+        // STEAM_CATALOG_DESIGN.md §3: typeahead traffic must not eat the general read budget.
+        new(
+            "steam-catalog-search",
+            60,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.User,
+            Operations(ApiOperationIds.SearchSteamCatalog)),
         new(
             "default",
             300,

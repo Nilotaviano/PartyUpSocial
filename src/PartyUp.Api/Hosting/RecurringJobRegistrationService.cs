@@ -51,6 +51,10 @@ public sealed partial class RecurringJobRegistrationService(
                     "avatar-refresh",
                     job => job.ExecuteAsync(CancellationToken.None),
                     Cron.Daily);
+                recurringJobs.AddOrUpdate<SteamCatalogRefreshJob>(
+                    "steam-catalog-refresh",
+                    job => job.ExecuteAsync(CancellationToken.None),
+                    "0 */6 * * *");
                 return;
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

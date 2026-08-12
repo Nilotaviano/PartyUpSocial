@@ -151,4 +151,7 @@ public static class ApiOperationIds
     // D189_DESIGN.md §2/§3: the account setting and its unauthenticated unsubscribe-link confirm.
     public const string ChangeMyEmailNotifications = "ChangeMyEmailNotifications";
     public const string UnsubscribeEmailNotifications = "UnsubscribeEmailNotifications";
+
+    // STEAM_CATALOG_DESIGN.md §3: the catalog typeahead search.
+    public const string SearchSteamCatalog = "SearchSteamCatalog";
 }

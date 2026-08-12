@@ -665,7 +665,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-173 | Join requests remain open until the session's end time, including while it is in progress. | Confirmed |
 | D-174 | Canceling a session immediately revokes all of its guest links. | Confirmed |
 | D-175 | iOS Safari Web Push (home-screen PWA requirement) is not pursued; iOS web users get the in-app fallback until the native app. | Confirmed |
-| D-176 | PlayStation and Xbox game fields are free text at launch (no viable public catalog APIs); only Steam offers catalog selection, per the D-058 fallback. | Confirmed |
+| D-176 | PlayStation and Xbox game fields are free text at launch (no viable public catalog APIs); only Steam offers catalog selection, per the D-058 fallback. Catalog selection is implemented per D-194's cache. | Confirmed |
 | D-177 | An admin role exists, assigned operationally at deploy time; no in-app role management. | Confirmed |
 | D-178 | Admins see a usage dashboard covering registrations, active users, sessions/polls created, confirmation rate, and 30-day repeat scheduling. | Confirmed |
 | D-179 | Admins see a user list with per-user stats and ban state. | Confirmed |
@@ -683,6 +683,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-191 | A PartyUp user's avatar picture is served only through the first-party proxy, from bytes re-encoded server-side at capture. Upstream URLs are never emitted to clients. **Carve-out:** `SteamUnmatchedFriendResponse.AvatarUrl` (`FriendEndpoints.cs:709`) keeps its raw steamstatic URL — those people have no `User` row and therefore no avatar source. | Confirmed |
 | D-192 | The blocked-users list renders a neutral disc seeded from the stored username snapshot and carries no avatar. Amends D-188, which listed it as an avatar surface. | Confirmed |
 | D-193 | The organizer may invite registered friends to a poll after creation, while the poll is **Polling** — invitations close the moment the poll leaves Polling (Closed, Finalized, Expired, or Canceled), because a post-deadline invitee could never vote. Mid-flight invitees get exactly the creation-time treatment: they become Active participants immediately with no votes (D-033), receive the D-112 in-app notification and the D-189 direct-poll-invite email, and gain visibility through participation. Only the organizer invites; invitees must be the organizer's friends (D-020 posture), blocked pairs cannot be invited (D-065/D-077), and a Removed participant is never re-invited over (removal is permanent, as in sessions §5.2). D-119 finalization ordering is unchanged: a late invitee's response time is their first vote, so arriving late costs allocation priority and nothing else. | Confirmed |
+| D-194 | Steam catalog selection is served from a first-party cache of `IStoreService/GetAppList` (games only), refreshed every 6 hours incrementally via `if_modified_since`; search is fuzzy; free text remains valid alongside (D-058); when the catalog is unavailable the UI degrades to free text plus the optional manual App ID (D-176). | Confirmed |
 
 ## 15. Open questions
 

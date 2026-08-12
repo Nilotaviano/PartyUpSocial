@@ -1275,6 +1275,7 @@ namespace PartyUp.Infrastructure.Migrations
                                 .HasColumnName("avatar_source_id");
 
                             b1.Property<string>("Token")
+                                .IsRequired()
                                 .HasColumnType("text")
                                 .HasColumnName("avatar_token");
                         });
@@ -1674,6 +1675,51 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasDatabaseName("ux_steam_identities_steam_id64");
 
                     b.ToTable("steam_identities", (string)null);
+                });
+
+            modelBuilder.Entity("PartyUp.Infrastructure.SteamCatalog.SteamCatalogApp", b =>
+                {
+                    b.Property<long>("AppId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("app_id");
+
+                    b.Property<Instant?>("LastModified")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_modified");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.HasKey("AppId")
+                        .HasName("pk_steam_apps");
+
+                    b.ToTable("steam_apps", (string)null);
+                });
+
+            modelBuilder.Entity("PartyUp.Infrastructure.SteamCatalog.SteamCatalogStateRow", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    b.Property<Instant?>("LastRunAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_run_at");
+
+                    b.Property<bool>("LastRunSucceeded")
+                        .HasColumnType("boolean")
+                        .HasColumnName("last_run_succeeded");
+
+                    b.Property<Instant?>("Watermark")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("watermark");
+
+                    b.HasKey("Id")
+                        .HasName("pk_steam_catalog_state");
+
+                    b.ToTable("steam_catalog_state", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
