@@ -294,19 +294,33 @@ export function WeekGridPage() {
   const showSessions = layers?.sessions ?? true
   const showPollOptions = layers?.pollOptions ?? true
 
-  const occurrences: GridOccurrence[] = showMyAvailability
-    ? (calendar.data?.myAvailability.occurrences ?? []).map((occurrence) => ({
-        id: occurrenceKey(occurrence),
-        start: instantToFakeLocal(occurrence.startTime, timeZone),
-        end: instantToFakeLocal(occurrence.endTime, timeZone),
-      }))
-    : []
-  const merged: GridRange[] = showMyAvailability
-    ? (calendar.data?.myAvailability.merged ?? []).map((range) => ({
-        start: instantToFakeLocal(range.start, timeZone),
-        end: instantToFakeLocal(range.end, timeZone),
-      }))
-    : []
+  // Memoized so their reference identity is stable across renders that
+  // don't actually change the underlying data — `WeekGrid`'s band-metadata
+  // memo is keyed on these identities (§8), so an unstable array here would
+  // defeat that memo on every render.
+  const myOccurrences = calendar.data?.myAvailability.occurrences
+  const occurrences: GridOccurrence[] = useMemo(
+    () =>
+      showMyAvailability
+        ? (myOccurrences ?? []).map((occurrence) => ({
+            id: occurrenceKey(occurrence),
+            start: instantToFakeLocal(occurrence.startTime, timeZone),
+            end: instantToFakeLocal(occurrence.endTime, timeZone),
+          }))
+        : [],
+    [showMyAvailability, myOccurrences, timeZone],
+  )
+  const myMerged = calendar.data?.myAvailability.merged
+  const merged: GridRange[] = useMemo(
+    () =>
+      showMyAvailability
+        ? (myMerged ?? []).map((range) => ({
+            start: instantToFakeLocal(range.start, timeZone),
+            end: instantToFakeLocal(range.end, timeZone),
+          }))
+        : [],
+    [showMyAvailability, myMerged, timeZone],
+  )
 
   // The rules list is not a layer: it manages what the viewer published, so it
   // stays readable while the grid layer is toggled off (D-135 keeps the toggle
@@ -340,51 +354,65 @@ export function WeekGridPage() {
   // on `ordinal`, which is only stable within this one response.
   const showFriendAvailability = layers?.friendAvailability ?? true
   const shownFriendOrdinals = layers?.shownFriendOrdinals ?? null
-  const friendRanges: GridFriendRange[] = showFriendAvailability
-    ? (friendAvailabilityData ?? []).flatMap((entry) => {
-        if (shownFriendOrdinals && !shownFriendOrdinals.has(Number(entry.owner.ordinal))) {
-          return []
-        }
-        const ownerLabel = entry.owner.displayName ?? t('calendar.anonymousFriend')
-        return entry.ranges.map((range) => ({
-          ownerLabel,
-          start: instantToFakeLocal(range.start, timeZone),
-          end: instantToFakeLocal(range.end, timeZone),
-        }))
-      })
-    : []
+  const friendRanges: GridFriendRange[] = useMemo(
+    () =>
+      showFriendAvailability
+        ? (friendAvailabilityData ?? []).flatMap((entry) => {
+            if (shownFriendOrdinals && !shownFriendOrdinals.has(Number(entry.owner.ordinal))) {
+              return []
+            }
+            const ownerLabel = entry.owner.displayName ?? t('calendar.anonymousFriend')
+            return entry.ranges.map((range) => ({
+              ownerLabel,
+              start: instantToFakeLocal(range.start, timeZone),
+              end: instantToFakeLocal(range.end, timeZone),
+            }))
+          })
+        : [],
+    [showFriendAvailability, friendAvailabilityData, shownFriendOrdinals, timeZone, t],
+  )
 
   // A-077 at access-kind `any`: the sessions layer already includes
   // inherited/discoverable rows (D-149), each carrying `viewerRelation` so
   // the grid can style them distinctly — never a second fetch or filter.
-  const sessionEntries: GridSessionEntry[] = showSessions
-    ? (calendar.data?.sessions ?? []).map((session) => ({
-        id: session.id,
-        title: session.title,
-        start: instantToFakeLocal(session.startTime, timeZone),
-        end: instantToFakeLocal(
-          new Date(
-            new Date(session.startTime).getTime() + Number(session.durationMinutes) * 60_000,
-          ).toISOString(),
-          timeZone,
-        ),
-        viewerRelation: session.viewerRelation as GridViewerRelation,
-      }))
-    : []
+  const sessionsData = calendar.data?.sessions
+  const sessionEntries: GridSessionEntry[] = useMemo(
+    () =>
+      showSessions
+        ? (sessionsData ?? []).map((session) => ({
+            id: session.id,
+            title: session.title,
+            start: instantToFakeLocal(session.startTime, timeZone),
+            end: instantToFakeLocal(
+              new Date(
+                new Date(session.startTime).getTime() + Number(session.durationMinutes) * 60_000,
+              ).toISOString(),
+              timeZone,
+            ),
+            viewerRelation: session.viewerRelation as GridViewerRelation,
+          }))
+        : [],
+    [showSessions, sessionsData, timeZone],
+  )
 
   // D-111/A-080 pollOptions layer (design §5, Phase 6 S4c fill): one instant per option, no
   // duration (spec §7.3-1) — start and end are the same fake-local instant, painted as a point.
-  const pollOptionEntries: GridPollOptionEntry[] = showPollOptions
-    ? (calendar.data?.pollOptions ?? []).flatMap((poll) =>
-        poll.options.map((option) => ({
-          id: option.optionId,
-          pollId: poll.pollId,
-          pollTitle: poll.title,
-          start: instantToFakeLocal(option.startTime, timeZone),
-          ownVote: (option.ownVote as GridPollOptionEntry['ownVote']) ?? null,
-        })),
-      )
-    : []
+  const pollOptionsData = calendar.data?.pollOptions
+  const pollOptionEntries: GridPollOptionEntry[] = useMemo(
+    () =>
+      showPollOptions
+        ? (pollOptionsData ?? []).flatMap((poll) =>
+            poll.options.map((option) => ({
+              id: option.optionId,
+              pollId: poll.pollId,
+              pollTitle: poll.title,
+              start: instantToFakeLocal(option.startTime, timeZone),
+              ownVote: (option.ownVote as GridPollOptionEntry['ownVote']) ?? null,
+            })),
+          )
+        : [],
+    [showPollOptions, pollOptionsData, timeZone],
+  )
 
   const agendaEntries: AgendaEntry[] = [
     ...(showMyAvailability

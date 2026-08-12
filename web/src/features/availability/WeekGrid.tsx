@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 export type GridOccurrence = {
@@ -145,6 +145,177 @@ function overlaps(rangeStart: Date, rangeEnd: Date, cellStart: Date, cellEnd: Da
   return rangeStart < cellEnd && rangeEnd > cellStart
 }
 
+function dayBounds(weekStart: Date, day: number, startHour: number, slots: number) {
+  return {
+    start: cellTime(weekStart, day, 0, startHour),
+    end: cellTime(weekStart, day, slots, startHour),
+  }
+}
+
+/** The clamped `[startSlot, endSlot]` (inclusive) a range covers within one
+ * day's visible slots, plus whether either edge was clamped to the viewport
+ * rather than being the entry's true boundary — §8's "clamped edge renders
+ * flat" distinction. `null` when the range doesn't touch this day at all. */
+function clampedSlotRange(
+  entryStart: Date,
+  entryEnd: Date,
+  dayStart: Date,
+  dayEnd: Date,
+  slots: number,
+): { startSlot: number; endSlot: number; clampedAtStart: boolean; clampedAtEnd: boolean } | null {
+  if (!(entryStart < dayEnd && entryEnd > dayStart)) return null
+  const clampedStart = entryStart < dayStart ? dayStart : entryStart
+  const clampedEndExclusive = entryEnd > dayEnd ? dayEnd : entryEnd
+  if (clampedEndExclusive <= clampedStart) return null
+  const startSlot = Math.max(0, Math.floor((clampedStart.getTime() - dayStart.getTime()) / SLOT_MS))
+  const endSlot = Math.min(
+    slots - 1,
+    Math.ceil((clampedEndExclusive.getTime() - dayStart.getTime()) / SLOT_MS) - 1,
+  )
+  return {
+    startSlot,
+    endSlot,
+    clampedAtStart: entryStart < dayStart,
+    clampedAtEnd: entryEnd > dayEnd,
+  }
+}
+
+type OccurrenceCell = {
+  occurrence: GridOccurrence
+  isStart: boolean
+  isEnd: boolean
+}
+
+type MergedCell = {
+  isStart: boolean
+  isEnd: boolean
+  clampedAtStart: boolean
+  clampedAtEnd: boolean
+}
+
+type SessionCell = {
+  session: GridSessionEntry
+  isStart: boolean
+  isEnd: boolean
+}
+
+type FriendCell = {
+  ranges: GridFriendRange[]
+  isSegmentStart: boolean
+}
+
+type BandMeta = {
+  occurrenceGrid: (OccurrenceCell | undefined)[][]
+  mergedGrid: (MergedCell | undefined)[][]
+  sessionGrid: SessionCell[][][]
+  friendGrid: FriendCell[][]
+  pollGrid: GridPollOptionEntry[][][]
+}
+
+const DAY_COUNT = 7
+
+/** §8's band metadata: a per-day indexed lookup replacing the per-cell
+ * linear scans over every occurrence/merged/friend/session/poll array, plus
+ * start/middle/end span info per entry (visible-range clamped) that the
+ * label/border/rounding rendering below reads instead of re-deriving it. */
+function computeBandMeta(
+  occurrences: GridOccurrence[],
+  merged: GridRange[],
+  friendRanges: GridFriendRange[],
+  sessionEntries: GridSessionEntry[],
+  pollOptionEntries: GridPollOptionEntry[],
+  weekStart: Date,
+  startHour: number,
+  slots: number,
+): BandMeta {
+  const occurrenceGrid: (OccurrenceCell | undefined)[][] = []
+  const mergedGrid: (MergedCell | undefined)[][] = []
+  const sessionGrid: SessionCell[][][] = []
+  const friendGrid: FriendCell[][] = []
+  const pollGrid: GridPollOptionEntry[][][] = []
+
+  for (let day = 0; day < DAY_COUNT; day++) {
+    const { start: dayStart, end: dayEnd } = dayBounds(weekStart, day, startHour, slots)
+    occurrenceGrid[day] = new Array(slots).fill(undefined)
+    mergedGrid[day] = new Array(slots).fill(undefined)
+    sessionGrid[day] = Array.from({ length: slots }, () => [])
+    friendGrid[day] = Array.from({ length: slots }, () => ({ ranges: [], isSegmentStart: false }))
+    pollGrid[day] = Array.from({ length: slots }, () => [])
+
+    // First occurrence covering a slot wins — matches the `.find` semantics
+    // this replaces (`merges overlapping own blocks visually_D101`).
+    for (const occurrence of occurrences) {
+      const range = clampedSlotRange(occurrence.start, occurrence.end, dayStart, dayEnd, slots)
+      if (!range) continue
+      for (let slot = range.startSlot; slot <= range.endSlot; slot++) {
+        if (occurrenceGrid[day][slot]) continue
+        occurrenceGrid[day][slot] = {
+          occurrence,
+          isStart: slot === range.startSlot,
+          isEnd: slot === range.endSlot,
+        }
+      }
+    }
+
+    for (const range of merged) {
+      const r = clampedSlotRange(range.start, range.end, dayStart, dayEnd, slots)
+      if (!r) continue
+      for (let slot = r.startSlot; slot <= r.endSlot; slot++) {
+        mergedGrid[day][slot] = {
+          isStart: slot === r.startSlot,
+          isEnd: slot === r.endSlot,
+          clampedAtStart: r.clampedAtStart,
+          clampedAtEnd: r.clampedAtEnd,
+        }
+      }
+    }
+
+    for (const session of sessionEntries) {
+      const r = clampedSlotRange(session.start, session.end, dayStart, dayEnd, slots)
+      if (!r) continue
+      for (let slot = r.startSlot; slot <= r.endSlot; slot++) {
+        sessionGrid[day][slot].push({
+          session,
+          isStart: slot === r.startSlot,
+          isEnd: slot === r.endSlot,
+        })
+      }
+    }
+
+    for (const option of pollOptionEntries) {
+      if (option.start < dayStart || option.start >= dayEnd) continue
+      const slot = Math.min(
+        slots - 1,
+        Math.max(0, Math.floor((option.start.getTime() - dayStart.getTime()) / SLOT_MS)),
+      )
+      pollGrid[day][slot].push(option)
+    }
+
+    // Friend coverage is a segment, not a per-friend span: the covering set
+    // (by reference — `friendRanges` is a stable prop array) is compared
+    // slot to slot, and a new segment starts wherever that set changes —
+    // including where it becomes empty then non-empty again.
+    let previous: GridFriendRange[] = []
+    for (let slot = 0; slot < slots; slot++) {
+      const cellStart = cellTime(weekStart, day, slot, startHour)
+      const cellEnd = cellTime(weekStart, day, slot + 1, startHour)
+      const covering = friendRanges.filter((range) =>
+        overlaps(range.start, range.end, cellStart, cellEnd),
+      )
+      const sameAsPrevious =
+        covering.length === previous.length &&
+        covering.every((range, index) => range === previous[index])
+      friendGrid[day][slot] = {
+        ranges: covering,
+        isSegmentStart: covering.length > 0 && !sameAsPrevious,
+      }
+      previous = covering
+    }
+  }
+
+  return { occurrenceGrid, mergedGrid, sessionGrid, friendGrid, pollGrid }
+}
+
 export function WeekGrid({
   weekStart,
   startHour = 0,
@@ -162,6 +333,20 @@ export function WeekGrid({
 }: WeekGridProps) {
   const { t } = useTranslation('availability')
   const slots = slotsPerDay(startHour, endHour)
+  const bandMeta = useMemo(
+    () =>
+      computeBandMeta(
+        occurrences,
+        merged,
+        friendRanges,
+        sessionEntries,
+        pollOptionEntries,
+        weekStart,
+        startHour,
+        slots,
+      ),
+    [occurrences, merged, friendRanges, sessionEntries, pollOptionEntries, weekStart, startHour, slots],
+  )
   const [focused, setFocused] = useState<Cursor>({ day: 0, slot: 0 })
   const [selection, setSelection] = useState<Selection | null>(null)
   const [liveMessage, setLiveMessage] = useState('')
@@ -208,33 +393,87 @@ export function WeekGrid({
   )
 
   function occurrenceAt(day: number, slot: number) {
-    const start = cellTime(weekStart, day, slot, startHour)
-    const end = cellTime(weekStart, day, slot + 1, startHour)
-    return occurrences.find((o) => overlaps(o.start, o.end, start, end))
+    return bandMeta.occurrenceGrid[day][slot]?.occurrence
   }
 
   function mergedAt(day: number, slot: number) {
-    const start = cellTime(weekStart, day, slot, startHour)
-    const end = cellTime(weekStart, day, slot + 1, startHour)
-    return merged.some((range) => overlaps(range.start, range.end, start, end))
+    return bandMeta.mergedGrid[day][slot] !== undefined
   }
 
   function friendsAt(day: number, slot: number) {
-    const start = cellTime(weekStart, day, slot, startHour)
-    const end = cellTime(weekStart, day, slot + 1, startHour)
-    return friendRanges.filter((range) => overlaps(range.start, range.end, start, end))
+    return bandMeta.friendGrid[day][slot].ranges
   }
 
   function sessionsAt(day: number, slot: number) {
-    const start = cellTime(weekStart, day, slot, startHour)
-    const end = cellTime(weekStart, day, slot + 1, startHour)
-    return sessionEntries.filter((session) => overlaps(session.start, session.end, start, end))
+    return bandMeta.sessionGrid[day][slot].map((cell) => cell.session)
   }
 
   function pollOptionsAt(day: number, slot: number) {
-    const start = cellTime(weekStart, day, slot, startHour)
-    const end = cellTime(weekStart, day, slot + 1, startHour)
-    return pollOptionEntries.filter((option) => option.start >= start && option.start < end)
+    return bandMeta.pollGrid[day][slot]
+  }
+
+  // §8: the resize handles occupy the full cell of the selected occurrence's
+  // start/end slot — a session/friend label rendering underneath there would
+  // be occluded. `bandActiveAt` mirrors the fill's own busy||resizing test
+  // (WeekGrid.tsx:677-681) so the band border/rounding below can never
+  // disagree with what's painted.
+  function handleOccupiesCell(day: number, slot: number) {
+    if (!onAdjustOccurrence || !selectedOccurrenceId) return false
+    const cell = bandMeta.occurrenceGrid[day][slot]
+    if (!cell || cell.occurrence.id !== selectedOccurrenceId) return false
+    return cell.isStart || cell.isEnd
+  }
+
+  function bandActiveAt(day: number, slot: number) {
+    if (bandMeta.mergedGrid[day][slot]) return true
+    const cell = bandMeta.occurrenceGrid[day][slot]
+    if (!cell || !resizePreview || cell.occurrence.id !== selectedOccurrenceId) return false
+    const cellStart = cellTime(weekStart, day, slot, startHour)
+    const cellEnd = cellTime(weekStart, day, slot + 1, startHour)
+    return overlaps(resizePreview.start, resizePreview.end, cellStart, cellEnd)
+  }
+
+  // Session titles/friend glyphs render once at their band's start slot; a
+  // start slot occluded by a resize handle shifts the label one slot later
+  // instead of hiding it, but only when the band has a second slot to move
+  // into — a single-slot band just accepts the occlusion (§8).
+  function sessionLabelsAt(day: number, slot: number): GridSessionEntry[] {
+    const result: GridSessionEntry[] = []
+    for (const cell of bandMeta.sessionGrid[day][slot]) {
+      if (!cell.isStart) continue
+      if (!cell.isEnd && handleOccupiesCell(day, slot)) continue
+      result.push(cell.session)
+    }
+    if (slot > 0) {
+      for (const cell of bandMeta.sessionGrid[day][slot - 1]) {
+        if (cell.isStart && !cell.isEnd && handleOccupiesCell(day, slot - 1)) {
+          result.push(cell.session)
+        }
+      }
+    }
+    return result
+  }
+
+  function friendGlyphRangesAt(day: number, slot: number): GridFriendRange[] {
+    const cell = bandMeta.friendGrid[day][slot]
+    if (cell.isSegmentStart) {
+      const next = slot + 1 < slots ? bandMeta.friendGrid[day][slot + 1] : null
+      const segmentContinues = Boolean(next && !next.isSegmentStart && next.ranges.length > 0)
+      if (segmentContinues && handleOccupiesCell(day, slot)) return []
+      return cell.ranges
+    }
+    if (slot > 0) {
+      const prev = bandMeta.friendGrid[day][slot - 1]
+      if (
+        prev.isSegmentStart &&
+        handleOccupiesCell(day, slot - 1) &&
+        cell.ranges.length === prev.ranges.length &&
+        cell.ranges.every((range, index) => range === prev.ranges[index])
+      ) {
+        return cell.ranges
+      }
+    }
+    return []
   }
 
   function announceExtent(day: number, anchorSlot: number, endSlot: number) {
@@ -367,6 +606,14 @@ export function WeekGrid({
     occurrence: GridOccurrence,
     edge: 'start' | 'end',
   ) {
+    // A native `<button>`'s Enter/Space would otherwise synthesize a click
+    // that bubbles to the cell's `onClick` and re-runs activation on top of
+    // whichever branch below already handled the key (§8).
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      event.stopPropagation()
+      return
+    }
     if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
     event.preventDefault()
     // The cell below owns ArrowUp/ArrowDown for roving focus; letting this
@@ -417,7 +664,11 @@ export function WeekGrid({
         setFocused({ day: Math.min(6, day + 1), slot })
         break
       }
-      case 'Enter': {
+      // §8: Space mirrors Enter exactly — its behavior is state-dependent
+      // (start selection / commit / open editor) — with `preventDefault` so
+      // the page never scrolls, the ARIA grid pattern's expectation.
+      case 'Enter':
+      case ' ': {
         event.preventDefault()
         if (selection) {
           commitSelection(selection)
@@ -692,16 +943,36 @@ export function WeekGrid({
                 onAdjustOccurrence && occurrence && occurrence.id === selectedOccurrenceId
                   ? occurrence
                   : null
-              const isStartSlot =
-                selectedHere !== null &&
-                (slot === 0
-                  ? selectedHere.start < cellEnd
-                  : selectedHere.start >= cellStart && selectedHere.start < cellEnd)
-              const isEndSlot =
-                selectedHere !== null &&
-                (slot === slots - 1
-                  ? selectedHere.end > cellStart
-                  : selectedHere.end > cellStart && selectedHere.end <= cellEnd)
+              const occurrenceCell = bandMeta.occurrenceGrid[day][slot]
+              const isStartSlot = selectedHere !== null && occurrenceCell?.isStart === true
+              const isEndSlot = selectedHere !== null && occurrenceCell?.isEnd === true
+
+              // §8: the busy/selected fill forms a band across contiguous
+              // slots — the internal 15-minute border between two cells of
+              // the same band is suppressed, the 60-minute line keeps a
+              // stronger token than the 15-minute line, and band ends round
+              // off unless the true edge is clamped outside the viewport
+              // (continues past it, so the visible edge stays flat).
+              const bandActive = busy || resizing
+              const isRunStart = bandActive && (slot === 0 || !bandActiveAt(day, slot - 1))
+              const isRunEnd = bandActive && (slot === slots - 1 || !bandActiveAt(day, slot + 1))
+              const mergedCell = bandMeta.mergedGrid[day][slot]
+              const isHourLine = slot % 4 === 0
+              const topBorderClass =
+                bandActive && !isRunStart
+                  ? 'border-t-0'
+                  : isHourLine
+                    ? 'border-t border-t-ink/45'
+                    : 'border-t border-t-ink/20'
+              const roundedTop = isRunStart && !mergedCell?.clampedAtStart
+              const roundedBottom = isRunEnd && !mergedCell?.clampedAtEnd
+              const roundingClass = [
+                roundedTop ? 'rounded-t-md' : '',
+                roundedBottom ? 'rounded-b-md' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')
+              const bottomBorderClass = slot === slots - 1 ? 'border-b border-b-ink/25' : ''
 
               // §3: the selection ring is drawn around the *band*, not per
               // cell. A drag/keyboard selection is always one column wide
@@ -756,7 +1027,7 @@ export function WeekGrid({
                   aria-colindex={day + 2}
                   aria-label={labelParts.join(' – ')}
                   aria-rowindex={slot + 2}
-                  className="relative isolate min-h-11 min-w-11 flex-1 border border-ink/25 bg-free data-[busy=true]:bg-busy focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus data-[state=selected]:before:absolute data-[state=selected]:before:inset-0 data-[state=selected]:before:z-[-1] data-[state=selected]:before:bg-ink/6 data-[state=selected]:before:content-[''] data-[selection-edge~=top]:border-t-2 data-[selection-edge~=top]:border-t-ink data-[selection-edge~=bottom]:border-b-2 data-[selection-edge~=bottom]:border-b-ink data-[selection-edge~=left]:border-l-2 data-[selection-edge~=left]:border-l-ink data-[selection-edge~=right]:border-r-2 data-[selection-edge~=right]:border-r-ink"
+                  className={`relative isolate min-h-11 min-w-11 flex-1 border-x border-ink/25 ${topBorderClass} ${bottomBorderClass} ${roundingClass} bg-free data-[busy=true]:bg-busy focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus data-[state=selected]:before:absolute data-[state=selected]:before:inset-0 data-[state=selected]:before:z-[-1] data-[state=selected]:before:bg-ink/6 data-[state=selected]:before:content-[''] data-[selection-edge~=top]:border-t-2 data-[selection-edge~=top]:border-t-ink data-[selection-edge~=bottom]:border-b-2 data-[selection-edge~=bottom]:border-b-ink data-[selection-edge~=left]:border-l-2 data-[selection-edge~=left]:border-l-ink data-[selection-edge~=right]:border-r-2 data-[selection-edge~=right]:border-r-ink`}
                   data-busy={busy || undefined}
                   data-selection-edge={selectionEdges || undefined}
                   data-state={state}
@@ -817,7 +1088,7 @@ export function WeekGrid({
                     </span>
                   )}
                   {occurrence && <span className="sr-only">{t('a11y.busy')}</span>}
-                  {cellFriends.length > 0 && (
+                  {friendGlyphRangesAt(day, slot).length > 0 && (
                     <span
                       aria-hidden="true"
                       className="block text-xs text-ink"
@@ -826,7 +1097,7 @@ export function WeekGrid({
                       &#9675;
                     </span>
                   )}
-                  {cellSessions.map((session) => (
+                  {sessionLabelsAt(day, slot).map((session) => (
                     <span
                       key={session.id}
                       aria-hidden="true"

@@ -351,11 +351,10 @@ describe('WeekGrid pointer flow', () => {
   })
 
   // Regression guard: this already passes pre-change — Enter through
-  // `handleKeyDown` (`:275`) is the path this ticket deliberately leaves
-  // alone. Included so the pointer suite proves the new mouse/touch entry
-  // points didn't disturb it. (`handleKeyDown`'s switch has no `' '`/Space
-  // case at all — only Enter opens the editor from the keyboard today; see
-  // report concerns.)
+  // `handleKeyDown` is the path this ticket deliberately leaves alone.
+  // Included so the pointer suite proves the new mouse/touch entry points
+  // didn't disturb it. Space's identical behavior is covered separately in
+  // the "WeekGrid Space activation" suite below.
   it('still opens the editor with Enter from the keyboard', () => {
     const { onEditOccurrence } = renderGrid({ occurrences })
 
@@ -527,6 +526,184 @@ describe('WeekGrid resize handles', () => {
 
     expect(onAdjustOccurrence).not.toHaveBeenCalled()
     expect(onEditOccurrence).toHaveBeenCalledWith('block-a')
+  })
+
+  // §8: a native `<button>`'s Space/Enter would otherwise synthesize a click
+  // that bubbles to the cell and reopens the editor on top of whichever
+  // pointer-driven adjustment just happened; `handleResizeKeyDown` swallows
+  // both so that click is never produced. jsdom doesn't synthesize that
+  // click from a keydown the way a real browser does, so the assertion here
+  // is on the swallow itself: the keydown is prevented and no arrow-key
+  // nudge logic runs.
+  it.each(['Enter', ' '])(
+    'swallows %s on the resize handle without nudging or double-activating',
+    (key) => {
+      const onAdjustOccurrence = vi.fn<(adjustment: GridAdjustment) => void>()
+      renderGrid({ occurrences, onAdjustOccurrence })
+
+      selectBlock()
+
+      const handle = screen.getByRole('button', { name: 'Change end time' })
+      const notPrevented = fireEvent.keyDown(handle, { key })
+
+      expect(notPrevented).toBe(false)
+      expect(onAdjustOccurrence).not.toHaveBeenCalled()
+    },
+  )
+})
+
+describe('WeekGrid Space activation_D071_D132', () => {
+  it('mirrors Enter through the full keyboard selection flow with Space', () => {
+    const { onCreateBlock } = renderGrid({})
+
+    const start = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    start.focus()
+    fireEvent.keyDown(start, { key: ' ' })
+    expect(screen.getByRole('status')).toHaveTextContent('Selection started at 9:00.')
+
+    fireEvent.keyDown(start, { key: 'ArrowDown', shiftKey: true })
+    const extended = screen.getAllByRole('gridcell', { name: '9:15' })[0]
+    fireEvent.keyDown(extended, { key: ' ' })
+
+    expect(onCreateBlock).toHaveBeenCalledTimes(1)
+    const [committed] = onCreateBlock.mock.calls[0]
+    expect(committed.start.getTime()).toBe(localDate(9, 0).getTime())
+    expect(committed.end.getTime()).toBe(localDate(9, 30).getTime())
+  })
+
+  it('opens the editor with Space on an existing block', () => {
+    const occurrences: GridOccurrence[] = [
+      { id: 'block-a', start: localDate(9, 0), end: localDate(9, 30) },
+    ]
+    const { onEditOccurrence } = renderGrid({ occurrences })
+
+    const block = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    block.focus()
+    fireEvent.keyDown(block, { key: ' ' })
+
+    expect(onEditOccurrence).toHaveBeenCalledWith('block-a')
+  })
+
+  it('cancels a selection with Escape after starting it with Space', () => {
+    renderGrid({})
+
+    const cell = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    cell.focus()
+    fireEvent.keyDown(cell, { key: ' ' })
+    fireEvent.keyDown(cell, { key: 'Escape' })
+
+    expect(screen.getByRole('status')).toHaveTextContent('Selection canceled.')
+  })
+
+  it('prevents the default (page scroll) on Space', () => {
+    renderGrid({})
+
+    const cell = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    cell.focus()
+    const notPrevented = fireEvent.keyDown(cell, { key: ' ' })
+
+    expect(notPrevented).toBe(false)
+  })
+})
+
+describe('WeekGrid §8 band rendering', () => {
+  it('rounds a band at its true edges and flattens a clamped edge', () => {
+    // block-a is entirely within the visible 9:00-11:00 window, so both its
+    // true start and end are rounded.
+    const occurrences: GridOccurrence[] = [
+      { id: 'block-a', start: localDate(9, 0), end: localDate(9, 45) },
+    ]
+    const merged: GridRange[] = [{ start: localDate(9, 0), end: localDate(9, 45) }]
+    renderGrid({ occurrences, merged })
+
+    const startCell = screen.getByRole('gridcell', { name: '9:00 – Busy' })
+    const middleCell = screen.getByRole('gridcell', { name: '9:15 – Busy' })
+    const endCell = screen.getByRole('gridcell', { name: '9:30 – Busy' })
+
+    expect(startCell.className).toMatch(/rounded-t-md/)
+    expect(startCell.className).not.toMatch(/border-t-0/)
+    // The internal 15-minute border between two cells of the same band is
+    // suppressed on every cell but the run's start.
+    expect(middleCell.className).toMatch(/border-t-0/)
+    expect(middleCell.className).not.toMatch(/rounded-(t|b)-md/)
+    expect(endCell.className).toMatch(/border-t-0/)
+    expect(endCell.className).toMatch(/rounded-b-md/)
+  })
+
+  it('flattens the visible edge when the band continues past the viewport', () => {
+    // block-a starts an hour before the grid's visible 9:00 floor, so the
+    // first visible slot is a clamp, not the window's true start.
+    const occurrences: GridOccurrence[] = [
+      { id: 'block-a', start: localDate(8, 0), end: localDate(9, 30) },
+    ]
+    const merged: GridRange[] = [{ start: localDate(8, 0), end: localDate(9, 30) }]
+    renderGrid({ occurrences, merged })
+
+    const firstVisibleCell = screen.getByRole('gridcell', { name: '9:00 – Busy' })
+    expect(firstVisibleCell.className).not.toMatch(/rounded-t-md/)
+  })
+
+  it('renders a session title once per band, at the band start only', () => {
+    const sessionEntries: GridSessionEntry[] = [
+      {
+        id: 'session-1',
+        title: 'Raid night',
+        start: localDate(9, 0),
+        end: localDate(9, 30),
+        viewerRelation: 'organizer',
+      },
+    ]
+    renderGrid({ sessionEntries })
+
+    const startCell = screen.getByRole('gridcell', { name: '9:00 – Raid night' })
+    const middleCell = screen.getByRole('gridcell', { name: '9:15 – Raid night' })
+    expect(startCell.querySelector('[data-layer="session"]')).toHaveTextContent('Raid night')
+    expect(middleCell.querySelector('[data-layer="session"]')).toBeNull()
+  })
+
+  it('renders the friend glyph once per coverage segment, at the segment start only', () => {
+    const friendRanges: GridFriendRange[] = [
+      { ownerLabel: 'Ana', start: localDate(9, 0), end: localDate(9, 30) },
+    ]
+    renderGrid({ friendRanges })
+
+    const startCell = screen.getByRole('gridcell', { name: '9:00 – Ana available' })
+    const middleCell = screen.getByRole('gridcell', { name: '9:15 – Ana available' })
+    expect(startCell.querySelector('[data-layer="friend"]')).not.toBeNull()
+    expect(middleCell.querySelector('[data-layer="friend"]')).toBeNull()
+  })
+
+  it('shifts a band label off the start cell once a resize handle occupies it', () => {
+    const occurrences: GridOccurrence[] = [
+      { id: 'block-a', start: localDate(9, 0), end: localDate(9, 30) },
+    ]
+    const sessionEntries: GridSessionEntry[] = [
+      {
+        id: 'session-1',
+        title: 'Raid night',
+        start: localDate(9, 0),
+        end: localDate(9, 30),
+        viewerRelation: 'organizer',
+      },
+    ]
+    const onAdjustOccurrence = vi.fn<(adjustment: GridAdjustment) => void>()
+    renderGrid({ occurrences, sessionEntries, onAdjustOccurrence })
+
+    const startCell = screen.getAllByRole('gridcell', { name: '9:00 – Raid night' })[0]
+    expect(startCell.querySelector('[data-layer="session"]')).toHaveTextContent('Raid night')
+
+    // Selecting the block exposes the start-cell resize handle, which would
+    // otherwise occlude the title rendered underneath it.
+    fireEvent.mouseDown(startCell, { button: 0 })
+    fireEvent.mouseUp(startCell)
+    fireEvent.click(startCell)
+
+    expect(
+      screen.getByRole('button', { name: 'Change start time' }),
+    ).toBeInTheDocument()
+    expect(startCell.querySelector('[data-layer="session"]')).toBeNull()
+    const secondCell = screen.getByRole('gridcell', { name: '9:15 – Raid night' })
+    expect(secondCell.querySelector('[data-layer="session"]')).toHaveTextContent('Raid night')
   })
 })
 
