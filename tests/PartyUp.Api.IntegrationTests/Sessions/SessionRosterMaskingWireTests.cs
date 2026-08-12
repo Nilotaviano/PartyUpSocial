@@ -176,6 +176,75 @@ public sealed class SessionRosterMaskingWireTests : IAsyncLifetime, IDisposable
         Assert.False(organizer.TryGetProperty("avatar", out _));
     }
 
+    /// <summary>
+    /// AVATARS_DESIGN.md §2.4/§5: the D-188/D-076 absence assertion above (line 86) would stay green
+    /// even if only the <c>emoji</c> field were nulled and the img arm's proxy token leaked through a
+    /// forgotten field on a masked entry -- because the whole <c>avatar</c> key is absent, the token
+    /// can't ride along in it either. This pins that down explicitly for a blocked counterpart whose
+    /// avatar is an <c>External</c> one with a real, otherwise-working proxy token, so the coverage
+    /// gap can't come back if a future field is ever added directly onto the roster entry.
+    /// </summary>
+    [Fact]
+    public async Task AMaskedEntryWithAnExternalAvatarLeaksNoProxyToken_D188_D076()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"wire-tok-org-{Guid.NewGuid():N}@example.test");
+        UserId viewerId = await _factory.SeedUserAsync(email: $"wire-tok-viewer-{Guid.NewGuid():N}@example.test");
+        UserId blockedId = await _factory.SeedUserAsync(email: $"wire-tok-blocked-{Guid.NewGuid():N}@example.test");
+
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        User blockedUser = await context.DomainUsers.SingleAsync(u => u.Id == blockedId);
+        AvatarSource source = blockedUser.CaptureAvatarSource(
+            AvatarSourceKind.SteamPlatform,
+            [1, 2, 3],
+            "image/webp",
+            _factory.Clock);
+        string token = source.Token;
+        blockedUser.ChangeAvatar(Avatar.FromSource(source.Id));
+        await context.SaveChangesAsync();
+
+        SessionDetails details = new(
+            SessionTitle.Create("Token leak fixture"),
+            _factory.Clock.GetCurrentInstant() + Duration.FromHours(3),
+            Duration15.FromMinutes(60),
+            Platform.NotApplicable,
+            null,
+            SessionNotes.Empty,
+            minAttendance: 1,
+            maxCapacity: null,
+            isPrivate: false);
+        Session session = Session.Create(organizerId, details, [viewerId, blockedId], _factory.Clock);
+        _ = session.DequeueEvents();
+        context.Sessions.Add(session);
+        await context.SaveChangesAsync();
+
+        Session reloaded = await context.Sessions.Include(s => s.Participations).SingleAsync(s => s.Id == session.Id);
+        reloaded.Rsvp(ParticipantRef.ForUser(viewerId), ParticipationStatus.Going, _factory.Clock);
+        reloaded.Rsvp(ParticipantRef.ForUser(blockedId), ParticipationStatus.Going, _factory.Clock);
+        _ = reloaded.DequeueEvents();
+        await context.SaveChangesAsync();
+
+        context.Blocks.Add(Block.Create(
+            viewerId, blockedId, blockedUser.Username!.Value, _factory.Clock));
+        await context.SaveChangesAsync();
+
+        using SessionHttpSession viewerSession = await SessionEndpointTestSupport.SignInAsync(_factory, viewerId);
+        HttpResponseMessage response = await viewerSession.GetAsync($"/api/v1/sessions/{session.Id.Value:D}");
+        string body = await response.Content.ReadAsStringAsync();
+        using JsonDocument detail = JsonDocument.Parse(body);
+
+        JsonElement roster = detail.RootElement.GetProperty("roster");
+        JsonElement maskedEntry = roster.EnumerateArray()
+            .Single(entry => !entry.TryGetProperty("userId", out _)
+                && !entry.TryGetProperty("displayName", out _));
+        Assert.False(maskedEntry.TryGetProperty("avatar", out _));
+
+        // Belt and suspenders: the real token never appears anywhere in the raw response body,
+        // whatever shape a future regression might smuggle it in under.
+        Assert.DoesNotContain(token, body, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task JoinRequestResponsesCarryTheResolvedRequesterNameOnTheSummaryPathOnly_D103()
     {

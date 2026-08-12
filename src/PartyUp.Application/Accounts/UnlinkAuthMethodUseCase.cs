@@ -92,6 +92,16 @@ public sealed class UnlinkAuthMethodUseCase(
                         command.UserId,
                         ExternalProviderPolicy.Google,
                         ct);
+
+                    // AVATARS_DESIGN.md §3.4: unlike Steam (UnlinkSteamUseCase -> User.UnlinkPlatform),
+                    // this branch never otherwise touches the aggregate -- without this, a
+                    // Google-sourced avatar would dangle after the login is removed.
+                    AvatarSource? googleSource = user.AvatarSources.SingleOrDefault(
+                        source => source.Kind == AvatarSourceKind.GoogleAccount);
+                    if (googleSource is not null)
+                    {
+                        user.RemoveAvatarSource(googleSource.Id);
+                    }
                 }
 
                 await sessions.SignOutEverywhereAsync(command.UserId, ct);

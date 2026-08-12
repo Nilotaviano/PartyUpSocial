@@ -21,6 +21,9 @@ public enum UserDataScope
 
     /// <summary>Notification rows addressed to the user; they never held names to begin with (§9).</summary>
     Notifications = 3,
+
+    /// <summary>AVATARS_DESIGN.md §3.4: every <c>AvatarSource</c> row this user captured.</summary>
+    AvatarSources = 4,
 }
 
 /// <summary>

@@ -744,16 +744,14 @@ describe('PollDetailPage', () => {
       expect(screen.queryByText('Choose a time')).not.toBeInTheDocument()
     })
 
-    it('the finalization preview renders no disc in wave A_D188', async () => {
-      // Rows carrying an avatar, so the assertion proves a deliberate
-      // non-render rather than an empty field.
+    it('renders a disc per finalization preview roster row without rewriting the radio accessible name_D188', async () => {
       const preview = previewResponse()
       const previewWithAvatars = {
         options: preview.options.map((option) => ({
           ...option,
           roster: option.roster.map((row) => ({
             ...row,
-            avatar: { kind: 'emoji', emoji: '🦄', sourcePlatformLinkId: null },
+            avatar: { kind: 'emoji', emoji: '🦄', avatarSourceId: null, imgUrl: null },
           })),
         })),
       }
@@ -767,10 +765,16 @@ describe('PollDetailPage', () => {
       renderPage()
 
       const option = await screen.findByTestId('finalize-option-option-1')
-      // The preview's names live inside a <label> wrapping the radio input;
-      // a disc there would rewrite the radio's accessible name.
-      expect(option.querySelector('[aria-hidden="true"]')).toBeNull()
-      expect(within(option).getByRole('radio')).not.toHaveAccessibleName(/🦄/)
+      // Discs render (one per going + one per waitlisted row), but each lives in its
+      // own aria-hidden span, so the radio's accessible name still comes only from
+      // the comma-joined name text — the emoji never enters it.
+      const discs = option.querySelectorAll('[aria-hidden="true"]')
+      expect(discs.length).toBeGreaterThan(0)
+      discs.forEach((disc) => expect(disc).toHaveTextContent('🦄'))
+      const radio = within(option).getByRole('radio')
+      expect(radio).not.toHaveAccessibleName(/🦄/)
+      expect(radio).toHaveAccessibleName(/Organizer One/)
+      expect(radio).toHaveAccessibleName(/Voter Two/)
     })
   })
 
@@ -996,7 +1000,7 @@ describe('PollDetailPage', () => {
             guestIdentityId: null,
             displayName: 'Ada',
             isActive: true,
-            avatar: { kind: 'emoji', emoji: '🐙', sourcePlatformLinkId: null },
+            avatar: { kind: 'emoji', emoji: '🐙', avatarSourceId: null, imgUrl: null },
           },
           {
             participationId: 'pp-masked',
@@ -1004,7 +1008,7 @@ describe('PollDetailPage', () => {
             guestIdentityId: null,
             displayName: null,
             isActive: true,
-            avatar: { kind: 'emoji', emoji: '⚡', sourcePlatformLinkId: null },
+            avatar: { kind: 'emoji', emoji: '⚡', avatarSourceId: null, imgUrl: null },
           },
         ],
       }),

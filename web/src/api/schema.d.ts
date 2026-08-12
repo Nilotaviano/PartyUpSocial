@@ -2003,12 +2003,21 @@ export interface components {
             emoji: null | string;
             /** Format: uuid */
             platformLinkId: null | string;
+            /** Format: uuid */
+            avatarSourceId?: null | string;
         };
         AvatarResponse: {
             kind: string;
             emoji: null | string;
             /** Format: uuid */
-            sourcePlatformLinkId: null | string;
+            avatarSourceId: null | string;
+            imgUrl: null | string;
+        };
+        AvatarSourceOptionResponse: {
+            /** Format: uuid */
+            avatarSourceId: string;
+            kind: string;
+            imgUrl: string;
         };
         BanUserRequest: {
             removeContent: boolean;
@@ -2395,6 +2404,7 @@ export interface components {
             friendCode: null | string;
             reminderDefault: string;
             platformLinks: components["schemas"]["PlatformLinkResponse"][];
+            avatarSources: components["schemas"]["AvatarSourceOptionResponse"][];
             authMethods: components["schemas"]["AuthMethodResponse"][];
             pushPromptEligible: boolean;
             tourCompleted: boolean;

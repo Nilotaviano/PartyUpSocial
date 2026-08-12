@@ -169,6 +169,22 @@ public sealed class GuestSecurityTests : IAsyncLifetime, IDisposable
             FriendPathLogSanitizer.Sanitize(new PathString("/g/")));
     }
 
+    /// <summary>
+    /// AVATARS_DESIGN.md §3.3: the picture proxy's token-bearing path gets the same application-log
+    /// redaction as the guest exchange route -- Caddy's own uri filter is asserted by
+    /// <c>CaddyAccessLoggingTests</c>.
+    /// </summary>
+    [Fact]
+    public void AvatarProxyTokenNeverAppearsInSerilog_D191()
+    {
+        Assert.Equal(
+            "/a/REDACTED",
+            FriendPathLogSanitizer.Sanitize(new PathString("/a/AbCdEf1234567890")));
+        Assert.Equal(
+            "/a/REDACTED",
+            FriendPathLogSanitizer.Sanitize(new PathString("/a/")));
+    }
+
     [Fact]
     public async Task GuestExchangeResponseCarriesNoReferrerPolicy_A044()
     {

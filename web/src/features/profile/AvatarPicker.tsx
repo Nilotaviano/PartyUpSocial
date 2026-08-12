@@ -1,7 +1,15 @@
-import { type JSX, type KeyboardEvent } from 'react'
+import { type JSX, type KeyboardEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { AVATAR_CATALOG } from './avatarCatalog'
+import { avatarSourceLabelKey, type AvatarSourceOption } from './avatarSources'
+
+type PickerOption = {
+  key: string
+  value: string
+  ariaLabel: string
+  node: ReactNode
+}
 
 /**
  * AVATARS_DESIGN.md §2.1: a 1-D wrapping ARIA APG radiogroup, the same arrow-key
@@ -10,20 +18,47 @@ import { AVATAR_CATALOG } from './avatarCatalog'
  *
  * `labelledBy` points at page text that already names the field; passing it
  * suppresses `picker.label` so the group never carries two competing names.
+ *
+ * AVATARS_DESIGN.md §3.5: `sources` extends this same radiogroup with the caller's
+ * linked-account pictures, appended after the emoji catalog — one component, one
+ * group, never a second picker. Onboarding never passes `sources` (§2.1: no avatar
+ * source can exist yet at that point), so it renders exactly as before.
  */
 export function AvatarPicker({
   value,
   onChange,
   idPrefix,
   labelledBy,
+  sources = [],
 }: {
   value: string
-  onChange: (glyph: string) => void
+  onChange: (value: string) => void
   idPrefix: string
   labelledBy?: string
+  sources?: AvatarSourceOption[]
 }): JSX.Element {
   const { t } = useTranslation('avatar')
-  const selectedIndex = AVATAR_CATALOG.findIndex((entry) => entry.glyph === value)
+
+  const catalogOptions: PickerOption[] = AVATAR_CATALOG.map((entry) => ({
+    key: entry.slug,
+    value: entry.glyph,
+    ariaLabel: t(`catalog.${entry.slug}`),
+    node: <span aria-hidden="true">{entry.glyph}</span>,
+  }))
+  const sourceOptions: PickerOption[] = sources.map((source) => ({
+    key: source.avatarSourceId,
+    value: `source:${source.avatarSourceId}`,
+    ariaLabel: t(`picker.source.${avatarSourceLabelKey(source.kind)}`, {
+      defaultValue: t('picker.source.fallback'),
+    }),
+    node: (
+      <span aria-hidden="true">
+        <img alt="" className="h-6 w-6 rounded-full object-cover" src={source.imgUrl} />
+      </span>
+    ),
+  }))
+  const options = [...catalogOptions, ...sourceOptions]
+  const selectedIndex = options.findIndex((option) => option.value === value)
 
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     const delta =
@@ -35,9 +70,8 @@ export function AvatarPicker({
     if (delta === 0) return
     event.preventDefault()
     const from = selectedIndex < 0 ? 0 : selectedIndex
-    const nextIndex =
-      (from + delta + AVATAR_CATALOG.length) % AVATAR_CATALOG.length
-    onChange(AVATAR_CATALOG[nextIndex].glyph)
+    const nextIndex = (from + delta + options.length) % options.length
+    onChange(options[nextIndex].value)
     const radios =
       event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
         '[role=radio]',
@@ -53,23 +87,23 @@ export function AvatarPicker({
       data-testid={`${idPrefix}-picker`}
       role="radiogroup"
     >
-      {AVATAR_CATALOG.map((entry, index) => {
-        const checked = entry.glyph === value
+      {options.map((option, index) => {
+        const checked = option.value === value
         return (
           <button
-            key={entry.slug}
+            key={option.key}
             aria-checked={checked}
-            aria-label={t(`catalog.${entry.slug}`)}
+            aria-label={option.ariaLabel}
             className="min-h-11 min-w-11 rounded-control border-2 border-ink bg-card px-3 py-2 text-lg text-ink aria-checked:bg-accent aria-checked:text-accent-ink dark:aria-checked:border-accent-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            data-testid={`${idPrefix}-${entry.slug}`}
-            id={`${idPrefix}-${entry.slug}`}
+            data-testid={`${idPrefix}-${option.key}`}
+            id={`${idPrefix}-${option.key}`}
             role="radio"
             tabIndex={checked || (selectedIndex < 0 && index === 0) ? 0 : -1}
             type="button"
-            onClick={() => onChange(entry.glyph)}
+            onClick={() => onChange(option.value)}
             onKeyDown={onKeyDown}
           >
-            <span aria-hidden="true">{entry.glyph}</span>
+            {option.node}
           </button>
         )
       })}

@@ -175,56 +175,149 @@ public class UserProfileTests
     }
 
     [Fact]
-    public void ChangeAvatar_ToAPlatformRequiresOneOfTheUsersOwnLinks_D050()
+    public void ChangeAvatar_ToExternalRequiresOneOfTheUsersOwnAvatarSources_D190()
     {
         FakeClock clock = TestUsers.Clock();
         User user = TestUsers.Active(clock);
 
         DomainException error = Assert.Throws<DomainException>(() =>
-            user.ChangeAvatar(Avatar.FromPlatformLink(PlatformLinkId.New())));
+            user.ChangeAvatar(Avatar.FromSource(AvatarSourceId.New())));
 
         Assert.Equal(DomainError.NotFound, error.Error);
         Assert.Equal(AvatarKind.Emoji, user.Avatar?.Kind);
     }
 
     [Fact]
-    public void ChangeAvatar_PointsAtExactlyOneAvatarSource_D050()
+    public void ChangeAvatar_PointsAtExactlyOneAvatarSource_D190()
     {
         FakeClock clock = TestUsers.Clock();
         User user = TestUsers.Active(clock);
-        PlatformLink steam = user.LinkPlatform(Platform.Steam, GamingHandle.Create("gaben"));
-        PlatformLink xbox = user.LinkPlatform(Platform.Xbox, GamingHandle.Create("xboxer"));
+        AvatarSource steam = user.CaptureAvatarSource(AvatarSourceKind.SteamPlatform, [1, 2, 3], "image/webp", clock);
+        AvatarSource google = user.CaptureAvatarSource(AvatarSourceKind.GoogleAccount, [4, 5, 6], "image/webp", clock);
 
-        user.ChangeAvatar(Avatar.FromPlatformLink(steam.Id));
+        user.ChangeAvatar(Avatar.FromSource(steam.Id));
 
         Assert.True(user.Avatar?.DrawsFrom(steam.Id));
-        Assert.False(user.Avatar?.DrawsFrom(xbox.Id));
+        Assert.False(user.Avatar?.DrawsFrom(google.Id));
         Assert.Equal(string.Empty, user.Avatar?.Emoji);
     }
 
+    /// <summary>
+    /// AVATARS_DESIGN.md §3.1/§3.3: <see cref="Avatar.Token"/> is denormalized from the owning
+    /// <see cref="AvatarSource"/> by <see cref="User.ChangeAvatar"/>, never trusted from the caller
+    /// -- so a caller passing no token (the only shape <c>ChangeAvatarUseCase</c> ever builds) still
+    /// ends up with the real one, and a caller passing a bogus one is overwritten regardless.
+    /// </summary>
     [Fact]
-    public void UnlinkPlatform_FallsTheAvatarBackToAnEmoji_D050()
+    public void ChangeAvatar_DenormalizesTheRealTokenFromTheOwningSource_D190()
     {
         FakeClock clock = TestUsers.Clock();
         User user = TestUsers.Active(clock);
-        PlatformLink link = user.LinkPlatform(Platform.Steam, GamingHandle.Create("gaben"));
-        user.ChangeAvatar(Avatar.FromPlatformLink(link.Id));
+        AvatarSource source = user.CaptureAvatarSource(AvatarSourceKind.SteamPlatform, [1, 2, 3], "image/webp", clock);
 
-        user.UnlinkPlatform(link.Id);
+        user.ChangeAvatar(Avatar.FromSource(source.Id, "not-the-real-token"));
 
-        Assert.Empty(user.PlatformLinks);
+        Assert.Equal(source.Token, user.Avatar?.Token);
+        Assert.NotEqual("not-the-real-token", user.Avatar?.Token);
+    }
+
+    [Fact]
+    public void CaptureAvatarSource_UpsertsTheSingleRowPerKind_D190()
+    {
+        FakeClock clock = TestUsers.Clock();
+        User user = TestUsers.Active(clock);
+        AvatarSource first = user.CaptureAvatarSource(AvatarSourceKind.SteamPlatform, [1], "image/webp", clock);
+
+        AvatarSource second = user.CaptureAvatarSource(AvatarSourceKind.SteamPlatform, [2], "image/webp", clock);
+
+        Assert.Equal(first.Id, second.Id);
+        Assert.Equal(first.Token, second.Token);
+        Assert.Single(user.AvatarSources);
+        Assert.Equal(new byte[] { 2 }, user.AvatarSources[0].Bytes);
+    }
+
+    [Fact]
+    public void RemoveAvatarSource_FallsTheAvatarBackToAnEmoji_D190()
+    {
+        FakeClock clock = TestUsers.Clock();
+        User user = TestUsers.Active(clock);
+        AvatarSource source = user.CaptureAvatarSource(AvatarSourceKind.SteamPlatform, [1, 2, 3], "image/webp", clock);
+        user.ChangeAvatar(Avatar.FromSource(source.Id));
+
+        user.RemoveAvatarSource(source.Id);
+
+        Assert.Empty(user.AvatarSources);
         Assert.Equal(AvatarKind.Emoji, user.Avatar?.Kind);
         Assert.Equal(Avatar.FallbackEmoji, user.Avatar?.Emoji);
         Assert.True(user.IsProfileComplete);
     }
 
     [Fact]
-    public void UnlinkPlatform_FallsBackToTheEmojiTheUserPicked_D050()
+    public void RemoveAvatarSource_FallsBackToTheEmojiTheUserPicked_D190()
+    {
+        FakeClock clock = TestUsers.Clock();
+        User user = TestUsers.Active(clock);
+        AvatarSource source = user.CaptureAvatarSource(AvatarSourceKind.SteamPlatform, [1, 2, 3], "image/webp", clock);
+        user.ChangeAvatar(Avatar.FromSource(source.Id));
+
+        user.RemoveAvatarSource(source.Id, TestUsers.Emoji);
+
+        Assert.Equal(TestUsers.Emoji, user.Avatar?.Emoji);
+    }
+
+    [Fact]
+    public void RemoveAvatarSource_LeavesAnAvatarSourcedFromAnotherKindAlone_D190()
+    {
+        FakeClock clock = TestUsers.Clock();
+        User user = TestUsers.Active(clock);
+        AvatarSource steam = user.CaptureAvatarSource(AvatarSourceKind.SteamPlatform, [1, 2, 3], "image/webp", clock);
+        AvatarSource google = user.CaptureAvatarSource(AvatarSourceKind.GoogleAccount, [4, 5, 6], "image/webp", clock);
+        user.ChangeAvatar(Avatar.FromSource(steam.Id));
+
+        user.RemoveAvatarSource(google.Id);
+
+        Assert.True(user.Avatar?.DrawsFrom(steam.Id));
+        Assert.Single(user.AvatarSources);
+    }
+
+    [Fact]
+    public void RemoveAvatarSource_RejectsAnUnknownSource_D190()
+    {
+        FakeClock clock = TestUsers.Clock();
+        User user = TestUsers.Active(clock);
+
+        DomainException error = Assert.Throws<DomainException>(() =>
+            user.RemoveAvatarSource(AvatarSourceId.New()));
+
+        Assert.Equal(DomainError.NotFound, error.Error);
+    }
+
+    [Fact]
+    public void UnlinkPlatform_RemovesTheSteamAvatarSourceAndFallsBackToAnEmoji_D190()
     {
         FakeClock clock = TestUsers.Clock();
         User user = TestUsers.Active(clock);
         PlatformLink link = user.LinkPlatform(Platform.Steam, GamingHandle.Create("gaben"));
-        user.ChangeAvatar(Avatar.FromPlatformLink(link.Id));
+        AvatarSource source = user.CaptureAvatarSource(AvatarSourceKind.SteamPlatform, [1, 2, 3], "image/webp", clock);
+        user.ChangeAvatar(Avatar.FromSource(source.Id));
+
+        user.UnlinkPlatform(link.Id);
+
+        Assert.Empty(user.PlatformLinks);
+        Assert.Empty(user.AvatarSources);
+        Assert.Equal(AvatarKind.Emoji, user.Avatar?.Kind);
+        Assert.Equal(Avatar.FallbackEmoji, user.Avatar?.Emoji);
+        Assert.True(user.IsProfileComplete);
+    }
+
+    [Fact]
+    public void UnlinkPlatform_FallsBackToTheEmojiTheUserPicked_D190()
+    {
+        FakeClock clock = TestUsers.Clock();
+        User user = TestUsers.Active(clock);
+        PlatformLink link = user.LinkPlatform(Platform.Steam, GamingHandle.Create("gaben"));
+        AvatarSource source = user.CaptureAvatarSource(AvatarSourceKind.SteamPlatform, [1, 2, 3], "image/webp", clock);
+        user.ChangeAvatar(Avatar.FromSource(source.Id));
 
         user.UnlinkPlatform(link.Id, TestUsers.Emoji);
 
@@ -232,18 +325,20 @@ public class UserProfileTests
     }
 
     [Fact]
-    public void UnlinkPlatform_LeavesAnAvatarSourcedFromAnotherLinkAlone_D050()
+    public void UnlinkPlatform_LeavesANonSteamPlatformsAvatarSourceAlone_D190()
     {
         FakeClock clock = TestUsers.Clock();
         User user = TestUsers.Active(clock);
         PlatformLink steam = user.LinkPlatform(Platform.Steam, GamingHandle.Create("gaben"));
         PlatformLink xbox = user.LinkPlatform(Platform.Xbox, GamingHandle.Create("xboxer"));
-        user.ChangeAvatar(Avatar.FromPlatformLink(steam.Id));
+        AvatarSource source = user.CaptureAvatarSource(AvatarSourceKind.SteamPlatform, [1, 2, 3], "image/webp", clock);
+        user.ChangeAvatar(Avatar.FromSource(source.Id));
 
         user.UnlinkPlatform(xbox.Id);
 
-        Assert.True(user.Avatar?.DrawsFrom(steam.Id));
+        Assert.True(user.Avatar?.DrawsFrom(source.Id));
         Assert.Single(user.PlatformLinks);
+        Assert.Single(user.AvatarSources);
     }
 
     [Fact]

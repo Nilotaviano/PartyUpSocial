@@ -59,7 +59,6 @@ public interface IUserAccountGateway
         UserId id,
         string steamId64,
         string personaName,
-        string? avatarUrl,
         Instant fetchedAt,
         CancellationToken cancellationToken);
 

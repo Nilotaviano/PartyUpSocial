@@ -1,5 +1,12 @@
 {
-  "picker": { "label": "Choose an avatar" },
+  "picker": {
+    "label": "Choose an avatar",
+    "source": {
+      "steamPlatform": "Steam picture",
+      "googleAccount": "Google picture",
+      "fallback": "Linked picture"
+    }
+  },
   "catalog": {
     "gameController": "Game controller",
     "dice": "Dice",

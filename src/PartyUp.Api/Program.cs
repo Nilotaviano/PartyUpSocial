@@ -134,6 +134,8 @@ builder.Services.AddSingleton(new DeletionSweepOptions(
     builder.Configuration.GetValue("Deletion:SweepEnabled", true),
     ReadTimeSpan(builder.Configuration, "Deletion:SweepInterval", "00:15:00"),
     Math.Max(1, builder.Configuration.GetValue("Deletion:SweepBatchSize", 50))));
+builder.Services.AddSingleton(new AvatarRefreshOptions(
+    Math.Max(1, builder.Configuration.GetValue("Avatars:RefreshBatchSize", 200))));
 builder.Services.AddSingleton<ScopedDeletionUserExecutor>();
 builder.Services.AddSingleton<IDeletionUserExecutor>(services =>
     services.GetRequiredService<ScopedDeletionUserExecutor>());
@@ -318,7 +320,8 @@ app.UseAuthentication();
 app.UseRateLimitEmailPartitioning();
 app.UseWhen(
     context => context.Request.Path.StartsWithSegments(ApiRoutes.V1) ||
-        context.Request.Path.StartsWithSegments("/g"),
+        context.Request.Path.StartsWithSegments("/g") ||
+        context.Request.Path.StartsWithSegments("/a"),
     branch => branch.UseRateLimiter());
 app.UseAuthorization();
 app.UseMiddleware<RequestContentTypeMiddleware>();
@@ -356,6 +359,10 @@ api.MapEmailNotificationsEndpoints();
 // mapped. It sits outside the /api/v1 group by design (A-064: a transport exception, not a REST
 // resource) and is therefore excluded from /openapi/v1.json.
 app.MapGuestExchangeEndpoints();
+
+// AVATARS_DESIGN.md §3.3: the picture proxy, the same A-064 exception as the guest exchange route
+// above -- outside /api/v1 and outside /openapi/v1.json.
+app.MapAvatarProxyEndpoints();
 
 if (app.Environment.IsEnvironment("Testing"))
 {

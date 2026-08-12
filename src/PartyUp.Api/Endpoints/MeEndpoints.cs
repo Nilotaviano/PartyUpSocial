@@ -962,6 +962,13 @@ public sealed record ProfileProblem(
     string TraceId,
     string RetryAt);
 
+/// <summary>AVATARS_DESIGN.md §3.5: one entry in the settings source chooser, alongside the emoji catalog.</summary>
+public sealed record AvatarSourceOptionResponse(Guid AvatarSourceId, string Kind, string ImgUrl)
+{
+    public static AvatarSourceOptionResponse From(AvatarSource source) =>
+        new(source.Id.Value, source.Kind.ToString(), $"/a/{source.Token}");
+}
+
 public sealed record MyProfileResponse(
     string? Username,
     string? DisplayName,
@@ -971,6 +978,7 @@ public sealed record MyProfileResponse(
     string? FriendCode,
     string ReminderDefault,
     IReadOnlyList<PlatformLinkResponse> PlatformLinks,
+    IReadOnlyList<AvatarSourceOptionResponse> AvatarSources,
     IReadOnlyList<AuthMethodResponse> AuthMethods,
     // PHASE7_DESIGN.md §4/ruling 4: the server-derived half of the push-prompt split — an account
     // fact, so a second device does not restart the D-147 qualification.
@@ -996,6 +1004,7 @@ public sealed record MyProfileResponse(
                 link.Id.Value,
                 link.Platform.ToString(),
                 link.Handle.Value)).ToArray(),
+            user.AvatarSources.Select(AvatarSourceOptionResponse.From).ToArray(),
             profile.AuthMethods.Select(method => new AuthMethodResponse(
                 method.Kind,
                 method.Linked,

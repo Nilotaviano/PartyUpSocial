@@ -114,7 +114,7 @@ function activeSession(continuation: string | null = null) {
     profile: {
       username: 'partyup',
       displayName: 'Party Up',
-      avatar: { kind: 'emoji', emoji: '🎮', sourcePlatformLinkId: null },
+      avatar: { kind: 'emoji', emoji: '🎮', avatarSourceId: null, imgUrl: null },
       timeZone: 'UTC',
       locale: 'en',
       friendCode: '23456789AB',

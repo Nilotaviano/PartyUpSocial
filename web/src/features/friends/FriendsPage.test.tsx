@@ -26,9 +26,10 @@ import { FriendsPage } from './FriendsPage'
 
 const friend = {
   friendshipId: 'friendship-accepted',
+  userId: 'user-friend-one',
   username: 'friend.one',
   displayName: 'Friend One',
-  avatar: { kind: 'emoji', emoji: '🎮', sourcePlatformLinkId: null },
+  avatar: { kind: 'emoji', emoji: '🎮', avatarSourceId: null, imgUrl: null },
   platforms: [],
 }
 let friendVisible = true

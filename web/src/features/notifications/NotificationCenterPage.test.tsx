@@ -422,7 +422,7 @@ describe('NotificationCenterPage — empty states and scope toggle', () => {
           type: 'friendRequestReceived',
           actorUserId: 'user-3',
           actorDisplayName: 'Ada',
-          actorAvatar: { kind: 'emoji', emoji: '🦉', sourcePlatformLinkId: null },
+          actorAvatar: { kind: 'emoji', emoji: '🦉', avatarSourceId: null, imgUrl: null },
         }),
       ],
     })
@@ -451,7 +451,7 @@ describe('NotificationCenterPage — empty states and scope toggle', () => {
           subjectId: '11111111-1111-1111-1111-111111111111',
           subjectTitle: 'Raid night',
           actorUserId: 'user-3',
-          actorAvatar: { kind: 'emoji', emoji: '🔥', sourcePlatformLinkId: null },
+          actorAvatar: { kind: 'emoji', emoji: '🔥', avatarSourceId: null, imgUrl: null },
         }),
       ],
     })
@@ -471,7 +471,7 @@ describe('NotificationCenterPage — empty states and scope toggle', () => {
           type: 'friendRequestReceived',
           actorUserId: 'user-blocked',
           actorDisplayName: null,
-          actorAvatar: { kind: 'emoji', emoji: '🌵', sourcePlatformLinkId: null },
+          actorAvatar: { kind: 'emoji', emoji: '🌵', avatarSourceId: null, imgUrl: null },
         }),
       ],
     })

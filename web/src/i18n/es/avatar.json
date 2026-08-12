@@ -1,5 +1,12 @@
 {
-  "picker": { "label": "Elige un avatar" },
+  "picker": {
+    "label": "Elige un avatar",
+    "source": {
+      "steamPlatform": "Foto de Steam",
+      "googleAccount": "Foto de Google",
+      "fallback": "Foto vinculada"
+    }
+  },
   "catalog": {
     "gameController": "Mando de videojuegos",
     "dice": "Dado",

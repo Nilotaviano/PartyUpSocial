@@ -7,6 +7,7 @@ import { client, isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { validateFriendContinuation } from '../../auth/friendContinuation'
 import { AvatarDisc } from './AvatarDisc'
+import { avatarImgUrl } from './avatarImage'
 import { UnfriendDialog } from './FriendList'
 import {
   friendKeys,
@@ -103,6 +104,7 @@ export function ProfileActionCard({
           <div className="flex items-center gap-3">
             <AvatarDisc
               emoji={profile.avatar.emoji}
+              imgUrl={avatarImgUrl(profile.avatar)}
               seed={profile.username}
               size="sm"
             />

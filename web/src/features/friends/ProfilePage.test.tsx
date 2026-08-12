@@ -56,7 +56,7 @@ describe('ProfilePage', () => {
           avatar: {
             kind: 'emoji',
             emoji: 'secret-avatar',
-            sourcePlatformLinkId: null,
+            avatarSourceId: null, imgUrl: null,
           },
           platforms: [{ platform: 'Steam', handle: 'secret-handle' }],
         },
@@ -83,7 +83,7 @@ describe('ProfilePage', () => {
           disclosure: 'full',
           username: 'friend.one',
           displayName: 'Friend One',
-          avatar: { kind: 'emoji', emoji: '🎮', sourcePlatformLinkId: null },
+          avatar: { kind: 'emoji', emoji: '🎮', avatarSourceId: null, imgUrl: null },
           platforms: [{ platform: 'Steam', handle: 'friendly' }],
           relationship: { kind: 'accepted', friendshipId: 'friendship-1' },
         },

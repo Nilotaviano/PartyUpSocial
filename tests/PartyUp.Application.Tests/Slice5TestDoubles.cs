@@ -31,7 +31,7 @@ internal sealed class FakeAccountGateway : IUserAccountGateway
 
     internal HashSet<UserId> PasswordUsers { get; } = [];
 
-    internal List<(UserId Id, string SteamId64, string PersonaName, string? AvatarUrl, Instant FetchedAt)>
+    internal List<(UserId Id, string SteamId64, string PersonaName, Instant FetchedAt)>
         SteamIdentities { get; } = [];
 
     internal List<UserId> RemovedSteamIdentities { get; } = [];
@@ -172,12 +172,11 @@ internal sealed class FakeAccountGateway : IUserAccountGateway
         UserId id,
         string steamId64,
         string personaName,
-        string? avatarUrl,
         Instant fetchedAt,
         CancellationToken cancellationToken)
     {
         SteamIdentities.RemoveAll(identity => identity.Id == id);
-        SteamIdentities.Add((id, steamId64, personaName, avatarUrl, fetchedAt));
+        SteamIdentities.Add((id, steamId64, personaName, fetchedAt));
         return Task.CompletedTask;
     }
 
@@ -358,6 +357,22 @@ internal sealed class FakeSteamProfileClient : ISteamProfileClient
         string steamId64,
         CancellationToken cancellationToken) =>
         Task.FromResult(Profile);
+}
+
+/// <summary>Never captures anything by default -- exactly the "capture failure never fails sign-in" case.</summary>
+internal sealed class FakeAvatarCaptureService : IAvatarCaptureService
+{
+    internal AvatarCapture? Capture { get; set; }
+
+    internal bool Throw { get; set; }
+
+    public Task<AvatarCapture?> CaptureAsync(
+        string upstreamUrl,
+        AvatarSourceKind kind,
+        CancellationToken cancellationToken) =>
+        Throw
+            ? throw new InvalidOperationException("Simulated capture failure.")
+            : Task.FromResult(Capture);
 }
 
 internal sealed class FakeAccountSessionService : IAccountSessionService

@@ -16,6 +16,7 @@ using PartyUp.Application.Sessions;
 using PartyUp.Application.Text;
 using PartyUp.Infrastructure.Accounts;
 using PartyUp.Infrastructure.Auth;
+using PartyUp.Infrastructure.Avatars;
 using PartyUp.Infrastructure.Email;
 using PartyUp.Infrastructure.Friends;
 using PartyUp.Infrastructure.Deletion;
@@ -62,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserProjectionReader, CurrentUserProjectionReader>();
         services.AddScoped<IAdminUserReader, AdminUserReader>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IAvatarSourceRepository, AvatarSourceRepository>();
         services.AddScoped<IUsernameRegistryRepository, UsernameRegistryRepository>();
         services.AddScoped<IFriendshipRepository, FriendshipRepository>();
         services.AddScoped<IBlockRepository, BlockRepository>();
@@ -181,6 +183,9 @@ public static class DependencyInjection
             new SteamFriendListClient(
                 provider.GetRequiredService<SteamApiClient>(),
                 configuration["Steam:ApiKey"]));
+        // A dedicated instance, never the shared singleton HttpClient above -- AVATARS_DESIGN.md §3.2.
+        services.AddSingleton<IAvatarCaptureService, AvatarCaptureService>();
+        services.AddScoped<AvatarRefreshJob>();
         services.AddSingleton<IDateTimeZoneProvider>(DateTimeZoneProviders.Tzdb);
         services.AddSingleton<IEmailTemplateRenderer, EmbeddedEmailTemplateRenderer>();
         services.AddSingleton<IPushTemplateRenderer, EmbeddedPushTemplateRenderer>();

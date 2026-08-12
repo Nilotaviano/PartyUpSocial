@@ -979,9 +979,16 @@ public sealed record ProfileResponse(
 public sealed record AvatarResponse(
     string Kind,
     string? Emoji,
-    Guid? SourcePlatformLinkId)
+    Guid? AvatarSourceId,
+    string? ImgUrl)
 {
-    public static AvatarResponse From(Avatar avatar) => avatar.IsPlatform
-        ? new("platform", null, avatar.SourcePlatformLinkId!.Value.Value)
-        : new("emoji", avatar.Emoji, null);
+    /// <summary>
+    /// AVATARS_DESIGN.md §3.1: a pure, join-free mapper. <see cref="Avatar.Token"/> is denormalized
+    /// onto the <c>users</c> row by <see cref="User.ChangeAvatar"/>/
+    /// <see cref="User.CompleteOnboarding"/>, so the proxy URL never requires a second lookup keyed
+    /// on <see cref="Avatar.SourceId"/> (D-191's proxy-only rule).
+    /// </summary>
+    public static AvatarResponse From(Avatar avatar) => avatar.IsExternal
+        ? new("external", null, avatar.SourceId!.Value.Value, $"/a/{avatar.Token}")
+        : new("emoji", avatar.Emoji, null, null);
 }

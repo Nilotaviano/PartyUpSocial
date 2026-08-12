@@ -120,6 +120,35 @@ public sealed class UnlinkAuthMethodUseCaseTests
     }
 
     [Fact]
+    public async Task Execute_RemovesTheDanglingGoogleAvatarSourceAndFallsBackToEmoji_D190()
+    {
+        TestContext context = Create(confirmedEmail: false);
+        context.Accounts.PasswordUsers.Add(context.User.Id);
+        context.Accounts.LoginProviders[context.User.Id] = [ExternalProviderPolicy.Google];
+        AvatarSource source = context.User.CaptureAvatarSource(
+            AvatarSourceKind.GoogleAccount,
+            [1, 2, 3],
+            "image/webp",
+            new TestClock(Instant.FromUtc(2026, 7, 31, 12, 0)));
+        context.User.CompleteOnboarding(
+            Username.Create("gamer"),
+            DisplayName.Create("Gamer"),
+            Avatar.FromSource(source.Id),
+            DateTimeZoneProviders.Tzdb["America/Fortaleza"],
+            Locale.Create("en"),
+            new TestClock(Instant.FromUtc(2026, 7, 31, 12, 0)));
+
+        UnlinkAuthMethodResult result = await context.UseCase.ExecuteAsync(
+            new UnlinkAuthMethodCommand(context.User.Id, "google", true),
+            default);
+
+        Assert.True(result.Succeeded);
+        Assert.Empty(context.User.AvatarSources);
+        Assert.Equal(AvatarKind.Emoji, context.User.Avatar?.Kind);
+        Assert.Equal(Avatar.FallbackEmoji, context.User.Avatar?.Emoji);
+    }
+
+    [Fact]
     public async Task Execute_NotifiesTheAccountAddress_D137()
     {
         TestContext context = Create(confirmedEmail: true);

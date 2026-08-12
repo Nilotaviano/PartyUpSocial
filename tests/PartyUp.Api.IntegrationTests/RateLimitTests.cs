@@ -87,6 +87,9 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
                 "RejectSessionWaitlistParticipant",
             ],
             ["guest-link-exchange"] = ["ExchangeGuestLink"],
+            // AVATARS_DESIGN.md §3.3: sized for page loads, its own dimension so a large friend
+            // roster's avatar fan-out never competes with `default`'s API-call ceiling.
+            ["avatar-proxy"] = ["GetAvatarProxy"],
             ["guest-write"] =
             [
                 "ClaimGuestSessionLink",
@@ -165,7 +168,8 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
     [Fact]
     public void EveryDimensionCoversItsDocumentedRoutes()
     {
-        Assert.Equal(33, RateLimitPolicies.Dimensions.Count);
+        // AVATARS_DESIGN.md §3.3: one new Ip-partitioned dimension, 33 -> 34.
+        Assert.Equal(34, RateLimitPolicies.Dimensions.Count);
         Assert.Equal(ExpectedRoutes.Keys, RateLimitPolicies.Dimensions.Select(value => value.Name));
         foreach (RateLimitDimension dimension in RateLimitPolicies.Dimensions)
         {

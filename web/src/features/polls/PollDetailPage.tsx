@@ -5,6 +5,7 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { useSession } from '../../auth/useSession'
 import { AvatarDisc } from '../friends/AvatarDisc'
+import { avatarImgUrl } from '../friends/avatarImage'
 import { Button } from '../../components/ui/button'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
@@ -499,22 +500,56 @@ function FinalizeSection({ pollId, locale, early, onError }: FinalizeSectionProp
                 </span>
                 {/* D-119 order: the server's own ordering, never re-sorted client-side. */}
                 {going.length > 0 && (
-                  <p className="mt-1 text-ink-soft">
-                    {t('finalize.going', {
-                      names: going
-                        .map((entry) => entry.displayName ?? t('detail.anonymous'))
-                        .join(', '),
-                    })}
-                  </p>
+                  <>
+                    {/*
+                      AVATARS_DESIGN.md §3.5: the discs are aria-hidden decoration rendered
+                      alongside the name text below, never inside it — the radio's accessible
+                      name still comes only from the comma-joined name string, unchanged from
+                      wave A (_D188).
+                    */}
+                    <span aria-hidden="true" className="mt-1 flex flex-wrap gap-1">
+                      {going.map((entry, index) => (
+                        <AvatarDisc
+                          key={entry.userId ?? entry.guestIdentityId ?? index}
+                          emoji={entry.avatar?.emoji}
+                          imgUrl={avatarImgUrl(entry.avatar)}
+                          masked={entry.displayName === null}
+                          seed={entry.userId ?? entry.guestIdentityId ?? String(index)}
+                          size="xs"
+                        />
+                      ))}
+                    </span>
+                    <p className="mt-1 text-ink-soft">
+                      {t('finalize.going', {
+                        names: going
+                          .map((entry) => entry.displayName ?? t('detail.anonymous'))
+                          .join(', '),
+                      })}
+                    </p>
+                  </>
                 )}
                 {waitlisted.length > 0 && (
-                  <p className="text-ink-soft">
-                    {t('finalize.waitlisted', {
-                      names: waitlisted
-                        .map((entry) => entry.displayName ?? t('detail.anonymous'))
-                        .join(', '),
-                    })}
-                  </p>
+                  <>
+                    <span aria-hidden="true" className="mt-1 flex flex-wrap gap-1">
+                      {waitlisted.map((entry, index) => (
+                        <AvatarDisc
+                          key={entry.userId ?? entry.guestIdentityId ?? index}
+                          emoji={entry.avatar?.emoji}
+                          imgUrl={avatarImgUrl(entry.avatar)}
+                          masked={entry.displayName === null}
+                          seed={entry.userId ?? entry.guestIdentityId ?? String(index)}
+                          size="xs"
+                        />
+                      ))}
+                    </span>
+                    <p className="text-ink-soft">
+                      {t('finalize.waitlisted', {
+                        names: waitlisted
+                          .map((entry) => entry.displayName ?? t('detail.anonymous'))
+                          .join(', '),
+                      })}
+                    </p>
+                  </>
                 )}
               </label>
             )
@@ -866,6 +901,7 @@ export function PollDetailPage() {
                   <span className="flex min-w-0 items-center gap-2">
                     <AvatarDisc
                       emoji={entry.avatar?.emoji}
+                      imgUrl={avatarImgUrl(entry.avatar)}
                       masked={entry.displayName === null}
                       seed={entry.userId ?? entry.guestIdentityId ?? entry.participationId}
                       size="xs"

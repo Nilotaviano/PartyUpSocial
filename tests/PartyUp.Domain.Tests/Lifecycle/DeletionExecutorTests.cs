@@ -225,6 +225,7 @@ public class DeletionExecutorTests
                 UserDataScope.NotificationMutes,
                 UserDataScope.PushSubscriptions,
                 UserDataScope.Notifications,
+                UserDataScope.AvatarSources,
             ],
             result.PurgedData);
     }

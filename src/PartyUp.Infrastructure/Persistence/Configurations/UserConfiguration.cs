@@ -52,13 +52,23 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         {
             avatar.Property(value => value.Kind).HasColumnName("avatar_kind");
             avatar.Property(value => value.Emoji).HasColumnName("avatar_emoji");
-            avatar.Property(value => value.SourcePlatformLinkId)
-                .HasConversion(new TypedIdConverter<PlatformLinkId>())
-                .HasColumnName("avatar_source_platform_link_id");
+            avatar.Property(value => value.SourceId)
+                .HasConversion(new TypedIdConverter<AvatarSourceId>())
+                .HasColumnName("avatar_source_id");
+            // AVATARS_DESIGN.md §3.1/§3.3: the proxy token denormalized onto the users row so
+            // AvatarResponse.From(Avatar) stays a pure, join-free mapper.
+            avatar.Property(value => value.Token)
+                .IsRequired()
+                .HasDefaultValue(string.Empty)
+                .HasColumnName("avatar_token");
         });
 
         builder.Navigation(user => user.PlatformLinks)
             .HasField("_platformLinks")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.Navigation(user => user.AvatarSources)
+            .HasField("_avatarSources")
             .UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.Ignore(user => user.IsOnboarding);

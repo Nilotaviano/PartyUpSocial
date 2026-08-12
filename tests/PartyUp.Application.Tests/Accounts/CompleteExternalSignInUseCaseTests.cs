@@ -1,4 +1,5 @@
 using System.Reflection;
+using Microsoft.Extensions.Logging.Abstractions;
 using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Accounts;
@@ -240,6 +241,56 @@ public sealed class CompleteExternalSignInUseCaseTests
     }
 
     [Fact]
+    public async Task Execute_CapturesTheSteamAvatarAlongsideThePlatformLink_D190()
+    {
+        AvatarCapture capture = new([1, 2, 3], "image/webp");
+        TestContext context = Create(avatarCapture: capture);
+
+        ExternalSignInResult result = await context.UseCase.ExecuteAsync(
+            LoginCommand(provider: ExternalProviderPolicy.Steam, email: null, emailVerified: false),
+            default);
+
+        Assert.True(result.Succeeded);
+        User user = Assert.Single(context.Users.Added);
+        AvatarSource source = Assert.Single(user.AvatarSources);
+        Assert.Equal(AvatarSourceKind.SteamPlatform, source.Kind);
+        Assert.Equal(capture.Bytes, source.Bytes);
+        Assert.Equal(capture.ContentType, source.ContentType);
+    }
+
+    [Fact]
+    public async Task Execute_CapturesTheGoogleAvatarOnAccountCreation_D190()
+    {
+        AvatarCapture capture = new([9, 9, 9], "image/webp");
+        TestContext context = Create(avatarCapture: capture);
+
+        ExternalSignInResult result = await context.UseCase.ExecuteAsync(
+            LoginCommand(pictureUrl: "https://lh3.googleusercontent.com/a/pic.png"),
+            default);
+
+        Assert.True(result.Succeeded);
+        User user = Assert.Single(context.Users.Added);
+        AvatarSource source = Assert.Single(user.AvatarSources);
+        Assert.Equal(AvatarSourceKind.GoogleAccount, source.Kind);
+        Assert.Equal(capture.Bytes, source.Bytes);
+    }
+
+    [Fact]
+    public async Task Execute_AvatarCaptureFailureNeverFailsSignIn_D190()
+    {
+        TestContext context = Create();
+        context.AvatarCapture.Throw = true;
+
+        ExternalSignInResult result = await context.UseCase.ExecuteAsync(
+            LoginCommand(pictureUrl: "https://lh3.googleusercontent.com/a/pic.png"),
+            default);
+
+        Assert.True(result.Succeeded);
+        User user = Assert.Single(context.Users.Added);
+        Assert.Empty(user.AvatarSources);
+    }
+
+    [Fact]
     public async Task Execute_UsesTheSteamIdSuffixWhenTheProfileIsUnavailable()
     {
         TestContext context = Create(steamProfileAvailable: false);
@@ -257,7 +308,6 @@ public sealed class CompleteExternalSignInUseCaseTests
         Assert.Equal("Steam 1234", Assert.Single(user.PlatformLinks).Handle.Value);
         var identity = Assert.Single(context.Accounts.SteamIdentities);
         Assert.Equal("Steam 1234", identity.PersonaName);
-        Assert.Null(identity.AvatarUrl);
         Assert.Contains(
             context.Accounts.Logins,
             login => login.Id == user.Id && login.Provider == ExternalProviderPolicy.Steam);
@@ -323,7 +373,8 @@ public sealed class CompleteExternalSignInUseCaseTests
         string providerKey = "provider-key",
         string? email = "Player@Example.test",
         bool emailVerified = true,
-        bool ageGateAttested = true) =>
+        bool ageGateAttested = true,
+        string? pictureUrl = null) =>
         new(
             provider,
             providerKey,
@@ -332,13 +383,15 @@ public sealed class CompleteExternalSignInUseCaseTests
             ExternalStartMode.Login,
             ageGateAttested,
             null,
-            null);
+            null,
+            pictureUrl);
 
-    private static TestContext Create(bool steamProfileAvailable = true)
+    private static TestContext Create(bool steamProfileAvailable = true, AvatarCapture? avatarCapture = null)
     {
         var accounts = new FakeAccountGateway();
         var users = new FakeUserRepository();
         var email = new FakeEmailDispatcher();
+        var capture = new FakeAvatarCaptureService { Capture = avatarCapture };
         var useCase = new CompleteExternalSignInUseCase(
             accounts,
             users,
@@ -353,13 +406,16 @@ public sealed class CompleteExternalSignInUseCaseTests
                     ? new SteamProfile("Steam Player", "https://cdn.example/avatar.jpg")
                     : null,
             },
-            new TestClock(Instant.FromUtc(2026, 7, 31, 12, 0)));
-        return new TestContext(useCase, accounts, users, email);
+            capture,
+            new TestClock(Instant.FromUtc(2026, 7, 31, 12, 0)),
+            NullLogger<CompleteExternalSignInUseCase>.Instance);
+        return new TestContext(useCase, accounts, users, email, capture);
     }
 
     private sealed record TestContext(
         CompleteExternalSignInUseCase UseCase,
         FakeAccountGateway Accounts,
         FakeUserRepository Users,
-        FakeEmailDispatcher Email);
+        FakeEmailDispatcher Email,
+        FakeAvatarCaptureService AvatarCapture);
 }

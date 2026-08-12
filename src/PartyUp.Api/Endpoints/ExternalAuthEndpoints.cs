@@ -344,7 +344,8 @@ public static class ExternalAuthEndpoints
                 state.Mode,
                 state.AgeGateAttested,
                 state.BoundUserId is { } bound ? UserId.From(bound) : null,
-                caller?.Id),
+                caller?.Id,
+                null),
             cancellationToken);
         return await FinishExternalResultAsync(result, signIn, state.ReturnTo, cancellationToken);
     }
@@ -390,7 +391,8 @@ public static class ExternalAuthEndpoints
                     flow.Mode,
                     flow.AgeGateAttested,
                     flow.BoundUserId,
-                    caller?.Id),
+                    caller?.Id,
+                    principal.FindFirstValue(GoogleAuthSetup.PictureClaimType)),
                 cancellationToken);
 
             return await FinishExternalResultAsync(

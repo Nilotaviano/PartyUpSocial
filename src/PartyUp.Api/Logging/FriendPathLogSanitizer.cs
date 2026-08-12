@@ -11,6 +11,7 @@ public static class FriendPathLogSanitizer
         ("/api/v1/users/by-username/", "/api/v1/users/by-username/REDACTED"),
         ("/api/v1/friend-codes/", "/api/v1/friend-codes/REDACTED"),
         ("/g/", "/g/REDACTED"),
+        ("/a/", "/a/REDACTED"),
     ];
 
     public static string Sanitize(PathString path)

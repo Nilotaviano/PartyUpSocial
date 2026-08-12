@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/button'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
 import { AvatarDisc } from '../friends/AvatarDisc'
+import { avatarImgUrl } from '../friends/avatarImage'
 import { friendKeys, getFriends } from '../friends/friendGraph'
 import {
   createGuestLinks,
@@ -194,7 +195,12 @@ export function SessionInvitePage() {
                     )
                   }}
                 />
-                <AvatarDisc emoji={friend.avatar.emoji} seed={friend.username} size="xs" />
+                <AvatarDisc
+                  emoji={friend.avatar.emoji}
+                  imgUrl={avatarImgUrl(friend.avatar)}
+                  seed={friend.userId}
+                  size="xs"
+                />
                 {friend.displayName} (@{friend.username})
               </label>
             </li>

@@ -148,6 +148,55 @@ public sealed class CaddyAccessLoggingTests
             StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// AVATARS_DESIGN.md §3.3: the picture proxy's token-bearing path is redacted from the Caddy
+    /// access log the same way as the guest exchange route -- application-log redaction is asserted
+    /// by <c>GuestSecurityTests.AvatarProxyTokenNeverAppearsInSerilog_D191</c>.
+    /// </summary>
+    [Fact]
+    public async Task AvatarProxyRoute_IsRedactedInAccessEvents_D191()
+    {
+        string caddyfile = Path.Combine(FindRepositoryRoot(), "deploy", "Caddyfile");
+        await using IContainer caddy = new ContainerBuilder("caddy:2")
+            .WithPortBinding(80, assignRandomHostPort: true)
+            .WithBindMount(caddyfile, "/etc/caddy/Caddyfile", AccessMode.ReadOnly)
+            .WithWaitStrategy(
+                Wait.ForUnixContainer().UntilMessageIsLogged("serving initial configuration"))
+            .Build();
+        await caddy.StartAsync();
+
+        const string avatarTokenMarker = "avatar-proxy-token-marker";
+
+        using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+        using var client = new HttpClient(handler)
+        {
+            BaseAddress = new Uri($"http://{caddy.Hostname}:{caddy.GetMappedPublicPort(80)}"),
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/a/{avatarTokenMarker}");
+        request.Headers.Host = "partyup.social";
+        using HttpResponseMessage response = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.PermanentRedirect, response.StatusCode);
+
+        await Task.Delay(250);
+        (string stdout, string stderr) = await caddy.GetLogsAsync(
+            DateTime.UtcNow.AddMinutes(-2),
+            DateTime.UtcNow.AddMinutes(1),
+            timestampsEnabled: false);
+        string combined = stdout + Environment.NewLine + stderr;
+        JsonElement[] accessEvents = combined
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(TryParse)
+            .Where(element => element is { } &&
+                element.Value.TryGetProperty("request", out _))
+            .Select(element => element!.Value)
+            .ToArray();
+
+        JsonElement avatarEvent = Assert.Single(accessEvents);
+        Assert.Equal("/a/REDACTED", AccessUri(avatarEvent));
+        Assert.DoesNotContain(avatarTokenMarker, combined, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static JsonElement? TryParse(string line)
     {
         try

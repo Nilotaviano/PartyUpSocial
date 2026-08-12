@@ -40,7 +40,7 @@ function result(state: SteamImportResult['state']): SteamImportResult {
         matches: [
           {
             username: 'ready.one',
-            avatar: { kind: 'emoji', emoji: '🙂', sourcePlatformLinkId: null },
+            avatar: { kind: 'emoji', emoji: '🙂', avatarSourceId: null, imgUrl: null },
           },
         ],
         unmatched: [],
@@ -149,15 +149,15 @@ describe('SteamImportPageTests', () => {
       matches: [
         {
           username: 'player.one',
-          avatar: { kind: 'emoji', emoji: '🙂', sourcePlatformLinkId: null },
+          avatar: { kind: 'emoji', emoji: '🙂', avatarSourceId: null, imgUrl: null },
         },
         {
           username: 'player.one',
-          avatar: { kind: 'emoji', emoji: '🙂', sourcePlatformLinkId: null },
+          avatar: { kind: 'emoji', emoji: '🙂', avatarSourceId: null, imgUrl: null },
         },
         {
           username: 'block.one',
-          avatar: { kind: 'emoji', emoji: '🙂', sourcePlatformLinkId: null },
+          avatar: { kind: 'emoji', emoji: '🙂', avatarSourceId: null, imgUrl: null },
         },
       ],
       unmatched: [],
@@ -218,7 +218,7 @@ describe('SteamImportPageTests', () => {
         matches: [
           {
             username: 'ready.one',
-            avatar: { kind: 'emoji', emoji: '🎮', sourcePlatformLinkId: null },
+            avatar: { kind: 'emoji', emoji: '🎮', avatarSourceId: null, imgUrl: null },
           },
         ],
         unmatched: [],

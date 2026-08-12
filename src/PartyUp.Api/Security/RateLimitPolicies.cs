@@ -249,6 +249,15 @@ public static class RateLimitPolicies
             TimeSpan.FromMinutes(1),
             RateLimitPartitionKind.Ip,
             Operations(ApiOperationIds.ExchangeGuestLink)),
+        // AVATARS_DESIGN.md §3.3: sized for a page load, not an API call -- a 150-friend roster
+        // fans out to ~150 GETs in one paint, which would burn through `default`'s 300/min/IP on
+        // its own and 429 the caller's real API traffic behind it.
+        new(
+            "avatar-proxy",
+            600,
+            TimeSpan.FromMinutes(1),
+            RateLimitPartitionKind.Ip,
+            Operations(ApiOperationIds.GetAvatarProxy)),
         new(
             "guest-write",
             20,

@@ -1,6 +1,8 @@
 # Avatars — design
 
-Status: ratified 2026-08-11. Supersedes nothing; extends D-032/D-050/D-127/D-188.
+Status: ratified 2026-08-11. Wave A shipped 2026-08-11; waves B and C shipped 2026-08-12
+(§4 folded into wave B per its own text — the client source chooser and `AvatarDisc`'s `<img>` arm
+remain, tracked in TODO.md). Supersedes nothing; extends D-032/D-050/D-127/D-188.
 
 An avatar is one of two things: a glyph the user picked from a fixed catalog, or a picture
 supplied by an account they linked. Users never upload bytes (D-032). This document binds the

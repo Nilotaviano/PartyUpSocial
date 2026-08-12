@@ -8,6 +8,9 @@ namespace PartyUp.Api.Auth;
 
 public static class GoogleAuthSetup
 {
+    /// <summary>AVATARS_DESIGN.md §4: the claim type the picture claim is mapped onto.</summary>
+    public const string PictureClaimType = "urn:google:picture";
+
     public static IServiceCollection AddPartyUpGoogleAuthentication(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -53,6 +56,11 @@ public static class GoogleAuthSetup
                     value.ValueKind == JsonValueKind.True
                 ? "true"
                 : "false");
+        // AVATARS_DESIGN.md §4: the profile scope's picture claim, captured at the callback into an
+        // AvatarSource of kind GoogleAccount (CompleteExternalSignInUseCase). Mapped explicitly rather
+        // than relying on whatever GoogleHandler maps by default, so this claim type is load-bearing
+        // and documented, not incidental.
+        options.ClaimActions.MapJsonKey(PictureClaimType, "picture");
         options.CorrelationCookie.SameSite = SameSiteMode.Lax;
         options.CorrelationCookie.SecurePolicy = isDevelopment
             ? CookieSecurePolicy.SameAsRequest

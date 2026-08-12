@@ -11,6 +11,7 @@ namespace PartyUp.Domain.Users;
 public sealed class User : AggregateRoot
 {
     private readonly List<PlatformLink> _platformLinks = [];
+    private readonly List<AvatarSource> _avatarSources = [];
 
     private User()
     {
@@ -82,6 +83,8 @@ public sealed class User : AggregateRoot
 
     public IReadOnlyList<PlatformLink> PlatformLinks => _platformLinks;
 
+    public IReadOnlyList<AvatarSource> AvatarSources => _avatarSources;
+
     public bool IsOnboarding => Lifecycle == UserLifecycle.Onboarding;
 
     public bool IsActive => Lifecycle == UserLifecycle.Active;
@@ -143,12 +146,12 @@ public sealed class User : AggregateRoot
 
         RequireUsername(username);
         RequireDisplayName(displayName);
-        RequireAvatar(avatar);
+        Avatar resolvedAvatar = ResolveAvatar(avatar);
         RequireLocale(locale);
 
         Username = username;
         DisplayName = displayName;
-        Avatar = avatar;
+        Avatar = resolvedAvatar;
         TimeZone = timeZone;
         Locale = locale;
         Lifecycle = UserLifecycle.Active;
@@ -207,9 +210,7 @@ public sealed class User : AggregateRoot
     public void ChangeAvatar(Avatar avatar)
     {
         RequireActive("change the avatar");
-        RequireAvatar(avatar);
-
-        Avatar = avatar;
+        Avatar = ResolveAvatar(avatar);
     }
 
     public void ChangeTimeZone(DateTimeZone timeZone)
@@ -303,8 +304,9 @@ public sealed class User : AggregateRoot
     }
 
     /// <summary>
-    /// D-050: unlinking the avatar-source platform falls the avatar back to emoji selection, so the
-    /// <c>Active</c> profile never loses a required field.
+    /// D-050/D-190: unlinking a platform that also backs an avatar source removes that source too, so
+    /// the aggregate never holds a source with nothing linking it. Only <see cref="Platform.Steam"/>
+    /// carries an <see cref="AvatarSourceKind.SteamPlatform"/> source today.
     /// </summary>
     public void UnlinkPlatform(PlatformLinkId platformLinkId, string? fallbackEmoji = null)
     {
@@ -313,7 +315,58 @@ public sealed class User : AggregateRoot
         PlatformLink link = RequireLink(platformLinkId);
         _platformLinks.Remove(link);
 
-        if (Avatar is { } avatar && avatar.DrawsFrom(platformLinkId))
+        if (link.Platform != Platform.Steam)
+        {
+            return;
+        }
+
+        AvatarSource? source = _avatarSources.Find(candidate => candidate.Kind == AvatarSourceKind.SteamPlatform);
+        if (source is not null)
+        {
+            RemoveAvatarSource(source.Id, fallbackEmoji);
+        }
+    }
+
+    /// <summary>
+    /// AVATARS_DESIGN.md §3.1/§3.2: captures or refreshes the one avatar source per
+    /// <see cref="AvatarSourceKind"/> this user holds. Bytes are already re-encoded WebP by the time
+    /// they reach here -- capture-time validation is the application layer's job.
+    /// </summary>
+    public AvatarSource CaptureAvatarSource(
+        AvatarSourceKind kind,
+        byte[] bytes,
+        string contentType,
+        IClock clock)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        RequireProfileMutable("capture an avatar source");
+
+        Instant fetchedAt = clock.GetCurrentInstant();
+        AvatarSource? existing = _avatarSources.Find(candidate => candidate.Kind == kind);
+        if (existing is not null)
+        {
+            existing.Refresh(bytes, contentType, fetchedAt);
+            return existing;
+        }
+
+        AvatarSource created = AvatarSource.Capture(Id, kind, bytes, contentType, fetchedAt);
+        _avatarSources.Add(created);
+        return created;
+    }
+
+    /// <summary>
+    /// AVATARS_DESIGN.md §3.4: removes the source row and, if the avatar draws from it, resets to
+    /// <see cref="Avatar.Fallback"/> so the <c>Active</c> profile never loses a required field.
+    /// </summary>
+    public void RemoveAvatarSource(AvatarSourceId avatarSourceId, string? fallbackEmoji = null)
+    {
+        RequireProfileMutable("remove an avatar source");
+
+        AvatarSource source = _avatarSources.Find(candidate => candidate.Id == avatarSourceId)
+            ?? throw new DomainException(DomainError.NotFound, "This user has no such avatar source.");
+        _avatarSources.Remove(source);
+
+        if (Avatar is { } avatar && avatar.DrawsFrom(avatarSourceId))
         {
             Avatar = fallbackEmoji is null
                 ? PartyUp.Domain.Users.Avatar.Fallback
@@ -508,12 +561,30 @@ public sealed class User : AggregateRoot
             throw new DomainException(DomainError.ValidationFailed, "An avatar is required.");
         }
 
-        if (avatar.IsPlatform && !_platformLinks.Exists(link => link.Id == avatar.SourcePlatformLinkId))
+        if (avatar.IsExternal && !_avatarSources.Exists(source => source.Id == avatar.SourceId))
         {
             throw new DomainException(
                 DomainError.NotFound,
-                "A platform avatar must point at one of this user's own platform links.");
+                "An external avatar must point at one of this user's own avatar sources.");
         }
+    }
+
+    /// <summary>
+    /// AVATARS_DESIGN.md §3.1: validates <paramref name="avatar"/> (D-050's ownership rule) and, for
+    /// an external avatar, overwrites its token with the owning <see cref="AvatarSource"/>'s real one
+    /// -- the caller-supplied token, if any, is never trusted. Emoji avatars pass through unchanged.
+    /// </summary>
+    private Avatar ResolveAvatar(Avatar avatar)
+    {
+        RequireAvatar(avatar);
+
+        if (!avatar.IsExternal)
+        {
+            return avatar;
+        }
+
+        AvatarSource source = _avatarSources.Find(candidate => candidate.Id == avatar.SourceId)!;
+        return PartyUp.Domain.Users.Avatar.FromSource(avatar.SourceId!.Value, source.Token);
     }
 
     private PlatformLink RequireLink(PlatformLinkId platformLinkId) =>

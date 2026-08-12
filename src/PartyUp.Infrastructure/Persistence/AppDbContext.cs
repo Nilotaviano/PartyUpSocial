@@ -27,6 +27,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<PlatformLink> PlatformLinks => Set<PlatformLink>();
 
+    public DbSet<AvatarSource> AvatarSources => Set<AvatarSource>();
+
     public DbSet<SteamIdentity> SteamIdentities => Set<SteamIdentity>();
 
     public DbSet<UsernameRegistryEntry> UsernameRegistry => Set<UsernameRegistryEntry>();
@@ -89,9 +91,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.ApplyConfiguration(new DeletionJournalConfiguration());
         builder.ApplyConfiguration(new UserConfiguration());
         builder.ApplyConfiguration(new PlatformLinkConfiguration());
+        builder.ApplyConfiguration(new AvatarSourceConfiguration());
         builder.ApplyConfiguration(new SteamIdentityConfiguration());
         builder.ApplyConfiguration(new UsernameRegistryEntryConfiguration());
         builder.Entity<User>().Navigation(user => user.PlatformLinks).AutoInclude();
+        builder.Entity<User>().Navigation(user => user.AvatarSources).AutoInclude();
 
         builder.Entity<AuthRole>().ToTable("auth_roles");
         builder.Entity<IdentityUserRole<Guid>>().ToTable("auth_user_roles");

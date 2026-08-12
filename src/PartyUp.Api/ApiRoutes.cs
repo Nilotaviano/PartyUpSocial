@@ -75,6 +75,12 @@ public static class ApiOperationIds
     // guest resource operations.
     public const string ExchangeGuestLink = "ExchangeGuestLink";
     public const string GetGuestSession = "GetGuestSession";
+
+    /// <summary>
+    /// AVATARS_DESIGN.md §3.3: the picture proxy, an A-064 transport exception outside /api/v1 and
+    /// outside the OpenAPI document, alongside <see cref="ExchangeGuestLink"/>.
+    /// </summary>
+    public const string GetAvatarProxy = "GetAvatarProxy";
     public const string ClaimGuestSessionLink = "ClaimGuestSessionLink";
     public const string RenameGuestSessionIdentity = "RenameGuestSessionIdentity";
     public const string RespondAsGuest = "RespondAsGuest";

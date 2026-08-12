@@ -202,7 +202,7 @@ public class UserOnboardingTests
     }
 
     [Fact]
-    public void CompleteOnboarding_RejectsAPlatformAvatarWithNoMatchingLink_D050()
+    public void CompleteOnboarding_RejectsAnExternalAvatarWithNoMatchingSource_D190()
     {
         FakeClock clock = TestUsers.Clock();
         User user = TestUsers.Onboarding(clock);
@@ -210,7 +210,7 @@ public class UserOnboardingTests
         DomainException error = Assert.Throws<DomainException>(() => user.CompleteOnboarding(
             Username.Create("gamer"),
             DisplayName.Create("Gamer"),
-            Avatar.FromPlatformLink(PlatformLinkId.New()),
+            Avatar.FromSource(AvatarSourceId.New()),
             TestUsers.Zone,
             Locale.Create("en"),
             clock));
@@ -219,21 +219,25 @@ public class UserOnboardingTests
     }
 
     [Fact]
-    public void CompleteOnboarding_AcceptsAPlatformAvatarLinkedDuringOnboarding_D127()
+    public void CompleteOnboarding_AcceptsAnExternalAvatarCapturedDuringOnboarding_D190()
     {
         FakeClock clock = TestUsers.Clock();
         User user = TestUsers.Onboarding(clock);
-        PlatformLink link = user.LinkPlatform(Platform.Steam, GamingHandle.Create("gaben"));
+        AvatarSource source = user.CaptureAvatarSource(
+            AvatarSourceKind.SteamPlatform,
+            [1, 2, 3],
+            "image/webp",
+            clock);
 
         user.CompleteOnboarding(
             Username.Create("gamer"),
             DisplayName.Create("Gamer"),
-            Avatar.FromPlatformLink(link.Id),
+            Avatar.FromSource(source.Id),
             TestUsers.Zone,
             Locale.Create("en"),
             clock);
 
-        Assert.Equal(AvatarKind.Platform, user.Avatar?.Kind);
-        Assert.Equal(link.Id, user.Avatar?.SourcePlatformLinkId);
+        Assert.Equal(AvatarKind.External, user.Avatar?.Kind);
+        Assert.Equal(source.Id, user.Avatar?.SourceId);
     }
 }

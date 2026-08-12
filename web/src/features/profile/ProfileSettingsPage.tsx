@@ -11,6 +11,12 @@ import { Label } from '../../components/ui/label'
 import { TimeZoneField, isKnownTimeZone } from '../../components/TimeZoneField'
 import { AVATAR_CATALOG } from './avatarCatalog'
 import { AvatarPicker } from './AvatarPicker'
+import {
+  avatarDraftBody,
+  avatarSourcesOf,
+  decodeAvatarSelection,
+  selectionFromAvatar,
+} from './avatarSources'
 
 const profileQueryKey = ['my-profile'] as const
 const methodsQueryKey = ['auth-methods'] as const
@@ -36,17 +42,24 @@ function ProfileError({ error }: { error: unknown }) {
   return <p role="alert">{t(key)}</p>
 }
 
-function AvatarField({ defaultGlyph }: { defaultGlyph: string }) {
-  const [glyph, setGlyph] = useState(defaultGlyph)
+function AvatarField({
+  defaultSelection,
+  sources,
+}: {
+  defaultSelection: string
+  sources: ReturnType<typeof avatarSourcesOf>
+}) {
+  const [selection, setSelection] = useState(defaultSelection)
   return (
     <>
       <AvatarPicker
         idPrefix="profile-avatar"
         labelledBy="profile-avatar-label"
-        value={glyph}
-        onChange={setGlyph}
+        sources={sources}
+        value={selection}
+        onChange={setSelection}
       />
-      <input name="emoji" type="hidden" value={glyph} />
+      <input name="avatarSelection" type="hidden" value={selection} />
     </>
   )
 }
@@ -85,7 +98,9 @@ export function ProfileSettingsPage() {
       } else if (endpoint === '/api/v1/me/display-name') {
         await client.PUT(endpoint, { params: { header: { 'X-CSRF-TOKEN': '' } }, body: { displayName: String(values.get('displayName') ?? '') } })
       } else if (endpoint === '/api/v1/me/avatar') {
-        await client.PUT(endpoint, { params: { header: { 'X-CSRF-TOKEN': '' } }, body: { kind: 'emoji', emoji: String(values.get('emoji') ?? ''), platformLinkId: null } })
+        const selection = decodeAvatarSelection(String(values.get('avatarSelection') ?? ''))
+        // GEN_API_PENDING: AvatarDraft.avatarSourceId (AVATARS_DESIGN.md §3.5) — see avatarSources.ts.
+        await client.PUT(endpoint, { params: { header: { 'X-CSRF-TOKEN': '' } }, body: avatarDraftBody(selection) as never })
       } else {
         await client.PUT(endpoint, { params: { header: { 'X-CSRF-TOKEN': '' } }, body: { timeZone: String(values.get('timeZone') ?? '') } })
       }
@@ -139,7 +154,10 @@ export function ProfileSettingsPage() {
       </form>
       <form className="space-y-2" onSubmit={(event) => void save(event, '/api/v1/me/avatar')}>
         <p className="font-display text-sm font-bold text-ink" id="profile-avatar-label">{t('fields.avatar')}</p>
-        <AvatarField defaultGlyph={profile?.avatar?.emoji ?? AVATAR_CATALOG[0].glyph} />
+        <AvatarField
+          defaultSelection={selectionFromAvatar(profile?.avatar, AVATAR_CATALOG[0].glyph)}
+          sources={avatarSourcesOf(profile)}
+        />
         <Button disabled={saving} type="submit" variant="neutral">{t('actions.saveAvatar')}</Button>
       </form>
       <form className="space-y-2" noValidate onSubmit={(event) => void save(event, '/api/v1/me/time-zone')}>

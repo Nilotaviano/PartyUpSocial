@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { client, isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { AvatarDisc } from './AvatarDisc'
+import { avatarImgUrl } from './avatarImage'
 import {
   invalidateFriendGraph,
   runFriendGraphAction,
@@ -15,7 +16,7 @@ type MatchState = 'actionable' | 'outgoing_pending' | 'accepted'
 type MatchCard = {
   username: string
   state: MatchState
-  avatar: { emoji: string | null }
+  avatar: { emoji: string | null; imgUrl?: string | null }
 }
 type ImportView = {
   result: SteamImportResult
@@ -190,6 +191,7 @@ export function SteamImportPage() {
                     <div className="flex items-center gap-2">
                       <AvatarDisc
                         emoji={match.avatar.emoji}
+                        imgUrl={avatarImgUrl(match.avatar)}
                         seed={match.username}
                         size="sm"
                       />

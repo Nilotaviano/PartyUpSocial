@@ -18,7 +18,6 @@ public sealed class SteamIdentityConfiguration : IEntityTypeConfiguration<SteamI
             .ValueGeneratedNever();
         builder.Property(identity => identity.SteamId64).HasMaxLength(20).IsRequired();
         builder.Property(identity => identity.PersonaName).HasMaxLength(64).IsRequired();
-        builder.Property(identity => identity.AvatarUrl).HasMaxLength(2048);
         builder.Property(identity => identity.FetchedAt).IsRequired();
         builder.HasIndex(identity => identity.SteamId64)
             .IsUnique()

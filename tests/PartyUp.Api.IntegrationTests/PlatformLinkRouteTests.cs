@@ -115,7 +115,6 @@ public sealed class PlatformLinkRouteTests : IAsyncLifetime, IDisposable
             userId,
             SteamId,
             "Steam Player",
-            "https://cdn.example/avatar.jpg",
             _factory.Clock.GetCurrentInstant()));
         await context.SaveChangesAsync();
 

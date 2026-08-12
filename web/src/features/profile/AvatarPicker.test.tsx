@@ -104,4 +104,45 @@ describe('AvatarPicker', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Fox' }))
     expect(screen.getByRole('radio', { name: 'Fox' })).toHaveAttribute('aria-checked', 'true')
   })
+
+  it('extends the same radiogroup with the caller sources, appended after the catalog_D190', () => {
+    function SourceHarness() {
+      const [value, setValue] = useState('🎮')
+      return (
+        <AvatarPicker
+          idPrefix="test-avatar"
+          sources={[
+            { avatarSourceId: 'src-1', kind: 'SteamPlatform', imgUrl: '/a/steam-token' },
+            { avatarSourceId: 'src-2', kind: 'GoogleAccount', imgUrl: '/a/google-token' },
+          ]}
+          value={value}
+          onChange={setValue}
+        />
+      )
+    }
+    render(<SourceHarness />)
+
+    expect(screen.getAllByRole('radio')).toHaveLength(AVATAR_CATALOG.length + 2)
+    const steamRadio = screen.getByRole('radio', { name: 'Steam picture' })
+    expect(steamRadio.querySelector('img')).toHaveAttribute('src', '/a/steam-token')
+    const googleRadio = screen.getByRole('radio', { name: 'Google picture' })
+    expect(googleRadio.querySelector('img')).toHaveAttribute('src', '/a/google-token')
+
+    fireEvent.click(steamRadio)
+    expect(steamRadio).toHaveAttribute('aria-checked', 'true')
+
+    // ArrowLeft from the first source option steps back into the last catalog glyph —
+    // one radiogroup, catalog and sources navigated as a single sequence.
+    fireEvent.keyDown(steamRadio, { key: 'ArrowLeft' })
+    const lastCatalogEntry = AVATAR_CATALOG[AVATAR_CATALOG.length - 1]
+    const lastCatalogRadio = screen.getAllByRole('radio')[AVATAR_CATALOG.length - 1]
+    expect(lastCatalogRadio).toHaveFocus()
+    expect(lastCatalogRadio).toHaveAttribute('aria-checked', 'true')
+    expect(lastCatalogRadio).toHaveTextContent(lastCatalogEntry.glyph)
+
+    // ArrowRight from there wraps forward past the whole catalog into the sources.
+    fireEvent.keyDown(lastCatalogRadio, { key: 'ArrowRight' })
+    expect(steamRadio).toHaveFocus()
+    expect(steamRadio).toHaveAttribute('aria-checked', 'true')
+  })
 })

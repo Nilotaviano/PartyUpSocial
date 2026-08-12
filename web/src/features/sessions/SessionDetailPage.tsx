@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link, Navigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { AvatarDisc } from '../friends/AvatarDisc'
+import { avatarImgUrl } from '../friends/avatarImage'
 import { Button } from '../../components/ui/button'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
@@ -555,6 +556,7 @@ export function SessionDetailPage() {
                       <span className="flex min-w-0 items-center gap-2">
                         <AvatarDisc
                           emoji={entry.avatar?.emoji}
+                          imgUrl={avatarImgUrl(entry.avatar)}
                           masked={entry.displayName === null}
                           seed={entry.userId ?? entry.guestIdentityId ?? entry.participationId}
                           size="xs"
@@ -593,6 +595,7 @@ export function SessionDetailPage() {
                     <span className="flex min-w-0 items-center gap-2">
                       <AvatarDisc
                         emoji={entry.avatar?.emoji}
+                        imgUrl={avatarImgUrl(entry.avatar)}
                         masked={entry.displayName === null}
                         seed={entry.userId ?? entry.guestIdentityId ?? entry.participationId}
                         size="xs"

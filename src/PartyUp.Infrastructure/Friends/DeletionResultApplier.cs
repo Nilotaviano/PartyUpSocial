@@ -30,6 +30,12 @@ namespace PartyUp.Infrastructure.Friends;
 /// <see cref="UserDataScope.Notifications"/> purge -- send-log rows follow their subscription's
 /// cascade FK, so no separate send-log delete is needed.
 /// </para>
+///
+/// <para>
+/// AVATARS_DESIGN.md §3.4 extends the tail once more: <see cref="UserDataScope.AvatarSources"/> is
+/// purged through <see cref="IAvatarSourceRepository"/>, deleting every captured picture the user's
+/// linked accounts ever supplied.
+/// </para>
 /// </summary>
 public sealed class DeletionResultApplier(
     IFriendshipRepository friendships,
@@ -39,7 +45,8 @@ public sealed class DeletionResultApplier(
     IDeletionScopeProvider scopeProvider,
     IAvailabilityRepository availability,
     IPushSubscriptionRepository pushSubscriptions,
-    INotificationMuteRepository notificationMutes) : IDeletionResultApplier
+    INotificationMuteRepository notificationMutes,
+    IAvatarSourceRepository avatarSources) : IDeletionResultApplier
 {
     public async Task ApplyAsync(
         DeletionExecutionResult result,
@@ -54,6 +61,11 @@ public sealed class DeletionResultApplier(
         if (result.PurgedData.Contains(UserDataScope.NotificationMutes))
         {
             await notificationMutes.DeleteForUserAsync(subject, cancellationToken);
+        }
+
+        if (result.PurgedData.Contains(UserDataScope.AvatarSources))
+        {
+            await avatarSources.DeleteForUserAsync(subject, cancellationToken);
         }
 
         await DeletionResultApplication.ApplyAsync(

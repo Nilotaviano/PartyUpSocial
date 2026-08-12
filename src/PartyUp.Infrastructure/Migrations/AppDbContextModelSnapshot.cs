@@ -1105,6 +1105,53 @@ namespace PartyUp.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("PartyUp.Domain.Users.AvatarSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<byte[]>("Bytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("bytes");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content_type");
+
+                    b.Property<Instant>("FetchedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fetched_at");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("token");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_avatar_sources");
+
+                    b.HasIndex("Token")
+                        .IsUnique()
+                        .HasDatabaseName("ux_avatar_sources_token");
+
+                    b.HasIndex("UserId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("ux_avatar_sources_user_id_kind");
+
+                    b.ToTable("avatar_sources", (string)null);
+                });
+
             modelBuilder.Entity("PartyUp.Domain.Users.PlatformLink", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1223,9 +1270,16 @@ namespace PartyUp.Infrastructure.Migrations
                                 .HasColumnType("integer")
                                 .HasColumnName("avatar_kind");
 
-                            b1.Property<Guid?>("SourcePlatformLinkId")
+                            b1.Property<Guid?>("SourceId")
                                 .HasColumnType("uuid")
-                                .HasColumnName("avatar_source_platform_link_id");
+                                .HasColumnName("avatar_source_id");
+
+                            b1.Property<string>("Token")
+                                .IsRequired()
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("text")
+                                .HasDefaultValue("")
+                                .HasColumnName("avatar_token");
                         });
 
                     b.HasKey("Id")
@@ -1598,11 +1652,6 @@ namespace PartyUp.Infrastructure.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
-
-                    b.Property<string>("AvatarUrl")
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)")
-                        .HasColumnName("avatar_url");
 
                     b.Property<Instant>("FetchedAt")
                         .HasColumnType("timestamp with time zone")
@@ -2045,6 +2094,16 @@ namespace PartyUp.Infrastructure.Migrations
                     b.Navigation("Game");
                 });
 
+            modelBuilder.Entity("PartyUp.Domain.Users.AvatarSource", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany("AvatarSources")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_avatar_sources_users_user_id");
+                });
+
             modelBuilder.Entity("PartyUp.Domain.Users.PlatformLink", b =>
                 {
                     b.HasOne("PartyUp.Domain.Users.User", null)
@@ -2155,6 +2214,8 @@ namespace PartyUp.Infrastructure.Migrations
 
             modelBuilder.Entity("PartyUp.Domain.Users.User", b =>
                 {
+                    b.Navigation("AvatarSources");
+
                     b.Navigation("PlatformLinks");
                 });
 #pragma warning restore 612, 618

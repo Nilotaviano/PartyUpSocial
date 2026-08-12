@@ -195,7 +195,8 @@ public sealed class FriendBlockConcurrencyTests : IAsyncLifetime
                 new AvailabilityRepository(context)),
             new AvailabilityRepository(context),
             new PushSubscriptionRepository(context),
-            new NotificationMuteRepository(context));
+            new NotificationMuteRepository(context),
+            new AvatarSourceRepository(context));
         var result = new DeletionExecutionResult(
             CanceledSessions: [],
             ExpiredPolls: [],

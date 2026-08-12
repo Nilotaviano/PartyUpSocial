@@ -6,14 +6,14 @@ namespace PartyUp.Domain.Tests.Users;
 public class ProfileValueObjectTests
 {
     [Fact]
-    public void Avatar_FromEmoji_TrimsAndKeepsNoPlatformSource_D050()
+    public void Avatar_FromEmoji_TrimsAndKeepsNoAvatarSource_D050()
     {
         Avatar avatar = Avatar.FromEmoji("  " + TestUsers.Emoji + "  ");
 
         Assert.True(avatar.IsEmoji);
-        Assert.False(avatar.IsPlatform);
+        Assert.False(avatar.IsExternal);
         Assert.Equal(TestUsers.Emoji, avatar.Emoji);
-        Assert.Null(avatar.SourcePlatformLinkId);
+        Assert.Null(avatar.SourceId);
     }
 
     [Theory]
@@ -37,17 +37,17 @@ public class ProfileValueObjectTests
     }
 
     [Fact]
-    public void Avatar_FromPlatformLink_CarriesNoEmoji_D050()
+    public void Avatar_FromSource_CarriesNoEmoji_D190()
     {
-        PlatformLinkId linkId = PlatformLinkId.New();
-        Avatar avatar = Avatar.FromPlatformLink(linkId);
+        AvatarSourceId sourceId = AvatarSourceId.New();
+        Avatar avatar = Avatar.FromSource(sourceId);
 
-        Assert.True(avatar.IsPlatform);
-        Assert.Equal(AvatarKind.Platform, avatar.Kind);
-        Assert.Equal(linkId, avatar.SourcePlatformLinkId);
+        Assert.True(avatar.IsExternal);
+        Assert.Equal(AvatarKind.External, avatar.Kind);
+        Assert.Equal(sourceId, avatar.SourceId);
         Assert.Equal(string.Empty, avatar.Emoji);
-        Assert.True(avatar.DrawsFrom(linkId));
-        Assert.False(avatar.DrawsFrom(PlatformLinkId.New()));
+        Assert.True(avatar.DrawsFrom(sourceId));
+        Assert.False(avatar.DrawsFrom(AvatarSourceId.New()));
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class ProfileValueObjectTests
     {
         Assert.True(default(Avatar).IsUnset);
         Assert.False(Avatar.Fallback.IsUnset);
-        Assert.False(Avatar.FromPlatformLink(PlatformLinkId.New()).IsUnset);
+        Assert.False(Avatar.FromSource(AvatarSourceId.New()).IsUnset);
     }
 
     [Fact]
@@ -68,11 +68,11 @@ public class ProfileValueObjectTests
     [Fact]
     public void Avatar_EqualityIsByValue_D050()
     {
-        PlatformLinkId linkId = PlatformLinkId.New();
+        AvatarSourceId sourceId = AvatarSourceId.New();
 
         Assert.Equal(Avatar.FromEmoji(TestUsers.Emoji), Avatar.FromEmoji(TestUsers.Emoji));
-        Assert.Equal(Avatar.FromPlatformLink(linkId), Avatar.FromPlatformLink(linkId));
-        Assert.NotEqual(Avatar.FromEmoji(TestUsers.Emoji), Avatar.FromPlatformLink(linkId));
+        Assert.Equal(Avatar.FromSource(sourceId), Avatar.FromSource(sourceId));
+        Assert.NotEqual(Avatar.FromEmoji(TestUsers.Emoji), Avatar.FromSource(sourceId));
     }
 
     [Fact]

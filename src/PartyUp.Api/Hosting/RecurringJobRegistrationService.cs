@@ -47,6 +47,10 @@ public sealed partial class RecurringJobRegistrationService(
                     "push-send-log-prune",
                     job => job.ExecuteAsync(CancellationToken.None),
                     Cron.Daily);
+                recurringJobs.AddOrUpdate<AvatarRefreshJob>(
+                    "avatar-refresh",
+                    job => job.ExecuteAsync(CancellationToken.None),
+                    Cron.Daily);
                 return;
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

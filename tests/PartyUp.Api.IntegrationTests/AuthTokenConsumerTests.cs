@@ -165,7 +165,7 @@ public sealed class AuthTokenConsumerTests : IAsyncLifetime, IDisposable
         public Task<AccountEmailInfo?> GetEmailAsync(UserId id, CancellationToken ct) => inner.GetEmailAsync(id, ct);
         public Task<IReadOnlyList<string>> ListLoginProvidersAsync(UserId id, CancellationToken ct) => inner.ListLoginProvidersAsync(id, ct);
         public Task<bool> HasPasswordAsync(UserId id, CancellationToken ct) => inner.HasPasswordAsync(id, ct);
-        public Task UpsertSteamIdentityAsync(UserId id, string steamId64, string personaName, string? avatarUrl, NodaTime.Instant fetchedAt, CancellationToken ct) => Mutate(() => inner.UpsertSteamIdentityAsync(id, steamId64, personaName, avatarUrl, fetchedAt, ct));
+        public Task UpsertSteamIdentityAsync(UserId id, string steamId64, string personaName, NodaTime.Instant fetchedAt, CancellationToken ct) => Mutate(() => inner.UpsertSteamIdentityAsync(id, steamId64, personaName, fetchedAt, ct));
         public Task RemoveSteamIdentityAsync(UserId id, CancellationToken ct) => Mutate(() => inner.RemoveSteamIdentityAsync(id, ct));
         public Task CreateAccountAsync(UserId id, string? email, bool confirmed, string? password, CancellationToken ct) => Mutate(() => inner.CreateAccountAsync(id, email, confirmed, password, ct));
         public Task SetPasswordAsync(UserId id, string password, CancellationToken ct) => Mutate(() => inner.SetPasswordAsync(id, password, ct));

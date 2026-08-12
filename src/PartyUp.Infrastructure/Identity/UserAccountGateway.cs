@@ -218,7 +218,6 @@ public sealed partial class UserAccountGateway(
         UserId id,
         string steamId64,
         string personaName,
-        string? avatarUrl,
         Instant fetchedAt,
         CancellationToken cancellationToken)
     {
@@ -226,11 +225,11 @@ public sealed partial class UserAccountGateway(
         if (identity is null)
         {
             context.SteamIdentities.Add(
-                new SteamIdentity(id, steamId64, personaName, avatarUrl, fetchedAt));
+                new SteamIdentity(id, steamId64, personaName, fetchedAt));
         }
         else
         {
-            identity.Update(steamId64, personaName, avatarUrl, fetchedAt);
+            identity.Update(steamId64, personaName, fetchedAt);
         }
 
         try

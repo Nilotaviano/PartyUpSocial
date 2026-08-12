@@ -193,7 +193,7 @@ internal sealed class FriendGraphDatabase
                  {user.FriendCode!.Value.Value}, {user.AgeGatePassed}, {(int)user.AgeGateSource!.Value},
                  {(int)user.ReminderDefault}, {user.CreatedAt},
                  {(int)user.Avatar!.Value.Kind}, {user.Avatar.Value.Emoji},
-                 {(user.Avatar.Value.SourcePlatformLinkId.HasValue ? user.Avatar.Value.SourcePlatformLinkId.Value.Value : (Guid?)null)})
+                 {(user.Avatar.Value.SourceId.HasValue ? user.Avatar.Value.SourceId.Value.Value : (Guid?)null)})
             """);
     }
 

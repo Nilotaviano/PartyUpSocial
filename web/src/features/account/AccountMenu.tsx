@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router'
 import { useLogoutMutation } from '../../auth/useSession'
 import { AvatarDisc } from '../friends/AvatarDisc'
+import { avatarImgUrl } from '../friends/avatarImage'
 import { getViewerProfile, viewerProfileKey } from '../sessions/sessionQueries'
 
 const itemClasses =
@@ -38,6 +39,7 @@ export function AccountMenu() {
         >
           <AvatarDisc
             emoji={profile.data?.avatar?.emoji}
+            imgUrl={avatarImgUrl(profile.data?.avatar)}
             seed={profile.data?.username ?? ''}
             size="xs"
           />

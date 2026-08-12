@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Auth;
@@ -7,7 +8,7 @@ using PartyUp.Domain.Users;
 
 namespace PartyUp.Application.Accounts;
 
-public sealed class CompleteExternalSignInUseCase(
+public sealed partial class CompleteExternalSignInUseCase(
     IUserAccountGateway accounts,
     IUserRepository users,
     IFriendCodeGenerator friendCodes,
@@ -16,7 +17,9 @@ public sealed class CompleteExternalSignInUseCase(
     IUnitOfWork unitOfWork,
     IEmailDispatcher emailDispatcher,
     ISteamProfileClient steamProfiles,
-    IClock clock)
+    IAvatarCaptureService avatarCapture,
+    IClock clock,
+    ILogger<CompleteExternalSignInUseCase> logger)
 {
     private static readonly Duration ReauthenticationTtl = Duration.FromMinutes(5);
 
@@ -70,6 +73,23 @@ public sealed class CompleteExternalSignInUseCase(
                     async ct =>
                     {
                         await UpsertSteamFactsAsync(loginOwner.Value, command.ProviderKey, profile, ct);
+                        return true;
+                    },
+                    cancellationToken);
+            }
+            else if (provider == ExternalProviderPolicy.Google && command.PictureUrl is not null)
+            {
+                // AVATARS_DESIGN.md §4: Google is capture-time only -- re-captured on each sign-in
+                // that carries a picture claim, rather than a background refresh job like Steam's.
+                await unitOfWork.ExecuteAsync(
+                    async ct =>
+                    {
+                        User? user = await users.FindForUpdateAsync(loginOwner.Value, ct);
+                        if (user is not null)
+                        {
+                            await CaptureAvatarAsync(user, AvatarSourceKind.GoogleAccount, command.PictureUrl, ct);
+                        }
+
                         return true;
                     },
                     cancellationToken);
@@ -145,7 +165,8 @@ public sealed class CompleteExternalSignInUseCase(
             (bool Allowed, bool Added) mutation = await unitOfWork.ExecuteAsync(
                 async ct =>
                 {
-                    if (await users.FindForUpdateAsync(boundUserId, ct) is null)
+                    User? user = await users.FindForUpdateAsync(boundUserId, ct);
+                    if (user is null)
                     {
                         return (false, false);
                     }
@@ -169,11 +190,16 @@ public sealed class CompleteExternalSignInUseCase(
                         if (steamProfile is not null)
                         {
                             await UpsertSteamFactsAsync(
-                                boundUserId,
+                                user,
                                 command.ProviderKey,
                                 steamProfile,
                                 ct);
                         }
+                        else if (command.Provider == ExternalProviderPolicy.Google)
+                        {
+                            await CaptureAvatarAsync(user, AvatarSourceKind.GoogleAccount, command.PictureUrl, ct);
+                        }
+
                         await sessions.SignOutEverywhereAsync(boundUserId, ct);
                         return (true, true);
                     }
@@ -236,6 +262,12 @@ public sealed class CompleteExternalSignInUseCase(
                         ExternalProviderPolicy.Google,
                         command.ProviderKey,
                         ct);
+                    User? user = await users.FindForUpdateAsync(emailOwner.Value, ct);
+                    if (user is not null)
+                    {
+                        await CaptureAvatarAsync(user, AvatarSourceKind.GoogleAccount, command.PictureUrl, ct);
+                    }
+
                     await sessions.SignOutEverywhereAsync(emailOwner.Value, ct);
                     return true;
                 },
@@ -315,6 +347,13 @@ public sealed class CompleteExternalSignInUseCase(
                             steamProfile,
                             ct);
                     }
+                    else if (email is not null)
+                    {
+                        // Only Google reaches account creation with an email and no Steam profile
+                        // (ExternalProviderPolicy.CanCreateWithoutAddress is Steam-only).
+                        await CaptureAvatarAsync(user, AvatarSourceKind.GoogleAccount, command.PictureUrl, ct);
+                    }
+
                     return ExternalSignInResult.SignedIn(createdId);
                 },
                 cancellationToken);
@@ -381,10 +420,46 @@ public sealed class CompleteExternalSignInUseCase(
             user.Id,
             steamId64,
             profile.PersonaName,
-            profile.AvatarUrl,
             clock.GetCurrentInstant(),
             cancellationToken);
+
+        await CaptureAvatarAsync(user, AvatarSourceKind.SteamPlatform, profile.AvatarUrl, cancellationToken);
     }
+
+    /// <summary>
+    /// AVATARS_DESIGN.md §3.2's capture pipeline, run at write time inside the caller's already-open
+    /// <see cref="IUnitOfWork"/>. Never throws: a capture rejection or an unexpected failure (network,
+    /// decode) must never fail the sign-in it rides along with (§3.2, D-190).
+    /// </summary>
+    private async Task CaptureAvatarAsync(
+        User user,
+        AvatarSourceKind kind,
+        string? upstreamUrl,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(upstreamUrl))
+        {
+            return;
+        }
+
+        try
+        {
+            AvatarCapture? capture = await avatarCapture.CaptureAsync(upstreamUrl, kind, cancellationToken);
+            if (capture is not null)
+            {
+                user.CaptureAvatarSource(kind, capture.Bytes, capture.ContentType, clock);
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            LogAvatarCaptureFailed(logger, kind, exception.GetType().Name);
+        }
+    }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Avatar capture of kind {Kind} failed unexpectedly ({ExceptionType})")]
+    private static partial void LogAvatarCaptureFailed(ILogger logger, AvatarSourceKind kind, string exceptionType);
 
     private async Task NotifyMethodAddedAsync(
         UserId userId,
@@ -418,7 +493,8 @@ public sealed record CompleteExternalSignInCommand(
     ExternalStartMode Mode,
     bool AgeGateAttested,
     UserId? BoundUserId,
-    UserId? CallerId);
+    UserId? CallerId,
+    string? PictureUrl = null);
 
 public sealed record ExternalSignInResult(
     bool Succeeded,

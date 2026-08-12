@@ -180,7 +180,40 @@ describe('ProfileSettingsPage', () => {
 
     await waitFor(() => expect(api.put).toHaveBeenCalledWith('/api/v1/me/avatar', {
       params: { header: { 'X-CSRF-TOKEN': '' } },
-      body: { kind: 'emoji', emoji: '🐉', platformLinkId: null },
+      body: { kind: 'emoji', emoji: '🐉', platformLinkId: null, avatarSourceId: null },
+    }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('lists the avatar sources alongside the catalog and saves a picked source_D190', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') {
+        return Promise.resolve({ data: {
+          username: 'player',
+          displayName: 'Player',
+          avatar: { kind: 'emoji', emoji: '🎮', platformLinkId: null },
+          timeZone: 'America/Fortaleza',
+          platformLinks: [],
+          avatarSources: [
+            { avatarSourceId: 'source-1', kind: 'SteamPlatform', imgUrl: '/a/steam-token' },
+          ],
+        } })
+      }
+      return Promise.resolve({ data: { methods: [] } })
+    })
+    api.put.mockResolvedValue({ data: {} })
+
+    renderPage()
+
+    const sourceRadio = await screen.findByRole('radio', { name: 'Steam picture' })
+    expect(sourceRadio.querySelector('img')).toHaveAttribute('src', '/a/steam-token')
+
+    fireEvent.click(sourceRadio)
+    fireEvent.click(screen.getByRole('button', { name: 'Save avatar' }))
+
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/api/v1/me/avatar', {
+      params: { header: { 'X-CSRF-TOKEN': '' } },
+      body: { kind: 'source', emoji: null, platformLinkId: null, avatarSourceId: 'source-1' },
     }))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })

@@ -78,7 +78,6 @@ public sealed class DeletionPurgeTests : IAsyncLifetime, IDisposable
                 userId,
                 steamKey,
                 "Former Player",
-                null,
                 _factory.Clock.GetCurrentInstant(),
                 default);
         }
@@ -259,14 +258,12 @@ internal sealed class FailingPurgeAccountGateway(
         UserId id,
         string steamId64,
         string personaName,
-        string? avatarUrl,
         Instant fetchedAt,
         CancellationToken cancellationToken) =>
         inner.UpsertSteamIdentityAsync(
             id,
             steamId64,
             personaName,
-            avatarUrl,
             fetchedAt,
             cancellationToken);
 

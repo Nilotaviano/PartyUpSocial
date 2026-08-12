@@ -36,6 +36,15 @@ public readonly record struct PlatformLinkId(Guid Value) : ITypedId<PlatformLink
     public override string ToString() => Value.ToString();
 }
 
+public readonly record struct AvatarSourceId(Guid Value) : ITypedId<AvatarSourceId>
+{
+    public static AvatarSourceId New() => new(Guid.CreateVersion7());
+
+    public static AvatarSourceId From(Guid value) => new(value);
+
+    public override string ToString() => Value.ToString();
+}
+
 public readonly record struct SessionId(Guid Value) : ITypedId<SessionId>
 {
     public static SessionId New() => new(Guid.CreateVersion7());

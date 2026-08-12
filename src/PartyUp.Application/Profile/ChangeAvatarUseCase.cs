@@ -31,7 +31,18 @@ public sealed class ChangeAvatarUseCase(IUserRepository users, IUnitOfWork unitO
                     return ProfileMutationResult.Failed("not_found");
                 }
 
-                user.ChangeAvatar(avatar);
+                try
+                {
+                    user.ChangeAvatar(avatar);
+                }
+                catch (DomainException)
+                {
+                    // A source draft that names another user's avatar source (or one that no
+                    // longer exists) fails User.ChangeAvatar's D-050 ownership check, not the
+                    // pure ToAvatar catalog check above -- same client-facing code either way.
+                    return ProfileMutationResult.Failed("errors.avatar.invalid");
+                }
+
                 return ProfileMutationResult.Completed;
             },
             cancellationToken);

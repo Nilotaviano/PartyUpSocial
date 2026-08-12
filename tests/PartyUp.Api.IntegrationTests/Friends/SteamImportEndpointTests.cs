@@ -235,7 +235,6 @@ public sealed class SteamImportEndpointTests : IAsyncLifetime, IDisposable
             user.Id,
             steamId64 ?? $"s{user.Id.Value:N}"[..20],
             "Steam User",
-            null,
             _factory.Clock.GetCurrentInstant()));
         await context.SaveChangesAsync();
         return user;

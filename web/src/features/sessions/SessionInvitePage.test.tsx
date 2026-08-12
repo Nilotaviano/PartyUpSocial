@@ -77,7 +77,7 @@ beforeEach(() => {
               userId: 'user-1',
               username: 'friend.one',
               displayName: 'Friend One',
-              avatar: { kind: 'emoji', emoji: '🎮', sourcePlatformLinkId: null },
+              avatar: { kind: 'emoji', emoji: '🎮', avatarSourceId: null, imgUrl: null },
               platforms: [],
             },
           ],

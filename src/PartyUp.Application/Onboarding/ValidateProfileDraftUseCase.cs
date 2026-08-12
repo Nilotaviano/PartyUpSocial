@@ -56,13 +56,17 @@ public sealed class ValidateProfileDraftUseCase(
     }
 
     /// <summary>
-    /// Emoji is the only draft kind a client can set: picture sources are captured
-    /// server-side from linked accounts (AVATARS_DESIGN.md §3), never chosen by draft.
+    /// A client picks an emoji glyph or names one of its own server-captured avatar sources
+    /// (AVATARS_DESIGN.md §3.5); it never uploads or supplies picture bytes (D-032). A source
+    /// draft only carries the <see cref="AvatarSourceId"/> here -- ownership and the token are
+    /// resolved by <see cref="User.ChangeAvatar"/>/<see cref="User.CompleteOnboarding"/>, which
+    /// have the aggregate's own avatar sources to check against.
     /// </summary>
     internal static Avatar ToAvatar(AvatarDraft draft) =>
         draft.Kind.Trim().ToLowerInvariant() switch
         {
             "emoji" => FromCatalogEmoji(draft.Emoji),
+            "source" => FromSourceId(draft.AvatarSourceId),
             _ => throw new DomainException(
                 DomainError.ValidationFailed,
                 "The avatar shape is invalid."),
@@ -80,6 +84,13 @@ public sealed class ValidateProfileDraftUseCase(
                 DomainError.ValidationFailed,
                 "The avatar glyph is not in the catalog.");
     }
+
+    private static Avatar FromSourceId(Guid? avatarSourceId) =>
+        avatarSourceId is { } id
+            ? Avatar.FromSource(AvatarSourceId.From(id))
+            : throw new DomainException(
+                DomainError.ValidationFailed,
+                "A source avatar requires an avatarSourceId.");
 
     internal static Locale ToLocale(string locale) => AccountInput.Locale(locale);
 
@@ -131,7 +142,7 @@ public sealed record ProfileDraft(
     string? TimeZone,
     string? Locale);
 
-public sealed record AvatarDraft(string Kind, string? Emoji, Guid? PlatformLinkId);
+public sealed record AvatarDraft(string Kind, string? Emoji, Guid? PlatformLinkId, Guid? AvatarSourceId = null);
 
 public sealed record ProfileDraftValidation(
     IReadOnlyDictionary<string, IReadOnlyList<string>> Errors)

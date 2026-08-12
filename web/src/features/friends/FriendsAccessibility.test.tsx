@@ -38,7 +38,7 @@ function renderComponents() {
                 avatar: {
                   kind: 'emoji',
                   emoji: '🎮',
-                  sourcePlatformLinkId: null,
+                  avatarSourceId: null, imgUrl: null,
                 },
                 platforms: [],
               },

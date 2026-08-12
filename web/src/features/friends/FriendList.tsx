@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/button'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
 import { AvatarDisc } from './AvatarDisc'
+import { avatarImgUrl } from './avatarImage'
 import {
   friendKeys,
   invalidateFriendGraph,
@@ -132,9 +133,15 @@ export function FriendList({ items, onStatus }: FriendListProps) {
                 className="flex min-h-11 items-center gap-3 rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                 to={`/u/${friend.username}`}
               >
+                {/*
+                  AVATARS_DESIGN.md §3.5 / TODO.md wave-A cleanup: seeded on userId, matching
+                  every roster disc, so the same person's fill color is consistent across
+                  surfaces instead of drifting between a userId seed and a username seed.
+                */}
                 <AvatarDisc
                   emoji={friend.avatar.emoji}
-                  seed={friend.username}
+                  imgUrl={avatarImgUrl(friend.avatar)}
+                  seed={friend.userId}
                 />
                 <span className="min-w-0">
                   <span className="block truncate font-display font-semibold text-ink">

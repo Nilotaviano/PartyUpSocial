@@ -33,7 +33,7 @@ describe('FriendRequestsTests', () => {
       avatar: {
         kind: 'emoji',
         emoji: 'SECRET-AVATAR',
-        sourcePlatformLinkId: null,
+        avatarSourceId: null, imgUrl: null,
       },
       platforms: [{ platform: 'Steam', handle: 'secret-handle' }],
     } as unknown as FriendRequestItem

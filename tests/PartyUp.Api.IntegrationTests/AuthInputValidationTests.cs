@@ -287,8 +287,8 @@ public sealed class AuthInputValidationTests : IAsyncLifetime, IDisposable
         public Task<bool> HasPasswordAsync(UserId id, CancellationToken cancellationToken) =>
             inner.HasPasswordAsync(id, cancellationToken);
 
-        public Task UpsertSteamIdentityAsync(UserId id, string steamId64, string personaName, string? avatarUrl, NodaTime.Instant fetchedAt, CancellationToken cancellationToken) =>
-            Mutate(() => inner.UpsertSteamIdentityAsync(id, steamId64, personaName, avatarUrl, fetchedAt, cancellationToken));
+        public Task UpsertSteamIdentityAsync(UserId id, string steamId64, string personaName, NodaTime.Instant fetchedAt, CancellationToken cancellationToken) =>
+            Mutate(() => inner.UpsertSteamIdentityAsync(id, steamId64, personaName, fetchedAt, cancellationToken));
 
         public Task RemoveSteamIdentityAsync(UserId id, CancellationToken cancellationToken) =>
             Mutate(() => inner.RemoveSteamIdentityAsync(id, cancellationToken));

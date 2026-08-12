@@ -5,6 +5,7 @@ import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { AvatarDisc } from '../friends/AvatarDisc'
+import { avatarImgUrl } from '../friends/avatarImage'
 import {
   FRIEND_TYPES,
   getNotificationList,
@@ -120,6 +121,7 @@ function NotificationRow({
             <AvatarDisc
               className="notification-actor-disc"
               emoji={notification.actorAvatar?.emoji}
+              imgUrl={avatarImgUrl(notification.actorAvatar)}
               masked={notification.actorDisplayName === null}
               seed={notification.actorUserId ?? notification.id}
               size="xs"

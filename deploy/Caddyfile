@@ -14,11 +14,11 @@ partyup.social {
 				# the pinned caddy:2 image.
 				request>uri multi_regexp {
 					regexp "\?.*" ""
-					regexp "(?i)^(/(u|add|g|api/v1/(users/by-username|friend-codes))/).*" "${1}REDACTED"
+					regexp "(?i)^(/(u|add|g|a|api/v1/(users/by-username|friend-codes))/).*" "${1}REDACTED"
 				}
 				resp_headers>Location multi_regexp {
 					regexp "\?.*" ""
-					regexp "(?i)^(https?://[^/]+)?(/(u|add|g|api/v1/(users/by-username|friend-codes))/).*" "${1}${2}REDACTED"
+					regexp "(?i)^(https?://[^/]+)?(/(u|add|g|a|api/v1/(users/by-username|friend-codes))/).*" "${1}${2}REDACTED"
 				}
 				# PHASE4_DESIGN.md §9.2: the guest bearer token never appears in a log even via the
 				# Referer header a browser navigation from /g/<token> could otherwise carry.

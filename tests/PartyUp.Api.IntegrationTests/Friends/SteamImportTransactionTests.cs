@@ -126,7 +126,6 @@ internal static class SteamImportIntegrationData
             user.Id,
             steamId64,
             "Steam User",
-            null,
             factory.Clock.GetCurrentInstant()));
         await context.SaveChangesAsync();
         return user;
