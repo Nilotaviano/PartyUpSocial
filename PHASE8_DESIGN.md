@@ -167,6 +167,10 @@ table, no trackers — verified by a policy test asserting the web bundle loads 
   non-admins.
 - Ban = plain action; content removal = a separate destructive action with its own confirmation, never a
   checkbox on ban (IMPLEMENTATION_PLAN.md:149); unban does not mention restoration.
+- Dashboard rendering caveats (from S1 verification): `sessionsCreated` includes poll-derived sessions, so
+  never present `sessionsCreated + pollsCreated` as "proposals" (double-counts finalized polls — the
+  confirmation denominator is the correct proposals figure); repeat-scheduling shows raw
+  `organizers`/`repeatOrganizers` beside the rate because recent cohorts structurally depress it.
 - A11y: admin routes join AuditedRoutes and ship axe-clean per A-082. Admin fixture mechanism: the seeder runs
   at host startup (AdminSeeder is an IHostedService keyed off `Admin:SeedUserIds`/`Admin:SeedEmails`), before
   browser-lane accounts exist — so the fixture grants the role row over its own Npgsql connection: insert into
