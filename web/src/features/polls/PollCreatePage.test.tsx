@@ -269,6 +269,40 @@ describe('PollCreatePage', () => {
     )
   })
 
+  it('retyping the name after selecting a catalog result clears the stale appId_D194', async () => {
+    mockGet({ catalogAvailable: true, catalogResults: [{ appId: 730, name: 'Counter-Strike 2' }] })
+    api.post.mockResolvedValue({ data: { poll: { id: 'poll-1' }, guestLinks: [] } })
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Title'), {
+      target: { value: 'Weekend raid' },
+    })
+    addOption('2099-01-01T10:00')
+    addOption('2099-01-01T12:00')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
+      target: { value: 'counter' },
+    })
+    fireEvent.mouseDown(await screen.findByRole('option', { name: 'Counter-Strike 2' }))
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
+      target: { value: 'Deep Rock Galactic' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Create poll' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/polls',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            game: { name: 'Deep Rock Galactic', steamAppId: null },
+          }),
+        }),
+      ),
+    )
+  })
+
   it('degrades to the manual App ID field and submits the typed digits when the catalog is unavailable_D176_D194', async () => {
     mockGet()
     api.post.mockResolvedValue({ data: { poll: { id: 'poll-1' }, guestLinks: [] } })

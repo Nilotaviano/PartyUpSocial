@@ -37,6 +37,7 @@ function Harness() {
         }}
       />
       <p data-testid="selected">{selected ? JSON.stringify(selected) : 'none'}</p>
+      <p data-testid="appid">{appId}</p>
     </>
   )
 }
@@ -166,5 +167,44 @@ describe('SteamGamePicker_D194', () => {
 
     expect(await screen.findByLabelText('Enter a game name')).toBeInTheDocument()
     expect(screen.getByLabelText('Steam app ID')).toBeInTheDocument()
+  })
+
+  it('retyping the name after a selection clears the paired appId_D194', async () => {
+    renderPicker()
+
+    const input = screen.getByRole('combobox')
+    fireEvent.change(input, { target: { value: 'counter' } })
+    const option = await screen.findByRole('option', { name: 'Counter-Strike 2' })
+    fireEvent.mouseDown(option)
+
+    await waitFor(() =>
+      expect(screen.getByTestId('selected')).toHaveTextContent(
+        JSON.stringify({ appId: '730', name: 'Counter-Strike 2' }),
+      ),
+    )
+
+    fireEvent.change(input, { target: { value: 'Deep Rock Galactic' } })
+
+    expect(input).toHaveValue('Deep Rock Galactic')
+    await waitFor(() => expect(screen.getByTestId('appid')).toHaveTextContent(''))
+  })
+
+  it('does not emit aria-controls pointing at a listbox that is not rendered_D194', async () => {
+    renderPicker()
+
+    const input = screen.getByRole('combobox')
+    expect(input).not.toHaveAttribute('aria-controls')
+
+    fireEvent.change(input, { target: { value: 'counter' } })
+    // While the request is in flight (or before results land), no element
+    // with the listbox id exists yet.
+    if (input.getAttribute('aria-controls')) {
+      expect(document.getElementById(input.getAttribute('aria-controls')!)).toBeInTheDocument()
+    }
+
+    await screen.findByRole('option', { name: 'Counter-Strike 2' })
+    const controlsId = input.getAttribute('aria-controls')
+    expect(controlsId).toBeTruthy()
+    expect(document.getElementById(controlsId!)).toBeInTheDocument()
   })
 })

@@ -269,6 +269,40 @@ describe('SessionCreatePage', () => {
     )
   })
 
+  it('retyping the name after selecting a catalog result clears the stale appId_D194', async () => {
+    mockGet({
+      friends: friendsResponse,
+      catalogAvailable: true,
+      catalogResults: [{ appId: 730, name: 'Counter-Strike 2' }],
+    })
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Raid night' } })
+    fireEvent.change(screen.getByLabelText('Start time'), {
+      target: { value: '2026-09-01T18:00' },
+    })
+    fireEvent.click(await screen.findByLabelText('Friend One (@friend.one)'))
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), { target: { value: 'counter' } })
+    fireEvent.mouseDown(await screen.findByRole('option', { name: 'Counter-Strike 2' }))
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
+      target: { value: 'Deep Rock Galactic' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/sessions',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            game: { name: 'Deep Rock Galactic', steamAppId: null },
+          }),
+        }),
+      ),
+    )
+  })
+
   it('degrades to the manual App ID field and submits the typed digits when the catalog is unavailable_D176_D194', async () => {
     mockGet({ friends: friendsResponse })
     renderPage()

@@ -99,6 +99,48 @@ public sealed class SteamCatalogRefreshJobTests
     }
 
     [Fact]
+    public async Task HaveMoreResultsWithNoForwardProgressCursor_AbortsWithoutAdvancingTheWatermark_D194()
+    {
+        Instant priorWatermark = Instant.FromUtc(2026, 8, 1, 0, 0, 0);
+        FakeSteamAppListClient client = new(
+        [
+            new SteamAppListPage([new SteamAppListItem(1, "One", null)], LastAppId: null, HaveMoreResults: true),
+        ]);
+        FakeSteamCatalogRepository repository = new(new SteamCatalogState(priorWatermark, null, true));
+        SteamCatalogRefreshJob job = CreateJob(client, repository);
+
+        await job.ExecuteAsync(default);
+
+        // The loop must not spin forever re-requesting the same page.
+        Assert.Single(client.Requests);
+        (Instant? watermark, Instant lastRunAt, bool lastRunSucceeded) = Assert.Single(repository.StateWrites);
+        Assert.Equal(priorWatermark, watermark);
+        Assert.Equal(RunStartedAt, lastRunAt);
+        Assert.False(lastRunSucceeded);
+    }
+
+    [Fact]
+    public async Task HaveMoreResultsWithUnchangedLastAppId_AbortsWithoutAdvancingTheWatermark_D194()
+    {
+        Instant priorWatermark = Instant.FromUtc(2026, 8, 1, 0, 0, 0);
+        FakeSteamAppListClient client = new(
+        [
+            new SteamAppListPage([new SteamAppListItem(1, "One", null)], LastAppId: 1, HaveMoreResults: true),
+            new SteamAppListPage([new SteamAppListItem(1, "One", null)], LastAppId: 1, HaveMoreResults: true),
+        ]);
+        FakeSteamCatalogRepository repository = new(new SteamCatalogState(priorWatermark, null, true));
+        SteamCatalogRefreshJob job = CreateJob(client, repository);
+
+        await job.ExecuteAsync(default);
+
+        Assert.Equal(2, client.Requests.Count);
+        (Instant? watermark, Instant lastRunAt, bool lastRunSucceeded) = Assert.Single(repository.StateWrites);
+        Assert.Equal(priorWatermark, watermark);
+        Assert.Equal(RunStartedAt, lastRunAt);
+        Assert.False(lastRunSucceeded);
+    }
+
+    [Fact]
     public async Task UpsertBatchShape_OnePageEqualsOneUpsertCall_D194()
     {
         FakeSteamAppListClient client = new(

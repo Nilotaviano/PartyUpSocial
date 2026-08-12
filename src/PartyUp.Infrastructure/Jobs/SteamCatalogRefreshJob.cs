@@ -55,6 +55,17 @@ public sealed partial class SteamCatalogRefreshJob(
                 await catalog.UpsertBatchAsync(upserts, cancellationToken);
             }
 
+            if (page.HaveMoreResults && (page.LastAppId is null || page.LastAppId == lastAppId))
+            {
+                // Steam claims more pages exist but gave no forward-progress
+                // cursor (null or unchanged last_appid) -- paging on this
+                // would spin forever. Treat it as a failed run rather than
+                // advancing the watermark on a truncated catalog.
+                LogNoForwardProgress(logger);
+                await catalog.SetStateAsync(state.Watermark, runStartedAt, lastRunSucceeded: false, cancellationToken);
+                return;
+            }
+
             haveMore = page.HaveMoreResults;
             lastAppId = page.LastAppId;
         }
@@ -66,4 +77,9 @@ public sealed partial class SteamCatalogRefreshJob(
         Level = LogLevel.Warning,
         Message = "Steam catalog refresh page failed ({ExceptionType}); run aborted without advancing the watermark")]
     private static partial void LogPageFailed(ILogger logger, string exceptionType);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Steam catalog refresh page reported have_more_results with no forward-progress cursor; run aborted without advancing the watermark")]
+    private static partial void LogNoForwardProgress(ILogger logger);
 }

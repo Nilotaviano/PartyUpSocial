@@ -36,14 +36,22 @@ public sealed class SteamCatalogRepository(AppDbContext context) : ISteamCatalog
             return;
         }
 
-        long[] appIds = new long[apps.Count];
-        string[] names = new string[apps.Count];
-        Instant?[] lastModified = new Instant?[apps.Count];
-        for (int i = 0; i < apps.Count; i++)
+        // A single unnest INSERT ... ON CONFLICT statement cannot affect the
+        // same row twice ("ON CONFLICT DO UPDATE command cannot affect row a
+        // second time"). Steam's paged AppList can repeat an app_id within a
+        // page, so dedupe last-wins before building the statement's arrays.
+        List<SteamCatalogAppUpsert> deduped = [.. apps
+            .GroupBy(app => app.AppId)
+            .Select(group => group.Last())];
+
+        long[] appIds = new long[deduped.Count];
+        string[] names = new string[deduped.Count];
+        Instant?[] lastModified = new Instant?[deduped.Count];
+        for (int i = 0; i < deduped.Count; i++)
         {
-            appIds[i] = apps[i].AppId;
-            names[i] = apps[i].Name;
-            lastModified[i] = apps[i].LastModified;
+            appIds[i] = deduped[i].AppId;
+            names[i] = deduped[i].Name;
+            lastModified[i] = deduped[i].LastModified;
         }
 
         // Set-based, one statement per page (STEAM_CATALOG_DESIGN.md §1) -- never per-row round trips.

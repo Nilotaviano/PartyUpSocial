@@ -90,6 +90,11 @@ export function SteamGamePicker({
   const results = search.data?.results ?? []
   const showPopup =
     popupOpen && !degraded && trimmedTerm.length >= MIN_QUERY_LENGTH
+  // F5/axe aria-valid-attr-value: aria-controls must reference an element
+  // that actually exists in the DOM. The listbox <ul id={listboxId}> only
+  // renders once results are in hand — while loading or empty, no element
+  // has that id, so aria-controls must be withheld to match.
+  const listboxRendered = showPopup && !search.isFetching && results.length > 0
 
   function selectResult(result: SteamGamePickerResult) {
     onSelect(result)
@@ -183,7 +188,7 @@ export function SteamGamePicker({
           activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined
         }
         aria-autocomplete="list"
-        aria-controls={listboxId}
+        aria-controls={listboxRendered ? listboxId : undefined}
         aria-describedby={nameError ? `${nameId}-error` : undefined}
         aria-expanded={showPopup}
         aria-invalid={Boolean(nameError)}
@@ -199,6 +204,7 @@ export function SteamGamePicker({
         }}
         onChange={(event) => {
           onNameChange(event.target.value)
+          onAppIdChange('')
           setPopupOpen(true)
         }}
         onFocus={() => {

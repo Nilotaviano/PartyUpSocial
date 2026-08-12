@@ -186,6 +186,39 @@ describe('SessionEditPage', () => {
     )
   })
 
+  it('retyping the seeded game name clears the stale stored appId instead of resurrecting it_D194', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/steam-catalog') {
+        return Promise.resolve({
+          data: {
+            catalogAvailable: true,
+            results: [{ appId: 1091500, name: 'Cyberpunk 2077' }],
+          },
+        })
+      }
+      return Promise.resolve({ data: detail() })
+    })
+    api.patch.mockResolvedValue({ data: detail() })
+    renderPage()
+
+    const input = await screen.findByRole('combobox')
+    expect(input).toHaveValue('Deep Rock Galactic')
+
+    fireEvent.change(input, { target: { value: 'Cyberpunk 2077 but not really' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith(
+        '/api/v1/sessions/{sessionId}',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            game: { name: 'Cyberpunk 2077 but not really', steamAppId: null },
+          }),
+        }),
+      ),
+    )
+  })
+
   it('degrades to the manual App ID field once the catalog search reports catalogAvailable false_D194', async () => {
     mockSessionDetail(() => detail())
     renderPage()
