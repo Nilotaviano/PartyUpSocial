@@ -200,6 +200,14 @@ transient failure would read as an anonymized user.
 The settings picker gained a source chooser listing the user's avatar sources alongside the
 emoji catalog. Onboarding stays emoji-only (§2.1), by design, not debt.
 
+**Seed standardization (2026-08-12):** every `AvatarDisc` call site for a registered user now
+seeds on `userId`, not `username`, so the same person's fill color is consistent across every
+surface (`f353240` added `userId` to `MyProfileResponse`, `FullProfileResponse`, and
+`SteamMatchedUserResponse` to close the last holdouts). Deliberate exceptions: the D-192 blocked
+list seeds on the stored username snapshot (no `User` join exists to read a `userId` from,
+by design); Steam-only rows (no matched `User`) seed on `steamId64`; guest rows seed on
+`guestIdentityId`.
+
 ## 4. Wave C — Google picture capture
 
 `GoogleAuthSetup.cs` requests the profile scope and maps the `picture` claim; the external-login

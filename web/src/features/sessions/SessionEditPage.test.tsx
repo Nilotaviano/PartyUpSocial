@@ -175,6 +175,47 @@ describe('SessionEditPage', () => {
     )
   })
 
+  it('does not anchor the validation summary at the hidden app-id field when Clear game is ticked_F4_H2', async () => {
+    api.get.mockResolvedValue({
+      data: detail({ game: { name: 'Deep Rock Galactic', steamAppId: 548430 } }),
+    })
+    renderPage()
+
+    fireEvent.click(await screen.findByLabelText('Remove game'))
+    expect(screen.queryByLabelText('Steam app ID')).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    const summary = await screen.findByText('There were problems with your submission')
+    const links = within(summary.closest('div')!).getAllByRole('link')
+    expect(links.length).toBeGreaterThan(0)
+    for (const link of links) {
+      const targetId = link.getAttribute('href')!.slice(1)
+      expect(document.getElementById(targetId)).not.toBeNull()
+    }
+  })
+
+  it('clears a stale Steam app id error the moment Clear game hides the field_F4', async () => {
+    api.get.mockResolvedValue({
+      data: detail({ game: { name: 'Deep Rock Galactic', steamAppId: 548430 } }),
+    })
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Steam app ID'), { target: { value: 'abc' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(
+      await screen.findByText('There were problems with your submission'),
+    ).toBeInTheDocument()
+    expect(screen.getAllByText('Enter only the numeric Steam app ID.').length).toBeGreaterThan(0)
+
+    fireEvent.click(screen.getByLabelText('Remove game'))
+
+    await waitFor(() =>
+      expect(screen.queryAllByText('Enter only the numeric Steam app ID.')).toHaveLength(0),
+    )
+  })
+
   it('links every validation-summary entry to an existing field id_H2', async () => {
     renderPage()
 

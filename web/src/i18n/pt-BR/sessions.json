@@ -47,7 +47,8 @@
     "waitlistCapacity": "Uma lista de espera exige uma capacidade máxima.",
     "tooManyInvitees": "Você pode convidar até 50 amigos.",
     "tooManyGuestLinks": "Você pode criar até 20 links de convidado.",
-    "steamAppIdDigits": "Digite apenas o ID numérico do aplicativo Steam."
+    "steamAppIdDigits": "Digite apenas o ID numérico do aplicativo Steam.",
+    "steamAppIdNeedsGameName": "Digite o nome do jogo correspondente ao ID do aplicativo Steam."
   },
   "detail": {
     "organizer": "Organizador",

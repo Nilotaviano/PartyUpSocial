@@ -47,7 +47,8 @@
     "waitlistCapacity": "A waitlist requires a maximum capacity.",
     "tooManyInvitees": "You can invite up to 50 friends.",
     "tooManyGuestLinks": "You can create up to 20 guest links.",
-    "steamAppIdDigits": "Enter only the numeric Steam app ID."
+    "steamAppIdDigits": "Enter only the numeric Steam app ID.",
+    "steamAppIdNeedsGameName": "Enter a game name to go with the Steam app ID."
   },
   "detail": {
     "organizer": "Organizer",

@@ -44,7 +44,8 @@
     "tooManyGuestLinks": "You can create up to 20 guest links.",
     "optionMinimum": "Add at least two candidate times.",
     "optionCap": "A poll can have at most 12 candidate times.",
-    "steamAppIdDigits": "Enter only the numeric Steam app ID."
+    "steamAppIdDigits": "Enter only the numeric Steam app ID.",
+    "steamAppIdNeedsGameName": "Enter a game name to go with the Steam app ID."
   },
   "list": {
     "heading": "Polls",

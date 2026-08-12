@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { NavLink } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { AvatarDisc } from '../friends/AvatarDisc'
 import {
   friendKeys,
   getBlockedUsers,
@@ -114,13 +115,22 @@ export function BlockedUsersPage() {
                 key={blocked.blockId}
                 className="flex flex-col items-start justify-between gap-4 rounded-card border-2 border-ink bg-card p-4 shadow-offset-card sm:flex-row sm:items-center"
               >
-                <div className="min-w-0">
-                  <p className="truncate font-mono font-semibold text-ink">
-                    @{blocked.username}
-                  </p>
-                  <p className="text-meta text-ink-soft">
-                    {t('labels.blockedOn', { date })}
-                  </p>
+                <div className="flex min-w-0 items-center gap-3">
+                  {/*
+                    D-192: the disc is neutral — masked, seeded from the stored
+                    username snapshot rather than a userId. `IBlockRepository`
+                    deliberately holds no join to the blocked `User`, so a
+                    live avatar here would make blocking a monitoring channel.
+                  */}
+                  <AvatarDisc masked seed={blocked.username} size="sm" />
+                  <div className="min-w-0">
+                    <p className="truncate font-mono font-semibold text-ink">
+                      @{blocked.username}
+                    </p>
+                    <p className="text-meta text-ink-soft">
+                      {t('labels.blockedOn', { date })}
+                    </p>
+                  </div>
                 </div>
                 <Button
                   aria-busy={unblock.isPending}

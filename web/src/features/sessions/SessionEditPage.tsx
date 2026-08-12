@@ -17,6 +17,7 @@ import {
   type EditSessionRequest,
   type SessionDetail,
 } from './sessionQueries'
+import { extractSteamAppId } from './steamAppIdField'
 
 // Single source of truth for the validation-summary link targets: every
 // entry in `fieldErrors` must resolve to a real element id (H2).
@@ -25,11 +26,6 @@ const fieldIds: Record<string, string> = {
   minAttendance: 'field-min',
   gameAppId: 'field-game-app-id',
 }
-
-// Accepts a pasted Steam store URL (e.g.
-// https://store.steampowered.com/app/730/Counter-Strike_2/) and extracts the
-// numeric app id so users don't have to hand-copy it out of the URL.
-const STEAM_STORE_URL_APP_ID = /store\.steampowered\.com\/app\/(\d+)/i
 
 function formFrom(session: SessionDetail) {
   return {
@@ -91,6 +87,19 @@ export function SessionEditPage() {
   // for deriving state from data that only becomes available after mount.
   if (detail.data && !form) {
     setForm(formFrom(detail.data))
+  }
+
+  // The app-id field only renders when a game is kept on a Steam platform
+  // (see the JSX below); once either condition stops holding, a stale
+  // `gameAppId` error would anchor the validation summary at a field that
+  // no longer exists, breaking the `_H2` invariant. Cleared during render,
+  // the same documented pattern as the form-seeding block above.
+  if (form && (form.clearGame || form.platform !== 'Steam') && 'gameAppId' in fieldErrors) {
+    setFieldErrors((current) => {
+      const rest = { ...current }
+      delete rest.gameAppId
+      return rest
+    })
   }
 
   const save = useMutation({
@@ -159,8 +168,7 @@ export function SessionEditPage() {
   }
 
   function handleGameAppIdChange(value: string) {
-    const urlMatch = value.match(STEAM_STORE_URL_APP_ID)
-    update('gameAppId', urlMatch ? urlMatch[1] : value)
+    update('gameAppId', extractSteamAppId(value))
   }
 
   function validate(): Record<string, string> {
@@ -172,6 +180,7 @@ export function SessionEditPage() {
     if (!Number.isFinite(min) || min < 1) errors.minAttendance = t('validation.range')
     if (max !== undefined && min > max) errors.minAttendance = t('validation.minMax')
     if (
+      !form.clearGame &&
       form.platform === 'Steam' &&
       form.gameAppId &&
       !/^\d+$/.test(form.gameAppId)

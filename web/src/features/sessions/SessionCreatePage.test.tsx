@@ -302,6 +302,21 @@ describe('SessionCreatePage', () => {
     expect(api.post).not.toHaveBeenCalled()
   })
 
+  it('requires a game name when a Steam app id is typed with the name left blank_F1', async () => {
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Raid night' } })
+    fireEvent.click(screen.getByLabelText('Private session'))
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByLabelText('Steam app ID'), { target: { value: '730' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
+
+    expect(
+      await screen.findByText('There were problems with your submission'),
+    ).toBeInTheDocument()
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
   it('posts the wire-format platform value, not the UI label', async () => {
     api.get.mockResolvedValue({
       data: {

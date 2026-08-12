@@ -44,7 +44,8 @@
     "tooManyGuestLinks": "Puedes crear hasta 20 enlaces de invitado.",
     "optionMinimum": "Agrega al menos dos horarios candidatos.",
     "optionCap": "Una encuesta puede tener como máximo 12 horarios candidatos.",
-    "steamAppIdDigits": "Ingresa solo el ID numérico de la app de Steam."
+    "steamAppIdDigits": "Ingresa solo el ID numérico de la app de Steam.",
+    "steamAppIdNeedsGameName": "Ingresa el nombre del juego junto con el ID de la app de Steam."
   },
   "list": {
     "heading": "Encuestas",

@@ -282,6 +282,26 @@ describe('PollCreatePage', () => {
     expect(api.post).not.toHaveBeenCalled()
   })
 
+  it('requires a game name when a Steam app id is typed with the name left blank_F1', async () => {
+    api.get.mockResolvedValue({ data: { items: [] } })
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Title'), {
+      target: { value: 'Weekend raid' },
+    })
+    addOption('2099-01-01T10:00')
+    addOption('2099-01-01T12:00')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByLabelText('Steam app ID'), { target: { value: '730' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create poll' }))
+
+    expect(
+      await screen.findByText('There were problems with your submission'),
+    ).toBeInTheDocument()
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
   it('warns before discarding dirty create-form values_D162', async () => {
     api.get.mockResolvedValue({ data: { items: [] } })
     renderPage()

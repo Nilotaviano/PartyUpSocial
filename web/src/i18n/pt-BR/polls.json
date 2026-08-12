@@ -44,7 +44,8 @@
     "tooManyGuestLinks": "Você pode criar até 20 links de convidado.",
     "optionMinimum": "Adicione pelo menos dois horários candidatos.",
     "optionCap": "Uma enquete pode ter no máximo 12 horários candidatos.",
-    "steamAppIdDigits": "Digite apenas o ID numérico do aplicativo Steam."
+    "steamAppIdDigits": "Digite apenas o ID numérico do aplicativo Steam.",
+    "steamAppIdNeedsGameName": "Digite o nome do jogo correspondente ao ID do aplicativo Steam."
   },
   "list": {
     "heading": "Enquetes",

@@ -86,6 +86,17 @@ describe('BlockedUsersPageTests', () => {
     expect(screen.getByText('User unblocked.')).toBeInTheDocument()
   })
 
+  it('renders a neutral disc seeded from the username snapshot, never the userId_D192', async () => {
+    renderPage()
+
+    const row = (await screen.findByText('@snapshot.name')).closest('li')!
+    const disc = row.querySelector('span[aria-hidden="true"]')
+    expect(disc).not.toBeNull()
+    // Masked: no emoji, no image — just the neutral glyph.
+    expect(disc).toHaveTextContent('●')
+    expect(disc?.querySelector('img')).toBeNull()
+  })
+
   it('renders the outbound-management empty state', async () => {
     api.get.mockResolvedValue({ data: { items: [] } })
     renderPage()

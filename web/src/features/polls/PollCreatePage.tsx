@@ -10,6 +10,7 @@ import { useDirtyGuard } from '../../components/useDirtyGuard'
 import { AvatarDisc } from '../friends/AvatarDisc'
 import { avatarImgUrl } from '../friends/avatarImage'
 import { friendKeys, getFriends } from '../friends/friendGraph'
+import { extractSteamAppId } from '../sessions/steamAppIdField'
 import { createPoll, type CreatePollRequest } from './pollQueries'
 
 // D-080/D-131 (creation-time cap): the same 12-option ceiling `PollCreateTests`
@@ -134,12 +135,8 @@ const fieldIds: Record<string, string> = {
   inviteeUserIds: 'field-invitees',
   guestLinkCount: 'field-guest-links',
   gameAppId: 'field-game-app-id',
+  gameName: 'field-game-name',
 }
-
-// Accepts a pasted Steam store URL (e.g.
-// https://store.steampowered.com/app/730/Counter-Strike_2/) and extracts the
-// numeric app id so users don't have to hand-copy it out of the URL.
-const STEAM_STORE_URL_APP_ID = /store\.steampowered\.com\/app\/(\d+)/i
 
 const platformWireValues: Record<string, string> = {
   Steam: 'steam',
@@ -222,8 +219,7 @@ export function PollCreatePage() {
   }
 
   function handleGameAppIdChange(value: string) {
-    const urlMatch = value.match(STEAM_STORE_URL_APP_ID)
-    update('gameAppId', urlMatch ? urlMatch[1] : value)
+    update('gameAppId', extractSteamAppId(value))
   }
 
   function addOption() {
@@ -299,6 +295,9 @@ export function PollCreatePage() {
     }
     if (form.platform === 'Steam' && form.gameAppId && !/^\d+$/.test(form.gameAppId)) {
       errors.gameAppId = t('validation.steamAppIdDigits')
+    }
+    if (form.platform === 'Steam' && form.gameAppId && !form.gameName.trim()) {
+      errors.gameName = t('validation.steamAppIdNeedsGameName')
     }
     return errors
   }
@@ -578,11 +577,18 @@ export function PollCreatePage() {
             {t('create.gameFreeText')}
           </label>
           <input
+            aria-describedby={fieldErrors.gameName ? 'game-name-error' : undefined}
+            aria-invalid={Boolean(fieldErrors.gameName)}
             className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             id="field-game-name"
             value={form.gameName}
             onChange={(event) => update('gameName', event.target.value)}
           />
+          {fieldErrors.gameName && (
+            <p id="game-name-error" role="alert">
+              {fieldErrors.gameName}
+            </p>
+          )}
           {form.platform === 'Steam' && (
             <div className="mt-2">
               <label
