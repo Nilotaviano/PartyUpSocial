@@ -44,8 +44,10 @@ jobs:
             filter: Category=Integration&FullyQualifiedName~IntegrationTests.Sessions.
           - shard: polls
             filter: Category=Integration&FullyQualifiedName~IntegrationTests.Polls.
+          - shard: social
+            filter: Category=Integration&(FullyQualifiedName~IntegrationTests.Friends.|FullyQualifiedName~IntegrationTests.Notifications.|FullyQualifiedName~IntegrationTests.Availability.)
           - shard: rest
-            filter: Category=Integration&FullyQualifiedName!~IntegrationTests.Sessions.&FullyQualifiedName!~IntegrationTests.Polls.
+            filter: Category=Integration&FullyQualifiedName!~IntegrationTests.Sessions.&FullyQualifiedName!~IntegrationTests.Polls.&FullyQualifiedName!~IntegrationTests.Friends.&FullyQualifiedName!~IntegrationTests.Notifications.&FullyQualifiedName!~IntegrationTests.Availability.
     runs-on: ubuntu-latest
     name: integration (${{ matrix.shard }})
     steps:
