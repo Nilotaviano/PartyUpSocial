@@ -39,7 +39,8 @@ public sealed record RateLimitDimension(
     TimeSpan Window,
     RateLimitPartitionKind PartitionKind,
     IReadOnlySet<string> OperationIds,
-    bool CoversEveryApiOperation = false);
+    bool CoversEveryApiOperation = false,
+    bool ExcludesDefault = false);
 
 public sealed class RateLimitPartitionPepper
 {
@@ -103,15 +104,16 @@ public static class RateLimitPolicies
     public static IReadOnlyList<RateLimitDimension> Dimensions => _cachedDimensions ??= BuildDimensions();
 
     /// <summary>
-    /// Every operation id an explicit (non-<see cref="RateLimitDimension.CoversEveryApiOperation"/>)
-    /// dimension already claims — <c>default</c> excludes them in <see cref="PartitionFor"/> so a
-    /// dimension like <c>avatar-proxy</c> (600/min) is not also throttled by <c>default</c>'s 300/min,
-    /// which would make the wider ceiling inert.
+    /// Operation ids of dimensions that declare <see cref="RateLimitDimension.ExcludesDefault"/> —
+    /// <c>default</c> skips only these in <see cref="PartitionFor"/>, so a wider ceiling like
+    /// <c>avatar-proxy</c> (600/min) is not made inert by <c>default</c>'s 300/min. Every other
+    /// explicit dimension deliberately stacks on top of <c>default</c> (the D-049 Steam import must
+    /// satisfy lookup, import and default simultaneously).
     /// </summary>
     private static IReadOnlySet<string> ClaimedOperationIds => _cachedClaimedOperationIds ??=
         new HashSet<string>(
             Dimensions
-                .Where(dimension => !dimension.CoversEveryApiOperation)
+                .Where(dimension => dimension.ExcludesDefault)
                 .SelectMany(dimension => dimension.OperationIds),
             StringComparer.Ordinal);
 
@@ -272,7 +274,8 @@ public static class RateLimitPolicies
             600,
             TimeSpan.FromMinutes(1),
             RateLimitPartitionKind.Ip,
-            Operations(ApiOperationIds.GetAvatarProxy)),
+            Operations(ApiOperationIds.GetAvatarProxy),
+            ExcludesDefault: true),
         new(
             "guest-write",
             20,

@@ -22,9 +22,12 @@ public readonly record struct Avatar
     private Avatar(AvatarKind kind, string? emoji, AvatarSourceId? sourceId, string? token)
     {
         Kind = kind;
-        _emoji = emoji;
+        // Both strings normalize to empty rather than null: EF materializes the optional complex
+        // property as a wholly-null Avatar when a required member column is NULL, so an External
+        // avatar (no glyph) must still store an empty string, never NULL.
+        _emoji = emoji ?? string.Empty;
         SourceId = sourceId;
-        _token = token;
+        _token = token ?? string.Empty;
     }
 
     public AvatarKind Kind { get; }

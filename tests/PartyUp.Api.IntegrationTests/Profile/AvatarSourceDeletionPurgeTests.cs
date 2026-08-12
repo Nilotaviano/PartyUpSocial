@@ -29,14 +29,14 @@ public sealed class AvatarSourceDeletionPurgeTests : IAsyncLifetime, IDisposable
         Phase3DeletionSeed seed = await Phase3DeletionTestSupport.SeedAsync(_factory);
         await using (AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
         {
+            // The seeded subject is already PendingDeletion, which CaptureAvatarSource rightly
+            // rejects — the purge only needs the row to exist, so it is inserted directly.
             AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            User user = await context.DomainUsers.SingleAsync(u => u.Id == seed.SubjectId);
-            user.CaptureAvatarSource(
-                AvatarSourceKind.SteamPlatform,
-                [1, 2, 3],
-                "image/webp",
-                _factory.Clock);
-            await context.SaveChangesAsync();
+            await context.Database.ExecuteSqlAsync($"""
+                INSERT INTO avatar_sources (id, user_id, kind, token, bytes, content_type, fetched_at)
+                VALUES ({Guid.CreateVersion7()}, {seed.SubjectId.Value}, 0,
+                        {AvatarSource.CreateToken()}, {new byte[] { 1, 2, 3 }}, 'image/webp', now())
+                """);
         }
 
         _factory.Clock.Advance(User.DeletionGracePeriod);

@@ -1275,10 +1275,7 @@ namespace PartyUp.Infrastructure.Migrations
                                 .HasColumnName("avatar_source_id");
 
                             b1.Property<string>("Token")
-                                .IsRequired()
-                                .ValueGeneratedOnAdd()
                                 .HasColumnType("text")
-                                .HasDefaultValue("")
                                 .HasColumnName("avatar_token");
                         });
 

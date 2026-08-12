@@ -14,8 +14,7 @@ namespace PartyUp.Infrastructure.Migrations
                 name: "avatar_token",
                 table: "users",
                 type: "text",
-                nullable: true,
-                defaultValue: "");
+                nullable: true);
         }
 
         /// <inheritdoc />

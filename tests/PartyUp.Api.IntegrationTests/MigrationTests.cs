@@ -60,7 +60,8 @@ public sealed class MigrationTests : IAsyncLifetime
 
         await AssertConstraintExistsAsync(context, "fk_platform_links_users_user_id");
         await AssertConstraintExistsAsync(context, "fk_username_registry_users_owner_id");
-        await AssertConstraintExistsAsync(context, "fk_users_platform_links_avatar_source_platform_link_id");
+        await AssertConstraintExistsAsync(context, "fk_avatar_sources_users_user_id");
+        await AssertConstraintExistsAsync(context, "fk_users_avatar_sources_avatar_source_id");
         await AssertConstraintExistsAsync(context, "fk_auth_users_users_id");
         await AssertConstraintExistsAsync(context, "fk_auth_tokens_users_user_id");
     }

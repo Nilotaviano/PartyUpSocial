@@ -56,10 +56,10 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
                 .HasConversion(new TypedIdConverter<AvatarSourceId>())
                 .HasColumnName("avatar_source_id");
             // AVATARS_DESIGN.md §3.1/§3.3: the proxy token denormalized onto the users row so
-            // AvatarResponse.From(Avatar) stays a pure, join-free mapper.
+            // AvatarResponse.From(Avatar) stays a pure, join-free mapper. Deliberately not
+            // store-generated: a default would make EF propagate the read-back value into the
+            // Nullable<Avatar> complex struct, whose fields its setter factory cannot write.
             avatar.Property(value => value.Token)
-                .IsRequired()
-                .HasDefaultValue(string.Empty)
                 .HasColumnName("avatar_token");
         });
 

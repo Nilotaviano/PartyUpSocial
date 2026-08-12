@@ -24,6 +24,7 @@ namespace PartyUp.Api.IntegrationTests.Profile;
 public sealed class AvatarCatalogBackfillMigrationTests : IAsyncLifetime
 {
     private const string PreCatalogHead = "20260810022735_AddTourCompletedAt";
+    private const string CatalogHead = "20260811172328_AssignCatalogAvatars";
     private const string OffCatalogGlyph = "\U0001F642";
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
@@ -47,7 +48,9 @@ public sealed class AvatarCatalogBackfillMigrationTests : IAsyncLifetime
         Guid platformLinkId = await SeedPlatformLinkAsync(context, linkedPlatformId);
         await SetAvatarSourceAsync(context, linkedPlatformId, platformLinkId);
 
-        await migrator.MigrateAsync();
+        // Stop at the backfill's own head: its statement and the assertions below speak the
+        // pre-wave-B schema (avatar_source_platform_link_id still exists here).
+        await migrator.MigrateAsync(CatalogHead);
 
         Guid[] seeded =
         [
@@ -60,21 +63,33 @@ public sealed class AvatarCatalogBackfillMigrationTests : IAsyncLifetime
 
         foreach (Guid id in seeded)
         {
-            (int? kind, string? emoji, Guid? sourceId) = await ReadAvatarAsync(context, id);
+            (int? kind, string? emoji, Guid? sourceId) =
+                await ReadAvatarAsync(context, id, "avatar_source_platform_link_id");
             Assert.Equal(0, kind);
             Assert.NotNull(emoji);
             Assert.True(AvatarCatalog.Contains(emoji!), $"{emoji} is not a catalog glyph.");
             Assert.Null(sourceId);
         }
 
-        (_, string? first, _) = await ReadAvatarAsync(context, offCatalogEmojiId);
+        (_, string? first, _) =
+            await ReadAvatarAsync(context, offCatalogEmojiId, "avatar_source_platform_link_id");
         await context.Database.ExecuteSqlRawAsync(
             "UPDATE users SET avatar_emoji = 'stale', avatar_kind = 1 WHERE id = @id",
             new Npgsql.NpgsqlParameter("id", offCatalogEmojiId));
         await context.Database.ExecuteSqlRawAsync(BackfillSql(context));
-        (int? rerunKind, string? rerun, _) = await ReadAvatarAsync(context, offCatalogEmojiId);
+        (int? rerunKind, string? rerun, _) =
+            await ReadAvatarAsync(context, offCatalogEmojiId, "avatar_source_platform_link_id");
         Assert.Equal(0, rerunKind);
         Assert.Equal(first, rerun);
+
+        // The wave-B migrations (avatar_sources, the column swap, avatar_token) must carry these
+        // backfilled rows to head with the emoji intact and no dangling source reference.
+        await migrator.MigrateAsync();
+        (int? headKind, string? headEmoji, Guid? headSourceId) =
+            await ReadAvatarAsync(context, offCatalogEmojiId, "avatar_source_id");
+        Assert.Equal(0, headKind);
+        Assert.Equal(first, headEmoji);
+        Assert.Null(headSourceId);
     }
 
     /// <summary>
@@ -138,12 +153,13 @@ public sealed class AvatarCatalogBackfillMigrationTests : IAsyncLifetime
 
     private static async Task<(int? Kind, string? Emoji, Guid? SourceId)> ReadAvatarAsync(
         AppDbContext context,
-        Guid userId)
+        Guid userId,
+        string sourceColumn)
     {
         DbConnection connection = await OpenAsync(context);
         await using DbCommand command = connection.CreateCommand();
         command.CommandText =
-            "SELECT avatar_kind, avatar_emoji, avatar_source_platform_link_id FROM users WHERE id = @id";
+            $"SELECT avatar_kind, avatar_emoji, {sourceColumn} FROM users WHERE id = @id";
         DbParameter parameter = command.CreateParameter();
         parameter.ParameterName = "id";
         parameter.Value = userId;
