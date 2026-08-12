@@ -21,7 +21,13 @@ While Q1/Q2/Q6 answers are pending, the startable work is S4's e2e half and S10'
 
 ## 2. Owner questions (block the slices that cite them)
 
-- **Q1 — analytics reading + "active users"/"last activity" (blocks S1, S2, and S5's analytics paragraph).**
+- **Q1 — RATIFIED 2026-08-12: `last_seen_at` column.** The owner chose the column over the derived-only
+  default: S1 authors a migration adding `users.last_seen_at` (touched on authenticated requests, throttled —
+  write only when the stored value is older than ~10 minutes, so it is not a per-request write), active users
+  = `last_seen_at` within the window, D-179 last activity reads it directly. The no-event-pipeline reading of
+  D-161 and the `status IN (Confirmed, Completed)` success predicate are ratified with it. S5's privacy
+  policy must describe the last-activity collection. Original question preserved below for the record.
+  *(superseded)* — analytics reading + "active users"/"last activity" (blocks S1, S2, and S5's analytics paragraph).
   (a) D-161/§8.6 say the MVP "*records* minimal first-party product *events*" (PRODUCT_SPEC.md:396,653); this
   design proposes **no event pipeline** — all five D-178 metrics derive from existing domain tables. That is a
   spec reinterpretation ("events" → "derived measures over existing product data") and needs a ratified spec
@@ -35,10 +41,10 @@ While Q1/Q2/Q6 answers are pending, the startable work is S4's e2e half and S10'
   **Known blind spot:** availability rows carry no timestamps (AvailabilityBlock exposes only Start/End), so
   availability edits are invisible to this definition — accepted, or the owner instead approves a
   `last_seen_at` column (migration + new collection ⇒ privacy-policy text changes). Windows: 7- and 30-day.
-- **Q2 — admin UI placement (blocks S3).** IMPLEMENTATION_PLAN.md:149 flags a spec touch. *Proposed default:*
+- **Q2 — RATIFIED 2026-08-12: proposed default (`/admin` by URL, no nav entry).** IMPLEMENTATION_PLAN.md:149 flags a spec touch. *Proposed default:*
   routes under `/admin` (SPA), no nav entry rendered for anyone — admins reach it by URL; the D-177 404 posture
   makes nav gating unnecessary and leak-proof. Spec row proposal accompanies S3.
-- **Q3 — D-138 evidence policy (blocks S8 closure, not its build).** "Current + previous" versions are not
+- **Q3 — RATIFIED 2026-08-12: evergreen-engine policy as proposed (no macOS lane).** "Current + previous" versions are not
   expressible with Playwright's single pinned build per engine. *Proposed default:* evergreen-engine policy —
   Playwright-pinned Chromium/WebKit/Firefox lanes + a browserslist/Vite build-target floor covering
   current+previous of the four families + owner real-device spot checks; open-source engines stand in for
@@ -64,7 +70,7 @@ While Q1/Q2/Q6 answers are pending, the startable work is S4's e2e half and S10'
   mobile phase), **the data-retention periods** — both backup retention (the IMPLEMENTATION_PLAN.md:147
   age-out target) and the PRODUCT_SPEC.md:464 To-be-decided shared-session-content retention, which are
   separate owner calls — and final sign-off of all nine documents. S5 drafts; owner ratifies.
-- **Q7 — security-header ownership (blocks part of S9).** *Proposed default:* app-side CSP,
+- **Q7 — RATIFIED 2026-08-12: app-side headers + owner-applied HSTS in Caddy, `__Host-` deferred.** *Proposed default:* app-side CSP,
   X-Content-Type-Options, X-Frame-Options/frame-ancestors, Permissions-Policy; HSTS in Caddy (owner-applied).
   `__Host-` cookie-prefix migration is **explicitly deferred** — the one-container single-origin topology
   already enforces what the prefix guarantees (AuthCookieSetup.cs:28-33), and the rename forces a prod re-login.
@@ -86,7 +92,9 @@ table, no trackers — verified by a policy test asserting the web bundle loads 
   recorded disposition. Repeat scheduling = % of organizers creating again within 30 days of their *first*
   creation.
 - New: `GET /api/v1/admin/dashboard` (RequireAdmin ⇒ 404 fail-closed inherited), Application-layer
-  `GetUsageDashboardUseCase` with SQL-backed read model. Active-users per Q1(b).
+  `GetUsageDashboardUseCase` with SQL-backed read model. Active-users per the ratified Q1 column: S1 authors
+  the `users.last_seen_at` migration (EF, forward-only) plus the throttled touch on authenticated requests
+  (~10-min write floor); it applies on prod startup via the normal `Database:MigrateOnStartup` path.
 - Tests: `_D178` integration (per metric, incl. cancellation-in-denominator and poll-success-only-via-
   Confirmed), `_D151` (definitions), `_D161` (no-tracker policy). A-071 op-id + problem-code inventories
   extended; `gen:api` regenerated.
