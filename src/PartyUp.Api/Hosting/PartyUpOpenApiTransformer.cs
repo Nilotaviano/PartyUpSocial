@@ -73,6 +73,10 @@ public sealed class PartyUpOpenApiTransformer :
         "poll_selection_window_closed",
         "poll_zero_options",
 
+        // D-193 mid-flight invites: the only new code the invite surface adds — its other
+        // failures reuse poll_not_found / user_not_found / poll_validation above.
+        "poll_invites_closed",
+
         // PHASE6_DESIGN.md §4 (ticket-P6-S4b): the poll guest arm's own code — the explicit
         // vote-before-claim 409 (D-017), the only GuestPollUseCases guest-arm failure code actually
         // reachable over HTTP. GuestPollUseCases.RequireClaimedGuest's other two failure branches
