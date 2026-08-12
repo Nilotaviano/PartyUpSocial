@@ -15,6 +15,7 @@ using PartyUp.Application.Abstractions;
 using PartyUp.Application.Email;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Users;
+using PartyUp.Infrastructure.Deletion;
 using PartyUp.Infrastructure.Identity;
 using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Persistence.Repositories;
@@ -27,6 +28,7 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
 {
     private readonly bool _googleEnabled;
     private readonly bool? _steamEnabled;
+    private readonly string? _deletionJournalPath;
     private readonly PostgreSqlContainer _postgres =
         new PostgreSqlBuilder("postgres:17-alpine").Build();
     private readonly CapturingEmailSender _emailSender = new();
@@ -49,10 +51,19 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
     internal PostAuthenticationGateProbe PostAuthenticationGateProbe =>
         _postAuthenticationGateProbe;
 
-    internal PartyUpApiFactory(bool googleEnabled = false, bool? steamEnabled = null)
+    /// <summary>
+    /// <paramref name="deletionJournalPath"/> points <c>FileDeletionJournalShipper</c> at a writable
+    /// directory: its production default (<c>/data/deletion-journal</c>) has no existing parent on a
+    /// test machine, so the shipper disables itself and no NDJSON is ever written.
+    /// </summary>
+    internal PartyUpApiFactory(
+        bool googleEnabled = false,
+        bool? steamEnabled = null,
+        string? deletionJournalPath = null)
     {
         _googleEnabled = googleEnabled;
         _steamEnabled = steamEnabled;
+        _deletionJournalPath = deletionJournalPath;
     }
 
     internal Task StartAsync() => _postgres.StartAsync();
@@ -182,6 +193,15 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
                             "test-google-client",
                             "test-google-secret",
                             isDevelopment: false));
+            }
+
+            if (_deletionJournalPath is not null)
+            {
+                // A configuration override cannot reach this option: AddInfrastructure materializes it
+                // eagerly from builder.Configuration, before WebApplicationFactory's deferred
+                // configuration sources are applied. The service override runs last and always wins.
+                services.RemoveAll<DeletionJournalOptions>();
+                services.AddSingleton(new DeletionJournalOptions(_deletionJournalPath));
             }
 
             services.RemoveAll<IClock>();
