@@ -90,6 +90,10 @@ public sealed class PartyUpOpenApiTransformer :
         "push_subscription_not_found",
         "push_not_configured",
         "push_channel_unsupported",
+
+        // PHASE8_DESIGN.md §3 S2 (D-180): the ban-and-remove-content route's §6.2 bounded-retry
+        // outcome, surfaced as a 409 alongside the admin routes' existing "not_found".
+        "scope_contended",
     ];
 
     private static readonly HashSet<string> FriendOperationIds =

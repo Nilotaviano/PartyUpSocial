@@ -202,7 +202,9 @@ public sealed class BanAndRemoveContentUseCaseTests
             applier,
             new FakeAccountSessionService(),
             new FakeUnitOfWork(),
-            clock);
+            clock,
+            new NoOpSessionNotificationMaterializer(),
+            new NoOpPollNotificationMaterializer());
     }
 
     private static User ActiveUser(out MutableClock clock, string friendCode)
@@ -283,6 +285,8 @@ public sealed class BanAndRemoveContentUseCaseTests
                 sessions,
                 unitOfWork,
                 clock,
+                new NoOpSessionNotificationMaterializer(),
+                new NoOpPollNotificationMaterializer(),
                 recordingLocks);
 
             return new RemovalWorld(
@@ -383,5 +387,23 @@ public sealed class BanAndRemoveContentUseCaseTests
             UserId subject,
             CancellationToken cancellationToken) =>
             throw new InvalidOperationException("The reminder-cancel tail failed.");
+    }
+
+    private sealed class NoOpSessionNotificationMaterializer : ISessionNotificationMaterializer
+    {
+        public Task MaterializeAsync(
+            Session session,
+            IReadOnlyList<IDomainEvent> events,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+    }
+
+    private sealed class NoOpPollNotificationMaterializer : IPollNotificationMaterializer
+    {
+        public Task MaterializeAsync(
+            PartyUp.Domain.Polls.Poll poll,
+            IReadOnlyList<IDomainEvent> events,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
     }
 }

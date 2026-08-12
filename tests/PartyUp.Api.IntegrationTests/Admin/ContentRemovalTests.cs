@@ -2,10 +2,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
 using PartyUp.Api.IntegrationTests.Polls;
+using PartyUp.Api.IntegrationTests.Sessions;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Admin;
+using PartyUp.Application.Deletion;
 using PartyUp.Application.Polls;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users;
@@ -50,6 +53,12 @@ public sealed class ContentRemovalTests : IAsyncLifetime, IDisposable
         Assert.NotEqual(
             SessionStatus.Canceled,
             (await verify.Sessions.AsNoTracking().SingleAsync(s => s.Id == seed.OwnedInProgressId)).Status);
+
+        // Excluded: an owned session that already reached Completed before the ban is history, not
+        // live content — DOMAIN_MODEL §11 steps 1–3 only ever touch not-started/live content.
+        Assert.Equal(
+            SessionStatus.Completed,
+            (await verify.Sessions.AsNoTracking().SingleAsync(s => s.Id == seed.OwnedCompletedId)).Status);
 
         // Effect 2: the owned live poll expires.
         Assert.Equal(
@@ -133,6 +142,135 @@ public sealed class ContentRemovalTests : IAsyncLifetime, IDisposable
             (await verify.JoinRequests.AsNoTracking().SingleAsync(r => r.Id == seed.JoinRequestId)).Status);
     }
 
+    /// <summary>
+    /// F1: the §6.2 atomicity for real, against Postgres. <see cref="AlwaysChangingDeletionScopeProvider"/>
+    /// (<c>Sessions/SessionDeletionEffectsTests.cs</c>) forces every one of the runner's 3 attempts to
+    /// disagree with reload, so <see cref="LockedSubjectScopeRunner"/> throws
+    /// <see cref="DeletionScopeChangedException"/> on all three and the outer transaction rolls back
+    /// each time — unlike the in-memory application-seam proof, a real rollback here actually undoes
+    /// the ban row write, so this is the one place that can assert it landed nowhere.
+    /// </summary>
+    [Fact]
+    public async Task RemoveContent_RollsBackTheBanWhenTheScopeNeverStabilizes_D180()
+    {
+        string suffix = Guid.NewGuid().ToString("N");
+        UserId subjectId = await _factory.SeedUserAsync(email: $"removal-contended-{suffix}@example.test");
+
+        SessionId ownedFutureId;
+        await using (AsyncServiceScope seedScope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Session ownedFuture = Session.Create(subjectId, Details("Contended owned", 180), [], _factory.Clock);
+            _ = ownedFuture.DequeueEvents();
+            ownedFutureId = ownedFuture.Id;
+            context.Sessions.Add(ownedFuture);
+            await context.SaveChangesAsync();
+        }
+
+        AdminUserMutationResult result;
+        var counter = new DiscoveryCallCounter();
+        await using (AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
+        {
+            var alwaysChanging = new AlwaysChangingDeletionScopeProvider(
+                scope.ServiceProvider.GetRequiredService<IDeletionScopeProvider>(),
+                scope.ServiceProvider,
+                _factory.Clock,
+                counter);
+
+            var useCase = new BanAndRemoveContentUseCase(
+                scope.ServiceProvider.GetRequiredService<IUserRepository>(),
+                alwaysChanging,
+                scope.ServiceProvider.GetRequiredService<IDeletionResultApplier>(),
+                scope.ServiceProvider.GetRequiredService<IAccountSessionService>(),
+                scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
+                _factory.Clock,
+                scope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
+                scope.ServiceProvider.GetRequiredService<IPollNotificationMaterializer>(),
+                scope.ServiceProvider.GetRequiredService<ISessionLockRepository>());
+
+            result = await useCase.ExecuteAsync(subjectId, default);
+        }
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("scope_contended", result.Code);
+        Assert.Equal(3, counter.Calls);
+
+        await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
+        AppDbContext verify = verification.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Null((await verify.DomainUsers.AsNoTracking().SingleAsync(u => u.Id == subjectId)).BannedAt);
+        Assert.NotEqual(
+            SessionStatus.Canceled,
+            (await verify.Sessions.AsNoTracking().SingleAsync(s => s.Id == ownedFutureId)).Status);
+    }
+
+    /// <summary>
+    /// F2: the removal path shares its notification wiring with the deletion path — the counterpart
+    /// on the canceled session gets the ordinary <c>SessionCanceled</c> row and the poll's registered
+    /// voter gets the D-170 <c>PollExpired</c> row, and the banned subject, who caused both, gets
+    /// neither.
+    /// </summary>
+    [Fact]
+    public async Task RemoveContent_NotifiesCounterpartsButNeverTheSubject_D180()
+    {
+        string suffix = Guid.NewGuid().ToString("N");
+        UserId subjectId = await _factory.SeedUserAsync(email: $"removal-notify-subject-{suffix}@example.test");
+        UserId counterpartId = await _factory.SeedUserAsync(email: $"removal-notify-counterpart-{suffix}@example.test");
+        UserId voterId = await _factory.SeedUserAsync(email: $"removal-notify-voter-{suffix}@example.test");
+
+        SessionId sessionId;
+        PollId pollId;
+        await using (AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
+        {
+            AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await PollTestHelpers.SeedAcceptedFriendshipAsync(context, subjectId, counterpartId, _factory.Clock);
+            await PollTestHelpers.SeedAcceptedFriendshipAsync(context, subjectId, voterId, _factory.Clock);
+
+            Session session = Session.Create(subjectId, Details("Notify owned", 180), [], _factory.Clock);
+            session.Invite(counterpartId, _factory.Clock);
+            session.Rsvp(ParticipantRef.ForUser(counterpartId), ParticipationStatus.Going, _factory.Clock);
+            _ = session.DequeueEvents();
+            sessionId = session.Id;
+            context.Sessions.Add(session);
+            await context.SaveChangesAsync();
+
+            Instant now = _factory.Clock.GetCurrentInstant();
+            CreatePollResult created = await PollTestHelpers.BuildCreateUseCase(scope).ExecuteAsync(
+                new CreatePollCommand(
+                    subjectId,
+                    "Notify owned poll",
+                    DurationMinutes: 60,
+                    Platform: null,
+                    Game: null,
+                    Notes: null,
+                    MinAttendance: 1,
+                    MaxCapacity: null,
+                    IsPrivate: false,
+                    OptionStartTimes: [now + Duration.FromDays(6), now + Duration.FromDays(7)],
+                    DeadlineChoice: PollDeadlineChoice.Hours48,
+                    InviteeUserIds: [voterId],
+                    GuestLinkCount: null),
+                default);
+            Assert.True(created.Succeeded, created.Code);
+            pollId = created.Poll!.Id;
+        }
+
+        AdminUserMutationResult result = await RemoveContentAsync(subjectId);
+        Assert.True(result.Succeeded, result.Code);
+
+        await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
+        AppDbContext verify = verification.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        Assert.Equal(1, await verify.Notifications.CountAsync(n =>
+            n.SessionId == sessionId &&
+            n.Type == NotificationType.SessionCanceled &&
+            n.RecipientUserId == counterpartId));
+        Assert.Equal(1, await verify.Notifications.CountAsync(n =>
+            n.PollId == pollId &&
+            n.Type == NotificationType.PollExpired &&
+            n.RecipientUserId == voterId));
+        Assert.Equal(0, await verify.Notifications.CountAsync(n => n.RecipientUserId == subjectId));
+    }
+
     private static Task<Instant?> LastSeenAsync(AppDbContext context, UserId subjectId) =>
         context.DomainUsers.AsNoTracking()
             .Where(user => user.Id == subjectId)
@@ -157,6 +295,7 @@ public sealed class ContentRemovalTests : IAsyncLifetime, IDisposable
         Instant seenAt = _factory.Clock.GetCurrentInstant();
         SessionId ownedFutureId;
         SessionId ownedInProgressId;
+        SessionId ownedCompletedId;
         SessionId participatedFutureId;
         JoinRequestId joinRequestId;
 
@@ -164,6 +303,16 @@ public sealed class ContentRemovalTests : IAsyncLifetime, IDisposable
         {
             AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await PollTestHelpers.SeedAcceptedFriendshipAsync(context, subjectId, friendId, _factory.Clock);
+
+            // Completed history (§11's own exclusion) — confirmed and run to completion before any of
+            // the removal-scoped sessions below are even created, so it predates the ban entirely.
+            Session ownedCompleted = Session.Create(
+                subjectId, Details("Owned completed", 15, durationMinutes: 15), [], _factory.Clock);
+            ownedCompleted.Confirm(_factory.Clock);
+            _factory.Clock.Advance(Duration.FromMinutes(31));
+            ownedCompleted.Complete(_factory.Clock);
+            _ = ownedCompleted.DequeueEvents();
+            ownedCompletedId = ownedCompleted.Id;
 
             Session ownedFuture = Session.Create(subjectId, Details("Owned future", 180), [], _factory.Clock);
             _ = ownedFuture.DequeueEvents();
@@ -188,7 +337,7 @@ public sealed class ContentRemovalTests : IAsyncLifetime, IDisposable
             _ = requestTarget.DequeueEvents();
 
             context.Sessions.AddRange(
-                ownedFuture, ownedInProgress, participatedFuture, requestTarget);
+                ownedCompleted, ownedFuture, ownedInProgress, participatedFuture, requestTarget);
             context.SessionReminderHandoffs.Add(new SessionReminderHandoff
             {
                 Id = Guid.CreateVersion7(),
@@ -244,6 +393,7 @@ public sealed class ContentRemovalTests : IAsyncLifetime, IDisposable
             subjectId,
             ownedFutureId,
             ownedInProgressId,
+            ownedCompletedId,
             participatedFutureId,
             joinRequestId,
             ownedPollId,
@@ -265,6 +415,7 @@ public sealed class ContentRemovalTests : IAsyncLifetime, IDisposable
         UserId SubjectId,
         SessionId OwnedFutureId,
         SessionId OwnedInProgressId,
+        SessionId OwnedCompletedId,
         SessionId ParticipatedFutureId,
         JoinRequestId JoinRequestId,
         PollId OwnedPollId,

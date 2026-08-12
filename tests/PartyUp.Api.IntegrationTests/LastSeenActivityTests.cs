@@ -53,19 +53,29 @@ public sealed class LastSeenActivityTests : IAsyncLifetime, IDisposable
 
     /// <summary>
     /// The unauthenticated path: no projection is resolved, so the middleware writes nothing and
-    /// throws nothing — an anonymous request is served exactly as it was before the touch existed.
+    /// throws nothing — an anonymous request is served exactly as it was before the touch existed. An
+    /// authenticated request runs first so the column already holds a real value; the anonymous
+    /// request that follows must leave that value exactly as it found it, proving the anonymous path
+    /// is a no-op rather than merely that a never-touched column stays null.
     /// </summary>
     [Fact]
     public async Task LastSeen_IsNotTouchedByAnAnonymousRequest_D178()
     {
         UserId userId = await _factory.SeedUserAsync(email: "last-seen-anonymous@example.test");
         using HttpClient client = Slice5HttpTest.CreateClient(_factory);
+        string cookie = await SignInAsync(client, userId);
+
+        Instant authenticatedRequestAt = _factory.Clock.GetCurrentInstant();
+        await GetMeAsync(client, cookie);
+        Assert.Equal(authenticatedRequestAt, await LastSeenAsync(userId));
+
+        _factory.Clock.Advance(LastSeenTouchMiddleware.WriteFloor + Duration.FromMinutes(1));
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/me");
         HttpResponseMessage response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        Assert.Null(await LastSeenAsync(userId));
+        Assert.Equal(authenticatedRequestAt, await LastSeenAsync(userId));
     }
 
     private static async Task GetMeAsync(HttpClient client, string cookie)

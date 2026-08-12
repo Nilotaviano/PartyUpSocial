@@ -35,9 +35,9 @@ public sealed class BanAndRemoveContentUseCase(
     IAccountSessionService sessions,
     IUnitOfWork unitOfWork,
     IClock clock,
-    ISessionLockRepository? sessionLocks = null,
-    ISessionNotificationMaterializer? materializer = null,
-    IPollNotificationMaterializer? pollMaterializer = null)
+    ISessionNotificationMaterializer materializer,
+    IPollNotificationMaterializer pollMaterializer,
+    ISessionLockRepository? sessionLocks = null)
 {
     private readonly LockedSubjectScopeRunner _runner =
         new(users, scopeProvider, unitOfWork, sessionLocks);
@@ -77,30 +77,24 @@ public sealed class BanAndRemoveContentUseCase(
     {
         ContentRemovalResult result = ContentRemovalExecutor.Execute(subject, scope, clock);
 
-        if (materializer is not null)
+        foreach (Session session in scope.Sessions)
         {
-            foreach (Session session in scope.Sessions)
+            IReadOnlyList<IDomainEvent> events = session.DequeueEvents();
+            if (events.Count > 0)
             {
-                IReadOnlyList<IDomainEvent> events = session.DequeueEvents();
-                if (events.Count > 0)
-                {
-                    // The subject is excluded exactly as the deletion path excludes the deleting
-                    // user, so counterparts read the ordinary cancellation/removal copy and the ban
-                    // itself is never disclosed.
-                    await materializer.MaterializeAsync(session, events, subject, cancellationToken);
-                }
+                // The subject is excluded exactly as the deletion path excludes the deleting
+                // user, so counterparts read the ordinary cancellation/removal copy and the ban
+                // itself is never disclosed.
+                await materializer.MaterializeAsync(session, events, subject, cancellationToken);
             }
         }
 
-        if (pollMaterializer is not null)
+        foreach (Poll poll in scope.Polls)
         {
-            foreach (Poll poll in scope.Polls)
+            IReadOnlyList<IDomainEvent> events = poll.DequeueEvents();
+            if (events.Count > 0)
             {
-                IReadOnlyList<IDomainEvent> events = poll.DequeueEvents();
-                if (events.Count > 0)
-                {
-                    await pollMaterializer.MaterializeAsync(poll, events, subject, cancellationToken);
-                }
+                await pollMaterializer.MaterializeAsync(poll, events, subject, cancellationToken);
             }
         }
 
