@@ -105,7 +105,7 @@ export function ProfileActionCard({
             <AvatarDisc
               emoji={profile.avatar.emoji}
               imgUrl={avatarImgUrl(profile.avatar)}
-              seed={profile.username}
+              seed={profile.userId}
               size="sm"
             />
             <div>

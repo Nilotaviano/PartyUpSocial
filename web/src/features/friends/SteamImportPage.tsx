@@ -14,6 +14,7 @@ import {
 
 type MatchState = 'actionable' | 'outgoing_pending' | 'accepted'
 type MatchCard = {
+  userId: string
   username: string
   state: MatchState
   avatar: { emoji: string | null; imgUrl?: string | null }
@@ -51,6 +52,7 @@ export function SteamImportPage() {
         matches:
           'matches' in result
             ? result.matches.map((match) => ({
+                userId: match.userId,
                 username: match.username,
                 state: 'actionable' as const,
                 avatar: match.avatar,
@@ -192,7 +194,7 @@ export function SteamImportPage() {
                       <AvatarDisc
                         emoji={match.avatar.emoji}
                         imgUrl={avatarImgUrl(match.avatar)}
-                        seed={match.username}
+                        seed={match.userId}
                         size="sm"
                       />
                       <h3 className="min-w-0 truncate font-mono font-semibold text-ink">

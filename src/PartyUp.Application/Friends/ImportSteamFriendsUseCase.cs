@@ -162,7 +162,7 @@ public sealed class ImportSteamFriendsUseCase(
                 ?? throw new InvalidOperationException("A visible Steam match must have a username.");
             Avatar avatar = candidate.User.Avatar
                 ?? throw new InvalidOperationException("A visible Steam match must have an avatar.");
-            matches.Add(new SteamMatchedUser(username, avatar));
+            matches.Add(new SteamMatchedUser(candidate.User.Id, username, avatar));
             IReadOnlyList<NotificationRequest> requests = RecipientComputer.SteamImportMatchAtImport(
                 importerId,
                 candidate.User.Id,
@@ -239,7 +239,7 @@ public sealed record SteamImportUpstreamFailure(
     bool Retryable,
     string InvitationUrl) : ImportSteamFriendsResult;
 
-public sealed record SteamMatchedUser(string Username, Avatar Avatar);
+public sealed record SteamMatchedUser(UserId UserId, string Username, Avatar Avatar);
 
 public sealed record SteamUnmatchedFriend(
     string SteamId64,

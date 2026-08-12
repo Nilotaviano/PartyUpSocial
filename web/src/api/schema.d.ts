@@ -2415,6 +2415,8 @@ export interface components {
             origin: components["schemas"]["AvailabilityOccurrenceOriginView"];
         };
         MyProfileResponse: {
+            /** Format: uuid */
+            userId: string;
             username: null | string;
             displayName: null | string;
             avatar: null | components["schemas"]["AvatarResponse"];
@@ -2641,6 +2643,8 @@ export interface components {
              * @enum {string}
              */
             disclosure: "full";
+            /** Format: uuid */
+            userId: string;
             username: string;
             displayName: string;
             avatar: components["schemas"]["AvatarResponse"];
@@ -2857,6 +2861,8 @@ export interface components {
             invitationUrl: string;
         };
         SteamMatchedUserResponse: {
+            /** Format: uuid */
+            userId: string;
             username: string;
             avatar: components["schemas"]["AvatarResponse"];
         };

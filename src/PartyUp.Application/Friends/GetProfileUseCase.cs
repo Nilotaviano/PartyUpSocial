@@ -38,6 +38,7 @@ public abstract record ProfileView(string Disclosure, FriendRelationship Relatio
         {
             ProfileDisclosure.UsernameOnly => new UsernameOnlyProfile(username, resolved.Relationship),
             ProfileDisclosure.Full => new FullProfile(
+                user.Id,
                 username,
                 user.DisplayName!.Value.Value,
                 user.Avatar!.Value,
@@ -56,6 +57,7 @@ public sealed record UsernameOnlyProfile(
     : ProfileView("username_only", Relationship);
 
 public sealed record FullProfile(
+    UserId UserId,
     string Username,
     string DisplayName,
     Avatar Avatar,

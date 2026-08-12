@@ -81,6 +81,7 @@ describe('ProfilePage', () => {
       data: {
         profile: {
           disclosure: 'full',
+          userId: '00000000-0000-0000-0000-000000000002',
           username: 'friend.one',
           displayName: 'Friend One',
           avatar: { kind: 'emoji', emoji: '🎮', avatarSourceId: null, imgUrl: null },

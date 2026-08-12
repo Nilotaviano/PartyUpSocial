@@ -134,11 +134,8 @@ export function FriendList({ items, onStatus }: FriendListProps) {
                 to={`/u/${friend.username}`}
               >
                 {/*
-                  AVATARS_DESIGN.md §3.5: roster surfaces (this list, and every other place
-                  a friendship response carries userId) seed AvatarDisc on userId, so the same
-                  person's fill color is consistent across those surfaces. ProfilePage and
-                  SteamImportPage cannot follow this seed: their responses deliberately
-                  withhold the user id, so they seed on username instead.
+                  AVATARS_DESIGN.md §3.5: every AvatarDisc call site seeds on userId, so the
+                  same person's fill color is consistent across every surface.
                 */}
                 <AvatarDisc
                   emoji={friend.avatar.emoji}

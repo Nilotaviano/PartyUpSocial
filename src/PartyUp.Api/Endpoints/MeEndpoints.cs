@@ -970,6 +970,7 @@ public sealed record AvatarSourceOptionResponse(Guid AvatarSourceId, string Kind
 }
 
 public sealed record MyProfileResponse(
+    Guid UserId,
     string? Username,
     string? DisplayName,
     AvatarResponse? Avatar,
@@ -993,6 +994,7 @@ public sealed record MyProfileResponse(
     {
         User user = profile.User;
         return new MyProfileResponse(
+            user.Id.Value,
             user.Username?.Value,
             user.DisplayName?.Value,
             user.Avatar is { } avatar ? AvatarResponse.From(avatar) : null,

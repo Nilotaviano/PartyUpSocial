@@ -18,7 +18,11 @@ function mockProfile() {
   api.get.mockImplementation((path: string) => {
     if (path === '/api/v1/me')
       return Promise.resolve({
-        data: { username: 'friend.one', avatar: { kind: 'Emoji', emoji: '🎲' } },
+        data: {
+          userId: '00000000-0000-0000-0000-000000000001',
+          username: 'friend.one',
+          avatar: { kind: 'Emoji', emoji: '🎲' },
+        },
       })
     throw new Error(`Unexpected GET ${path}`)
   })

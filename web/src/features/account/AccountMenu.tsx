@@ -40,7 +40,7 @@ export function AccountMenu() {
           <AvatarDisc
             emoji={profile.data?.avatar?.emoji}
             imgUrl={avatarImgUrl(profile.data?.avatar)}
-            seed={profile.data?.username ?? ''}
+            seed={profile.data?.userId ?? ''}
             size="xs"
           />
         </button>

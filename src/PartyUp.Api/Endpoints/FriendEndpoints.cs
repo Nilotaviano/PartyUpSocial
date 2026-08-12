@@ -493,6 +493,7 @@ public abstract record ProfileViewResponse
             usernameOnly.Username,
             FriendRelationshipResponse.From(usernameOnly.Relationship)),
         FullProfile full => new FullProfileResponse(
+            full.UserId.Value,
             full.Username,
             full.DisplayName,
             AvatarResponse.From(full.Avatar),
@@ -517,6 +518,7 @@ public sealed record UsernameOnlyProfileResponse : ProfileViewResponse
 public sealed record FullProfileResponse : ProfileViewResponse
 {
     public FullProfileResponse(
+        Guid userId,
         string username,
         string displayName,
         AvatarResponse avatar,
@@ -524,11 +526,14 @@ public sealed record FullProfileResponse : ProfileViewResponse
         FriendRelationshipResponse relationship)
         : base(relationship)
     {
+        UserId = userId;
         Username = username;
         DisplayName = displayName;
         Avatar = avatar;
         Platforms = platforms;
     }
+
+    public Guid UserId { get; }
 
     public string Username { get; }
 
@@ -700,10 +705,10 @@ public sealed record UpstreamFailureSteamFriendImportResponse(
     string InvitationUrl) : SteamFriendImportResponse;
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record SteamMatchedUserResponse(string Username, AvatarResponse Avatar)
+public sealed record SteamMatchedUserResponse(Guid UserId, string Username, AvatarResponse Avatar)
 {
     public static SteamMatchedUserResponse From(SteamMatchedUser user) =>
-        new(user.Username, AvatarResponse.From(user.Avatar));
+        new(user.UserId.Value, user.Username, AvatarResponse.From(user.Avatar));
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
