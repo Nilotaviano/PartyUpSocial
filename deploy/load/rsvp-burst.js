@@ -15,8 +15,8 @@
 // src/PartyUp.Api/Contracts/Sessions/SessionContracts.cs:62-68 ("Going" | "Maybe" | "Declined") --
 // NOT the lowercase wire-response vocabulary the GET side returns.
 //
-// Thresholds below are the PROPOSED numbers from README.md's threshold table -- OWNER RATIFIES
-// (PHASE8_DESIGN.md §2 Q5) before this script is ever run against a real target.
+// Thresholds below are the numbers from README.md's threshold table, RATIFIED 2026-08-12 (owner,
+// PHASE8_DESIGN.md §2 Q5).
 
 import http from 'k6/http';
 import { check, sleep } from 'k6';
@@ -33,6 +33,18 @@ const credentials = new SharedArray('rsvp-burst-users', () => JSON.parse(open(CR
 
 const RESPONSES = ['Going', 'Maybe', 'Declined'];
 
+// checks below declare 422 as an expected status alongside 200; without this override k6's
+// default http_req_failed classification counts any 4xx as a request failure, contradicting the
+// "429/422 are excluded" comment on the threshold below.
+http.setResponseCallback(http.expectedStatuses({ min: 200, max: 399 }, 422, 429));
+
+// Login ONCE per VU, not once per iteration: auth-ip is 20 requests/15min/IP and login-email is
+// 10 requests/15min/email (RateLimitPolicies.cs, README.md's rate-limit note) -- a VU that
+// re-logs-in on every iteration exhausts its own login-email budget by iteration 11 and starts
+// 429ing on login itself, well before a single RSVP write. Module-level state here is per-VU (k6
+// gives each VU its own JS runtime instance), so this persists across that VU's iterations.
+let cachedCsrfToken = null;
+
 export const options = {
   scenarios: {
     rsvp_burst: {
@@ -42,8 +54,8 @@ export const options = {
     },
   },
   thresholds: {
-    // PROPOSED -- OWNER RATIFIES (Q5). No 5xx at all; 429 from the rate limiter is expected and
-    // excluded on purpose (see the http_req_failed override below), it is not a server error.
+    // RATIFIED 2026-08-12 (owner) -- README.md's threshold table (Q5). No 5xx at all; 429 from the
+    // rate limiter is expected and excluded on purpose (setResponseCallback above), not a server error.
     http_req_failed: ['rate<0.01'],
     'http_req_duration{name:my-participation}': ['p(95)<800'],
     checks: ['rate>0.99'],
@@ -58,8 +70,11 @@ export function setup() {
 }
 
 export default function (data) {
-  const vuCredentials = credentials[(__VU - 1) % credentials.length];
-  const csrfToken = login(BASE_URL, vuCredentials);
+  if (cachedCsrfToken === null) {
+    const vuCredentials = credentials[(__VU - 1) % credentials.length];
+    cachedCsrfToken = login(BASE_URL, vuCredentials);
+  }
+  const csrfToken = cachedCsrfToken;
 
   const response = RESPONSES[__ITER % RESPONSES.length];
   const res = http.put(

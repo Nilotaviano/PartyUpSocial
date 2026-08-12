@@ -21,17 +21,24 @@ Confirmed against `src/PartyUp.Api/Program.cs:206-215,336`, `src/PartyUp.Api/Aut
 and `src/PartyUp.Api/Endpoints/AuthEndpoints.cs:47-69`:
 
 1. `GET /api/v1/auth/antiforgery` → `{ "token": "..." }`, also sets the `pu.csrf` cookie
-   (`HttpOnly`, `SameSite=Lax`).
+   (`HttpOnly`, `SameSite=Lax`). Minted anonymous, this token is only good enough to authorize the
+   login POST itself.
 2. `POST /api/v1/auth/login` with `{ "email", "password" }` and header `X-CSRF-TOKEN: <token>` →
    sets the `pu.auth` session cookie (`HttpOnly`, 30-day sliding expiration).
-3. Every subsequent write (`PUT`/`POST`/`DELETE`) needs `X-CSRF-TOKEN: <token>` again -- the token
-   from step 1 stays valid for the rest of the VU's session, it does not need refetching per
-   request.
+3. `GET /api/v1/auth/antiforgery` again, now that `pu.auth` is set. ASP.NET Core's antiforgery
+   service binds the token to the caller's identity, so the anonymous token from step 1 is
+   rejected on every authenticated write once logged in -- callers must re-fetch it after login and
+   reuse THAT token (it stays valid for the rest of the VU's session; it does not need refetching
+   per request) for every subsequent `PUT`/`POST`/`DELETE`.
 
 k6's default per-VU `http` module maintains its own cookie jar automatically, so `pu.auth` and
 `pu.csrf` ride along on every request within a VU once set -- `lib/auth.js` never reads or writes
 cookie bytes directly, it only tracks the CSRF token string returned in the antiforgery response
-body (mirrors `web/src/api/client.ts`'s own `refreshAntiforgeryToken`/login sequence).
+body (mirrors `web/src/api/client.ts`'s own `refreshAntiforgeryToken`/login sequence). `login()`
+also caches nothing itself -- each script caches the returned token in a per-VU module variable and
+calls `login()` only once per VU (on that VU's first iteration), never once per iteration: the
+`auth-ip`/`login-email` rate-limit dimensions below would otherwise 429 a VU's own login calls long
+before its RSVP/read traffic gets going.
 
 ## Prerequisites
 
@@ -61,7 +68,7 @@ body (mirrors `web/src/api/client.ts`'s own `refreshAntiforgeryToken`/login sequ
   psql "$DATABASE_URL" -Atc "
     SELECT json_agg(json_build_object('email', email, 'password', 'LoadTest!2026#Rsvp'))
     FROM users u JOIN auth_users a ON a.id = u.id
-    WHERE a.email = 'load-viewer@partyup.load'"      > credentials/overlap-viewer.json
+    WHERE a.email LIKE 'load-viewer-%'"      > credentials/overlap-viewer.json
   psql "$DATABASE_URL" -Atc "
     SELECT json_agg(json_build_object('email', email, 'password', 'LoadTest!2026#Rsvp'))
     FROM users u JOIN auth_users a ON a.id = u.id
@@ -73,8 +80,8 @@ body (mirrors `web/src/api/client.ts`'s own `refreshAntiforgeryToken`/login sequ
 ## Running the seed
 
 ```sh
-psql "$DATABASE_URL" -v friend_count=60 -v blocked_count=5 -v rsvp_burst_count=25 \
-     -v sweeper_count=30 -v due_batch_count=40 -v due_offset_minutes=3 \
+psql "$DATABASE_URL" -v friend_count=60 -v blocked_count=5 -v overlap_viewer_count=5 \
+     -v rsvp_burst_count=25 -v sweeper_count=30 -v due_batch_count=40 -v due_offset_minutes=3 \
      -f deploy/load/seed.sql
 ```
 
@@ -111,22 +118,22 @@ All three read `BASE_URL` (default `http://localhost:5000`), so pointing at a WS
 rehearsal vs. a clone vs. prod is a single env-var swap -- the environment choice itself is Q5's
 call, not this script's.
 
-## Threshold proposal -- PROPOSED, OWNER RATIFIES (PHASE8_DESIGN.md §2 Q5)
+## Threshold table -- RATIFIED 2026-08-12 (owner) (PHASE8_DESIGN.md §2 Q5)
 
-Spec (§11) sets no numeric SLOs, so these are starting proposals baked into each script's
-`options.thresholds`, not settled numbers. The owner adjusts and ratifies before any real run:
+Spec (§11) sets no numeric SLOs, so these started as proposals baked into each script's
+`options.thresholds`; the owner has ratified the values below as-is (PHASE8_DESIGN.md §2 Q5):
 
-| Metric | Script(s) | Proposed threshold | Why this number |
+| Metric | Script(s) | Threshold | Why this number |
 | --- | --- | --- | --- |
-| `http_req_failed` (5xx rate) | all three | `< 1%` | Any 5xx under contention is a real defect signal; 429s from the rate limiter are excluded (see below), they are not server errors. |
+| `http_req_failed` (any status >=400, minus the 422/429 override below) | all three | `< 1%` | Any unexpected 4xx/5xx under contention is a real defect signal; 422 (terminal-state/window-closed) and 429 (rate limiter) are excluded via `http.setResponseCallback(http.expectedStatuses(...))` in `rsvp-burst.js`/`sweeper-load.js` (see below), they are not server errors. `overlap.js` issues only `GET`s with no expected non-2xx, so it carries no override -- `http_req_failed` there is a plain non-2xx rate. |
 | `my-participation` p95 latency | rsvp-burst, sweeper-load | `< 800ms` (`< 1000ms` under sweeper-load's combined traffic) | One `FOR NO KEY UPDATE` row lock serializes writers to the same session; a growing p95 as VUs increase is expected, the threshold is a "still acceptable" ceiling, not a "no contention" claim. |
 | `overlaps` p95 latency | overlap.js, sweeper-load | `< 500ms` (`< 700ms` under sweeper-load) | A-079's two-query budget should stay flat regardless of friend-list size; a regression that turns it into an N-friend fan-out is exactly what a growing p95 here would catch. |
 | Sweeper tick duration | sweeper-load (observed out-of-band) | `< 55s` | `[DisableConcurrentExecution(timeoutInSeconds: 55)]` on `SessionDueSweepJob.ExecuteAsync` (`SessionDueSweepJob.cs:26`) -- a tick that runs longer than 55s risks colliding with the next minute's tick and throwing. k6 cannot observe Hangfire tick duration directly; check the Hangfire dashboard/log for the tick's own timing, not a k6 metric. |
 | Overlapping-tick throw | sweeper-load (observed out-of-band) | Expected, not a failure | An A-066 signal per `SessionDueSweepJob.cs`'s header comment: two ticks genuinely overlapped under load and the second one backed off and threw. The idempotent transition makes the retry safe. Do not raise the timeout or disable the attribute to make this "pass" -- report it as a Q5 finding (does 500 candidates/tick still fit inside one minute at the seeded session volume?). |
 
 `checks` (business-logic assertions like expected status codes) are set to `> 99%` pass rate on
-`rsvp-burst.js` as a sanity floor; `overlap.js` and `sweeper-load.js` rely on `http_req_failed`
-and per-route p95 alone since their checks are read-only shape assertions, not contention signals.
+`rsvp-burst.js` and `overlap.js` as a sanity floor; `sweeper-load.js` relies on `http_req_failed`
+and per-route p95 alone since it declares no `checks` threshold of its own.
 
 ## Rate limits will throttle a single-IP burst
 
@@ -145,6 +152,11 @@ own permit window. The two that matter here:
   every VU's login call shares this budget if they all run from one load-generator IP, so VU
   counts much above ~20 per 15-minute window from a single IP will start 429ing on login itself,
   before a single RSVP is even attempted.
+- **`login-email`** (`RateLimitPolicies.cs:132-137`): **10 requests/15 min/email**, also covers
+  `Login`, partitioned per email instead of per IP -- this is why every script logs in each VU
+  exactly once (cached per VU, see the auth-flow section above) instead of once per iteration, and
+  why `overlap.js` round-robins its VUs across a pool of seeded viewer accounts (`seed.sql`'s
+  `:overlap_viewer_count` `load-viewer-N` rows) instead of sharing one email across every VU.
 - **`register-ip`** (`RateLimitPolicies.cs:138-143`): **5/hour/IP** -- not exercised by these
   scripts (accounts are pre-seeded, never registered live), noted here only because it is the
   tightest dimension in the file and the most likely one to bite if a future script variant adds

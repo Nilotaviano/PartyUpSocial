@@ -44,6 +44,16 @@ const credentials = new SharedArray('sweeper-load-users', () => JSON.parse(open(
 
 const RESPONSES = ['Going', 'Maybe', 'Declined'];
 
+// checks below declare 422 as an expected status alongside 200; without this override k6's
+// default http_req_failed classification counts any 4xx as a request failure.
+http.setResponseCallback(http.expectedStatuses({ min: 200, max: 399 }, 422, 429));
+
+// Login ONCE per VU per scenario, not once per iteration -- see rsvp-burst.js's comment on the
+// same pattern. sustained_rsvp and sustained_reads run as separate k6 scenarios (separate VU
+// pools, each with its own module instance), so each exec function caches its own token.
+let cachedRsvpCsrfToken = null;
+let cachedReadCsrfToken = null;
+
 export const options = {
   scenarios: {
     sustained_rsvp: {
@@ -60,7 +70,7 @@ export const options = {
     },
   },
   thresholds: {
-    // PROPOSED -- OWNER RATIFIES (Q5). 5xx off the RSVP/read routes still fails the run; a
+    // RATIFIED 2026-08-12 (owner) -- README.md's threshold table (Q5). 5xx off the RSVP/read routes still fails the run; a
     // Hangfire job throw is invisible to k6 (it never calls the job), so it does NOT show up
     // here -- check the Hangfire dashboard/log for the DisableConcurrentExecution throw signal
     // separately, per this file's header.
@@ -78,8 +88,11 @@ export function setup() {
 }
 
 export function rsvpTraffic(data) {
-  const vuCredentials = credentials[(__VU - 1) % credentials.length];
-  const csrfToken = login(BASE_URL, vuCredentials);
+  if (cachedRsvpCsrfToken === null) {
+    const vuCredentials = credentials[(__VU - 1) % credentials.length];
+    cachedRsvpCsrfToken = login(BASE_URL, vuCredentials);
+  }
+  const csrfToken = cachedRsvpCsrfToken;
   const sessionId = data.sessionIds[__ITER % data.sessionIds.length];
   const response = RESPONSES[__ITER % RESPONSES.length];
 
@@ -103,8 +116,10 @@ export function rsvpTraffic(data) {
 }
 
 export function readTraffic() {
-  const vuCredentials = credentials[0];
-  login(BASE_URL, vuCredentials);
+  if (cachedReadCsrfToken === null) {
+    const vuCredentials = credentials[0];
+    cachedReadCsrfToken = login(BASE_URL, vuCredentials);
+  }
 
   const res = http.get(`${BASE_URL}/api/v1/availability/overlaps`, {
     tags: { name: 'overlaps' },

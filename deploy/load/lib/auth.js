@@ -7,13 +7,16 @@
 // directly, they only need the CSRF token value for the X-CSRF-TOKEN write header.
 //
 // Flow (matches web/src/api/client.ts's own antiforgery+login sequence):
-//   1. GET  {base}/api/v1/auth/antiforgery  -> { token }  (also sets the pu.csrf cookie)
+//   1. GET  {base}/api/v1/auth/antiforgery  -> { token }  (also sets the pu.csrf cookie) --
+//      minted while anonymous, only good enough to authorize the login POST itself.
 //   2. POST {base}/api/v1/auth/login        body {email,password}, header X-CSRF-TOKEN: token
 //      (also sets the pu.auth cookie on success)
-//   3. Reuse the same antiforgery token for subsequent writes in this VU's session -- the token
-//      stays valid as long as the pu.csrf cookie it was minted against is unchanged (ASP.NET
-//      Core's antiforgery service does not rotate the cookie's masking secret per request), so
-//      there is no need to refetch it before every write.
+//   3. GET  {base}/api/v1/auth/antiforgery again, now that pu.auth is set -- ASP.NET Core's
+//      antiforgery service binds the token to the caller's identity (claims principal), so the
+//      anonymous token from step 1 is rejected by every authenticated write (400 via
+//      ProblemAntiforgeryFilter). Mirrors tests/PartyUp.Api.IntegrationTests/AntiforgeryTestClient
+//      .cs:31,50-59, which always re-fetches the pair with the authentication cookie attached.
+//      This second token is what callers must use for subsequent writes in this VU's session.
 //
 // Route paths verified against src/PartyUp.Api/Endpoints/AuthEndpoints.cs:47-69 and
 // src/PartyUp.Api/ApiRoutes.cs:5 ("/api/v1").
@@ -38,17 +41,21 @@ export function fetchCsrfToken(baseUrl) {
 }
 
 /**
- * Logs the VU in with pre-seeded credentials (see seed.sql) and returns the CSRF token to reuse
- * for every write this VU issues afterward. Login itself is a write (POST) and needs the header
- * too -- AuthEndpoints.cs:66 maps POST /auth/login behind the same antiforgery filter as every
- * other /api/v1 write (api.AddEndpointFilter<ProblemAntiforgeryFilter> in Program.cs:336).
+ * Logs the VU in with pre-seeded credentials (see seed.sql) and returns a CSRF token bound to the
+ * now-authenticated identity, to reuse for every write this VU issues afterward. Login itself is
+ * a write (POST) and needs the header too -- AuthEndpoints.cs:66 maps POST /auth/login behind the
+ * same antiforgery filter as every other /api/v1 write (api.AddEndpointFilter
+ * <ProblemAntiforgeryFilter> in Program.cs:336) -- but the anonymous token minted for that POST is
+ * NOT reusable afterward: ASP.NET Core's antiforgery service binds the token to the caller's
+ * identity, so a token minted before login 400s on every write issued after login. The token is
+ * re-fetched below once pu.auth is set, mirroring AntiforgeryTestClient.cs:31,50-59.
  *
  * @param {string} baseUrl
  * @param {{email: string, password: string}} credentials
- * @returns {string} csrfToken to pass as the X-CSRF-TOKEN header on subsequent writes
+ * @returns {string} csrfToken, bound to this identity, to pass as X-CSRF-TOKEN on subsequent writes
  */
 export function login(baseUrl, credentials) {
-  const csrfToken = fetchCsrfToken(baseUrl);
+  const anonymousCsrfToken = fetchCsrfToken(baseUrl);
 
   const res = http.post(
     `${baseUrl}/api/v1/auth/login`,
@@ -56,7 +63,7 @@ export function login(baseUrl, credentials) {
     {
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': csrfToken,
+        'X-CSRF-TOKEN': anonymousCsrfToken,
       },
       tags: { name: 'auth/login' },
     },
@@ -67,7 +74,8 @@ export function login(baseUrl, credentials) {
     fail(`POST /api/v1/auth/login failed for ${credentials.email}: ${res.status} ${res.body}`);
   }
 
-  return csrfToken;
+  // Re-fetch now that pu.auth is set -- the identity-bound token, valid for authenticated writes.
+  return fetchCsrfToken(baseUrl);
 }
 
 /** Standard write headers once a VU is authenticated and holds a CSRF token. */
