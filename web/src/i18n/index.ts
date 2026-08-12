@@ -10,6 +10,7 @@ import enCommon from './en/common.json'
 import enErrors from './en/errors.json'
 import enFriends from './en/friends.json'
 import enHome from './en/home.json'
+import enLegal from './en/legal.json'
 import enNotifications from './en/notifications.json'
 import enOnboarding from './en/onboarding.json'
 import enPolls from './en/polls.json'
@@ -25,6 +26,7 @@ import esCommon from './es/common.json'
 import esErrors from './es/errors.json'
 import esFriends from './es/friends.json'
 import esHome from './es/home.json'
+import esLegal from './es/legal.json'
 import esNotifications from './es/notifications.json'
 import esOnboarding from './es/onboarding.json'
 import esPolls from './es/polls.json'
@@ -40,6 +42,7 @@ import ptBRCommon from './pt-BR/common.json'
 import ptBRErrors from './pt-BR/errors.json'
 import ptBRFriends from './pt-BR/friends.json'
 import ptBRHome from './pt-BR/home.json'
+import ptBRLegal from './pt-BR/legal.json'
 import ptBRNotifications from './pt-BR/notifications.json'
 import ptBROnboarding from './pt-BR/onboarding.json'
 import ptBRPolls from './pt-BR/polls.json'
@@ -66,6 +69,7 @@ export const resources = {
     notifications: enNotifications,
     tour: enTour,
     admin: enAdmin,
+    legal: enLegal,
   },
   'pt-BR': {
     common: ptBRCommon,
@@ -83,6 +87,7 @@ export const resources = {
     notifications: ptBRNotifications,
     tour: ptBRTour,
     admin: ptBRAdmin,
+    legal: ptBRLegal,
   },
   es: {
     common: esCommon,
@@ -100,6 +105,7 @@ export const resources = {
     notifications: esNotifications,
     tour: esTour,
     admin: esAdmin,
+    legal: esLegal,
   },
 }
 
@@ -126,6 +132,7 @@ void i18n
       'notifications',
       'tour',
       'admin',
+      'legal',
     ],
     resources,
     interpolation: {

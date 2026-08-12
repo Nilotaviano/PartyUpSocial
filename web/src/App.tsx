@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { RequireAuth } from './auth/RequireAuth'
 import { RequireOnboarded } from './auth/RequireOnboarded'
 import { useSession } from './auth/useSession'
+import { AppFooter } from './components/AppFooter'
 import { AccountMenu } from './features/account/AccountMenu'
 import { AdminDashboardPage } from './features/admin/AdminDashboardPage'
 import { AdminUserDetailPage } from './features/admin/AdminUserDetailPage'
@@ -27,6 +28,9 @@ import { FriendsPage } from './features/friends/FriendsPage'
 import { ProfilePage } from './features/friends/ProfilePage'
 import { SteamImportPage } from './features/friends/SteamImportPage'
 import { HomePage } from './features/home/HomePage'
+import { CommunityStandardsPage } from './features/legal/CommunityStandardsPage'
+import { PrivacyPolicyPage } from './features/legal/PrivacyPolicyPage'
+import { TermsPage } from './features/legal/TermsPage'
 import { NotificationBell } from './features/notifications/NotificationBell'
 import { NotificationCenterPage } from './features/notifications/NotificationCenterPage'
 import { PushEnableCard } from './features/notifications/PushEnableCard'
@@ -143,6 +147,24 @@ function AuthenticatedShell() {
       <PushEnableCard />
       <TourOverlay />
       <Outlet />
+      <AppFooter />
+    </div>
+  )
+}
+
+/**
+ * The logged-out surfaces D-072 addresses (IMPLEMENTATION_PLAN.md:146): the
+ * welcome/sign-in screens, the public deletion pages and the legal documents
+ * themselves all carry the footer, so a logged-out user always has a route to
+ * the deletion request and to the policies.
+ */
+function PublicShell() {
+  return (
+    <div className="flex min-h-screen flex-col bg-page text-ink">
+      <div className="flex-1">
+        <Outlet />
+      </div>
+      <AppFooter />
     </div>
   )
 }
@@ -169,21 +191,27 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<LifecycleRedirect />} />
-      <Route path="/welcome" element={<Welcome />} />
+      <Route element={<PublicShell />}>
+        <Route path="/welcome" element={<Welcome />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/account-deletion" element={<PublicDeletionRequestPage />} />
+        <Route
+          path="/account-deletion/confirm"
+          element={<PublicDeletionConfirmPage />}
+        />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/community-standards" element={<CommunityStandardsPage />} />
+      </Route>
+
       <Route path="/age-gate" element={<AgeGate />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
       <Route path="/auth/magic" element={<MagicLink />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/auth/reset" element={<ResetPassword />} />
       <Route path="/auth/confirm-identity" element={<ConfirmIdentity />} />
       <Route path="/auth/verify-email" element={<VerifyEmail />} />
       <Route path="/auth/email-change" element={<EmailChange />} />
-      <Route path="/account-deletion" element={<PublicDeletionRequestPage />} />
-      <Route
-        path="/account-deletion/confirm"
-        element={<PublicDeletionConfirmPage />}
-      />
       <Route path="/email-unsubscribe" element={<EmailUnsubscribePage />} />
 
       {/*

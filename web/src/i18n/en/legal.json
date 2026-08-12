@@ -1,0 +1,25 @@
+{
+  "draft": {
+    "label": "Draft",
+    "banner": "DRAFT — pending legal review. This document describes how PartyUp works today, but it has not been reviewed by a lawyer and may change before launch."
+  },
+  "updatedLabel": "Last updated",
+  "updated": "12 August 2026",
+  "privacy": {
+    "title": "Privacy Policy"
+  },
+  "terms": {
+    "title": "Terms of Service"
+  },
+  "communityStandards": {
+    "title": "Community Standards"
+  },
+  "footer": {
+    "label": "Legal and support",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "communityStandards": "Community Standards",
+    "accountDeletion": "Delete your account",
+    "contact": "Contact us"
+  }
+}

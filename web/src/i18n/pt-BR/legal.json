@@ -1,0 +1,25 @@
+{
+  "draft": {
+    "label": "Rascunho",
+    "banner": "RASCUNHO — em revisão jurídica. Este documento descreve como o PartyUp funciona hoje, mas ainda não passou por revisão jurídica e pode mudar antes do lançamento."
+  },
+  "updatedLabel": "Última atualização",
+  "updated": "12 de agosto de 2026",
+  "privacy": {
+    "title": "Política de Privacidade"
+  },
+  "terms": {
+    "title": "Termos de Uso"
+  },
+  "communityStandards": {
+    "title": "Padrões da Comunidade"
+  },
+  "footer": {
+    "label": "Documentos e contato",
+    "privacy": "Política de Privacidade",
+    "terms": "Termos de Uso",
+    "communityStandards": "Padrões da Comunidade",
+    "accountDeletion": "Excluir sua conta",
+    "contact": "Fale com a gente"
+  }
+}

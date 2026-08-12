@@ -21,6 +21,7 @@ const namespaces = [
   'notifications',
   'tour',
   'admin',
+  'legal',
 ] as const
 
 // Closed problem-code inventory for the S5/S6-owned surface (PHASE7_DESIGN.md

@@ -110,5 +110,12 @@ public static class AuditedRoutes
         new AuditedRoute("admin-dashboard", "/admin", RequiresAdmin: true),
         new AuditedRoute("admin-users", "/admin/users", RequiresAdmin: true),
         new AuditedRoute("admin-user-detail", "/admin/users/{adminUserId}", RequiresAdmin: true),
+        // Phase 8 S5 (PHASE8_DESIGN.md §3 S5): the three legal documents, public like
+        // `/account-deletion` above. They also carry the app footer, which renders on every
+        // unauthenticated surface already listed here and inside the authenticated shell, so the
+        // footer is audited wherever it appears rather than as an entry of its own.
+        new AuditedRoute("privacy", "/privacy"),
+        new AuditedRoute("terms", "/terms"),
+        new AuditedRoute("community-standards", "/community-standards"),
     ];
 }

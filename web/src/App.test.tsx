@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -369,5 +370,45 @@ describe('Guest route reachability_S6', () => {
       ).not.toBeNull()
     })
     expect(screen.queryByTestId('screen-welcome')).not.toBeInTheDocument()
+  })
+})
+
+describe('legal routes and footer_S5', () => {
+  const routes = [
+    ['/privacy', 'screen-privacy'],
+    ['/terms', 'screen-terms'],
+    ['/community-standards', 'screen-community-standards'],
+  ] as const
+
+  for (const [path, testId] of routes) {
+    it(`serves ${path} to an unauthenticated visitor`, async () => {
+      setSession(session())
+      renderRoute(path)
+
+      expect(await screen.findByTestId(testId)).toBeInTheDocument()
+      expect(screen.getByTestId('location')).toHaveTextContent(path)
+      expect(screen.queryByTestId('screen-login')).not.toBeInTheDocument()
+    })
+  }
+
+  it('surfaces the public deletion route in the footer of the welcome screen_D072', async () => {
+    setSession(session())
+    renderRoute('/welcome')
+
+    const footer = await screen.findByRole('navigation', {
+      name: 'Legal and support',
+    })
+    expect(
+      within(footer).getByRole('link', { name: 'Delete your account' }),
+    ).toHaveAttribute('href', '/account-deletion')
+  })
+
+  it('renders the footer inside the authenticated shell too', async () => {
+    setSession(session({ authenticated: true, state: 'active', userId: 'u1' }))
+    renderRoute('/app')
+
+    expect(
+      await screen.findByRole('navigation', { name: 'Legal and support' }),
+    ).toBeInTheDocument()
   })
 })
