@@ -234,6 +234,17 @@ export function AdminUserDetailPage() {
     onSuccess: () => afterMutation(t('user.removeContent.done')),
   })
 
+  // A new action clears what the previous one left on screen, so a stale
+  // role="alert" failure never renders beside the role="status" success of the
+  // action the admin just took.
+  const start = (mutation: { mutate: () => void }) => {
+    setAnnouncement('')
+    ban.reset()
+    unban.reset()
+    removeContent.reset()
+    mutation.mutate()
+  }
+
   // D-177 fail-closed parity — see AdminDashboardPage's own branch.
   if (user.isError && isApiError(user.error) && user.error.status === 404) {
     return (
@@ -367,7 +378,7 @@ export function AdminUserDetailPage() {
                 pending={pending}
                 testId="admin-ban-action"
                 title={t('user.ban.title')}
-                onConfirm={() => ban.mutate()}
+                onConfirm={() => start(ban)}
               />
             ) : (
               <PlainActionDialog
@@ -378,12 +389,12 @@ export function AdminUserDetailPage() {
                 pending={pending}
                 testId="admin-unban-action"
                 title={t('user.unban.title')}
-                onConfirm={() => unban.mutate()}
+                onConfirm={() => start(unban)}
               />
             )}
             <RemoveContentDialog
               pending={pending}
-              onConfirm={() => removeContent.mutate()}
+              onConfirm={() => start(removeContent)}
             />
           </div>
         </>

@@ -100,7 +100,7 @@ export function CommunityStandardsPtBR() {
             'Passar-se por outra pessoa, por uma empresa ou por uma administração do PartyUp.',
             'Promover cheats, exploits, venda de contas ou outras formas de burlar as regras dos jogos que você agenda.',
             'Divulgar informações privadas de outra pessoa sem o consentimento dela.',
-            'Atacar o próprio serviço: abusar de convites ou links de convidado, burlar um veto ou automatizar requisições para sobrecarregá-lo.',
+            'Atacar o próprio serviço: abusar de convites ou links de convidado, burlar um banimento ou automatizar requisições para sobrecarregá-lo.',
           ]}
         />
       </Section>
@@ -127,13 +127,13 @@ export function CommunityStandardsPtBR() {
         <Bullets
           items={[
             'Aviso: entramos em contato com a conta sobre o que precisa mudar.',
-            'Veto: a conta é desconectada de todos os dispositivos, deixa de poder entrar e some da busca e da descoberta. Suas sessões, enquetes e histórico ficam como estão.',
-            'Remoção de conteúdo: em casos graves ou repetidos, o veto pode vir acompanhado da remoção do conteúdo da conta — cancelando as sessões que ainda não começaram, expirando as enquetes abertas e removendo a participação futura. Isso é permanente, e retirar o veto depois não traz nada de volta.',
+            'Banimento: a conta é desconectada de todos os dispositivos, deixa de poder entrar e some da busca e da descoberta. Suas sessões, enquetes e histórico ficam como estão.',
+            'Remoção de conteúdo: em casos graves ou repetidos, o banimento pode vir acompanhado da remoção do conteúdo da conta — cancelando as sessões que ainda não começaram, expirando as enquetes abertas e removendo a participação futura. Isso é permanente, e desfazer o banimento depois não traz nada de volta.',
           ]}
         />
         <P>
           Qual passo se aplica depende da gravidade do caso; os mais graves vão
-          direto para o veto com remoção de conteúdo.
+          direto para o banimento com remoção de conteúdo.
         </P>
       </Section>
 

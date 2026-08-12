@@ -167,3 +167,23 @@ describe('AdminDashboardPage — D-177 fail-closed parity', () => {
     expect(document.body.textContent?.toLowerCase()).not.toContain('admin')
   })
 })
+
+describe('AdminDashboardPage — in-admin navigation', () => {
+  it('links account management from the dashboard', async () => {
+    api.get.mockResolvedValue({ data: dashboard() })
+
+    renderPage()
+
+    const link = await screen.findByRole('link', { name: 'Manage accounts' })
+    expect(link.getAttribute('href')).toBe('/admin/users')
+  })
+
+  it('renders no admin link on the fail-closed branch_D177', async () => {
+    api.get.mockRejectedValue(new TestApiError(404, 'not_found'))
+
+    renderPage()
+
+    await screen.findByRole('alert')
+    expect(screen.queryByRole('link')).toBeNull()
+  })
+})

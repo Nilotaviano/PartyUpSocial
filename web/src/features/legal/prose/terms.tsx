@@ -151,9 +151,9 @@ export function TermsPtBR() {
       <Section title="Aplicação das regras">
         <Bullets
           items={[
-            'Se uma conta violar estes termos ou os Padrões da Comunidade, podemos vetá-la. Uma conta vetada é desconectada de todos os dispositivos, deixa de poder entrar e some da busca e da descoberta; suas sessões, enquetes e histórico ficam como estão.',
-            'O veto também pode vir acompanhado da remoção do conteúdo da conta, que cancela as sessões que ainda não começaram, expira as enquetes abertas e remove a participação futura.',
-            'A remoção de conteúdo é permanente. Retirar o veto depois devolve o acesso à conta, mas não traz de volta nada que tenha sido removido.',
+            'Se uma conta violar estes termos ou os Padrões da Comunidade, podemos bani-la. Uma conta banida é desconectada de todos os dispositivos, deixa de poder entrar e some da busca e da descoberta; suas sessões, enquetes e histórico ficam como estão.',
+            'O banimento também pode vir acompanhado da remoção do conteúdo da conta, que cancela as sessões que ainda não começaram, expira as enquetes abertas e remove a participação futura.',
+            'A remoção de conteúdo é permanente. Desfazer o banimento depois devolve o acesso à conta, mas não traz de volta nada que tenha sido removido.',
             'Se você achar que uma decisão foi equivocada, escreva para ' + CONTACT_EMAIL + '.',
           ]}
         />

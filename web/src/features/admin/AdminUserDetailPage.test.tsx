@@ -192,6 +192,64 @@ describe('AdminUserDetailPage — D-180 action separation', () => {
   })
 })
 
+describe('AdminUserDetailPage — announcement and error hygiene', () => {
+  it('clears the failed action’s alert when the next action starts', async () => {
+    api.get.mockResolvedValue({ data: adminUser() })
+    api.post.mockRejectedValueOnce(new TestApiError(409, 'scope_contended'))
+
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ban and remove content' }))
+    const removal = await screen.findByRole('dialog')
+    fireEvent.click(
+      within(removal).getByRole('checkbox', {
+        name: 'I understand the content removal is permanent.',
+      }),
+    )
+    fireEvent.click(
+      within(removal).getByRole('button', { name: 'Ban and remove content' }),
+    )
+    expect((await screen.findByRole('alert')).textContent).toContain('try again')
+
+    api.post.mockResolvedValue({ data: { status: 'banned' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ban this account' }))
+    const banDialog = await screen.findByRole('dialog')
+    fireEvent.click(within(banDialog).getByRole('button', { name: 'Ban' }))
+
+    expect(await screen.findByText('The account is banned.')).toBeTruthy()
+    // The previous failure never renders beside the fresh success.
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('clears the previous success announcement while the next action runs', async () => {
+    api.get.mockResolvedValue({ data: adminUser() })
+    api.post.mockResolvedValueOnce({ data: { status: 'banned' } })
+
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ban this account' }))
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Ban' }),
+    )
+    expect(await screen.findByText('The account is banned.')).toBeTruthy()
+
+    api.post.mockRejectedValue(new TestApiError(409, 'scope_contended'))
+    fireEvent.click(screen.getByRole('button', { name: 'Ban and remove content' }))
+    const removal = await screen.findByRole('dialog')
+    fireEvent.click(
+      within(removal).getByRole('checkbox', {
+        name: 'I understand the content removal is permanent.',
+      }),
+    )
+    fireEvent.click(
+      within(removal).getByRole('button', { name: 'Ban and remove content' }),
+    )
+
+    await screen.findByRole('alert')
+    expect(screen.queryByText('The account is banned.')).toBeNull()
+  })
+})
+
 describe('AdminUserDetailPage — D-177 fail-closed parity', () => {
   it('renders a role=alert not-found message on a 404 and names no admin surface_D177', async () => {
     api.get.mockRejectedValue(new TestApiError(404, 'not_found'))

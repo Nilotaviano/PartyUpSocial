@@ -29,6 +29,7 @@
       "organizers": "Organizadores",
       "repeatOrganizers": "Organizadores reincidentes"
     },
+    "usersLink": "Gestionar cuentas",
     "noValue": "—",
     "noValueLabel": "Todavía sin valor"
   },
@@ -60,12 +61,12 @@
       "sessionsJoined": "Sesiones en las que participó",
       "friendCount": "Amistades",
       "lifecycle": "Situación de la cuenta",
-      "banState": "Situación del bloqueo"
+      "banState": "Situación del veto"
     },
     "neverActive": "Sin actividad registrada",
     "unknown": "Sin definir",
-    "banned": "Bloqueada el {{date}}",
-    "notBanned": "Sin bloqueo",
+    "banned": "Vetada el {{date}}",
+    "notBanned": "Sin veto",
     "lifecycles": {
       "onboarding": "En configuración",
       "active": "Activa",
@@ -74,30 +75,30 @@
       "unknown": "Desconocida"
     },
     "ban": {
-      "action": "Bloquear esta cuenta",
-      "title": "¿Bloquear esta cuenta?",
+      "action": "Vetar esta cuenta",
+      "title": "¿Vetar esta cuenta?",
       "body": "La cuenta se cierra en todos los dispositivos, deja de poder entrar y desaparece de la búsqueda y del descubrimiento. Sus sesiones, encuestas e historial quedan tal cual están.",
-      "confirm": "Bloquear",
+      "confirm": "Vetar",
       "cancel": "Mantener la cuenta activa",
-      "done": "La cuenta quedó bloqueada."
+      "done": "La cuenta quedó vetada."
     },
     "unban": {
-      "action": "Quitar el bloqueo",
-      "title": "¿Quitar el bloqueo?",
+      "action": "Quitar el veto",
+      "title": "¿Quitar el veto?",
       "body": "La cuenta vuelve a poder entrar y a aparecer en la búsqueda y el descubrimiento.",
-      "confirm": "Quitar el bloqueo",
-      "cancel": "Dejar el bloqueo",
-      "done": "El bloqueo quedó quitado."
+      "confirm": "Quitar el veto",
+      "cancel": "Dejar el veto",
+      "done": "El veto quedó quitado."
     },
     "removeContent": {
-      "action": "Bloquear y eliminar el contenido",
-      "title": "¿Bloquear y eliminar el contenido de esta cuenta?",
-      "warning": "Eliminar el contenido no tiene vuelta atrás, y quitar el bloqueo después no recupera nada.",
-      "body": "Además del bloqueo, esto cancela las sesiones de la cuenta que aún no empezaron, expira sus encuestas abiertas, quita su participación futura y sus solicitudes de ingreso pendientes, y cancela sus recordatorios. El historial completado, las amistades y los bloqueos entre personas quedan intactos.",
+      "action": "Vetar y eliminar el contenido",
+      "title": "¿Vetar y eliminar el contenido de esta cuenta?",
+      "warning": "Eliminar el contenido no tiene vuelta atrás, y quitar el veto después no recupera nada.",
+      "body": "Además del veto, esto cancela las sesiones de la cuenta que aún no empezaron, expira sus encuestas abiertas, quita su participación futura y sus solicitudes de ingreso pendientes, y cancela sus recordatorios. El historial completado, las amistades y los bloqueos entre personas quedan intactos.",
       "acknowledge": "Entiendo que la eliminación del contenido es permanente.",
-      "confirm": "Bloquear y eliminar el contenido",
+      "confirm": "Vetar y eliminar el contenido",
       "cancel": "No eliminar nada",
-      "done": "La cuenta quedó bloqueada y su contenido eliminado."
+      "done": "La cuenta quedó vetada y su contenido eliminado."
     }
   },
   "errors": {
