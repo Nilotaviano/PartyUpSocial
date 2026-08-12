@@ -774,9 +774,12 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
 
     /// <summary>
     /// Reflects <see cref="PartyUpOpenApiTransformer"/>'s private problem-code registry, scoped to the
-    /// Phase 7 S4 section (from <c>notification_not_found</c> to the end of the array) — the same
-    /// reflection idiom as <c>GameSessionEndpointTests.Phase4DocumentedProblemCodes</c> and
-    /// <c>PollProblemCodeClosureTests.PollDocumentedProblemCodes</c>.
+    /// Phase 7 S4 section (from <c>notification_not_found</c> up to the Phase 8 section anchored by
+    /// <c>scope_contended</c>) — the same reflection idiom as
+    /// <c>GameSessionEndpointTests.Phase4DocumentedProblemCodes</c> and
+    /// <c>PollProblemCodeClosureTests.PollDocumentedProblemCodes</c>. Phase 8 codes get their own
+    /// closure test as that surface grows; <c>scope_contended</c> is exercised by
+    /// <c>ContentRemovalTests</c>.
     /// </summary>
     private static string[] Phase7DocumentedProblemCodes()
     {
@@ -784,7 +787,8 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
             "ProblemCodes", BindingFlags.NonPublic | BindingFlags.Static)!;
         var allCodes = (string[])field.GetValue(null)!;
         int phase7Start = Array.IndexOf(allCodes, "notification_not_found");
-        return allCodes[phase7Start..];
+        int phase8Start = Array.IndexOf(allCodes, "scope_contended");
+        return phase8Start < 0 ? allCodes[phase7Start..] : allCodes[phase7Start..phase8Start];
     }
 
     // ---- shared helpers ------------------------------------------------------------------------
