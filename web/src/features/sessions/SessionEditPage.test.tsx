@@ -123,13 +123,56 @@ describe('SessionEditPage', () => {
           minAttendance: 4,
           isPrivate: false,
           notes: 'Bring snacks',
-          game: { name: 'Deep Rock Galactic', steamAppId: null },
+          game: { name: 'Deep Rock Galactic', steamAppId: '548430' },
           clear: ['maxCapacity'],
           ifMatch: 'v1',
         },
       }),
     )
     expect(api.patch.mock.calls[0][1].body).not.toHaveProperty('maxCapacity')
+  })
+
+  it('preserves the stored Steam app id on save instead of silently dropping it_D176', async () => {
+    api.patch.mockResolvedValue({ data: detail() })
+    renderPage()
+
+    expect(await screen.findByLabelText('Steam app ID')).toHaveValue('548430')
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith(
+        '/api/v1/sessions/{sessionId}',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            game: { name: 'Deep Rock Galactic', steamAppId: '548430' },
+          }),
+        }),
+      ),
+    )
+  })
+
+  it('submits an edited Steam app id and extracts it from a pasted store URL_D176', async () => {
+    api.patch.mockResolvedValue({ data: detail() })
+    renderPage()
+
+    const appIdField = await screen.findByLabelText('Steam app ID')
+    fireEvent.change(appIdField, {
+      target: { value: 'https://store.steampowered.com/app/1091500/CyberpunkTwoOhSeven/' },
+    })
+    expect(appIdField).toHaveValue('1091500')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith(
+        '/api/v1/sessions/{sessionId}',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            game: { name: 'Deep Rock Galactic', steamAppId: '1091500' },
+          }),
+        }),
+      ),
+    )
   })
 
   it('links every validation-summary entry to an existing field id_H2', async () => {

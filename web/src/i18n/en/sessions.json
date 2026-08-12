@@ -11,7 +11,6 @@
     "duration": "Duration (minutes)",
     "platform": "Platform",
     "game": "Game",
-    "gameCatalog": "Choose from Steam",
     "gameFreeText": "Enter a game name",
     "notes": "Notes",
     "min": "Minimum attendance",
@@ -23,7 +22,8 @@
     "defaults": "Defaults: 4 minimum, 4 maximum, 2 hours, no platform, not private.",
     "submit": "Create session",
     "platformOther": "Other",
-    "steamAppId": "Steam app ID"
+    "steamAppId": "Steam app ID",
+    "steamAppIdHelp": "Optional. The number in the game's Steam store URL, e.g. 730 for Counter-Strike 2."
   },
   "edit": {
     "heading": "Edit session",
@@ -46,7 +46,8 @@
     "startWindow": "Choose a start time within the allowed scheduling window.",
     "waitlistCapacity": "A waitlist requires a maximum capacity.",
     "tooManyInvitees": "You can invite up to 50 friends.",
-    "tooManyGuestLinks": "You can create up to 20 guest links."
+    "tooManyGuestLinks": "You can create up to 20 guest links.",
+    "steamAppIdDigits": "Enter only the numeric Steam app ID."
   },
   "detail": {
     "organizer": "Organizer",

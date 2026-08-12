@@ -82,7 +82,13 @@ const fieldIds: Record<string, string> = {
   maxCapacity: 'field-max',
   inviteeUserIds: 'field-invitees',
   guestLinkCount: 'field-guest-links',
+  gameAppId: 'field-game-app-id',
 }
+
+// Accepts a pasted Steam store URL (e.g.
+// https://store.steampowered.com/app/730/Counter-Strike_2/) and extracts the
+// numeric app id so users don't have to hand-copy it out of the URL.
+const STEAM_STORE_URL_APP_ID = /store\.steampowered\.com\/app\/(\d+)/i
 
 const platformWireValues: Record<string, string> = {
   Steam: 'steam',
@@ -96,7 +102,6 @@ const emptyForm = {
   start: '',
   durationMinutes: '120',
   platform: '',
-  gameSource: 'freeText' as 'catalog' | 'freeText',
   gameName: '',
   gameAppId: '',
   notes: '',
@@ -220,6 +225,11 @@ export function SessionCreatePage() {
     setDirty(true)
   }
 
+  function handleGameAppIdChange(value: string) {
+    const urlMatch = value.match(STEAM_STORE_URL_APP_ID)
+    update('gameAppId', urlMatch ? urlMatch[1] : value)
+  }
+
   function validate(): Record<string, string> {
     const errors: Record<string, string> = {}
     if (!form.title.trim()) errors.title = t('validation.required')
@@ -247,6 +257,9 @@ export function SessionCreatePage() {
     if (guestLinkCount > 20) {
       errors.guestLinkCount = t('validation.tooManyGuestLinks')
     }
+    if (form.platform === 'Steam' && form.gameAppId && !/^\d+$/.test(form.gameAppId)) {
+      errors.gameAppId = t('validation.steamAppIdDigits')
+    }
     return errors
   }
 
@@ -259,15 +272,13 @@ export function SessionCreatePage() {
       return
     }
 
-    const game =
-      form.platform === 'Steam' && form.gameSource === 'catalog'
-        ? {
-            name: form.gameName,
-            steamAppId: form.gameAppId ? form.gameAppId : null,
-          }
-        : form.gameName
-          ? { name: form.gameName, steamAppId: null }
-          : null
+    const game = form.gameName
+      ? {
+          name: form.gameName,
+          steamAppId:
+            form.platform === 'Steam' && form.gameAppId ? form.gameAppId : null,
+        }
+      : null
 
     submit.mutate({
       title: form.title,
@@ -457,28 +468,6 @@ export function SessionCreatePage() {
           <legend className="font-body font-semibold text-ink">
             {t('create.game')}
           </legend>
-          {form.platform === 'Steam' && (
-            <div className="mt-1 flex gap-4">
-              <label className="inline-flex min-h-11 items-center gap-2">
-                <input
-                  checked={form.gameSource === 'catalog'}
-                  name="game-source"
-                  type="radio"
-                  onChange={() => update('gameSource', 'catalog')}
-                />
-                {t('create.gameCatalog')}
-              </label>
-              <label className="inline-flex min-h-11 items-center gap-2">
-                <input
-                  checked={form.gameSource === 'freeText'}
-                  name="game-source"
-                  type="radio"
-                  onChange={() => update('gameSource', 'freeText')}
-                />
-                {t('create.gameFreeText')}
-              </label>
-            </div>
-          )}
           <label className="mt-2 block" htmlFor="field-game-name">
             {t('create.gameFreeText')}
           </label>
@@ -488,13 +477,34 @@ export function SessionCreatePage() {
             value={form.gameName}
             onChange={(event) => update('gameName', event.target.value)}
           />
-          {form.platform === 'Steam' && form.gameSource === 'catalog' && (
-            <input
-              aria-label={t('create.steamAppId')}
-              className="mt-2 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-              value={form.gameAppId}
-              onChange={(event) => update('gameAppId', event.target.value)}
-            />
+          {form.platform === 'Steam' && (
+            <div className="mt-2">
+              <label
+                className="block font-body font-semibold text-ink"
+                htmlFor="field-game-app-id"
+              >
+                {t('create.steamAppId')}
+              </label>
+              <input
+                aria-describedby={
+                  fieldErrors.gameAppId ? 'game-app-id-error' : 'game-app-id-help'
+                }
+                aria-invalid={Boolean(fieldErrors.gameAppId)}
+                className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                id="field-game-app-id"
+                inputMode="numeric"
+                value={form.gameAppId}
+                onChange={(event) => handleGameAppIdChange(event.target.value)}
+              />
+              <p className="mt-1 text-ink-soft" id="game-app-id-help">
+                {t('create.steamAppIdHelp')}
+              </p>
+              {fieldErrors.gameAppId && (
+                <p id="game-app-id-error" role="alert">
+                  {fieldErrors.gameAppId}
+                </p>
+              )}
+            </div>
           )}
         </fieldset>
 

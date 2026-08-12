@@ -178,6 +178,110 @@ describe('PollCreatePage', () => {
     expect(navigateSpy).toHaveBeenCalledWith('/polls/poll-1')
   })
 
+  it('does not render a catalog/free-text radio choice for the game field_D176', async () => {
+    api.get.mockResolvedValue({ data: { items: [] } })
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Platform'), { target: { value: 'Steam' } })
+
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Steam app ID')).toBeInTheDocument()
+  })
+
+  it('submits steamAppId as null when the app id field is left blank_D176', async () => {
+    api.get.mockResolvedValue({ data: { items: [] } })
+    api.post.mockResolvedValue({ data: { poll: { id: 'poll-1' }, guestLinks: [] } })
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Title'), {
+      target: { value: 'Weekend raid' },
+    })
+    addOption('2099-01-01T10:00')
+    addOption('2099-01-01T12:00')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByLabelText('Enter a game name'), {
+      target: { value: 'Counter-Strike 2' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Create poll' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/polls',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            game: { name: 'Counter-Strike 2', steamAppId: null },
+          }),
+        }),
+      ),
+    )
+  })
+
+  it('submits the digits typed into the Steam app id field_D176', async () => {
+    api.get.mockResolvedValue({ data: { items: [] } })
+    api.post.mockResolvedValue({ data: { poll: { id: 'poll-1' }, guestLinks: [] } })
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Title'), {
+      target: { value: 'Weekend raid' },
+    })
+    addOption('2099-01-01T10:00')
+    addOption('2099-01-01T12:00')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByLabelText('Enter a game name'), {
+      target: { value: 'Counter-Strike 2' },
+    })
+    fireEvent.change(screen.getByLabelText('Steam app ID'), { target: { value: '730' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create poll' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/polls',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            game: { name: 'Counter-Strike 2', steamAppId: '730' },
+          }),
+        }),
+      ),
+    )
+  })
+
+  it('extracts the app id from a pasted Steam store URL_D176', async () => {
+    api.get.mockResolvedValue({ data: { items: [] } })
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByLabelText('Steam app ID'), {
+      target: { value: 'https://store.steampowered.com/app/730/CounterStrike_2/' },
+    })
+
+    expect(screen.getByLabelText('Steam app ID')).toHaveValue('730')
+  })
+
+  it('rejects a non-digit Steam app id and blocks submission_D176', async () => {
+    api.get.mockResolvedValue({ data: { items: [] } })
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Title'), {
+      target: { value: 'Weekend raid' },
+    })
+    addOption('2099-01-01T10:00')
+    addOption('2099-01-01T12:00')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByLabelText('Enter a game name'), {
+      target: { value: 'Counter-Strike 2' },
+    })
+    fireEvent.change(screen.getByLabelText('Steam app ID'), { target: { value: 'abc' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create poll' }))
+
+    expect(
+      await screen.findByText('There were problems with your submission'),
+    ).toBeInTheDocument()
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
   it('warns before discarding dirty create-form values_D162', async () => {
     api.get.mockResolvedValue({ data: { items: [] } })
     renderPage()

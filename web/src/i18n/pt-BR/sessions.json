@@ -11,7 +11,6 @@
     "duration": "Duração (minutos)",
     "platform": "Plataforma",
     "game": "Jogo",
-    "gameCatalog": "Escolher da Steam",
     "gameFreeText": "Digite o nome do jogo",
     "notes": "Notas",
     "min": "Presença mínima",
@@ -23,7 +22,8 @@
     "defaults": "Padrões: mínimo 4, máximo 4, 2 horas, sem plataforma, não privada.",
     "submit": "Criar sessão",
     "platformOther": "Outra",
-    "steamAppId": "ID do aplicativo Steam"
+    "steamAppId": "ID do aplicativo Steam",
+    "steamAppIdHelp": "Opcional. O número na URL da loja Steam do jogo, por exemplo 730 para Counter-Strike 2."
   },
   "edit": {
     "heading": "Editar sessão",
@@ -46,7 +46,8 @@
     "startWindow": "Escolha um horário de início dentro da janela de agendamento permitida.",
     "waitlistCapacity": "Uma lista de espera exige uma capacidade máxima.",
     "tooManyInvitees": "Você pode convidar até 50 amigos.",
-    "tooManyGuestLinks": "Você pode criar até 20 links de convidado."
+    "tooManyGuestLinks": "Você pode criar até 20 links de convidado.",
+    "steamAppIdDigits": "Digite apenas o ID numérico do aplicativo Steam."
   },
   "detail": {
     "organizer": "Organizador",

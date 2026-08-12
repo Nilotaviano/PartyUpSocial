@@ -177,12 +177,129 @@ describe('SessionCreatePage', () => {
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
-    fireEvent.click(screen.getByLabelText('Choose from Steam'))
 
     expect(screen.getByLabelText('Steam app ID')).toBeInTheDocument()
     expect(
       screen.getByRole('option', { name: 'Other' }),
     ).toBeInTheDocument()
+  })
+
+  it('does not render a catalog/free-text radio choice for the game field_D176', async () => {
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+  })
+
+  it('submits steamAppId as null when the app id field is left blank_D176', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        items: [
+          {
+            friendshipId: 'friendship-1',
+            userId: 'user-1',
+            username: 'friend.one',
+            displayName: 'Friend One',
+            avatar: { kind: 'emoji', emoji: '🎮', avatarSourceId: null, imgUrl: null },
+            platforms: [],
+          },
+        ],
+      },
+    })
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Raid night' } })
+    fireEvent.change(screen.getByLabelText('Start time'), {
+      target: { value: '2026-09-01T18:00' },
+    })
+    fireEvent.click(await screen.findByLabelText('Friend One (@friend.one)'))
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByLabelText('Enter a game name'), {
+      target: { value: 'Counter-Strike 2' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/sessions',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            game: { name: 'Counter-Strike 2', steamAppId: null },
+          }),
+        }),
+      ),
+    )
+  })
+
+  it('submits the digits typed into the Steam app id field_D176', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        items: [
+          {
+            friendshipId: 'friendship-1',
+            userId: 'user-1',
+            username: 'friend.one',
+            displayName: 'Friend One',
+            avatar: { kind: 'emoji', emoji: '🎮', avatarSourceId: null, imgUrl: null },
+            platforms: [],
+          },
+        ],
+      },
+    })
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Raid night' } })
+    fireEvent.change(screen.getByLabelText('Start time'), {
+      target: { value: '2026-09-01T18:00' },
+    })
+    fireEvent.click(await screen.findByLabelText('Friend One (@friend.one)'))
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByLabelText('Enter a game name'), {
+      target: { value: 'Counter-Strike 2' },
+    })
+    fireEvent.change(screen.getByLabelText('Steam app ID'), { target: { value: '730' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/sessions',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            game: { name: 'Counter-Strike 2', steamAppId: '730' },
+          }),
+        }),
+      ),
+    )
+  })
+
+  it('extracts the app id from a pasted Steam store URL_D176', async () => {
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByLabelText('Steam app ID'), {
+      target: { value: 'https://store.steampowered.com/app/730/CounterStrike_2/' },
+    })
+
+    expect(screen.getByLabelText('Steam app ID')).toHaveValue('730')
+  })
+
+  it('rejects a non-digit Steam app id and blocks submission_D176', async () => {
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Raid night' } })
+    fireEvent.click(screen.getByLabelText('Private session'))
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
+    fireEvent.change(screen.getByLabelText('Enter a game name'), {
+      target: { value: 'Counter-Strike 2' },
+    })
+    fireEvent.change(screen.getByLabelText('Steam app ID'), { target: { value: 'abc' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
+
+    expect(
+      await screen.findByText('There were problems with your submission'),
+    ).toBeInTheDocument()
+    expect(api.post).not.toHaveBeenCalled()
   })
 
   it('posts the wire-format platform value, not the UI label', async () => {

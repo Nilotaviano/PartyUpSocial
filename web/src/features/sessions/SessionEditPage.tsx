@@ -23,7 +23,13 @@ import {
 const fieldIds: Record<string, string> = {
   title: 'field-title',
   minAttendance: 'field-min',
+  gameAppId: 'field-game-app-id',
 }
+
+// Accepts a pasted Steam store URL (e.g.
+// https://store.steampowered.com/app/730/Counter-Strike_2/) and extracts the
+// numeric app id so users don't have to hand-copy it out of the URL.
+const STEAM_STORE_URL_APP_ID = /store\.steampowered\.com\/app\/(\d+)/i
 
 function formFrom(session: SessionDetail) {
   return {
@@ -32,6 +38,7 @@ function formFrom(session: SessionDetail) {
     durationMinutes: String(session.durationMinutes),
     platform: session.platform,
     gameName: session.game?.name ?? '',
+    gameAppId: session.game?.steamAppId ? String(session.game.steamAppId) : '',
     notes: session.notes,
     minAttendance: String(session.minAttendance),
     maxCapacity:
@@ -111,7 +118,11 @@ export function SessionEditPage() {
       if (!form.clearNotes) body.notes = form.notes
       if (!form.clearGame) {
         body.game = form.gameName
-          ? { name: form.gameName, steamAppId: null }
+          ? {
+              name: form.gameName,
+              steamAppId:
+                form.platform === 'Steam' && form.gameAppId ? form.gameAppId : null,
+            }
           : null
       }
 
@@ -147,6 +158,11 @@ export function SessionEditPage() {
     setDirty(true)
   }
 
+  function handleGameAppIdChange(value: string) {
+    const urlMatch = value.match(STEAM_STORE_URL_APP_ID)
+    update('gameAppId', urlMatch ? urlMatch[1] : value)
+  }
+
   function validate(): Record<string, string> {
     const errors: Record<string, string> = {}
     if (!form) return errors
@@ -155,6 +171,13 @@ export function SessionEditPage() {
     const max = form.clearMax ? undefined : Number(form.maxCapacity)
     if (!Number.isFinite(min) || min < 1) errors.minAttendance = t('validation.range')
     if (max !== undefined && min > max) errors.minAttendance = t('validation.minMax')
+    if (
+      form.platform === 'Steam' &&
+      form.gameAppId &&
+      !/^\d+$/.test(form.gameAppId)
+    ) {
+      errors.gameAppId = t('validation.steamAppIdDigits')
+    }
     return errors
   }
 
@@ -370,6 +393,35 @@ export function SessionEditPage() {
               />
               {t('edit.clearGame')}
             </label>
+            {form.platform === 'Steam' && !form.clearGame && (
+              <div className="mt-2">
+                <label
+                  className="block font-body font-semibold text-ink"
+                  htmlFor="field-game-app-id"
+                >
+                  {t('create.steamAppId')}
+                </label>
+                <input
+                  aria-describedby={
+                    fieldErrors.gameAppId ? 'game-app-id-error' : 'game-app-id-help'
+                  }
+                  aria-invalid={Boolean(fieldErrors.gameAppId)}
+                  className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                  id="field-game-app-id"
+                  inputMode="numeric"
+                  value={form.gameAppId}
+                  onChange={(event) => handleGameAppIdChange(event.target.value)}
+                />
+                <p className="mt-1 text-ink-soft" id="game-app-id-help">
+                  {t('create.steamAppIdHelp')}
+                </p>
+                {fieldErrors.gameAppId && (
+                  <p id="game-app-id-error" role="alert">
+                    {fieldErrors.gameAppId}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div>

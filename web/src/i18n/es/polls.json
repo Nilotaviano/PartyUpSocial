@@ -20,7 +20,6 @@
     "duration": "Duración (minutos)",
     "platform": "Plataforma",
     "game": "Juego",
-    "gameCatalog": "Elegir de Steam",
     "gameFreeText": "Escribir el nombre del juego",
     "notes": "Notas",
     "min": "Asistencia mínima",
@@ -32,7 +31,8 @@
     "defaults": "Valores predeterminados: mínimo 4, máximo 4, 2 horas, plazo de 24 horas, sin plataforma, no privada.",
     "submit": "Crear encuesta",
     "platformOther": "Otra",
-    "steamAppId": "ID de app de Steam"
+    "steamAppId": "ID de app de Steam",
+    "steamAppIdHelp": "Opcional. El número en la URL de la tienda Steam del juego, por ejemplo 730 para Counter-Strike 2."
   },
   "validation": {
     "required": "Este campo es obligatorio.",
@@ -43,7 +43,8 @@
     "tooManyInvitees": "Puedes invitar hasta 50 amigos.",
     "tooManyGuestLinks": "Puedes crear hasta 20 enlaces de invitado.",
     "optionMinimum": "Agrega al menos dos horarios candidatos.",
-    "optionCap": "Una encuesta puede tener como máximo 12 horarios candidatos."
+    "optionCap": "Una encuesta puede tener como máximo 12 horarios candidatos.",
+    "steamAppIdDigits": "Ingresa solo el ID numérico de la app de Steam."
   },
   "list": {
     "heading": "Encuestas",
