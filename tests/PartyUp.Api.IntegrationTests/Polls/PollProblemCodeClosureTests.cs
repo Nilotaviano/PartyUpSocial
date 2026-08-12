@@ -379,6 +379,7 @@ public sealed class PollProblemCodeClosureTests : IAsyncLifetime, IDisposable
         HashSet<string> exercisedBySiblingTests = new(StringComparer.Ordinal)
         {
             "poll_not_found", // PollEndpointTests + PollFailClosedTests (many)
+            "poll_invites_closed", // PollInviteEndpointTests.InvitePollUsers_PastDeadlineIsPollInvitesClosed_D193
             // ticket-P6-S4b: PollGuestHttpTests exercises the poll guest arm's own code.
             "guest_link_not_claimed", // PollGuestHttpTests.VoteBeforeClaim_OverHttp_Is409_D017
         };

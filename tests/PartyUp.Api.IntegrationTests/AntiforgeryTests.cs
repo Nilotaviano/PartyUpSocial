@@ -229,6 +229,8 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             ["POST /api/v1/polls/{pollId:guid}/finalize"] = Onboarded(() =>
                 JsonContent.Create(new { optionId = Guid.Empty })),
             ["POST /api/v1/polls/{pollId:guid}/cancel"] = Onboarded(() => null),
+            ["POST /api/v1/polls/{pollId:guid}/invites"] = Onboarded(() =>
+                JsonContent.Create(new { userIds = new[] { Guid.Empty } })),
             ["POST /api/v1/polls/{pollId:guid}/guest-links"] = Onboarded(() =>
                 JsonContent.Create(new { count = 1 })),
             ["DELETE /api/v1/polls/{pollId:guid}/guest-links/{guestLinkId:guid}"] = Onboarded(() => null),
