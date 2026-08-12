@@ -6,7 +6,9 @@ using PartyUp.Application.Abstractions;
 using PartyUp.Application.Accounts;
 using PartyUp.Application.Auth;
 using PartyUp.Application.Deletion;
+using PartyUp.Application.Notifications;
 using PartyUp.Application.Polls;
+using PartyUp.Application.Sessions;
 using PartyUp.Domain.Availability;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
@@ -111,8 +113,8 @@ public sealed class DeletionCompletenessE2ETests : IAsyncLifetime, IDisposable
         Assert.Equal(
             SessionStatus.Canceled,
             (await verify.Sessions.AsNoTracking().SingleAsync(s => s.Id == seed.OwnedNotStartedSessionId)).Status);
-        Assert.NotEqual(
-            SessionStatus.Canceled,
+        Assert.Equal(
+            SessionStatus.Confirmed,
             (await verify.Sessions.AsNoTracking().SingleAsync(s => s.Id == seed.OwnedInProgressSessionId)).Status);
 
         // 4. §11 step 2 / D-170: the owned poll expires and its invitee — never the deleting owner —
@@ -126,10 +128,9 @@ public sealed class DeletionCompletenessE2ETests : IAsyncLifetime, IDisposable
                 n.PollId == seed.OwnedPollId &&
                 n.Type == NotificationType.PollExpired &&
                 n.RecipientUserId == seed.FriendAcceptedId));
-        Assert.Equal(
-            0,
-            await verify.Notifications.CountAsync(n =>
-                n.Type == NotificationType.PollExpired && n.RecipientUserId == seed.SubjectId));
+        // No separate "PollExpired excludes the subject" assertion here: assertion 12 below already
+        // proves zero notifications of any type have RecipientUserId == seed.SubjectId post-purge,
+        // which subsumes this one — a subject-recipient PollExpired row would already fail there.
 
         // 5. The counterpart notification from the owned cancellation, materialized excluding the subject.
         Assert.Equal(
@@ -138,10 +139,7 @@ public sealed class DeletionCompletenessE2ETests : IAsyncLifetime, IDisposable
                 n.SessionId == seed.OwnedNotStartedSessionId &&
                 n.Type == NotificationType.SessionCanceled &&
                 n.RecipientUserId == seed.FriendAcceptedId));
-        Assert.Equal(
-            0,
-            await verify.Notifications.CountAsync(n =>
-                n.Type == NotificationType.SessionCanceled && n.RecipientUserId == seed.SubjectId));
+        // Same reasoning as above: subsumed by assertion 12's blanket subject-recipient-count check.
 
         // 6. §11 step 3: removal from other people's not-started content, retention in in-progress content.
         Assert.True((await verify.SessionParticipations.AsNoTracking()
@@ -216,9 +214,17 @@ public sealed class DeletionCompletenessE2ETests : IAsyncLifetime, IDisposable
             .SingleAsync(n => n.Id == seed.ActorOnlyNotificationId);
         Assert.Equal(seed.SubjectId, actorOnly.ActorUserId);
         Assert.True(await verify.Notifications.AnyAsync(n => n.Id == seed.ControlNotificationId));
-        MaskedIdentity rendered = IdentityMasking.ForUser(subject, Viewer.Create(seed.FriendPendingId));
-        Assert.True(rendered.IsAnonymous);
-        Assert.Equal(MaskingReason.Tombstoned, rendered.Reason);
+
+        // Drive the masking check through the same read path a client actually calls (S2's
+        // NotificationReadUseCases projector), not IdentityMasking.ForUser directly, so this proves
+        // the read path renders it, not just that the domain rule exists in isolation.
+        SessionPage<NotificationReadModel> friendPendingNotifications = await verification.ServiceProvider
+            .GetRequiredService<ListNotificationsUseCase>()
+            .ExecuteAsync(seed.FriendPendingId, unreadOnly: false, cursor: null, pageSize: 50, default);
+        NotificationReadModel actorOnlyRow = friendPendingNotifications.Items
+            .Single(row => row.Id == seed.ActorOnlyNotificationId);
+        Assert.True(actorOnlyRow.Actor is { IsAnonymous: true });
+        Assert.Equal(MaskingReason.Tombstoned, actorOnlyRow.Actor!.Value.Reason);
 
         // 13. Avatar sources gone, including the A-084 plaintext proxy-token row whose only revocation
         //     authority is that row's deletion.
@@ -278,8 +284,8 @@ public sealed class DeletionCompletenessE2ETests : IAsyncLifetime, IDisposable
         Assert.False(subject.IsTombstoned);
         Assert.Equal(UsernameRegistryState.Active, (await verify.UsernameRegistry.AsNoTracking()
             .SingleAsync(entry => entry.NameCanonical == seed.SubjectCanonicalUsername)).State);
-        Assert.NotEqual(
-            SessionStatus.Canceled,
+        Assert.Equal(
+            SessionStatus.Confirmed,
             (await verify.Sessions.AsNoTracking().SingleAsync(s => s.Id == seed.OwnedNotStartedSessionId)).Status);
         Assert.Equal(
             PollStatus.Polling,
@@ -433,6 +439,10 @@ public sealed class DeletionCompletenessE2ETests : IAsyncLifetime, IDisposable
             AvatarSource avatarSource = subject.CaptureAvatarSource(
                 AvatarSourceKind.SteamPlatform, [1, 2, 3, 4], AvatarSource.AllowedContentType, _factory.Clock);
             avatarProxyToken = avatarSource.Token;
+
+            // D-032/D-127: a real platform link so :101's Assert.Empty(subject.PlatformLinks) can
+            // actually fail on a regression, instead of vacuously passing on an always-empty list.
+            subject.LinkPlatform(Platform.PlayStation, GamingHandle.Create("completeness-handle"));
 
             DateTimeZone zone = DateTimeZoneProviders.Tzdb["America/Sao_Paulo"];
             AvailabilitySeries series = AvailabilitySeries.Create(
