@@ -6,8 +6,11 @@ on:
   pull_request:
     branches: [main]
 
+# Wall-clock shape: every job below is independent (no `needs` anywhere — no job consumes
+# another's output; each builds what it tests). The pipeline is as slow as its slowest job,
+# not the sum: unit ~3 min, each integration shard ~10-12 min, chromium ~20 min, webkit ~8 min.
 jobs:
-  dotnet:
+  unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,13 +19,55 @@ jobs:
         with:
           global-json-file: global.json
 
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
       - run: dotnet restore PartyUp.sln
 
       - run: dotnet build PartyUp.sln --no-restore -warnaserror
 
-      # Integration tests are included (Category=Integration, Testcontainers) — ubuntu-latest
-      # runners ship Docker. Locally without Docker: dotnet test --filter Category!=Integration
-      - run: dotnet test PartyUp.sln --no-build
+      - run: dotnet test PartyUp.sln --no-build --filter "Category!=Integration"
+
+  # The Testcontainers integration suite, sharded three ways. Filters are namespace-anchored
+  # (`IntegrationTests.Sessions.` with the trailing dot) so method-name substrings can't leak a
+  # test into the wrong shard, and the third shard is defined by exclusion — every test matches
+  # exactly one shard by construction, so nothing can silently run in none.
+  integration:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: sessions
+            filter: Category=Integration&FullyQualifiedName~IntegrationTests.Sessions.
+          - shard: polls
+            filter: Category=Integration&FullyQualifiedName~IntegrationTests.Polls.
+          - shard: rest
+            filter: Category=Integration&FullyQualifiedName!~IntegrationTests.Sessions.&FullyQualifiedName!~IntegrationTests.Polls.
+    runs-on: ubuntu-latest
+    name: integration (${{ matrix.shard }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - run: dotnet restore PartyUp.sln
+
+      - run: dotnet build PartyUp.sln --no-restore -warnaserror
+
+      # ubuntu-latest runners ship Docker (Testcontainers). Locally without Docker:
+      # dotnet test --filter Category!=Integration
+      - run: dotnet test tests/PartyUp.Api.IntegrationTests --no-build --filter "${{ matrix.filter }}"
 
   web:
     runs-on: ubuntu-latest
@@ -44,15 +89,25 @@ jobs:
       - run: npm run build
       - run: npm test
 
-  # A-082 (PHASE5_DESIGN.md §9, §12 S1 row): the dedicated CI browser + axe lane. `needs: dotnet`
-  # only orders the jobs — a GitHub Actions job shares no filesystem or build output with another,
-  # so this job builds and assembles the built topology itself rather than reusing the `dotnet` or
-  # `web` job's output. Neither this job's steps nor any other job start the API process:
-  # `PlaywrightFixture`'s built topology does that, against the `wwwroot` and built solution this
-  # job hands it, and fails outright if that `wwwroot` is empty.
+  # A-082 (PHASE5_DESIGN.md §9, §12 S1 row): the CI browser + axe lane, split into one job per
+  # browser so the Chromium and WebKit lanes overlap instead of stacking. A GitHub Actions job
+  # shares no filesystem or build output with another, so each lane builds and assembles the
+  # built topology itself. Neither lane's steps start the API process: `PlaywrightFixture`'s
+  # built topology does that, against the `wwwroot` and built solution the job hands it, and
+  # fails outright if that `wwwroot` is empty.
   browser:
-    needs: dotnet
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - browser: chromium
+            step-name: Chromium flows + axe
+            filter: Category=Integration&Browser!=WebKit
+          - browser: webkit
+            step-name: WebKit pointer lane
+            filter: Browser=WebKit
     runs-on: ubuntu-latest
+    name: browser (${{ matrix.browser }})
     steps:
       - uses: actions/checkout@v4
 
@@ -65,6 +120,12 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
 
       # This job's own SPA build. `dotnet build` (unlike `dotnet publish`) does NOT copy a
       # project's wwwroot into its output directory, so the copy below runs AFTER the build,
@@ -85,34 +146,34 @@ jobs:
           mkdir -p src/PartyUp.Api/bin/Debug/net10.0/wwwroot
           cp -r web/dist/. src/PartyUp.Api/bin/Debug/net10.0/wwwroot/
 
-      - name: Install pinned Playwright browsers (Chromium + WebKit)
-        run: pwsh tests/PartyUp.BrowserTests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium webkit
+      # Browser binaries keyed to the pinned Playwright package version; `install` becomes a
+      # no-op download on a hit. `--with-deps` still apt-installs system libraries every run —
+      # those live outside the cacheable home directory.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ matrix.browser }}-${{ runner.os }}-${{ hashFiles('Directory.Packages.props') }}
 
-      # F3 (round-1 fix): both steps log to trx inside the same `test-results` directory
+      - name: Install pinned Playwright browser
+        run: pwsh tests/PartyUp.BrowserTests/bin/Debug/net10.0/playwright.ps1 install --with-deps ${{ matrix.browser }}
+
+      # F3 (round-1 fix): the test step logs trx inside the same `test-results` directory
       # `PlaywrightFixture.ArtifactsDirectory` also writes API stdout/stderr and Playwright traces
       # into, so the upload step below has one real directory covering every diagnostic a CI red
       # produces, not a path nothing is ever written to.
-      - name: Chromium flows + axe
+      - name: ${{ matrix.step-name }}
         env:
           PARTYUP_BROWSER_TOPOLOGY: built
         run: >
           dotnet test tests/PartyUp.BrowserTests --no-build -p:PartyUpBrowserTests=true
-          --filter "Category=Integration&Browser!=WebKit"
-          --logger trx --results-directory tests/PartyUp.BrowserTests/bin/Debug/net10.0/test-results
-
-      - name: WebKit pointer lane
-        env:
-          PARTYUP_BROWSER_TOPOLOGY: built
-        run: >
-          dotnet test tests/PartyUp.BrowserTests --no-build -p:PartyUpBrowserTests=true
-          --filter "Browser=WebKit"
+          --filter "${{ matrix.filter }}"
           --logger trx --results-directory tests/PartyUp.BrowserTests/bin/Debug/net10.0/test-results
 
       - name: Upload axe/trace artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: browser-lane-artifacts
+          name: browser-lane-artifacts-${{ matrix.browser }}
           path: |
             tests/PartyUp.BrowserTests/bin/Debug/net10.0/axe-results/**
             tests/PartyUp.BrowserTests/bin/Debug/net10.0/test-results/**
