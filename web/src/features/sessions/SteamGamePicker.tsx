@@ -90,7 +90,7 @@ export function SteamGamePicker({
   const results = search.data?.results ?? []
   const showPopup =
     popupOpen && !degraded && trimmedTerm.length >= MIN_QUERY_LENGTH
-  // F5/axe aria-valid-attr-value: aria-controls must reference an element
+  // axe aria-valid-attr-value: aria-controls must reference an element
   // that actually exists in the DOM. The listbox <ul id={listboxId}> only
   // renders once results are in hand — while loading or empty, no element
   // has that id, so aria-controls must be withheld to match.
