@@ -105,9 +105,13 @@ jobs:
           - browser: chromium
             step-name: Chromium flows + axe
             filter: Category=Integration&Browser!=WebKit
+            install: chromium
           - browser: webkit
             step-name: WebKit pointer lane
             filter: Browser=WebKit
+            # PlaywrightFixture boots a Chromium alongside the WebKit lane, so this job
+            # needs both browser downloads — webkit alone fails at fixture start.
+            install: webkit chromium
     runs-on: ubuntu-latest
     name: browser (${{ matrix.browser }})
     steps:
@@ -156,8 +160,8 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ matrix.browser }}-${{ runner.os }}-${{ hashFiles('Directory.Packages.props') }}
 
-      - name: Install pinned Playwright browser
-        run: pwsh tests/PartyUp.BrowserTests/bin/Debug/net10.0/playwright.ps1 install --with-deps ${{ matrix.browser }}
+      - name: Install pinned Playwright browsers
+        run: pwsh tests/PartyUp.BrowserTests/bin/Debug/net10.0/playwright.ps1 install --with-deps ${{ matrix.install }}
 
       # F3 (round-1 fix): the test step logs trx inside the same `test-results` directory
       # `PlaywrightFixture.ArtifactsDirectory` also writes API stdout/stderr and Playwright traces
