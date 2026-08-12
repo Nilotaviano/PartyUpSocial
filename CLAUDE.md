@@ -22,8 +22,12 @@ dotnet test PartyUp.sln --filter "Category!=Integration"   # unit tests, no Dock
 dotnet test PartyUp.sln                                    # + integration tests (needs a reachable Docker daemon; CI always runs them)
 
 # Full suite incl. integration tests locally (Docker lives in WSL, not the Windows host).
-# MANDATORY before any push — never push integration tests that have not run:
-wsl -d Ubuntu-24.04 -e bash -lc "cd /mnt/c/Users/nilot/source/repos/PartyUpSocial && dotnet test PartyUp.sln -p:ArtifactsPath=/tmp/partyup-artifacts"
+# MANDATORY before any push — never push integration tests that have not run.
+# Parallel lanes (one build, then concurrent shards mirroring ci.yml's matrix — keep the
+# shard filters in scripts/wsl-gate.sh in lockstep with ci.yml):
+wsl -d Ubuntu-24.04 -e bash -lc "cd /mnt/c/Users/nilot/source/repos/PartyUpSocial && scripts/wsl-gate.sh"
+# Serial fallback (identical coverage, ~3x slower):
+# wsl -d Ubuntu-24.04 -e bash -lc "cd /mnt/c/Users/nilot/source/repos/PartyUpSocial && dotnet test PartyUp.sln -p:ArtifactsPath=/tmp/partyup-artifacts"
 
 dotnet test --filter "FullyQualifiedName~SomeTestName"     # single test
 dotnet run --project src/PartyUp.Api                       # API on http://localhost:5000

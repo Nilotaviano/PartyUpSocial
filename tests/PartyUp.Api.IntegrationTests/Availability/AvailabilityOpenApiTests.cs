@@ -116,7 +116,7 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         "RequestAccountDeletion", "RequestEmailVerification", "RequestMagicLink",
         "RequestSessionJoin", "ResetPassword", "ResolveFriendCode", "RespondAsGuest",
         "RespondToSessionInvitation", "RevokeSessionGuestLink", "RunDeletionSweep",
-        "SendFriendRequest", "SetPassword", "SetSessionReminder", "Slice2Authenticated",
+        "SearchSteamCatalog", "SendFriendRequest", "SetPassword", "SetSessionReminder", "Slice2Authenticated",
         "Slice2Onboarded", "Slice2SignIn", "Slice2SignOut", "StartSteamDeletion",
         "StartSteamExternal", "UnbanAdminUser", "UnblockUser", "Unfriend",
         "ValidateOnboardingProfile", "VerifyEmail", "VerifyEmailChange", "WithdrawSessionJoinRequest",
