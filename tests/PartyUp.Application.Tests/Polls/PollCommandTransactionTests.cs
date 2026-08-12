@@ -1,5 +1,6 @@
 ﻿using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Email;
 using PartyUp.Application.Polls;
 using PartyUp.Application.Tests.Friends;
 using PartyUp.Domain.Friendships;
@@ -37,7 +38,14 @@ public sealed class PollCommandTransactionTests
         (UserId organizerId, UserId inviteeId) = friendships.MakeAccepted(clock);
 
         var useCase = new CreatePollUseCase(
-            polls, new FakePollLockRepository(), friendships, blocks, materializer, unitOfWork, clock);
+            polls,
+            new FakePollLockRepository(),
+            friendships,
+            blocks,
+            materializer,
+            unitOfWork,
+            clock,
+            PartyUp.Application.Tests.TestInviteEmailService.Create());
 
         CreatePollCommand command = new(
             organizerId,

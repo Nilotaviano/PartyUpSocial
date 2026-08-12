@@ -58,6 +58,9 @@ public sealed class User : AggregateRoot
     /// <summary>D-082, defaulting to one hour.</summary>
     public ReminderOffset ReminderDefault { get; private set; } = ReminderOffsetExtensions.Default;
 
+    /// <summary>D-189, defaulting to on.</summary>
+    public bool EmailNotificationsEnabled { get; private set; } = true;
+
     public Instant CreatedAt { get; private set; }
 
     /// <summary>Null until the first canonical username change; anchors the D-128 cooldown.</summary>
@@ -238,6 +241,24 @@ public sealed class User : AggregateRoot
         }
 
         ReminderDefault = reminderDefault;
+    }
+
+    /// <summary>D-189.</summary>
+    public void SetEmailNotifications(bool enabled)
+    {
+        RequireProfileMutable("change the email notifications setting");
+
+        EmailNotificationsEnabled = enabled;
+    }
+
+    /// <summary>
+    /// D189_DESIGN.md §3: the unsubscribe-link redemption path. It must not fail on account
+    /// state, so it skips <see cref="RequireProfileMutable"/> entirely — the caller is the one
+    /// place that still checks <see cref="IsTombstoned"/> and no-ops instead of calling this.
+    /// </summary>
+    public void DisableEmailNotificationsForUnsubscribe()
+    {
+        EmailNotificationsEnabled = false;
     }
 
     /// <summary>

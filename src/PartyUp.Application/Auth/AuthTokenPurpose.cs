@@ -9,4 +9,5 @@ public enum AuthTokenPurpose
     DeletionRequestConfirmation = 4,
     ExternalStartIntent = 5,
     Reauthentication = 6,
+    EmailUnsubscribe = 7,
 }

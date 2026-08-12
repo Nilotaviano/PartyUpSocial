@@ -105,7 +105,21 @@
       "title": "Silenciar",
       "description": "Silencia sesiones o encuestas individuales desde sus propias páginas.",
       "link": "Ir a tus sesiones"
+    },
+    "email": {
+      "title": "Notificaciones por correo electrónico",
+      "description": "Recibe un correo cuando te inviten a una sesión o encuesta, o cuando se apruebe tu solicitud de unirte.",
+      "toggleOn": "Activar notificaciones por correo electrónico",
+      "toggleOff": "Desactivar notificaciones por correo electrónico",
+      "error": "Algo salió mal al cambiar tu configuración de notificaciones por correo electrónico."
     }
+  },
+  "emailUnsubscribe": {
+    "confirmTitle": "Cancelar suscripción a notificaciones por correo electrónico",
+    "confirmDescription": "Desactiva las notificaciones por correo electrónico de invitaciones, aprobaciones y otras actividades de tu cuenta.",
+    "confirm": "Cancelar suscripción",
+    "confirmed": "Has cancelado la suscripción a las notificaciones por correo electrónico.",
+    "invalidLink": "Este enlace para cancelar la suscripción no es válido o ha caducado."
   },
   "publicDeletion": {
     "requestTitle": "Eliminar tu cuenta",

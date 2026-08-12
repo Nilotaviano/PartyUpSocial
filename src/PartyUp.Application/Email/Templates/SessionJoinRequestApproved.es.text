@@ -1,0 +1,11 @@
+{{RecipientName}}, tu solicitud para unirte a {{Title}} fue aceptada.
+
+{{OrganizerName}} escribió:
+
+    {{Notes}}
+
+Mira la sesión para ver el estado actual:
+{{Link}}
+
+Recibes este correo porque los correos de PartyUp están activados en tu cuenta. Para desactivarlos:
+{{PublicBaseUrl}}/email-unsubscribe#token={{Token}}

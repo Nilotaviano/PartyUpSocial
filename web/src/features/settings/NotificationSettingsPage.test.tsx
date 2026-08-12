@@ -25,11 +25,11 @@ function renderPage() {
   )
 }
 
-function mockProfile(reminderDefault = 'Off') {
+function mockProfile(reminderDefault = 'Off', emailNotificationsEnabled = true) {
   api.get.mockImplementation((path: string) => {
     if (path === '/api/v1/me')
       return Promise.resolve({
-        data: { reminderDefault, pushPromptEligible: true },
+        data: { reminderDefault, pushPromptEligible: true, emailNotificationsEnabled },
       })
     if (path === '/api/v1/push/config')
       return Promise.resolve({ data: { vapidPublicKey: 'server-key', pushEnabled: true } })
@@ -222,5 +222,56 @@ describe('NotificationSettingsPage — the three ruling-3 controls', () => {
       'href',
       '/sessions/upcoming',
     )
+  })
+})
+
+describe('NotificationSettingsPage — email notifications section (D189_DESIGN.md §2)', () => {
+  it('renders on from the profile query emailNotificationsEnabled and PUTs off on click', async () => {
+    mockProfile('Off', true)
+    installPushSupport()
+
+    renderPage()
+    const toggle = await screen.findByRole('button', { name: 'Turn off email notifications' })
+    await waitFor(() => expect(toggle).not.toBeDisabled())
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(toggle)
+
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith(
+        '/api/v1/me/email-notifications',
+        expect.objectContaining({ body: { enabled: false } }),
+      ),
+    )
+  })
+
+  it('renders off from the profile query and PUTs on on click', async () => {
+    mockProfile('Off', false)
+    installPushSupport()
+
+    renderPage()
+    const toggle = await screen.findByRole('button', { name: 'Turn on email notifications' })
+    await waitFor(() => expect(toggle).not.toBeDisabled())
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.click(toggle)
+
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith(
+        '/api/v1/me/email-notifications',
+        expect.objectContaining({ body: { enabled: true } }),
+      ),
+    )
+  })
+
+  it('renders the section for accounts without email too (D-078)', async () => {
+    mockProfile('Off', true)
+    installPushSupport()
+
+    renderPage()
+
+    expect(
+      await screen.findByRole('button', { name: 'Turn off email notifications' }),
+    ).toBeInTheDocument()
   })
 })

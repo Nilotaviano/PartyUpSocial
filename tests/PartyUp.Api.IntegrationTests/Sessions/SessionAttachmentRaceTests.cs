@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Friends;
+using PartyUp.Application.Email;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
@@ -172,7 +173,8 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
                 inviteScope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
                 inviteScope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
                 inviteScope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
-                inviteScope.ServiceProvider.GetRequiredService<IClock>())
+                inviteScope.ServiceProvider.GetRequiredService<IClock>(),
+                inviteScope.ServiceProvider.GetRequiredService<InviteEmailService>())
             .InviteRegisteredUsersAsync(sessionId, organizerId, [inviteeId], default);
 
         await lockAttemptGate.Attempted.Task.WaitAsync(TimeSpan.FromSeconds(10));
@@ -244,7 +246,8 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
                 approveScope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
                 approveScope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
                 approveScope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
-                approveScope.ServiceProvider.GetRequiredService<IClock>())
+                approveScope.ServiceProvider.GetRequiredService<IClock>(),
+                approveScope.ServiceProvider.GetRequiredService<InviteEmailService>())
             .ApproveJoinRequestAsync(sessionId, organizerId, joinRequestId, default);
 
         await lockAttemptGate.Attempted.Task.WaitAsync(TimeSpan.FromSeconds(10));
@@ -340,7 +343,8 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
                 requestScope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
                 requestScope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
                 requestScope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
-                requestScope.ServiceProvider.GetRequiredService<IClock>())
+                requestScope.ServiceProvider.GetRequiredService<IClock>(),
+                requestScope.ServiceProvider.GetRequiredService<InviteEmailService>())
             .RequestJoinAsync(sessionId, requesterId, default);
 
         // The Attempted signal fires only once RequestJoin's step-2 LockUsersAsync call is made, which
@@ -440,7 +444,8 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
         scope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
         scope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
-        scope.ServiceProvider.GetRequiredService<IClock>());
+        scope.ServiceProvider.GetRequiredService<IClock>(),
+        scope.ServiceProvider.GetRequiredService<InviteEmailService>());
 
     private static SessionParticipationUseCases BuildParticipationUseCases(AsyncServiceScope scope) => new(
         scope.ServiceProvider.GetRequiredService<ISessionRepository>(),
@@ -459,7 +464,8 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
         scope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
         scope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
-        scope.ServiceProvider.GetRequiredService<IClock>());
+        scope.ServiceProvider.GetRequiredService<IClock>(),
+        scope.ServiceProvider.GetRequiredService<InviteEmailService>());
 
     private async Task<BlockGraphCommandResult> BlockAsync(
         AsyncServiceScope scope,

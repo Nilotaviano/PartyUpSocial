@@ -105,7 +105,21 @@
       "title": "Muting",
       "description": "Mute individual sessions or polls from their own pages.",
       "link": "Go to your sessions"
+    },
+    "email": {
+      "title": "Email notifications",
+      "description": "Receive email when you're invited to a session or poll, or when your join request is approved.",
+      "toggleOn": "Turn on email notifications",
+      "toggleOff": "Turn off email notifications",
+      "error": "Something went wrong changing your email notification setting."
     }
+  },
+  "emailUnsubscribe": {
+    "confirmTitle": "Unsubscribe from email notifications",
+    "confirmDescription": "Turn off email notifications for invites, approvals and other activity on your account.",
+    "confirm": "Unsubscribe",
+    "confirmed": "You have been unsubscribed from email notifications.",
+    "invalidLink": "This unsubscribe link is invalid or expired."
   },
   "publicDeletion": {
     "requestTitle": "Delete your account",

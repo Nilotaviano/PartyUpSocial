@@ -114,6 +114,8 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 JsonContent.Create(new { locale = "en" })),
             ["PUT /api/v1/me/reminder-default"] = Onboarded(() =>
                 JsonContent.Create(new { reminderDefault = "Min15" })),
+            ["PUT /api/v1/me/email-notifications"] = Onboarded(() =>
+                JsonContent.Create(new { enabled = false })),
             // TOUR_DESIGN.md §4: idempotent, RequireOnboarded (registered surface only).
             ["POST /api/v1/me/tour-completed"] = Onboarded(() => null),
             ["POST /api/v1/me/deletion"] = Authenticated(() =>
@@ -126,6 +128,8 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             ["POST /api/v1/account-deletion-requests"] = Public(() =>
                 JsonContent.Create(new { email = "not-an-email" })),
             ["POST /api/v1/account-deletion-requests/confirm"] = Public(() =>
+                JsonContent.Create(new { token = "invalid" })),
+            ["POST /api/v1/email-notifications/unsubscribe"] = Public(() =>
                 JsonContent.Create(new { token = "invalid" })),
             ["POST /api/v1/friend-requests"] = Onboarded(() =>
                 JsonContent.Create(new { targetUsername = "MatrixPlayer" })),

@@ -138,4 +138,8 @@ public static class ApiOperationIds
 
     // TOUR_DESIGN.md §4: the first-login tour's one write.
     public const string CompleteTour = "CompleteTour";
+
+    // D189_DESIGN.md §2/§3: the account setting and its unauthenticated unsubscribe-link confirm.
+    public const string ChangeMyEmailNotifications = "ChangeMyEmailNotifications";
+    public const string UnsubscribeEmailNotifications = "UnsubscribeEmailNotifications";
 }

@@ -1,0 +1,1 @@
+Seu pedido para participar da enquete {{Title}} foi aceito

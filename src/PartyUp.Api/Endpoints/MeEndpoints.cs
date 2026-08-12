@@ -44,6 +44,10 @@ public static class MeEndpoints
         api.MapPut("/me/reminder-default", ChangeReminderDefaultAsync)
             .WithName("ChangeMyReminderDefault")
             .RequireAuthorization(AuthorizationPolicies.RequireOnboarded);
+        // D189_DESIGN.md §2: the settings-page toggle.
+        api.MapPut("/me/email-notifications", ChangeEmailNotificationsAsync)
+            .WithName(ApiOperationIds.ChangeMyEmailNotifications)
+            .RequireAuthorization(AuthorizationPolicies.RequireOnboarded);
         // TOUR_DESIGN.md §4: idempotent, first instant wins; rides the "default" rate-limit
         // dimension exactly like the reminder-default write above (no explicit OperationIds
         // membership needed — RateLimitPolicies.cs's "default" dimension covers every operation).
@@ -259,6 +263,18 @@ public static class MeEndpoints
             (id, ct) => useCase.ExecuteAsync(id, reminder, ct),
             cancellationToken);
     }
+
+    private static Task<IResult> ChangeEmailNotificationsAsync(
+        ChangeEmailNotificationsRequest request,
+        HttpContext context,
+        ICurrentUserAccessor currentUser,
+        SetEmailNotificationsUseCase useCase,
+        CancellationToken cancellationToken) =>
+        ExecuteProfileMutationAsync(
+            context,
+            currentUser,
+            (id, ct) => useCase.ExecuteAsync(id, request.Enabled, ct),
+            cancellationToken);
 
     private static Task<IResult> CompleteTourAsync(
         HttpContext context,
@@ -934,6 +950,8 @@ public sealed record ChangeLocaleRequest(string Locale);
 
 public sealed record ChangeReminderDefaultRequest(string ReminderDefault);
 
+public sealed record ChangeEmailNotificationsRequest(bool Enabled);
+
 public sealed record AccountDeletionResponse(string GraceEndsAt);
 
 public sealed record ProfileProblem(
@@ -959,7 +977,9 @@ public sealed record MyProfileResponse(
     bool PushPromptEligible,
     // TOUR_DESIGN.md §4: the client-friendly half of TourCompletedAt — the tour gate only ever
     // needs the boolean, never the instant.
-    bool TourCompleted)
+    bool TourCompleted,
+    // D189_DESIGN.md §2.
+    bool EmailNotificationsEnabled)
 {
     public static MyProfileResponse From(MyProfileResult profile)
     {
@@ -982,6 +1002,7 @@ public sealed record MyProfileResponse(
                 method.Removable,
                 method.Detail)).ToArray(),
             profile.PushPromptEligible,
-            user.TourCompletedAt is not null);
+            user.TourCompletedAt is not null,
+            user.EmailNotificationsEnabled);
     }
 }

@@ -1,0 +1,13 @@
+{{RecipientName}}, {{OrganizerName}} convidou você para votar em uma enquete no PartyUp.
+
+{{Title}}
+
+{{OrganizerName}} escreveu:
+
+    {{Notes}}
+
+Votar na enquete:
+{{Link}}
+
+Você recebeu este e-mail porque os e-mails do PartyUp estão ativados na sua conta. Para desativar:
+{{PublicBaseUrl}}/email-unsubscribe#token={{Token}}

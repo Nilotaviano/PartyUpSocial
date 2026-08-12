@@ -1,5 +1,3 @@
-using System.Globalization;
-using NodaTime;
 using PartyUp.Application.Notifications;
 using PartyUp.Domain.Notifications;
 
@@ -25,7 +23,8 @@ public sealed class PushPayloadFactory(IPushTemplateRenderer renderer)
 
         if (row.OptionStartTime is { } optionStart)
         {
-            model["OptionStart"] = FormatInstant(optionStart, row.RecipientZone, row.RecipientLocale);
+            model["OptionStart"] = LocalizedInstantFormatter.FormatInstant(
+                optionStart, row.RecipientZone, row.RecipientLocale);
         }
 
         if (row.Actor is { } actor)
@@ -54,21 +53,6 @@ public sealed class PushPayloadFactory(IPushTemplateRenderer renderer)
         _ => row.ActorUserId is { } actorId
             ? ($"friend:{actorId}", "/friends")
             : ($"friend:{row.Id.Value}", "/friends"),
-    };
-
-    /// <summary>D-060/spec §8.5: the instant renders in the recipient's own zone and locale — the same inputs §2 already resolved.</summary>
-    private static string FormatInstant(Instant instant, DateTimeZone zone, string locale)
-    {
-        ZonedDateTime zoned = instant.InZone(zone);
-        DateTime local = zoned.ToDateTimeUnspecified();
-        return local.ToString("f", ResolveCulture(locale));
-    }
-
-    private static CultureInfo ResolveCulture(string locale) => locale switch
-    {
-        "pt-BR" => CultureInfo.GetCultureInfo("pt-BR"),
-        "es" => CultureInfo.GetCultureInfo("es-ES"),
-        _ => CultureInfo.GetCultureInfo("en-US"),
     };
 
     /// <summary>

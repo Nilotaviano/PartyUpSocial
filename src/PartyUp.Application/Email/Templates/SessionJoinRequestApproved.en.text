@@ -1,0 +1,11 @@
+{{RecipientName}}, your request to join {{Title}} was approved.
+
+{{OrganizerName}} wrote:
+
+    {{Notes}}
+
+See the session for its current status:
+{{Link}}
+
+You are receiving this because PartyUp email is on for your account. Turn it off here:
+{{PublicBaseUrl}}/email-unsubscribe#token={{Token}}

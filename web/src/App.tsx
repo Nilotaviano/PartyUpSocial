@@ -37,6 +37,7 @@ import { PollListPage } from './features/polls/PollListPage'
 import { ProfileSettingsPage } from './features/profile/ProfileSettingsPage'
 import { AccountSettingsPage } from './features/settings/AccountSettingsPage'
 import { BlockedUsersPage } from './features/settings/BlockedUsersPage'
+import { EmailUnsubscribePage } from './features/settings/EmailUnsubscribePage'
 import { NotificationSettingsPage } from './features/settings/NotificationSettingsPage'
 import { GuestSessionPage } from './features/sessions/GuestSessionPage'
 import { SessionCreatePage } from './features/sessions/SessionCreatePage'
@@ -179,6 +180,7 @@ function App() {
         path="/account-deletion/confirm"
         element={<PublicDeletionConfirmPage />}
       />
+      <Route path="/email-unsubscribe" element={<EmailUnsubscribePage />} />
 
       {/*
         Guest routes (design §10.1): never gated by RequireAuth/RequireOnboarded — a

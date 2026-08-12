@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Email;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
@@ -20,7 +21,8 @@ public sealed class CreateSessionUseCase(
     ISessionNotificationMaterializer materializer,
     ISessionReminderHandoffWriter reminders,
     IUnitOfWork unitOfWork,
-    IClock clock)
+    IClock clock,
+    InviteEmailService inviteEmails)
 {
     public const int DefaultMinAttendance = 4;
     public const int DefaultMaxCapacity = 4;
@@ -42,7 +44,8 @@ public sealed class CreateSessionUseCase(
             return CreateSessionResult.Failed("session_validation");
         }
 
-        return await unitOfWork.ExecuteAsync(
+        IReadOnlyList<IDomainEvent> committedEvents = [];
+        CreateSessionResult result = await unitOfWork.ExecuteAsync(
             async ct =>
             {
                 HashSet<UserId> lockSet = [command.OrganizerId, .. invitees];
@@ -94,6 +97,7 @@ public sealed class CreateSessionUseCase(
                 }
 
                 IReadOnlyList<IDomainEvent> events = session.DequeueEvents();
+                committedEvents = events;
                 await materializer.MaterializeAsync(session, events, ct);
 
                 await reminders.ReplanAsync(session, command.OrganizerId, ct);
@@ -105,6 +109,13 @@ public sealed class CreateSessionUseCase(
                 return CreateSessionResult.Created(session, guestLinks);
             },
             cancellationToken);
+
+        if (result.Succeeded && result.Session is { } createdSession)
+        {
+            await inviteEmails.NotifySessionEventsAsync(createdSession, committedEvents, cancellationToken);
+        }
+
+        return result;
     }
 }
 

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Email;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
@@ -151,7 +152,8 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
             scope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
             scope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
             scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
-            scope.ServiceProvider.GetRequiredService<IClock>());
+            scope.ServiceProvider.GetRequiredService<IClock>(),
+            scope.ServiceProvider.GetRequiredService<InviteEmailService>());
         return useCase.InviteRegisteredUsersAsync(sessionId, organizerId, [counterpartId], default);
     }
 
@@ -170,7 +172,8 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
             scope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
             scope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
             scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
-            scope.ServiceProvider.GetRequiredService<IClock>());
+            scope.ServiceProvider.GetRequiredService<IClock>(),
+            scope.ServiceProvider.GetRequiredService<InviteEmailService>());
         return useCase.ApproveJoinRequestAsync(sessionId, organizerId, joinRequestId, default);
     }
 
@@ -238,7 +241,8 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
                 callerScope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
                 callerScope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
                 callerScope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
-                callerScope.ServiceProvider.GetRequiredService<IClock>())
+                callerScope.ServiceProvider.GetRequiredService<IClock>(),
+                callerScope.ServiceProvider.GetRequiredService<InviteEmailService>())
             .InviteRegisteredUsersAsync(sessionId, organizerId, [higherId, lowerId], default);
 
         await Task.Delay(TimeSpan.FromMilliseconds(500));
@@ -323,7 +327,8 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
             callerScope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
             callerScope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
             callerScope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
-            callerScope.ServiceProvider.GetRequiredService<IClock>());
+            callerScope.ServiceProvider.GetRequiredService<IClock>(),
+            callerScope.ServiceProvider.GetRequiredService<InviteEmailService>());
 
         // Deliberately lists the already-locked higher-id invitee first -- the exact opposite of the
         // DB's declared ORDER BY id -- so a per-invitee caller-order lock loop would block on the higher

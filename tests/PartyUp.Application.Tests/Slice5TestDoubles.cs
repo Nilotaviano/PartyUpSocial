@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Accounts;
 using PartyUp.Application.Auth;
 using PartyUp.Application.Email;
 using PartyUp.Domain.Kernel;
@@ -250,6 +251,59 @@ internal sealed class FakeEmailDispatcher : IEmailDispatcher
         Messages.Add(message);
         return Task.CompletedTask;
     }
+
+    public bool TryDispatch(EmailMessage message)
+    {
+        Messages.Add(message);
+        return true;
+    }
+}
+
+internal sealed class FakeEmailRecipientReader : IEmailRecipientReader
+{
+    internal Dictionary<UserId, EmailRecipient> Recipients { get; } = [];
+
+    internal List<IReadOnlyList<UserId>> Calls { get; } = [];
+
+    public Task<IReadOnlyList<EmailRecipient>> GetAsync(
+        IReadOnlyList<UserId> userIds,
+        CancellationToken cancellationToken)
+    {
+        Calls.Add(userIds);
+        List<EmailRecipient> results = [];
+        foreach (UserId id in userIds)
+        {
+            if (Recipients.TryGetValue(id, out EmailRecipient? recipient))
+            {
+                results.Add(recipient);
+            }
+        }
+
+        return Task.FromResult<IReadOnlyList<EmailRecipient>>(results);
+    }
+}
+
+/// <summary>
+/// D-189 §5: builds a real <see cref="InviteEmailService"/> over the fakes above, with an empty
+/// recipient reader by default -- the safe no-op wiring for tests that exercise the five call sites
+/// without asserting on email behavior. Tests that DO assert on dispatch construct their own reader
+/// with recipients populated and pass it here.
+/// </summary>
+internal static class TestInviteEmailService
+{
+    internal static InviteEmailService Create(
+        IEmailRecipientReader? reader = null,
+        ISecurityTokenService? tokens = null,
+        IEmailDispatcher? dispatcher = null,
+        IUnitOfWork? unitOfWork = null,
+        string publicBaseUrl = "https://partyup.social") =>
+        new(
+            reader ?? new FakeEmailRecipientReader(),
+            tokens ?? new FakeTokenService(),
+            dispatcher ?? new FakeEmailDispatcher(),
+            unitOfWork ?? new FakeUnitOfWork(),
+            new AccountEmailOptions(publicBaseUrl),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<InviteEmailService>.Instance);
 }
 
 internal sealed class FakeUnitOfWork : IUnitOfWork

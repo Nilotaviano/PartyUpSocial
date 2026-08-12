@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Email;
 using PartyUp.Application.Sessions;
 using PartyUp.Application.Tests.Friends;
 using PartyUp.Domain.Friendships;
@@ -353,6 +354,7 @@ internal sealed class SessionTestFixture
         UnitOfWork = new RollbackAwareUnitOfWork(Sessions);
         Reads = new FakeSessionReadRepository(Sessions);
         Mutes = new FakeNotificationMuteRepository();
+        InviteEmails = TestInviteEmailService.Create();
 
         (OrganizerId, InviteeId) = Friendships.MakeAccepted(Clock);
     }
@@ -382,6 +384,8 @@ internal sealed class SessionTestFixture
     internal FakeNotificationMuteRepository Mutes { get; }
 
     internal FakeSessionVersionStamp VersionStamp { get; } = new();
+
+    internal InviteEmailService InviteEmails { get; }
 
     internal UserId OrganizerId { get; }
 
@@ -420,19 +424,20 @@ internal sealed class SessionTestFixture
             materializer ?? Materializer,
             Reminders,
             UnitOfWork,
-            Clock);
+            Clock,
+            InviteEmails);
 
     internal EditSessionUseCase EditUseCase() =>
         new(Sessions, Locks, Materializer, Reminders, UnitOfWork, Clock, VersionStamp);
 
     internal SessionInvitationUseCases InvitationUseCases() =>
-        new(Sessions, Locks, Friendships, Blocks, Materializer, Reminders, UnitOfWork, Clock);
+        new(Sessions, Locks, Friendships, Blocks, Materializer, Reminders, UnitOfWork, Clock, InviteEmails);
 
     internal SessionParticipationUseCases ParticipationUseCases() =>
         new(Sessions, Locks, Materializer, Reminders, UnitOfWork, Clock);
 
     internal SessionJoinRequestUseCases JoinRequestUseCases() =>
-        new(Sessions, Reads, Locks, Friendships, Blocks, Materializer, Reminders, UnitOfWork, Clock);
+        new(Sessions, Reads, Locks, Friendships, Blocks, Materializer, Reminders, UnitOfWork, Clock, InviteEmails);
 
     internal SetSessionReminderUseCase ReminderUseCase() =>
         new(Sessions, Locks, Reminders, UnitOfWork, Clock);

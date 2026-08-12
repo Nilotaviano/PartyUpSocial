@@ -187,6 +187,8 @@ public static class DependencyInjection
         services.AddSingleton<ChannelEmailDispatcher>();
         services.AddSingleton<IEmailDispatcher>(services =>
             services.GetRequiredService<ChannelEmailDispatcher>());
+        services.AddScoped<IEmailRecipientReader, EmailRecipientReader>();
+        services.AddScoped<InviteEmailService>();
         services.AddSingleton<ITextPolicy, ProfanityFilter>();
         services.AddSingleton<IEmailSender>(provider =>
         {

@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Email;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
@@ -24,7 +25,8 @@ public sealed class CreatePollUseCase(
     IBlockRepository blocks,
     IPollNotificationMaterializer materializer,
     IUnitOfWork unitOfWork,
-    IClock clock)
+    IClock clock,
+    InviteEmailService inviteEmails)
 {
     public const int DefaultMinAttendance = 4;
     public const int MaxInviteeCount = 50;
@@ -45,7 +47,8 @@ public sealed class CreatePollUseCase(
             return CreatePollResult.Failed("poll_validation");
         }
 
-        return await unitOfWork.ExecuteAsync(
+        IReadOnlyList<IDomainEvent> committedEvents = [];
+        CreatePollResult result = await unitOfWork.ExecuteAsync(
             async ct =>
             {
                 // P3-LK-01: users -> friendships -> blocks -> ... -> poll parents. The union of
@@ -116,11 +119,19 @@ public sealed class CreatePollUseCase(
                 }
 
                 IReadOnlyList<IDomainEvent> events = poll.DequeueEvents();
+                committedEvents = events;
                 await materializer.MaterializeAsync(poll, events, ct);
 
                 return CreatePollResult.Created(poll, guestLinks);
             },
             cancellationToken);
+
+        if (result.Succeeded && result.Poll is { } createdPoll)
+        {
+            await inviteEmails.NotifyPollEventsAsync(createdPoll, committedEvents, cancellationToken);
+        }
+
+        return result;
     }
 }
 

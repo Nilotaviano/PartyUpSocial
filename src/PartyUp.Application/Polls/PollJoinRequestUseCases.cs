@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Email;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
@@ -37,7 +38,8 @@ public sealed class PollJoinRequestUseCases(
     IBlockRepository blocks,
     IPollNotificationMaterializer materializer,
     IUnitOfWork unitOfWork,
-    IClock clock)
+    IClock clock,
+    InviteEmailService inviteEmails)
 {
     public Task<PollJoinRequestCommandResult> RequestJoinAsync(
         PollId pollId,
@@ -164,12 +166,14 @@ public sealed class PollJoinRequestUseCases(
             },
             cancellationToken);
 
-    public Task<PollJoinRequestCommandResult> ApproveJoinRequestAsync(
+    public async Task<PollJoinRequestCommandResult> ApproveJoinRequestAsync(
         PollId pollId,
         UserId organizerId,
         JoinRequestId joinRequestId,
-        CancellationToken cancellationToken) =>
-        unitOfWork.ExecuteAsync(
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<IDomainEvent> committedEvents = [];
+        PollJoinRequestCommandResult result = await unitOfWork.ExecuteAsync(
             async ct =>
             {
                 Poll? probe = await polls.FindNoTrackingAsync(pollId, ct);
@@ -230,11 +234,20 @@ public sealed class PollJoinRequestUseCases(
                 }
 
                 IReadOnlyList<IDomainEvent> events = poll.DequeueEvents();
+                committedEvents = events;
                 await materializer.MaterializeAsync(poll, events, ct);
 
                 return PollJoinRequestCommandResult.Ok(poll, request);
             },
             cancellationToken);
+
+        if (result.Succeeded && result.Poll is { } approvedPoll)
+        {
+            await inviteEmails.NotifyPollEventsAsync(approvedPoll, committedEvents, cancellationToken);
+        }
+
+        return result;
+    }
 
     public Task<PollJoinRequestCommandResult> RejectJoinRequestAsync(
         PollId pollId,

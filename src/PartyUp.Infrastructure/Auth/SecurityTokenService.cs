@@ -121,6 +121,18 @@ public sealed class SecurityTokenService(AppDbContext context, IClock clock)
                    AND t.consumed_at IS NULL
                    AND (@ageGateAttested IS NULL OR @ageGateAttested OR t.pending_age_gate
                         OR NOT c.is_pre_account)
+                RETURNING t.id, t.user_id
+            ),
+            consumed_siblings AS (
+                UPDATE auth_tokens t
+                   SET consumed_at = @now
+                  FROM redeemed r
+                 WHERE @purpose = @emailUnsubscribePurpose
+                   AND t.purpose = @emailUnsubscribePurpose
+                   AND t.user_id = r.user_id
+                   AND t.id <> r.id
+                   AND t.consumed_at IS NULL
+                   AND t.expires_at > @now
                 RETURNING t.id
             )
             SELECT c.is_pre_account,
@@ -132,7 +144,8 @@ public sealed class SecurityTokenService(AppDbContext context, IClock clock)
                    c.email_normalized,
                    c.pending_locale,
                    c.pending_age_gate,
-                   c.payload
+                   c.payload,
+                   (SELECT count(*) FROM consumed_siblings) AS consumed_siblings_count
               FROM candidate c
               LEFT JOIN redeemed r ON r.id = c.id
             """;
@@ -154,6 +167,11 @@ public sealed class SecurityTokenService(AppDbContext context, IClock clock)
             Add(command, "now", NpgsqlDbType.TimestampTz, now);
             Add(command, "binderHash", NpgsqlDbType.Text, request.BinderHash);
             Add(command, "ageGateAttested", NpgsqlDbType.Boolean, request.AgeGateAttested);
+            Add(
+                command,
+                "emailUnsubscribePurpose",
+                NpgsqlDbType.Integer,
+                (int)AuthTokenPurpose.EmailUnsubscribe);
 
             await using DbDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken))

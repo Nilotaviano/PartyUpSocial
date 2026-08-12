@@ -105,7 +105,21 @@
       "title": "Silenciar",
       "description": "Silencie sessões ou enquetes individuais nas próprias páginas delas.",
       "link": "Ir para suas sessões"
+    },
+    "email": {
+      "title": "Notificações por e-mail",
+      "description": "Receba e-mail quando você for convidado para uma sessão ou enquete, ou quando seu pedido de participação for aprovado.",
+      "toggleOn": "Ativar notificações por e-mail",
+      "toggleOff": "Desativar notificações por e-mail",
+      "error": "Algo deu errado ao alterar sua configuração de notificações por e-mail."
     }
+  },
+  "emailUnsubscribe": {
+    "confirmTitle": "Cancelar inscrição de notificações por e-mail",
+    "confirmDescription": "Desative as notificações por e-mail de convites, aprovações e outras atividades da sua conta.",
+    "confirm": "Cancelar inscrição",
+    "confirmed": "Você cancelou a inscrição das notificações por e-mail.",
+    "invalidLink": "Este link de cancelamento de inscrição é inválido ou expirou."
   },
   "publicDeletion": {
     "requestTitle": "Excluir sua conta",

@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Email;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
@@ -34,7 +35,8 @@ public sealed class SessionInvitationUseCases(
     ISessionNotificationMaterializer materializer,
     ISessionReminderHandoffWriter reminders,
     IUnitOfWork unitOfWork,
-    IClock clock)
+    IClock clock,
+    InviteEmailService inviteEmails)
 {
     public const int MaxInviteeCount = 50;
     public const int MaxGuestLinkCount = 20;
@@ -53,7 +55,8 @@ public sealed class SessionInvitationUseCases(
             return SessionCommandResult.Failed("session_validation");
         }
 
-        return await unitOfWork.ExecuteAsync(
+        IReadOnlyList<IDomainEvent> committedEvents = [];
+        SessionCommandResult result = await unitOfWork.ExecuteAsync(
             async ct =>
             {
                 // Step 1: resolve authorization without locking the arbitrary invitee ids; hidden/missing -> 404.
@@ -108,6 +111,7 @@ public sealed class SessionInvitationUseCases(
 
                 // Step 6: persist.
                 IReadOnlyList<IDomainEvent> events = session.DequeueEvents();
+                committedEvents = events;
                 await materializer.MaterializeAsync(session, events, ct);
 
                 foreach (UserId inviteeId in invitees)
@@ -118,6 +122,13 @@ public sealed class SessionInvitationUseCases(
                 return SessionCommandResult.Ok(session);
             },
             cancellationToken);
+
+        if (result.Succeeded && result.Session is { } invitedSession)
+        {
+            await inviteEmails.NotifySessionEventsAsync(invitedSession, committedEvents, cancellationToken);
+        }
+
+        return result;
     }
 
     public Task<CreateGuestLinksResult> CreateGuestLinksAsync(

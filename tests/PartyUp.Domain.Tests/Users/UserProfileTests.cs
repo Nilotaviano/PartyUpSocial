@@ -57,6 +57,37 @@ public class UserProfileTests
     }
 
     [Fact]
+    public void EmailNotificationsEnabled_IsTrueUntilTheUserChangesIt_D189()
+    {
+        FakeClock clock = TestUsers.Clock();
+
+        Assert.True(TestUsers.Active(clock).EmailNotificationsEnabled);
+    }
+
+    [Fact]
+    public void SetEmailNotifications_DisablesAndReenables_D189()
+    {
+        FakeClock clock = TestUsers.Clock();
+        User user = TestUsers.Active(clock);
+
+        user.SetEmailNotifications(false);
+        Assert.False(user.EmailNotificationsEnabled);
+
+        user.SetEmailNotifications(true);
+        Assert.True(user.EmailNotificationsEnabled);
+    }
+
+    [Fact]
+    public void SetEmailNotifications_IsAvailableWhileOnboarding_D189()
+    {
+        User user = TestUsers.Onboarding(TestUsers.Clock());
+
+        user.SetEmailNotifications(false);
+
+        Assert.False(user.EmailNotificationsEnabled);
+    }
+
+    [Fact]
     public void LinkPlatform_RecordsThePlatformAndHandle_D032()
     {
         FakeClock clock = TestUsers.Clock();

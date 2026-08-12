@@ -1,0 +1,1 @@
+Vote em um horário para {{Title}}

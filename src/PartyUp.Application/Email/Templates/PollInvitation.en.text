@@ -1,0 +1,13 @@
+{{RecipientName}}, {{OrganizerName}} invited you to vote on a PartyUp poll.
+
+{{Title}}
+
+{{OrganizerName}} wrote:
+
+    {{Notes}}
+
+Vote on the poll:
+{{Link}}
+
+You are receiving this because PartyUp email is on for your account. Turn it off here:
+{{PublicBaseUrl}}/email-unsubscribe#token={{Token}}

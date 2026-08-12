@@ -67,10 +67,18 @@ async function changeReminderDefault(reminderDefault: ReminderDefaultValue) {
   })
 }
 
+async function changeEmailNotifications(enabled: boolean) {
+  await client.PUT('/api/v1/me/email-notifications', {
+    params: { header: csrf },
+    body: { enabled },
+  })
+}
+
 /**
- * `/settings/notifications` (design §5, ruling 3): exactly three controls — per-browser push
- * on/off, the account default reminder (D-082), and a link out to per-session/poll muting (which
- * lives on each session/poll's own page, not here — a per-type opt-out matrix is out of scope).
+ * `/settings/notifications` (design §5, ruling 3): per-browser push on/off, the account default
+ * reminder (D-082), a link out to per-session/poll muting (which lives on each session/poll's own
+ * page, not here — a per-type opt-out matrix is out of scope), and the account email-notifications
+ * toggle (D-189, email-only — in-app notifications are unaffected).
  */
 export function NotificationSettingsPage() {
   const { t } = useTranslation(['settings', 'errors'])
@@ -82,6 +90,7 @@ export function NotificationSettingsPage() {
   const supported = isPushSupported()
 
   const profile = useQuery({ queryKey: viewerProfileKey, queryFn: getViewerProfile })
+  const emailNotificationsEnabled = profile.data?.emailNotificationsEnabled ?? true
 
   useEffect(() => {
     heading.current?.focus()
@@ -109,6 +118,13 @@ export function NotificationSettingsPage() {
     mutationFn: changeReminderDefault,
     onSuccess: async () => {
       setReminderSaved(true)
+      await queryClient.invalidateQueries({ queryKey: viewerProfileKey })
+    },
+  })
+
+  const emailNotifications = useMutation({
+    mutationFn: changeEmailNotifications,
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: viewerProfileKey })
     },
   })
@@ -208,6 +224,35 @@ export function NotificationSettingsPage() {
         >
           {t('notificationsPage.mute.link')}
         </Link>
+      </section>
+
+      <section aria-labelledby="email-notifications-heading" className="space-y-2">
+        <h2
+          className="font-display text-h2 font-semibold text-ink"
+          id="email-notifications-heading"
+        >
+          {t('notificationsPage.email.title')}
+        </h2>
+        <p className="text-ink-soft">{t('notificationsPage.email.description')}</p>
+        <Button
+          aria-busy={emailNotifications.isPending}
+          aria-pressed={emailNotificationsEnabled}
+          disabled={emailNotifications.isPending || profile.isPending}
+          variant={emailNotificationsEnabled ? 'primary' : 'neutral'}
+          onClick={() => emailNotifications.mutate(!emailNotificationsEnabled)}
+        >
+          {emailNotificationsEnabled
+            ? t('notificationsPage.email.toggleOff')
+            : t('notificationsPage.email.toggleOn')}
+        </Button>
+        {emailNotifications.isError && (
+          <p role="alert">
+            {t(
+              isApiError(emailNotifications.error) ? emailNotifications.error.code : 'generic',
+              { ns: 'errors', defaultValue: t('generic', { ns: 'errors' }) },
+            )}
+          </p>
+        )}
       </section>
     </main>
   )

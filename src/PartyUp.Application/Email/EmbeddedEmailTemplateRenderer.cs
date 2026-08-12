@@ -19,17 +19,23 @@ public sealed partial class EmbeddedEmailTemplateRenderer : IEmailTemplateRender
         string subject = Substitute(
             ReadResource(message.Template, locale, "subject.txt"),
             message.Model,
-            htmlEncode: false);
+            SubstitutionMode.Subject).Trim();
         string text = Substitute(
             ReadResource(message.Template, locale, "text"),
             message.Model,
-            htmlEncode: false);
+            SubstitutionMode.Text).Trim();
         string html = Substitute(
             ReadResource(message.Template, locale, "html"),
             message.Model,
-            htmlEncode: true);
+            SubstitutionMode.Html).Trim();
 
-        return new RenderedEmail(subject.Trim(), text.Trim(), html.Trim());
+        if (subject.Contains('\r') || subject.Contains('\n'))
+        {
+            throw new InvalidOperationException(
+                $"Email template subject for '{message.Template}' ({locale}) contains a newline.");
+        }
+
+        return new RenderedEmail(subject, text, html);
     }
 
     public static string CanonicalizeLocale(string? locale)
@@ -70,7 +76,7 @@ public sealed partial class EmbeddedEmailTemplateRenderer : IEmailTemplateRender
     private static string Substitute(
         string source,
         IReadOnlyDictionary<string, string> model,
-        bool htmlEncode)
+        SubstitutionMode mode)
     {
         return PlaceholderPattern().Replace(source, match =>
         {
@@ -81,8 +87,20 @@ public sealed partial class EmbeddedEmailTemplateRenderer : IEmailTemplateRender
                     $"Email template placeholder '{key}' has no model value.");
             }
 
-            return htmlEncode ? HtmlEncoder.Default.Encode(value) : value;
+            if (mode == SubstitutionMode.Subject)
+            {
+                value = value.Replace("\r", string.Empty).Replace("\n", string.Empty);
+            }
+
+            return mode == SubstitutionMode.Html ? HtmlEncoder.Default.Encode(value) : value;
         });
+    }
+
+    private enum SubstitutionMode
+    {
+        Subject,
+        Text,
+        Html,
     }
 
     [GeneratedRegex(@"\{\{(?<key>[A-Za-z][A-Za-z0-9]*)\}\}", RegexOptions.CultureInvariant)]

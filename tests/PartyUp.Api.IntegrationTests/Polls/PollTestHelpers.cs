@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Email;
 using PartyUp.Application.Polls;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
@@ -31,7 +32,8 @@ internal static class PollTestHelpers
         scope.ServiceProvider.GetRequiredService<IBlockRepository>(),
         scope.ServiceProvider.GetRequiredService<IPollNotificationMaterializer>(),
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
-        scope.ServiceProvider.GetRequiredService<IClock>());
+        scope.ServiceProvider.GetRequiredService<IClock>(),
+        scope.ServiceProvider.GetRequiredService<InviteEmailService>());
 
     internal static PollOptionUseCases BuildOptionUseCases(AsyncServiceScope scope) => new(
         scope.ServiceProvider.GetRequiredService<IPollRepository>(),
@@ -72,7 +74,8 @@ internal static class PollTestHelpers
         scope.ServiceProvider.GetRequiredService<IBlockRepository>(),
         scope.ServiceProvider.GetRequiredService<IPollNotificationMaterializer>(),
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
-        scope.ServiceProvider.GetRequiredService<IClock>());
+        scope.ServiceProvider.GetRequiredService<IClock>(),
+        scope.ServiceProvider.GetRequiredService<InviteEmailService>());
 
     internal static CancelPollUseCase BuildCancelUseCase(AsyncServiceScope scope) => new(
         scope.ServiceProvider.GetRequiredService<IPollRepository>(),

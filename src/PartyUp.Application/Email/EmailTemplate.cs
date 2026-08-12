@@ -16,4 +16,8 @@ public enum EmailTemplate
     DeletionRequestNoAccount = 11,
     ReauthenticationRequested = 12,
     DeletionRequestConfirmation = 13,
+    SessionInvitation = 14,
+    PollInvitation = 15,
+    SessionJoinRequestApproved = 16,
+    PollJoinRequestApproved = 17,
 }

@@ -352,6 +352,86 @@ public sealed class SecurityTokenServiceTests : IAsyncLifetime, IDisposable
         }
     }
 
+    [Fact]
+    public async Task Issue_TwoConsecutiveEmailUnsubscribeTokensAreBothLive_D189()
+    {
+        UserId userId = await _factory.SeedUserAsync(email: "unsubscribe-issue@example.test");
+        var request = new IssueTokenRequest(
+            AuthTokenPurpose.EmailUnsubscribe,
+            userId,
+            null,
+            Duration.FromDays(365));
+
+        IssuedToken first = await IssueAsync(request);
+        IssuedToken second = await IssueAsync(request);
+
+        TokenRedemption firstResult = await RedeemAsync(new RedeemTokenRequest(
+            AuthTokenPurpose.EmailUnsubscribe,
+            first.RawToken));
+        TokenRedemption secondResult = await RedeemAsync(new RedeemTokenRequest(
+            AuthTokenPurpose.EmailUnsubscribe,
+            second.RawToken));
+
+        Assert.True(firstResult.Succeeded);
+        Assert.True(secondResult.Succeeded);
+    }
+
+    [Fact]
+    public async Task Redeem_ConsumesEveryOutstandingEmailUnsubscribeTokenForTheUser_D189()
+    {
+        UserId userId = await _factory.SeedUserAsync(email: "unsubscribe-redeem@example.test");
+        var request = new IssueTokenRequest(
+            AuthTokenPurpose.EmailUnsubscribe,
+            userId,
+            null,
+            Duration.FromDays(365));
+
+        IssuedToken first = await IssueAsync(request);
+        IssuedToken second = await IssueAsync(request);
+        IssuedToken third = await IssueAsync(request);
+
+        TokenRedemption redeemedFirst = await RedeemAsync(new RedeemTokenRequest(
+            AuthTokenPurpose.EmailUnsubscribe,
+            first.RawToken));
+        TokenRedemption secondAttempt = await RedeemAsync(new RedeemTokenRequest(
+            AuthTokenPurpose.EmailUnsubscribe,
+            second.RawToken));
+        TokenRedemption thirdAttempt = await RedeemAsync(new RedeemTokenRequest(
+            AuthTokenPurpose.EmailUnsubscribe,
+            third.RawToken));
+
+        Assert.True(redeemedFirst.Succeeded);
+        Assert.False(secondAttempt.Succeeded);
+        Assert.Equal(TokenRedemptionFailure.NotFound, secondAttempt.Failure);
+        Assert.False(thirdAttempt.Succeeded);
+        Assert.Equal(TokenRedemptionFailure.NotFound, thirdAttempt.Failure);
+    }
+
+    [Fact]
+    public async Task Redeem_ExistingPurposesAreUnaffectedByTheUnsubscribeSiblingConsume_D189()
+    {
+        UserId userId = await _factory.SeedUserAsync(email: "unsubscribe-unaffected@example.test");
+        var passwordResetRequest = new IssueTokenRequest(
+            AuthTokenPurpose.PasswordReset,
+            userId,
+            "UNSUBSCRIBE-UNAFFECTED@EXAMPLE.TEST",
+            Duration.FromHours(1),
+            Email: "unsubscribe-unaffected@example.test");
+
+        IssuedToken firstReset = await IssueAsync(passwordResetRequest);
+        IssuedToken secondReset = await IssueAsync(passwordResetRequest);
+
+        TokenRedemption firstResetResult = await RedeemAsync(new RedeemTokenRequest(
+            AuthTokenPurpose.PasswordReset,
+            firstReset.RawToken));
+        TokenRedemption secondResetResult = await RedeemAsync(new RedeemTokenRequest(
+            AuthTokenPurpose.PasswordReset,
+            secondReset.RawToken));
+
+        Assert.True(firstResetResult.Succeeded);
+        Assert.True(secondResetResult.Succeeded);
+    }
+
     private async Task<IssuedToken> IssueAsync(IssueTokenRequest request)
     {
         await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
@@ -426,6 +506,11 @@ public sealed class SecurityTokenServiceTests : IAsyncLifetime, IDisposable
                 userId,
                 null,
                 Duration.FromMinutes(5)),
+            AuthTokenPurpose.EmailUnsubscribe => new(
+                purpose,
+                userId,
+                null,
+                Duration.FromDays(365)),
             _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null),
         };
 

@@ -97,6 +97,8 @@ builder.Services.AddScoped<ChangeAvatarUseCase>();
 builder.Services.AddScoped<ChangeTimeZoneUseCase>();
 builder.Services.AddScoped<ChangeLocaleUseCase>();
 builder.Services.AddScoped<SetReminderDefaultUseCase>();
+builder.Services.AddScoped<SetEmailNotificationsUseCase>();
+builder.Services.AddScoped<UnsubscribeEmailNotificationsUseCase>();
 builder.Services.AddScoped<CompleteTourUseCase>();
 builder.Services.AddScoped<RequestAccountDeletionUseCase>();
 builder.Services.AddScoped<RequestPublicDeletionUseCase>();
@@ -348,6 +350,7 @@ api.MapCalendarEndpoints();
 api.MapPollEndpoints();
 api.MapGuestPollEndpoints();
 api.MapNotificationEndpoints();
+api.MapEmailNotificationsEndpoints();
 
 // PHASE4_DESIGN.md P4-HTTP-01: A-064/A-065 are ratified in ARCHITECTURE.md before this route is
 // mapped. It sits outside the /api/v1 group by design (A-064: a transport exception, not a REST

@@ -32,6 +32,9 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(user => user.AgeGatePassed).IsRequired();
         builder.Property(user => user.AgeGateSource);
         builder.Property(user => user.ReminderDefault).IsRequired();
+        builder.Property(user => user.EmailNotificationsEnabled)
+            .IsRequired()
+            .HasDefaultValue(true);
         builder.Property(user => user.CreatedAt)
             .HasColumnType("timestamp with time zone");
         builder.Property(user => user.UsernameChangedAt)

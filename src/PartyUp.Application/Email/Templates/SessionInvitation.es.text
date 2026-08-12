@@ -1,0 +1,14 @@
+{{RecipientName}}, {{OrganizerName}} te invitó a una sesión en PartyUp.
+
+{{Title}}
+Empieza: {{StartTime}}
+
+{{OrganizerName}} escribió:
+
+    {{Notes}}
+
+Ver la sesión y responder:
+{{Link}}
+
+Recibes este correo porque los correos de PartyUp están activados en tu cuenta. Para desactivarlos:
+{{PublicBaseUrl}}/email-unsubscribe#token={{Token}}

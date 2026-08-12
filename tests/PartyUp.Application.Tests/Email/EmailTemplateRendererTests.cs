@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using PartyUp.Application.Email;
 using PartyUp.Domain.Users;
 
@@ -39,6 +40,30 @@ public sealed class EmailTemplateRendererTests
             Assert.Contains("localized-grace-end", graceOutput, StringComparison.Ordinal);
             Assert.DoesNotContain("raw-token", graceOutput, StringComparison.Ordinal);
             Assert.DoesNotContain("account-deletion/confirm", graceOutput, StringComparison.Ordinal);
+        }
+
+        foreach (EmailTemplate template in new[]
+        {
+            EmailTemplate.SessionInvitation,
+            EmailTemplate.PollInvitation,
+            EmailTemplate.SessionJoinRequestApproved,
+            EmailTemplate.PollJoinRequestApproved,
+        })
+        {
+            RenderedEmail english = _renderer.Render(CreateMessage(template, "en"));
+            foreach (string locale in new[] { "pt-BR", "es" })
+            {
+                RenderedEmail translated = _renderer.Render(CreateMessage(template, locale));
+                Assert.NotEqual(english.Subject, translated.Subject);
+                Assert.NotEqual(english.TextBody, translated.TextBody);
+                Assert.NotEqual(english.HtmlBody, translated.HtmlBody);
+            }
+
+            Assert.Contains("Friday Game Night", english.Subject, StringComparison.Ordinal);
+            Assert.Contains(
+                "/email-unsubscribe#token=raw-token",
+                english.TextBody,
+                StringComparison.Ordinal);
         }
     }
 
@@ -115,6 +140,119 @@ public sealed class EmailTemplateRendererTests
         }
     }
 
+    [Fact]
+    public void Render_StripsCrlfFromASubstitutedSubjectValue_D189()
+    {
+        var message = new EmailMessage(
+            "recipient@example.test",
+            Locale.Create("en"),
+            EmailTemplate.SessionInvitation,
+            new Dictionary<string, string>
+            {
+                ["PublicBaseUrl"] = "https://partyup.social",
+                ["Token"] = "raw-token",
+                ["RecipientName"] = "Recipient",
+                ["OrganizerName"] = "Organizer",
+                ["Title"] = "Friday Game Night\r\nX-Injected-Header: evil",
+                ["Notes"] = string.Empty,
+                ["Link"] = "https://partyup.social/sessions/00000000-0000-0000-0000-000000000000",
+                ["StartTime"] = "localized-start-time",
+            });
+
+        RenderedEmail rendered = _renderer.Render(message);
+
+        Assert.DoesNotContain('\r', rendered.Subject);
+        Assert.DoesNotContain('\n', rendered.Subject);
+        Assert.Contains("Friday Game NightX-Injected-Header: evil", rendered.Subject, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(EmailTemplate.SessionInvitation)]
+    [InlineData(EmailTemplate.PollInvitation)]
+    [InlineData(EmailTemplate.SessionJoinRequestApproved)]
+    [InlineData(EmailTemplate.PollJoinRequestApproved)]
+    public void Render_NeverSubstitutesUserContentInsideAnHref_D189(EmailTemplate template)
+    {
+        const string notesWithHrefLikeContent = "\">Click me</a><a href=\"https://evil.example.test";
+        var message = new EmailMessage(
+            "recipient@example.test",
+            Locale.Create("en"),
+            template,
+            new Dictionary<string, string>
+            {
+                ["PublicBaseUrl"] = "https://partyup.social",
+                ["Token"] = "raw-token",
+                ["RecipientName"] = "Recipient",
+                ["OrganizerName"] = "Organizer",
+                ["Title"] = "Friday Game Night",
+                ["Notes"] = notesWithHrefLikeContent,
+                ["Link"] = "https://partyup.social/sessions/00000000-0000-0000-0000-000000000000",
+                ["StartTime"] = "localized-start-time",
+            });
+
+        RenderedEmail rendered = _renderer.Render(message);
+
+        Assert.DoesNotContain(
+            $"href=\"{notesWithHrefLikeContent}",
+            rendered.HtmlBody,
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(EmailTemplate.SessionInvitation)]
+    [InlineData(EmailTemplate.PollInvitation)]
+    [InlineData(EmailTemplate.SessionJoinRequestApproved)]
+    [InlineData(EmailTemplate.PollJoinRequestApproved)]
+    public void HtmlTemplateHrefsOnlyEverInterpolateServerBuiltUrls_D189(EmailTemplate template)
+    {
+        // Link is server-built in InviteEmailService (PublicBaseUrl + segment + entity GUID),
+        // so it is the only non-token placeholder an href may carry.
+        string[] allowed = ["PublicBaseUrl", "Token", "Link"];
+
+        foreach (string locale in new[] { "en", "pt-BR", "es" })
+        {
+            string html = ReadTemplateResource(template, locale, "html");
+            MatchCollection hrefs = Regex.Matches(
+                html,
+                "href=\"(?<url>[^\"]*)\"",
+                RegexOptions.CultureInvariant);
+
+            Assert.NotEmpty(hrefs);
+            foreach (Match href in hrefs)
+            {
+                string url = href.Groups["url"].Value;
+                Assert.True(
+                    url.StartsWith("{{PublicBaseUrl}}", StringComparison.Ordinal) ||
+                    url.StartsWith("{{Link}}", StringComparison.Ordinal),
+                    $"{template}.{locale}.html has an href that is not rooted in a server-built URL: {url}");
+
+                foreach (Match placeholder in Regex.Matches(
+                    url,
+                    @"\{\{(?<key>[A-Za-z][A-Za-z0-9]*)\}\}",
+                    RegexOptions.CultureInvariant))
+                {
+                    string key = placeholder.Groups["key"].Value;
+                    Assert.True(
+                        allowed.Contains(key, StringComparer.Ordinal),
+                        $"{template}.{locale}.html interpolates '{key}' inside an href.");
+                }
+            }
+        }
+    }
+
+    private static string ReadTemplateResource(
+        EmailTemplate template,
+        string locale,
+        string part)
+    {
+        string resourceName = $"PartyUp.Application.Email.Templates.{template}.{locale}.{part}";
+        using Stream stream = typeof(EmbeddedEmailTemplateRenderer).Assembly
+            .GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException($"Missing resource '{resourceName}'.");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
     private static EmailMessage CreateMessage(EmailTemplate template, string locale) =>
         new(
             "recipient@example.test",
@@ -128,5 +266,11 @@ public sealed class EmailTemplateRendererTests
                 ["GraceEndsAt"] = "localized-grace-end",
                 ["NewEmail"] = "new@example.test",
                 ["Method"] = "<Steam>",
+                ["RecipientName"] = "Recipient",
+                ["OrganizerName"] = "Organizer",
+                ["Title"] = "Friday Game Night",
+                ["Notes"] = string.Empty,
+                ["Link"] = "https://partyup.social/sessions/00000000-0000-0000-0000-000000000000",
+                ["StartTime"] = "localized-start-time",
             });
 }

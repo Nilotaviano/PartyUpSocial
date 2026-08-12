@@ -1164,6 +1164,12 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("display_name");
 
+                    b.Property<bool>("EmailNotificationsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("email_notifications_enabled");
+
                     b.Property<string>("FriendCode")
                         .HasColumnType("text")
                         .HasColumnName("friend_code");

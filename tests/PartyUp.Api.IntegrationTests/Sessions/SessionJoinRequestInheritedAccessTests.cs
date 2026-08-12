@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Email;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
@@ -217,7 +218,8 @@ public sealed class SessionJoinRequestInheritedAccessTests : IAsyncLifetime, IDi
         scope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
         scope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
-        scope.ServiceProvider.GetRequiredService<IClock>());
+        scope.ServiceProvider.GetRequiredService<IClock>(),
+        scope.ServiceProvider.GetRequiredService<InviteEmailService>());
 
     private SessionDetails SessionDetailsFor() => new(
         SessionTitle.Create("Inherited access session"),

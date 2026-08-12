@@ -532,6 +532,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/email-notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ChangeMyEmailNotifications"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/tour-completed": {
         parameters: {
             query?: never;
@@ -702,6 +718,22 @@ export interface paths {
         get: operations["GetCalendarView"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/email-notifications/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UnsubscribeEmailNotifications"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2011,6 +2043,9 @@ export interface components {
         ChangeDisplayNameRequest: {
             displayName: string;
         };
+        ChangeEmailNotificationsRequest: {
+            enabled: boolean;
+        };
         ChangeEmailRequest: {
             email: string;
             currentPassword: null | string;
@@ -2363,6 +2398,7 @@ export interface components {
             authMethods: components["schemas"]["AuthMethodResponse"][];
             pushPromptEligible: boolean;
             tourCompleted: boolean;
+            emailNotificationsEnabled: boolean;
         };
         NotificationResponse: {
             /** Format: uuid */
@@ -2821,6 +2857,9 @@ export interface components {
         UnreadNotificationCountResponse: {
             /** Format: int32 */
             count: number | string;
+        };
+        UnsubscribeEmailNotificationsRequest: {
+            token: null | string;
         };
         UsernameAvailability: {
             available: boolean;
@@ -3911,6 +3950,31 @@ export interface operations {
             };
         };
     };
+    ChangeMyEmailNotifications: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeEmailNotificationsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CompleteTour: {
         parameters: {
             query?: never;
@@ -4295,6 +4359,40 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    UnsubscribeEmailNotifications: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnsubscribeEmailNotificationsRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };

@@ -1,0 +1,14 @@
+{{RecipientName}}, {{OrganizerName}} invited you to a PartyUp session.
+
+{{Title}}
+Starts: {{StartTime}}
+
+{{OrganizerName}} wrote:
+
+    {{Notes}}
+
+View the session and RSVP:
+{{Link}}
+
+You are receiving this because PartyUp email is on for your account. Turn it off here:
+{{PublicBaseUrl}}/email-unsubscribe#token={{Token}}

@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Email;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
@@ -52,7 +53,8 @@ public sealed class SessionJoinRequestUseCases(
     ISessionNotificationMaterializer materializer,
     ISessionReminderHandoffWriter reminders,
     IUnitOfWork unitOfWork,
-    IClock clock)
+    IClock clock,
+    InviteEmailService inviteEmails)
 {
     public Task<JoinRequestCommandResult> RequestJoinAsync(
         SessionId sessionId,
@@ -193,12 +195,14 @@ public sealed class SessionJoinRequestUseCases(
         return (true, page);
     }
 
-    public Task<JoinRequestCommandResult> ApproveJoinRequestAsync(
+    public async Task<JoinRequestCommandResult> ApproveJoinRequestAsync(
         SessionId sessionId,
         UserId organizerId,
         JoinRequestId joinRequestId,
-        CancellationToken cancellationToken) =>
-        unitOfWork.ExecuteAsync(
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<IDomainEvent> committedEvents = [];
+        JoinRequestCommandResult result = await unitOfWork.ExecuteAsync(
             async ct =>
             {
                 // Step 1: resolve authorization without locking arbitrary ids; hidden/missing -> 404.
@@ -263,12 +267,21 @@ public sealed class SessionJoinRequestUseCases(
 
                 // Step 6: persist.
                 IReadOnlyList<IDomainEvent> events = session.DequeueEvents();
+                committedEvents = events;
                 await materializer.MaterializeAsync(session, events, ct);
                 await reminders.ReplanAsync(session, requesterId, ct);
 
                 return JoinRequestCommandResult.Ok(session, request);
             },
             cancellationToken);
+
+        if (result.Succeeded && result.Session is { } approvedSession)
+        {
+            await inviteEmails.NotifySessionEventsAsync(approvedSession, committedEvents, cancellationToken);
+        }
+
+        return result;
+    }
 
     public Task<JoinRequestCommandResult> RejectJoinRequestAsync(
         SessionId sessionId,
