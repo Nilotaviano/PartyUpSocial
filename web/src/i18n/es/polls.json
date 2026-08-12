@@ -127,6 +127,10 @@
     "confirmBody": "Esto crea una sesión a las {{time}} y no se puede deshacer.",
     "confirmBodyEarly": "Esto cierra la votación ahora y crea una sesión a las {{time}}. No se puede deshacer."
   },
+  "invite": {
+    "heading": "Invitar",
+    "registered": "Invitar amigos"
+  },
   "cancel": {
     "action": "Cancelar encuesta",
     "title": "¿Cancelar esta encuesta?",
@@ -169,6 +173,7 @@
       "poll_voting_closed": "La votación cerró para esta encuesta.",
       "poll_terminal": "Esta encuesta ya no se puede modificar.",
       "poll_invalid_transition": "Ese cambio ya no es posible.",
+      "poll_invites_closed": "Esta encuesta ya no acepta invitaciones.",
       "poll_participant_removed": "Ya no tienes acceso a esta encuesta.",
       "poll_conflict": "Este invitado ya reclamó su enlace y no se puede revocar. Quítalo en su lugar.",
       "poll_guest_not_found": "No se pudo encontrar a ese invitado.",

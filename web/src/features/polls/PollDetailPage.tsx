@@ -933,6 +933,17 @@ export function PollDetailPage() {
             </div>
           )}
 
+          {isOrganizer && windowState === 'polling' && (
+            <div>
+              <Link
+                className={`inline-flex items-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+                to={`/polls/${pollId}/invite`}
+              >
+                {t('invite.heading')}
+              </Link>
+            </div>
+          )}
+
           {isOrganizer && (windowState === 'polling' || windowState === 'awaitingSelection') && (
             <GuestPanel
               canMint={windowState === 'polling'}

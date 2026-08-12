@@ -127,6 +127,10 @@
     "confirmBody": "This creates a session at {{time}} and cannot be undone.",
     "confirmBodyEarly": "This closes voting right now and creates a session at {{time}}. It cannot be undone."
   },
+  "invite": {
+    "heading": "Invite",
+    "registered": "Invite friends"
+  },
   "cancel": {
     "action": "Cancel poll",
     "title": "Cancel this poll?",
@@ -169,6 +173,7 @@
       "poll_voting_closed": "Voting has closed for this poll.",
       "poll_terminal": "This poll can no longer be changed.",
       "poll_invalid_transition": "That change is no longer possible.",
+      "poll_invites_closed": "This poll is no longer accepting invitations.",
       "poll_participant_removed": "You no longer have access to this poll.",
       "poll_conflict": "This guest has already claimed their link and can't be revoked. Remove the guest instead.",
       "poll_guest_not_found": "That guest could not be found.",

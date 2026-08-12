@@ -33,6 +33,7 @@ import { PublicDeletionConfirmPage } from './features/deletion/PublicDeletionCon
 import { PublicDeletionRequestPage } from './features/deletion/PublicDeletionRequestPage'
 import { PollCreatePage } from './features/polls/PollCreatePage'
 import { PollDetailPage } from './features/polls/PollDetailPage'
+import { PollInvitePage } from './features/polls/PollInvitePage'
 import { PollListPage } from './features/polls/PollListPage'
 import { ProfileSettingsPage } from './features/profile/ProfileSettingsPage'
 import { AccountSettingsPage } from './features/settings/AccountSettingsPage'
@@ -243,6 +244,7 @@ function App() {
             <Route path="/polls/new" element={<PollCreatePage />} />
             <Route path="/polls" element={<PollListPage />} />
             <Route path="/polls/:pollId" element={<PollDetailPage />} />
+            <Route path="/polls/:pollId/invite" element={<PollInvitePage />} />
           </Route>
         </Route>
       </Route>

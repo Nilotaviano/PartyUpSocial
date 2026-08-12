@@ -853,6 +853,51 @@ describe('PollDetailPage', () => {
     })
   })
 
+  describe('organizer mid-flight invite link (D-193)', () => {
+    it('shows the invite link for the organizer while Polling_D193', async () => {
+      api.get.mockResolvedValue({
+        data: pollDetail({ organizerId: 'viewer-1', status: 'polling' }),
+      })
+      renderPage()
+
+      expect(await screen.findByRole('link', { name: 'Invite' })).toHaveAttribute(
+        'href',
+        '/polls/poll-1/invite',
+      )
+    })
+
+    // Security-shaped, mirroring the D-156 cancel-control pair above: proves the link is
+    // never rendered for a viewer who is not the organizer, catching a regression where the
+    // `isOrganizer` gate is dropped or inverted even while the organizer-visible test passes.
+    it('never shows the invite link to a non-organizer_D193', async () => {
+      api.get.mockResolvedValue({
+        data: pollDetail({ organizerId: 'someone-else', status: 'polling' }),
+      })
+      renderPage()
+
+      await screen.findByText('Raid night poll')
+      expect(screen.queryByRole('link', { name: 'Invite' })).not.toBeInTheDocument()
+    })
+
+    it('hides the invite link once the poll has left Polling (Closed)_D193', async () => {
+      api.get.mockImplementation((path: string) =>
+        Promise.resolve({
+          data: path.includes('finalization-preview')
+            ? { options: [] }
+            : pollDetail({
+                organizerId: 'viewer-1',
+                status: 'closed',
+                deadline: new Date(Date.now() - 60_000).toISOString(),
+              }),
+        }),
+      )
+      renderPage()
+
+      await screen.findByText('Raid night poll')
+      expect(screen.queryByRole('link', { name: 'Invite' })).not.toBeInTheDocument()
+    })
+  })
+
   describe('organizer cancel (D-156)', () => {
     it('an organizer confirms cancel, POSTs to the endpoint and lands on /polls_D156', async () => {
       api.get.mockResolvedValue({ data: pollDetail({ organizerId: 'viewer-1' }) })

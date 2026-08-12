@@ -127,6 +127,10 @@
     "confirmBody": "Isso cria uma sessão em {{time}} e não pode ser desfeito.",
     "confirmBodyEarly": "Isso encerra a votação agora e cria uma sessão em {{time}}. Não pode ser desfeito."
   },
+  "invite": {
+    "heading": "Convidar",
+    "registered": "Convidar amigos"
+  },
   "cancel": {
     "action": "Cancelar enquete",
     "title": "Cancelar esta enquete?",
@@ -169,6 +173,7 @@
       "poll_voting_closed": "A votação encerrou para esta enquete.",
       "poll_terminal": "Esta enquete não pode mais ser alterada.",
       "poll_invalid_transition": "Essa alteração não é mais possível.",
+      "poll_invites_closed": "Esta enquete não está mais aceitando convites.",
       "poll_participant_removed": "Você não tem mais acesso a esta enquete.",
       "poll_conflict": "Esse convidado já reivindicou o link dele e não pode ser revogado. Remova-o em vez disso.",
       "poll_guest_not_found": "Esse convidado não pôde ser encontrado.",

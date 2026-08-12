@@ -52,6 +52,7 @@ const pollProblemCodes = [
   'poll_voting_closed',
   'poll_terminal',
   'poll_invalid_transition',
+  'poll_invites_closed',
   'poll_participant_removed',
   'poll_conflict',
   'poll_guest_not_found',

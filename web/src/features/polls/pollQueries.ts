@@ -50,6 +50,18 @@ export async function createPoll(body: CreatePollRequest) {
   return data
 }
 
+// D-193: organizer-only, valid only while the poll is still Polling — the server is the sole
+// enforcer (`poll_invites_closed` on a poll that has left Polling); the mirror of
+// `inviteUsers` on the session surface.
+export async function invitePollUsers(pollId: string, userIds: string[]) {
+  const { data } = await client.POST('/api/v1/polls/{pollId}/invites', {
+    params: { header: csrf, path: { pollId } },
+    body: { userIds },
+  })
+  if (!data) throw new Error('Invite response was empty.')
+  return data
+}
+
 // design §7 note 1: vote submission is per option, not per ballot.
 export async function voteOnPollOption(
   pollId: string,
