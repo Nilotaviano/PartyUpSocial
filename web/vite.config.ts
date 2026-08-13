@@ -5,6 +5,15 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    // D-138 / PHASE8_DESIGN.md §2 Q3 (ratified 2026-08-12), documented in docs/BROWSER_SUPPORT.md:
+    // the compilation floor for the four supported families. esbuild targets are dependency-free
+    // (no browserslist package, no @vitejs/plugin-legacy) and each name is a FLOOR, deliberately
+    // at or below the current-minus-one release of its family rather than a claim about which
+    // version is current today — every supported browser is newer than its floor, so raising a
+    // floor can only break support, never widen it. Reviewed each phase; Edge tracks Chromium.
+    target: ['chrome133', 'edge133', 'firefox135', 'safari18'],
+  },
   server: {
     proxy: {
       '/api': { target: 'http://localhost:5000', changeOrigin: true },

@@ -10,7 +10,7 @@ namespace PartyUp.BrowserTests.Availability;
 /// `AvailabilityCalendarPointerTests` under the same trait (`P5-TOUCH-01`) without touching
 /// `ci.yml`; this class's only job is making sure that step's discovered count is never zero before
 /// S6 exists. Launches its own <see cref="IPlaywright"/>/WebKit instance rather than reusing
-/// <see cref="PlaywrightFixture.Browser"/> (Chromium) — a pointer-lane smoke test proving nothing
+/// <see cref="PlaywrightFixture.Browser"/> — a pointer-lane smoke test proving nothing
 /// about WebKit specifically would defeat its own purpose.
 /// </summary>
 [Trait("Category", "Integration")]

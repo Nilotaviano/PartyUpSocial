@@ -11,7 +11,7 @@ namespace PartyUp.BrowserTests.Availability;
 /// <para>
 /// Runs its own WebKit instance with a touch-emulating context, the same shape
 /// <see cref="WebKitLaneSmokeTests"/> already established, rather than the collection's shared
-/// Chromium <see cref="PlaywrightFixture.Browser"/> — a pointer-lane test proving nothing about
+/// <see cref="PlaywrightFixture.Browser"/> — a pointer-lane test proving nothing about
 /// WebKit specifically would defeat its own purpose. <c>[Trait("Browser","WebKit")]</c> routes this
 /// class to the `browser` CI job's second step exclusively (A-082); that step's `dotnet test`
 /// invocation is a separate process from the Chromium step's, so it carries its own fresh

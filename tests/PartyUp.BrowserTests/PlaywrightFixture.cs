@@ -59,6 +59,39 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
+    /// PHASE8_DESIGN.md §3 S8 (D-138, Q3): which Playwright engine <see cref="Browser"/> is, selected
+    /// by <c>PARTYUP_BROWSER_ENGINE</c> — <c>chromium</c> (the unset default), <c>firefox</c>, or
+    /// <c>webkit</c>. Exactly one engine boots per <c>dotnet test</c> invocation, so every CI lane
+    /// downloads only its own browser binary. An unrecognized value throws rather than falling back to
+    /// Chromium: a misspelled lane variable that silently ran the default engine twice is precisely the
+    /// failure <c>Engine/BrowserEngineLaneTests</c> exists to make impossible.
+    /// <para>
+    /// Engine-specific classes (the <c>Browser=WebKit</c> pointer set) launch their own instance and do
+    /// not read this property — they never consumed <see cref="Browser"/> in the first place.
+    /// </para>
+    /// </summary>
+    public static string EngineName { get; } = ResolveEngineName();
+
+    private static string ResolveEngineName()
+    {
+        string? requested = Environment.GetEnvironmentVariable("PARTYUP_BROWSER_ENGINE");
+        if (string.IsNullOrWhiteSpace(requested))
+        {
+            return "chromium";
+        }
+
+        return requested.Trim().ToLowerInvariant() switch
+        {
+            "chromium" => "chromium",
+            "firefox" => "firefox",
+            "webkit" => "webkit",
+            _ => throw new InvalidOperationException(
+                $"PARTYUP_BROWSER_ENGINE='{requested}' is not a supported Playwright engine. " +
+                "Use 'chromium' (default), 'firefox', or 'webkit'."),
+        };
+    }
+
+    /// <summary>
     /// In the built topology the API serves the SPA itself (prod's single-container shape), so
     /// there is no separate Vite origin — this stays a static property (not an instance member) so
     /// every existing flow-test call site (<c>PlaywrightFixture.WebBaseUrl</c>) keeps working
@@ -180,7 +213,13 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         }
 
         _playwright = await Playwright.CreateAsync();
-        Browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+        IBrowserType engine = EngineName switch
+        {
+            "firefox" => _playwright.Firefox,
+            "webkit" => _playwright.Webkit,
+            _ => _playwright.Chromium,
+        };
+        Browser = await engine.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
     }
 
     private void InitializeLocalTopology()

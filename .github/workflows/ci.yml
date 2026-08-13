@@ -8,7 +8,12 @@ on:
 
 # Wall-clock shape: every job below is independent (no `needs` anywhere — no job consumes
 # another's output; each builds what it tests). The pipeline is as slow as its slowest job,
-# not the sum: unit ~3 min, each integration shard ~10-12 min, chromium ~20 min, webkit ~8 min.
+# not the sum: unit ~3 min, each integration shard ~10-12 min, chromium ~20 min, webkit ~8 min,
+# firefox ~10-15 min (estimate: its six tests take ~6 min locally against the dev topology, plus
+# the same npm+dotnet build and wwwroot assembly every browser lane pays; the CI figure itself is
+# first measured on the run that introduces the lane). It runs beside chromium, not after, so it
+# does not extend the
+# critical path unless it lands above the ~20-min chromium lane.
 jobs:
   unit:
     runs-on: ubuntu-latest
@@ -92,7 +97,9 @@ jobs:
       - run: npm test
 
   # A-082 (PHASE5_DESIGN.md §9, §12 S1 row): the CI browser + axe lane, split into one job per
-  # browser so the Chromium and WebKit lanes overlap instead of stacking. A GitHub Actions job
+  # engine so the lanes overlap instead of stacking. `PARTYUP_BROWSER_ENGINE` (PHASE8_DESIGN.md
+  # §3 S8) makes `PlaywrightFixture` boot exactly the one engine its lane tests, so each lane
+  # installs and caches only its own browser binary. A GitHub Actions job
   # shares no filesystem or build output with another, so each lane builds and assembles the
   # built topology itself. Neither lane's steps start the API process: `PlaywrightFixture`'s
   # built topology does that, against the `wwwroot` and built solution the job hands it, and
@@ -106,12 +113,26 @@ jobs:
             step-name: Chromium flows + axe
             filter: Category=Integration&Browser!=WebKit
             install: chromium
+            engine: chromium
           - browser: webkit
             step-name: WebKit pointer lane
             filter: Browser=WebKit
-            # PlaywrightFixture boots a Chromium alongside the WebKit lane, so this job
-            # needs both browser downloads — webkit alone fails at fixture start.
-            install: webkit chromium
+            install: webkit
+            engine: webkit
+          # PHASE8_DESIGN.md §3 S8 (D-138, Q3): a curated subset of the SAME untagged flow classes
+          # the chromium lane runs — auth (every flow's real register+onboard), RSVP, calendar
+          # create, poll vote, notifications — driven on a second engine. Intended two-engine
+          # coverage, not a double-run, so the chromium filter above is unchanged and the
+          # `Browser!=` trait exclusion still applies only to engine-specific classes (the WebKit
+          # pointer set). Curated per method rather than per class because every extra registration
+          # costs `PlaywrightFixture`'s 65-second shared-rate-window barrier.
+          # `BrowserEngineLaneTests` is the lane's liveness guard: it fails if the engine below did
+          # not actually launch, so a filter or env typo cannot leave a silently green empty lane.
+          - browser: firefox
+            step-name: Firefox curated flows
+            filter: FullyQualifiedName~BrowserEngineLaneTests|FullyQualifiedName~SessionRegisteredFlowTests.KeyboardOnlyRsvp_TogglesGoingWithoutAMouse|FullyQualifiedName~AvailabilityCalendarFlowTests.OccurrenceScopeDialogIsReachableWithoutAPointer_D143|FullyQualifiedName~PollVotingFlowTests.RevisingAnExistingVote_KeepsFocusOnTheClickedControl_S6Gate|FullyQualifiedName~PushEnableFlowTests.EnableFlow_AbsentPushManagerShowsTheD175FallbackNotice_AndNeverPrompts_D175
+            install: firefox
+            engine: firefox
     runs-on: ubuntu-latest
     name: browser (${{ matrix.browser }})
     steps:
@@ -170,6 +191,7 @@ jobs:
       - name: ${{ matrix.step-name }}
         env:
           PARTYUP_BROWSER_TOPOLOGY: built
+          PARTYUP_BROWSER_ENGINE: ${{ matrix.engine }}
         run: >
           dotnet test tests/PartyUp.BrowserTests --no-build -p:PartyUpBrowserTests=true
           --filter "${{ matrix.filter }}"
