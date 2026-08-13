@@ -937,7 +937,7 @@ export function WeekGrid({
               </span>
               <span
                 aria-hidden="true"
-                className="text-[11px] leading-tight tabular-nums text-ink-soft"
+                className="text-[11px] leading-tight tabular-nums text-ink/80"
               >
                 {cellTime(weekStart, day, 0, 0).getUTCDate()}
               </span>

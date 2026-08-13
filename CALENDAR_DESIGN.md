@@ -214,7 +214,8 @@ Slices (serialized S2→S5; write sets in `.foreman/ledger.md`):
   labels in a 56 px gutter; 15-min interior lines lighten toward `--color-grid-line`, hour
   lines `--color-grid-hour`; band rounding/label per §8 unchanged in mechanism, restyled.
   Session spans become pills at span start using **the ratified `accent`/`accent-ink` pair**
-  (poll spans: dashed border, same pair) — never `free-ink` on a new fill (zero-exclusion axe).
+  (poll spans: dashed border on the card fill with `ink` text) — never `free-ink` on a new
+  fill (zero-exclusion axe).
   Friend glyphs **stay non-identifying** (`GridFriendRange` carries `ownerLabel` only, and a
   per-friend avatar on masked entries would breach D-076): the glyph restyles as a small
   neutral disc chip at friend-span start, existing N>1 collapse rendered as "+N"; a real
