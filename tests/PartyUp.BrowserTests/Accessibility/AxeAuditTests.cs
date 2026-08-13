@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Deque.AxeCore.Commons;
 using Deque.AxeCore.Playwright;
 using Microsoft.Playwright;
+using PartyUp.Application.Auth;
 
 namespace PartyUp.BrowserTests.Accessibility;
 
@@ -62,6 +63,8 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
         RegisteredUser Organizer,
         RegisteredUser Admin,
         string AdminUserId,
+        Guid TokenSubjectId,
+        string TokenSubjectEmail,
         string SessionId,
         string GuestLinkUrl,
         string OwnFriendCode,
@@ -204,10 +207,33 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
             Guid adminUserId = await fixture.GrantAdminRoleAsync(admin.Username);
             await admin.Page.ReloadAsync();
 
+            // Phase 8 S7 (S3 review finding): the `RequiresAdmin` cases below are only meaningful if
+            // the grant above actually took. Both branches of `AdminDashboardPage` render the same
+            // `screen-admin-dashboard` testid, and the D-177 fail-closed branch is a single
+            // paragraph that trivially audits clean — so a silently failed role grant would turn
+            // three admin route audits into three green scans of a not-found page. This sentinel
+            // asserts real admin CONTENT (the dashboard heading) and the absence of the fail-closed
+            // alert, on the same context those cases navigate, before any of them run.
+            await admin.Page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/admin");
+            await admin.Page.GetByRole(
+                AriaRole.Heading, new() { Name = "Usage dashboard" }).WaitForAsync();
+            Assert.Equal(
+                0,
+                await admin.Page.Locator("[data-testid=screen-admin-dashboard] [role=alert]")
+                    .CountAsync());
+
+            // Phase 8 S7 / Q4: the identity every minted token below is bound to. The organizer
+            // backs them rather than a third registration — the `TokenForm` routes consume only on
+            // submit and the audit never submits, so the account is left untouched.
+            (Guid tokenSubjectId, string tokenSubjectEmail) =
+                await fixture.GetAuthIdentityAsync(organizer.Username);
+
             return new AuditContext(
                 organizer,
                 admin,
                 adminUserId.ToString(),
+                tokenSubjectId,
+                tokenSubjectEmail,
                 sessionId,
                 guestLinkUrl,
                 ownFriendCode,
@@ -352,17 +378,24 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
         return await RunAxeAsync(page);
     }
 
+    /// <summary>
+    /// Rows carry the route's <b>name</b>, not the record: a string is a serializable theory
+    /// argument, so vstest's <c>FullyQualifiedName</c> for each row contains it and a single route's
+    /// light+dark pair can be re-run on its own (`--filter FullyQualifiedName~auth-reset`). With the
+    /// record itself as the argument the only runnable unit was the whole ~50-route theory.
+    /// </summary>
     public static IEnumerable<object[]> Routes() =>
         from route in AuditedRoutes.All
         from theme in new[] { AuditedTheme.Light, AuditedTheme.Dark }
-        select new object[] { route, theme };
+        select new object[] { route.Name, theme };
 
     [Theory]
     [MemberData(nameof(Routes))]
     public async Task EveryAuditedRouteHasNoWcagViolationOutsideTheDatedExclusionList_D139(
-        AuditedRoute route,
+        string routeName,
         AuditedTheme theme)
     {
+        AuditedRoute route = AuditedRoutes.ByName(routeName);
         AuditContext context = await GetContextAsync();
 
         AxeResultItem[] violations;
@@ -388,6 +421,28 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
                     ? context.PollGuestLinkUrl
                     : context.GuestLinkUrl;
                 await page.GotoAsync(guestLinkUrl);
+            }
+            else if (route.SignedOut)
+            {
+                // Phase 8 S7 / Q4: a mailed link opens in whatever browser the recipient has, signed
+                // out — so these are audited in their own throwaway context, which also keeps a
+                // single-use token from ever being reused across the light/dark pair (each case
+                // mints its own below). Closed in the finally, like the guest contexts above.
+                guestContext = await fixture.NewContextAsync();
+                page = await guestContext.NewPageAsync();
+                await SeedThemeBeforeFirstNavigationAsync(page, theme);
+
+                string url = PlaywrightFixture.WebBaseUrl + route.PathTemplate;
+                if (route.TokenPurpose is AuthTokenPurpose purpose)
+                {
+                    string rawToken = await fixture.MintAuthTokenAsync(
+                        purpose,
+                        context.TokenSubjectId,
+                        context.TokenSubjectEmail);
+                    url += "#token=" + rawToken;
+                }
+
+                await page.GotoAsync(url);
             }
             else
             {
@@ -518,6 +573,253 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
     }
 
     /// <summary>
+    /// PHASE8_DESIGN.md §3 S7's interaction-state half. The route theory above scans initial render
+    /// only, so every state a viewer reaches by *doing* something — an open combobox popup, a modal
+    /// mid-flow, a live selection, a focused control — has never been audited. These are scripted
+    /// state-then-scan facts rather than <see cref="AuditedRoutes"/> entries: the state is not
+    /// addressable by URL, so there is nothing for that theory to navigate to.
+    /// <para>
+    /// Each runs on a fresh tab of an already-authenticated context (never the account's persistent
+    /// page) under a pre-navigation theme seed, the same idiom the route cases use, and closes it in
+    /// a finally so the state loop doesn't accumulate tabs.
+    /// </para>
+    /// </summary>
+    private static async Task AssertInteractionStateIsAxeCleanAsync(
+        string stateName,
+        AuditedTheme theme,
+        IBrowserContext browserContext,
+        string path,
+        Func<IPage, Task> reachState)
+    {
+        IPage page = await browserContext.NewPageAsync();
+        try
+        {
+            await SeedThemeBeforeFirstNavigationAsync(page, theme);
+            await page.GotoAsync(PlaywrightFixture.WebBaseUrl + path);
+            await AssertThemeAppliedAsync(page, theme);
+            await reachState(page);
+
+            AxeResultItem[] violations = await RunAxeAsync(page);
+            HashSet<string> excludedRuleIds = AxeExclusions.Entries
+                .Where(entry => entry.RouteName == stateName)
+                .Select(entry => entry.RuleId)
+                .ToHashSet(StringComparer.Ordinal);
+            AxeResultItem[] unexpected = violations
+                .Where(violation => !excludedRuleIds.Contains(violation.Id))
+                .ToArray();
+
+            if (unexpected.Length > 0)
+            {
+                Directory.CreateDirectory(AxeArtifactsDirectory);
+                string dumpPath = Path.Combine(
+                    AxeArtifactsDirectory, $"{stateName}.{ThemeValue(theme)}.json");
+                await File.WriteAllTextAsync(
+                    dumpPath, JsonSerializer.Serialize(unexpected, DumpJsonOptions));
+            }
+
+            Assert.True(
+                unexpected.Length == 0,
+                $"Interaction state '{stateName}' ({ThemeValue(theme)}) has {unexpected.Length} " +
+                "un-excluded axe violation(s): " +
+                string.Join(", ", unexpected.Select(v => $"{v.Id} ({v.Impact})")) +
+                $". Details in {AxeArtifactsDirectory}.");
+        }
+        finally
+        {
+            await page.CloseAsync();
+        }
+    }
+
+    /// <summary>
+    /// D-194's game picker with its combobox popup open over real results. The catalog is populated
+    /// by a Hangfire job against the live Steam API, which this lane must not depend on, so the rows
+    /// are seeded over the fixture's own connection — without them the component takes its sticky
+    /// D-058 fallback branch and there is no popup to audit at all, which this asserts before
+    /// scanning rather than silently auditing the fallback.
+    /// </summary>
+    [Theory]
+    [InlineData(AuditedTheme.Light)]
+    [InlineData(AuditedTheme.Dark)]
+    public async Task SteamGamePickerOpenWithResults_HasNoWcagViolation_D139(AuditedTheme theme)
+    {
+        AuditContext context = await GetContextAsync();
+        await fixture.SeedSteamCatalogAppsAsync(
+            (570, "Dota 2"), (730, "Counter-Strike 2"), (440, "Team Fortress 2"));
+
+        await AssertInteractionStateIsAxeCleanAsync(
+            "steam-game-picker-open",
+            theme,
+            context.Organizer.Page.Context,
+            "/sessions/new",
+            async page =>
+            {
+                await page.Locator("#field-platform").SelectOptionAsync("Steam");
+                ILocator combobox = page.Locator("#field-game-name");
+                await combobox.FillAsync("Team");
+                ILocator listbox = page.GetByRole(AriaRole.Listbox);
+                await listbox.WaitForAsync();
+                await Assertions.Expect(listbox.GetByRole(AriaRole.Option).First).ToBeVisibleAsync();
+            });
+    }
+
+    /// <summary>
+    /// The three availability modals, reached the way a keyboard viewer reaches them and audited in
+    /// one walk: paint a range to raise the commit dialog, cancel it, then open the seeded weekly
+    /// series' busy cell — which raises the D-134/D-143 scope dialog, whose Confirm raises the block
+    /// editor. Nothing is saved, so the organizer's calendar is unchanged for the route cases.
+    /// </summary>
+    [Theory]
+    [InlineData(AuditedTheme.Light)]
+    [InlineData(AuditedTheme.Dark)]
+    public async Task AvailabilityDialogs_HaveNoWcagViolation_D139(AuditedTheme theme)
+    {
+        AuditContext context = await GetContextAsync();
+
+        await AssertInteractionStateIsAxeCleanAsync(
+            "availability-commit-dialog",
+            theme,
+            context.Organizer.Page.Context,
+            "/calendar",
+            async page =>
+            {
+                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                await page.GetByRole(AriaRole.Gridcell).First.FocusAsync();
+                await page.Keyboard.PressAsync("Enter");
+                await page.Keyboard.PressAsync("Shift+ArrowDown");
+                await page.Keyboard.PressAsync("Enter");
+                await page.GetByRole(AriaRole.Dialog)
+                    .GetByText("Add this availability?").WaitForAsync();
+            });
+
+        await AssertInteractionStateIsAxeCleanAsync(
+            "availability-occurrence-scope-dialog",
+            theme,
+            context.Organizer.Page.Context,
+            "/calendar",
+            async page =>
+            {
+                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                ILocator busyCell = page
+                    .GetByRole(AriaRole.Gridcell, new() { NameRegex = new Regex("Busy") }).First;
+                await busyCell.WaitForAsync();
+                await busyCell.FocusAsync();
+                await page.Keyboard.PressAsync("Enter");
+                await page.GetByRole(AriaRole.Dialog)
+                    .GetByRole(AriaRole.Heading, new() { Name = "Which occurrences?" })
+                    .WaitForAsync();
+            });
+
+        await AssertInteractionStateIsAxeCleanAsync(
+            "availability-block-editor-dialog",
+            theme,
+            context.Organizer.Page.Context,
+            "/calendar",
+            async page =>
+            {
+                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                ILocator busyCell = page
+                    .GetByRole(AriaRole.Gridcell, new() { NameRegex = new Regex("Busy") }).First;
+                await busyCell.WaitForAsync();
+                await busyCell.FocusAsync();
+                await page.Keyboard.PressAsync("Enter");
+                await page.GetByRole(AriaRole.Button, new() { Name = "Confirm" }).ClickAsync();
+                await page.GetByRole(AriaRole.Dialog)
+                    .GetByText("Edit availability").WaitForAsync();
+            });
+    }
+
+    /// <summary>
+    /// A live keyboard selection on the week grid — the state between the first `Enter` and the one
+    /// that commits, where the grid carries `data-selection-edge` band borders and a `role=status`
+    /// extent announcement that no initial-render scan has ever seen.
+    /// </summary>
+    [Theory]
+    [InlineData(AuditedTheme.Light)]
+    [InlineData(AuditedTheme.Dark)]
+    public async Task WeekGridMidDragSelection_HasNoWcagViolation_D139(AuditedTheme theme)
+    {
+        AuditContext context = await GetContextAsync();
+
+        await AssertInteractionStateIsAxeCleanAsync(
+            "week-grid-mid-selection",
+            theme,
+            context.Organizer.Page.Context,
+            "/calendar",
+            async page =>
+            {
+                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                await page.GetByRole(AriaRole.Gridcell).First.FocusAsync();
+                await page.Keyboard.PressAsync("Enter");
+                await page.Keyboard.PressAsync("Shift+ArrowDown");
+                await page.Keyboard.PressAsync("Shift+ArrowDown");
+                // The selection is live and uncommitted: banded cells, no dialog.
+                await Assertions
+                    .Expect(page.Locator("[role=gridcell][data-selection-edge]").First)
+                    .ToBeVisibleAsync();
+                await Assertions.Expect(page.GetByRole(AriaRole.Dialog)).ToHaveCountAsync(0);
+            });
+    }
+
+    /// <summary>
+    /// The voting grid with one of its APG radiogroup controls focused — the focus ring, the roving
+    /// tabindex and the checked fill are all state an unfocused initial-render scan misses.
+    /// </summary>
+    [Theory]
+    [InlineData(AuditedTheme.Light)]
+    [InlineData(AuditedTheme.Dark)]
+    public async Task VotingGridFocusedControl_HasNoWcagViolation_D139(AuditedTheme theme)
+    {
+        AuditContext context = await GetContextAsync();
+
+        await AssertInteractionStateIsAxeCleanAsync(
+            "voting-grid-focused",
+            theme,
+            context.Organizer.Page.Context,
+            "/polls/" + context.PollId,
+            async page =>
+            {
+                ILocator control = page.Locator("[data-testid^='vote-available-']").First;
+                await control.WaitForAsync();
+                await control.FocusAsync();
+                await Assertions.Expect(control).ToBeFocusedAsync();
+            });
+    }
+
+    /// <summary>
+    /// The tour overlay <b>mid-run</b>, not at its first step: the existing D-182 fact scans step 1,
+    /// where the overlay has no "back" affordance and its progress text reads differently. This
+    /// advances one step first, so the middle-of-the-run chrome is audited too.
+    /// </summary>
+    [Theory]
+    [InlineData(AuditedTheme.Light)]
+    [InlineData(AuditedTheme.Dark)]
+    public async Task TourOverlayMidRun_HasNoWcagViolation_D139_D182(AuditedTheme theme)
+    {
+        AuditContext context = await GetContextAsync();
+
+        await AssertInteractionStateIsAxeCleanAsync(
+            "tour-overlay-mid-run",
+            theme,
+            context.Organizer.Page.Context,
+            "/settings/account",
+            async page =>
+            {
+                await page.GetByRole(AriaRole.Button, new() { Name = "Replay the tour" }).ClickAsync();
+                ILocator dialog = page.GetByRole(AriaRole.Dialog);
+                await dialog.WaitForAsync();
+                await dialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
+                // Step 2 of N — the dialog's own title carries the step number, so waiting on a
+                // title that is no longer "Step 1" is what proves the advance actually happened.
+                await Assertions
+                    .Expect(dialog.GetByText(new Regex(@"Step 2 of \d+")))
+                    .ToBeVisibleAsync();
+            });
+
+        // The replayed tour is left open on a tab this helper already closed; the account's
+        // `tourCompleted` flag is untouched by Replay, so nothing leaks into a later fact.
+    }
+
+    /// <summary>
     /// Round-1 F8 (NOTE, detection-power proof): the 29/29-clean result above is only meaningful if
     /// this harness can actually catch a real violation — this negative control proves it can,
     /// independent of the app, by scanning a deliberately inaccessible DOM (an unlabeled input and
@@ -572,6 +874,25 @@ public sealed class AxeExclusionListTests
     /// This constant must never gain a name after S1 close, no matter how <c>AuditedRoutes.cs</c>
     /// grows.
     /// </summary>
+    /// <summary>
+    /// Phase 8 S7: <see cref="AuditedRoutes.ByName"/> and the theory's per-row filterability both
+    /// depend on names being unique — a duplicate would silently collapse two routes into one
+    /// audited row (or throw mid-theory) rather than failing here.
+    /// </summary>
+    [Fact]
+    public void EveryAuditedRouteNameIsUnique_D139()
+    {
+        string[] duplicates = AuditedRoutes.All
+            .GroupBy(route => route.Name, StringComparer.Ordinal)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToArray();
+
+        Assert.True(
+            duplicates.Length == 0,
+            "Audited route names must be unique; duplicated: " + string.Join(", ", duplicates));
+    }
+
     private static readonly IReadOnlyList<string> S1SeededPhase4RouteNames =
     [
         "welcome", "age-gate", "login", "register",

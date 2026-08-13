@@ -22,6 +22,21 @@ const SPOTLIGHT_CLASSES = [
   'outline-2',
   'outline-offset-2',
   'outline-focus',
+  // Lifting the anchor above the scrim raises the element, not a backdrop: an
+  // anchor with no background of its own (an inactive nav link) still shows the
+  // scrim-darkened page through itself, so its own text keeps a light-mode ink
+  // colour over a darkened ground — measured at 1.94:1 by the S7 mid-run scan.
+  // An opaque pseudo-element behind the content restores the token pair the
+  // anchor was designed against. It is a `::before` rather than a `bg-*`
+  // utility because an anchor that DOES carry its own fill (an active nav link
+  // is `bg-primary`) must keep it — two background utilities on one element
+  // would resolve by Tailwind's emit order, not by intent.
+  'before:absolute',
+  'before:inset-0',
+  'before:-z-10',
+  'before:rounded-control',
+  'before:bg-card',
+  "before:content-['']",
 ]
 
 /**

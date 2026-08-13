@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using Microsoft.Playwright;
 using Npgsql;
+using PartyUp.Application.Auth;
 using Testcontainers.PostgreSql;
 
 namespace PartyUp.BrowserTests;
@@ -445,6 +446,118 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         }
 
         return userId;
+    }
+
+    /// <summary>
+    /// PHASE8_DESIGN.md §2 Q4's ratified mechanism for the S7 axe audit's token-gated routes. This
+    /// fixture is black box — a separate API process, no DI handle — so it cannot call
+    /// <c>ISecurityTokenService</c>. It writes the row that service would have written instead, over
+    /// its own Npgsql connection (the <see cref="GrantAdminRoleAsync"/> idiom): the raw token is 32
+    /// CSPRNG bytes, base64url-encoded for the URL fragment, and <c>auth_tokens.token_hash</c> holds
+    /// their SHA-256 — exactly <c>SecurityTokenService.IssueAsync</c>/<c>TryHashRawToken</c>'s shape,
+    /// so the running server redeems it through its ordinary path with nothing mocked. Driving the
+    /// issuing endpoints instead was ruled out by Q4: each extra registration costs
+    /// <see cref="SettleSharedRateLimitWindowBeforeRegistrationAsync"/>'s 65-second barrier, and the
+    /// consumption legs sit in the IP-partitioned <c>auth-ip</c> dimension a fresh account does
+    /// nothing for.
+    /// <para>
+    /// The returned raw token is single-use and some purposes mutate the account, so every caller
+    /// navigates it in a throwaway context and mints its own.
+    /// </para>
+    /// </summary>
+    public async Task<string> MintAuthTokenAsync(
+        AuthTokenPurpose purpose,
+        Guid? userId,
+        string? emailNormalized = null,
+        TimeSpan? ttl = null)
+    {
+        byte[] tokenBytes = RandomNumberGenerator.GetBytes(32);
+        string rawToken = Base64UrlEncode(tokenBytes);
+        byte[] tokenHash = SHA256.HashData(tokenBytes);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        await using var connection = new NpgsqlConnection(_dbConnectionString);
+        await connection.OpenAsync();
+
+        await using var insert = new NpgsqlCommand(
+            "INSERT INTO auth_tokens " +
+            "(id, purpose, token_hash, user_id, email_normalized, created_at, expires_at, " +
+            " consumed_at, request_ip_hash, pending_locale, pending_age_gate, payload) " +
+            "VALUES (@id, @purpose, @tokenHash, @userId, @emailNormalized, @now, @expiresAt, " +
+            " NULL, NULL, NULL, false, NULL)",
+            connection);
+        insert.Parameters.AddWithValue("id", Guid.CreateVersion7());
+        insert.Parameters.AddWithValue("purpose", (int)purpose);
+        insert.Parameters.AddWithValue("tokenHash", tokenHash);
+        insert.Parameters.AddWithValue(
+            "userId", userId.HasValue ? userId.Value : (object)DBNull.Value);
+        insert.Parameters.AddWithValue(
+            "emailNormalized", emailNormalized ?? (object)DBNull.Value);
+        insert.Parameters.AddWithValue("now", now);
+        insert.Parameters.AddWithValue("expiresAt", now + (ttl ?? TimeSpan.FromHours(1)));
+
+        int rows = await insert.ExecuteNonQueryAsync();
+        if (rows != 1)
+        {
+            throw new InvalidOperationException(
+                $"Minting an {purpose} auth token wrote {rows} row(s); expected exactly one.");
+        }
+
+        return rawToken;
+    }
+
+    /// <summary>
+    /// The user id and normalized email a minted token has to be bound to, read back over the same
+    /// connection (<c>auth_users.id</c> is the user's own id, <c>fk_auth_users_users_id</c>).
+    /// </summary>
+    public async Task<(Guid UserId, string NormalizedEmail)> GetAuthIdentityAsync(string username)
+    {
+        await using var connection = new NpgsqlConnection(_dbConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new NpgsqlCommand(
+            "SELECT a.id, a.normalized_email FROM auth_users a " +
+            "JOIN users u ON u.id = a.id WHERE u.username = @username",
+            connection);
+        command.Parameters.AddWithValue("username", username);
+
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+        {
+            throw new InvalidOperationException(
+                $"No auth_users row exists for '{username}'; a token has nothing to bind to.");
+        }
+
+        return (reader.GetGuid(0), reader.GetString(1));
+    }
+
+    /// <summary>
+    /// Phase 8 S7: the D-194 game picker only opens its combobox popup while the catalog is
+    /// known-available, and <c>SearchSteamCatalogUseCase</c> derives that from
+    /// <c>ISteamCatalogRepository.HasAnyAppAsync</c> — an empty <c>steam_apps</c> table makes the
+    /// component degrade to its honest name/App-ID fallback pair instead, permanently for the life
+    /// of the form. The catalog is populated by a Hangfire job against the real Steam web API, which
+    /// this lane neither runs nor should depend on, so the audit seeds its own rows over the same
+    /// connection backdoor the rest of this fixture uses. Idempotent: reruns against the persistent
+    /// dev Postgres upsert rather than collide on the primary key.
+    /// </summary>
+    public async Task SeedSteamCatalogAppsAsync(params (long AppId, string Name)[] apps)
+    {
+        ArgumentNullException.ThrowIfNull(apps);
+        await using var connection = new NpgsqlConnection(_dbConnectionString);
+        await connection.OpenAsync();
+
+        foreach ((long appId, string name) in apps)
+        {
+            await using var upsert = new NpgsqlCommand(
+                "INSERT INTO steam_apps (app_id, name, last_modified) " +
+                "VALUES (@appId, @name, NULL) " +
+                "ON CONFLICT (app_id) DO UPDATE SET name = EXCLUDED.name",
+                connection);
+            upsert.Parameters.AddWithValue("appId", appId);
+            upsert.Parameters.AddWithValue("name", name);
+            await upsert.ExecuteNonQueryAsync();
+        }
     }
 
     public async Task DisposeAsync()

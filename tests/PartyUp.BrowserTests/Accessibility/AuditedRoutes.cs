@@ -1,3 +1,5 @@
+using PartyUp.Application.Auth;
+
 namespace PartyUp.BrowserTests.Accessibility;
 
 /// <summary>
@@ -19,15 +21,28 @@ public enum GuestLinkKind
 /// navigating. <paramref name="OnboardingStepKey"/> is set only for the seven `/onboarding*` routes
 /// (round-1 F5) — those pages cannot be reached by direct navigation at all (see
 /// <see cref="Accessibility.AxeAuditTests"/>'s remarks), so their finding is captured during the
-/// fixture's own registration walk instead of a fresh <c>GotoAsync</c>. A route needing a token this
-/// fixture cannot mint on demand (magic link, password reset, email verification/change,
-/// external-auth callback) stays out of S1's seed — "reachable in the fixture" (PHASE5_DESIGN.md §9)
-/// excludes only what the fixture genuinely has no way to reach.
+/// fixture's own registration walk instead of a fresh <c>GotoAsync</c>. Token-bearing routes were
+/// out of S1's seed because the fixture could not mint on demand; Phase 8 S7 closes that under Q4's
+/// ratified pre-hashed-row mechanism (<paramref name="TokenPurpose"/> below), leaving
+/// <c>/auth/callback</c> as the one route with no repo-side audit at all.
 /// </summary>
+/// <param name="SignedOut">
+/// Phase 8 S7: the route's real audience is a signed-out visitor arriving from a mailed link, so it
+/// is scanned in a throwaway anonymous context rather than on the organizer's authenticated one —
+/// an authenticated session changes what the app chrome renders around these pages.
+/// </param>
 /// <param name="RequiresAdmin">
 /// Phase 8 S3 (PHASE8_DESIGN.md §3): the route is behind <c>RequireAdmin</c>, which answers 404 to
 /// everyone else — <see cref="Accessibility.AxeAuditTests"/> navigates it on the dedicated admin audit
 /// account's context rather than the shared organizer's, or it would scan the fail-closed branch.
+/// </param>
+/// <param name="TokenPurpose">
+/// Phase 8 S7 (PHASE8_DESIGN.md §2 Q4, ratified): the route only renders its real DOM with a
+/// security token in the URL fragment. <see cref="Accessibility.AxeAuditTests"/> mints one over the
+/// fixture's own Npgsql connection (<c>PlaywrightFixture.MintAuthTokenAsync</c> — a pre-hashed
+/// <c>auth_tokens</c> row in exactly <c>SecurityTokenService.IssueAsync</c>'s shape) and navigates
+/// <c>{path}#token={raw}</c> in a throwaway, signed-out context, the way a real mailed link arrives.
+/// A fresh token per case: tokens are single-use.
 /// </param>
 public sealed record AuditedRoute(
     string Name,
@@ -35,7 +50,9 @@ public sealed record AuditedRoute(
     bool RequiresGuestLink = false,
     string? OnboardingStepKey = null,
     GuestLinkKind GuestLinkKind = GuestLinkKind.Session,
-    bool RequiresAdmin = false);
+    bool RequiresAdmin = false,
+    AuthTokenPurpose? TokenPurpose = null,
+    bool SignedOut = false);
 
 /// <summary>
 /// Checked-in route inventory for the S1 axe lane (A-082, PHASE5_DESIGN.md §9, §11 "Browser lane
@@ -47,6 +64,16 @@ public sealed record AuditedRoute(
 /// </summary>
 public static class AuditedRoutes
 {
+    /// <summary>
+    /// Phase 8 S7: the theory below keys on this name rather than on the record itself, so each row
+    /// carries a serializable argument and <c>--filter FullyQualifiedName~{name}</c> selects exactly
+    /// one route's two theme cases. With the record as the argument, vstest could only ever run the
+    /// whole ~50-route theory — there was no way to re-run a single finding.
+    /// </summary>
+    public static AuditedRoute ByName(string name) =>
+        All.SingleOrDefault(route => string.Equals(route.Name, name, StringComparison.Ordinal))
+        ?? throw new InvalidOperationException($"No audited route is named '{name}'.");
+
     public static IReadOnlyList<AuditedRoute> All { get; } =
     [
         new AuditedRoute("welcome", "/welcome"),
@@ -117,5 +144,52 @@ public static class AuditedRoutes
         new AuditedRoute("privacy", "/privacy"),
         new AuditedRoute("terms", "/terms"),
         new AuditedRoute("community-standards", "/community-standards"),
+        // Phase 8 S7 (PHASE8_DESIGN.md §3 S7): the delta against App.tsx's route table — the two
+        // plainly-navigable routes the S1..S5 seed missed, then the token-gated set under Q4.
+        //
+        // Plainly navigable, organizer-authenticated like every other in-app route above.
+        new AuditedRoute("poll-invite", "/polls/{pollId}/invite"),
+        // `/email-unsubscribe` reads its token from the URL fragment and renders only the
+        // invalid-link branch without one, so both states are audited — they are different DOM,
+        // not the same page twice.
+        new AuditedRoute("email-unsubscribe-invalid", "/email-unsubscribe", SignedOut: true),
+        new AuditedRoute(
+            "email-unsubscribe-token",
+            "/email-unsubscribe",
+            SignedOut: true,
+            TokenPurpose: AuthTokenPurpose.EmailUnsubscribe),
+        // The three `TokenForm` routes (`AuthScreens.tsx`) render their form on mount and consume
+        // the token only on submit, so a minted token renders inertly: the audit sees the real
+        // token-bearing DOM and the backing account is never mutated. That is why one organizer
+        // account backs all of these rather than a dedicated registration (Q4's registration
+        // budget: every extra one costs the fixture's 65-second shared-rate-window barrier).
+        new AuditedRoute(
+            "auth-reset",
+            "/auth/reset",
+            SignedOut: true,
+            TokenPurpose: AuthTokenPurpose.PasswordReset),
+        new AuditedRoute(
+            "auth-verify-email",
+            "/auth/verify-email",
+            SignedOut: true,
+            TokenPurpose: AuthTokenPurpose.EmailVerification),
+        new AuditedRoute(
+            "auth-email-change",
+            "/auth/email-change",
+            SignedOut: true,
+            TokenPurpose: AuthTokenPurpose.EmailChange),
+        // `/auth/magic` and `/auth/confirm-identity` differ from the three above: both consume the
+        // token in a mount effect and `navigate(..., { replace: true })` away on success, so a
+        // minted token would leave axe scanning the *destination* (`/app`, `/settings/account`) —
+        // routes already audited above — and report nothing about these two. Their own DOM is the
+        // no-token invalid-link branch, which is deterministic, so that is what is audited here.
+        new AuditedRoute("auth-magic-invalid", "/auth/magic", SignedOut: true),
+        new AuditedRoute("auth-confirm-identity-invalid", "/auth/confirm-identity", SignedOut: true),
+        // `/auth/callback` carries NO entry, by decision rather than omission (Q4's documented
+        // manual-audit disposition): it is the external-auth redirect leg. It reads `reauth`/error
+        // state out of the fragment an external identity provider put there and immediately routes
+        // onward; there is no fixture-reachable state in which it renders a stable page of its own,
+        // and reaching a genuine one needs a real provider round trip. Recorded as a manual audit
+        // against D-139 in TRACEABILITY.md and in docs/WCAG_AUDIT_PHASE8.md, not silently skipped.
     ];
 }
