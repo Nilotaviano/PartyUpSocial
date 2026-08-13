@@ -126,7 +126,7 @@ describe('NotificationCenterPage — unread semantics (PHASE5_1_DESIGN.md §3 :5
 })
 
 describe('NotificationCenterPage — masked-actor wire shapes (PHASE7_DESIGN.md §4)', () => {
-  it('renders the named actor when both actor fields are present_D060', async () => {
+  it('renders the named actor when both actor fields are present_D076', async () => {
     mockNotifications({
       items: [
         notification({
@@ -179,7 +179,7 @@ describe('NotificationCenterPage — masked-actor wire shapes (PHASE7_DESIGN.md 
 })
 
 describe('NotificationCenterPage — §2 minimal-form row renders unlinked', () => {
-  it('renders no anchor and no navigating control for a subject-less row_D060', async () => {
+  it('renders no anchor and no navigating control for a subject-less row_D076', async () => {
     mockNotifications({
       items: [
         notification({

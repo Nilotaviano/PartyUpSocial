@@ -17,7 +17,7 @@ vi.mock('react-router', async () => {
   return { ...actual, useNavigate: () => navigateSpy }
 })
 
-import '../../i18n'
+import i18n from '../../i18n'
 import { PollCreatePage } from './PollCreatePage'
 
 function renderPage(initialEntry = '/polls/new') {
@@ -499,5 +499,32 @@ describe('PollCreatePage', () => {
         ),
       ).not.toBeInTheDocument()
     })
+  })
+
+  it('formats option instants in the account language, not the browser locale_D146', async () => {
+    mockGet()
+    await i18n.changeLanguage('pt-BR')
+    try {
+      renderPage()
+
+      fireEvent.change(document.getElementById('field-option-value')!, {
+        target: { value: '2099-01-01T10:00' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Adicionar horário' }))
+
+      const expected = new Intl.DateTimeFormat('pt-BR', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(new Date('2099-01-01T10:00'))
+      const unexpected = new Intl.DateTimeFormat('en', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(new Date('2099-01-01T10:00'))
+
+      expect(await screen.findByText(expected)).toBeInTheDocument()
+      expect(screen.queryByText(unexpected)).not.toBeInTheDocument()
+    } finally {
+      await i18n.changeLanguage('en')
+    }
   })
 })

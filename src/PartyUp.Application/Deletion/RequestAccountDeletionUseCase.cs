@@ -90,7 +90,7 @@ public sealed class RequestAccountDeletionUseCase(
         {
             "pt-BR" => ("pt-BR", "d 'de' MMMM 'de' yyyy '\u00e0s' HH:mm z"),
             "es" => ("es", "d 'de' MMMM 'de' yyyy 'a las' HH:mm z"),
-            _ => ("en-US", "MMMM d, yyyy 'at' HH:mm z"),
+            _ => ("en-US", "MMMM d, yyyy 'at' h:mm tt z"),
         };
         ZonedDateTimePattern pattern = ZonedDateTimePattern.CreateWithInvariantCulture(
             patternText,

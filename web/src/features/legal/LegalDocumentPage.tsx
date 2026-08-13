@@ -1,5 +1,7 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+
+import { LEGAL_UPDATED_AT } from './legalLocale'
 
 /**
  * Shared chrome for the three legal documents (PHASE8_DESIGN.md §3 S5): the
@@ -17,8 +19,15 @@ export function LegalDocumentPage({
   title: string
   children: ReactNode
 }) {
-  const { t } = useTranslation('legal')
+  const { t, i18n } = useTranslation('legal')
   const heading = useRef<HTMLHeadingElement>(null)
+  const updatedAt = useMemo(
+    () =>
+      new Intl.DateTimeFormat(i18n.language, { dateStyle: 'long' }).format(
+        new Date(LEGAL_UPDATED_AT),
+      ),
+    [i18n.language],
+  )
 
   useEffect(() => {
     heading.current?.focus()
@@ -47,7 +56,7 @@ export function LegalDocumentPage({
       </p>
 
       <p className="text-ink-soft">
-        {t('updatedLabel')}: {t('updated')}
+        {t('updatedLabel')}: {updatedAt}
       </p>
 
       <div className="space-y-8">{children}</div>

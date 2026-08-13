@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router'
 import { isApiError } from '../../api/client'
@@ -166,7 +166,7 @@ const emptyForm = {
 }
 
 export function PollCreatePage() {
-  const { t } = useTranslation(['polls', 'errors', 'availability'])
+  const { t, i18n } = useTranslation(['polls', 'errors', 'availability'])
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const heading = useRef<HTMLHeadingElement>(null)
@@ -182,6 +182,10 @@ export function PollCreatePage() {
   const [optionNotice, setOptionNotice] = useState<string | null>(null)
   const [discardOpen, setDiscardOpen] = useState(false)
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
+  const optionFormat = useMemo(
+    () => new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }),
+    [i18n.language],
+  )
 
   const friends = useQuery({
     queryKey: friendKeys.friends,
@@ -468,17 +472,9 @@ export function PollCreatePage() {
                   key={iso}
                   className="flex items-center justify-between gap-2 rounded-card border-2 border-ink bg-card p-2"
                 >
-                  <span className="text-ink">
-                    {new Intl.DateTimeFormat(undefined, {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    }).format(new Date(iso))}
-                  </span>
+                  <span className="text-ink">{optionFormat.format(new Date(iso))}</span>
                   <Button
-                    aria-label={`${t('create.removeOption')} ${new Intl.DateTimeFormat(
-                      undefined,
-                      { dateStyle: 'medium', timeStyle: 'short' },
-                    ).format(new Date(iso))}`}
+                    aria-label={`${t('create.removeOption')} ${optionFormat.format(new Date(iso))}`}
                     type="button"
                     variant="ghost"
                     onClick={() => removeOption(iso)}

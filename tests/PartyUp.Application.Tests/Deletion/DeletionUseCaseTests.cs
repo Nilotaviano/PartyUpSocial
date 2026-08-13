@@ -59,7 +59,7 @@ public sealed class RequestAccountDeletionUseCaseTests
     [InlineData(
         "en",
         "America/New_York",
-        "August 7, 2026 at 08:00 America/New_York")]
+        "August 7, 2026 at 8:00 AM America/New_York")]
     [InlineData(
         "pt-BR",
         "America/Fortaleza",

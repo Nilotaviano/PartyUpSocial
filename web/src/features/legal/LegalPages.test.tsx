@@ -7,7 +7,7 @@ import { AppFooter } from '../../components/AppFooter'
 import { CommunityStandardsPage } from './CommunityStandardsPage'
 import { PrivacyPolicyPage } from './PrivacyPolicyPage'
 import { TermsPage } from './TermsPage'
-import { resolveLegalLocale } from './legalLocale'
+import { LEGAL_UPDATED_AT, resolveLegalLocale } from './legalLocale'
 
 const locales = ['en', 'pt-BR', 'es'] as const
 
@@ -158,6 +158,17 @@ describe('draft banner', () => {
       expect(screen.getByText(/Last updated/)).toBeTruthy()
     })
   }
+
+  it('renders the last-updated date formatted in the current locale_D060', async () => {
+    await i18n.changeLanguage('pt-BR')
+    const expected = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' }).format(
+      new Date(LEGAL_UPDATED_AT),
+    )
+
+    renderWithRouter(<PrivacyPolicyPage />)
+
+    expect(screen.getByText((_, node) => node?.textContent === `Última atualização: ${expected}`)).toBeInTheDocument()
+  })
 
   it('marks every locale variant as a draft too', async () => {
     for (const locale of ['pt-BR', 'es'] as const) {
