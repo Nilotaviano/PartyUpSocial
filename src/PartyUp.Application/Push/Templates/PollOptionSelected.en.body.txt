@@ -1,1 +1,1 @@
-{{SubjectTitle}} picked {{OptionStart}}.
+The time for {{SubjectTitle}} is set: {{OptionStart}}.

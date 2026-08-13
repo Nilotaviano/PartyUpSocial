@@ -23,11 +23,11 @@
       "repeat": "Quien empezó a organizar hace poco tuvo menos ventana para volver a agendar, y eso baja la tasa por sí solo: léela junto a los números en bruto."
     },
     "repeat": {
-      "heading": "Reincidencia al agendar",
+      "heading": "Programación recurrente",
       "window": "Volvió a agendar dentro de {{days}} días de su primera creación",
-      "rate": "Tasa de reincidencia",
+      "rate": "Tasa de recurrencia",
       "organizers": "Organizadores",
-      "repeatOrganizers": "Organizadores reincidentes"
+      "repeatOrganizers": "Organizadores recurrentes"
     },
     "usersLink": "Gestionar cuentas",
     "noValue": "—",

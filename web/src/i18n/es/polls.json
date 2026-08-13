@@ -20,7 +20,7 @@
     "duration": "Duración (minutos)",
     "platform": "Plataforma",
     "game": "Juego",
-    "gameFreeText": "Escribir el nombre del juego",
+    "gameFreeText": "Escribe el nombre del juego",
     "notes": "Notas",
     "min": "Asistencia mínima",
     "max": "Capacidad máxima",
@@ -31,7 +31,7 @@
     "defaults": "Valores predeterminados: mínimo 4, máximo 4, 2 horas, plazo de 24 horas, sin plataforma, no privada.",
     "submit": "Crear encuesta",
     "platformOther": "Otra",
-    "steamAppId": "ID de app de Steam",
+    "steamAppId": "ID de la app de Steam",
     "steamAppIdHelp": "Opcional. El número en la URL de la tienda Steam del juego, por ejemplo 730 para Counter-Strike 2.",
     "gamePicker": {
       "label": "Buscar en el catálogo de Steam",
@@ -62,10 +62,11 @@
     "emptyDiscoverable": "No hay encuestas abiertas para descubrir por ahora.",
     "loadMore": "Cargar más",
     "optionCount": "{{count}} opción",
+    "optionCount_one": "{{count}} opción",
     "optionCount_other": "{{count}} opciones"
   },
   "status": {
-    "pollingUntil": "Votando · cierra {{deadline}}",
+    "pollingUntil": "En votación · cierra {{deadline}}",
     "awaitingSelection": "Cerrada · en espera de selección",
     "expiredPending": "Cerrada · ventana de selección vencida",
     "closed": "Cerrada",
@@ -76,7 +77,7 @@
   "detail": {
     "options": "Opciones",
     "roster": "Votantes",
-    "anonymous": "Usuario anónimo",
+    "anonymous": "Usuario Anónimo",
     "removed": "Eliminado",
     "deadline": "La votación cierra {{deadline}}.",
     "awaitingSelectionNotice": "La votación cerró. El organizador está eligiendo un horario.",
@@ -85,9 +86,12 @@
     "viewSession": "Ver la sesión",
     "expiredNotice": "Esta encuesta venció sin una selección.",
     "canceledNotice": "Esta encuesta fue cancelada.",
-    "tallyAvailable": "{{count}} disponible",
-    "tallyMaybe": "{{count}} tal vez",
-    "tallyUnavailable": "{{count}} no disponible",
+    "tallyAvailable_one": "{{count}} disponible",
+    "tallyAvailable_other": "{{count}} disponibles",
+    "tallyMaybe_one": "{{count}} tal vez",
+    "tallyMaybe_other": "{{count}} tal vez",
+    "tallyUnavailable_one": "{{count}} no disponible",
+    "tallyUnavailable_other": "{{count}} no disponibles",
     "tallyNone": "Aún no hay votos.",
     "yourVote": "Tu voto: {{value}}",
     "noVoteYet": "Aún no has votado en esta opción."
@@ -96,7 +100,7 @@
     "available": "Disponible",
     "maybe": "Tal vez",
     "unavailable": "No disponible",
-    "legend": "Vota para {{time}}",
+    "legend": "Votar en {{time}}",
     "controlLabel": "{{time}}, {{value}}",
     "updated": "Tu voto se guardó."
   },
@@ -112,7 +116,7 @@
   "mute": {
     "on": "Silenciar",
     "off": "Dejar de silenciar",
-    "copy": "Silenciar suprime todo sobre esta encuesta excepto tu recordatorio mientras estés en Voy o Tal vez. Dejar de silenciar no recupera nada — lo que se perdió mientras estaba silenciada no se pondrá en cola para entregarse después.",
+    "copy": "Silenciar suprime todo sobre esta encuesta excepto tu recordatorio mientras tu voto sea Disponible o Tal vez. Dejar de silenciar no recupera nada — lo que se perdió mientras estaba silenciada no se pondrá en cola para entregarse después.",
     "mutedAnnouncement": "Encuesta silenciada.",
     "unmutedAnnouncement": "Se dejó de silenciar la encuesta.",
     "disabledTerminal": "Silenciar no está disponible una vez que una encuesta se finaliza, expira o se cancela. Para una encuesta finalizada, silencia en su lugar la sesión que creó."
@@ -155,7 +159,7 @@
     "removeConfirm": "Esto elimina sus votos y revoca su enlace. Esta acción no se puede deshacer."
   },
   "guestPoll": {
-    "claimHeading": "Unirte a esta encuesta",
+    "claimHeading": "Unirse a esta encuesta",
     "displayName": "Tu nombre",
     "join": "Unirme y votar",
     "live": "Esta encuesta está abierta.",
@@ -184,7 +188,7 @@
       "poll_invalid_transition": "Ese cambio ya no es posible.",
       "poll_invites_closed": "Esta encuesta ya no acepta invitaciones.",
       "poll_participant_removed": "Ya no tienes acceso a esta encuesta.",
-      "poll_conflict": "Este invitado ya reclamó su enlace y no se puede revocar. Quítalo en su lugar.",
+      "poll_conflict": "Este invitado ya usó su enlace y no se puede revocar. Quita al invitado en su lugar.",
       "poll_guest_not_found": "No se pudo encontrar a ese invitado.",
       "poll_selection_window_closed": "La ventana de selección de esta encuesta cerró.",
       "poll_zero_options": "Esta encuesta no tiene opciones restantes.",

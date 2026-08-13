@@ -138,7 +138,7 @@ export function PrivacyPtBR() {
             'Sua identidade Steam, somente se você optar por vincular a Steam: seu Steam ID, seu nome de perfil (persona) e sua foto de perfil da Steam, que copiamos para que seu avatar continue funcionando dentro do PartyUp.',
             'Identificadores de jogo que você informa para as plataformas em que joga.',
             'Dados de disponibilidade: os blocos semanais e as exceções pontuais que você marca como livre ou ocupado.',
-            'Sessões e enquetes que você cria, aceita, recusa ou vota, com seus títulos, observações, jogos e horários.',
+            'Sessões e enquetes que você cria, aceita, recusa ou em que vota, com seus títulos, observações, jogos e horários.',
             'Notificações geradas para você no aplicativo e suas preferências de notificação, incluindo assinaturas de push se você ativar push.',
             'Quando você usou o PartyUp pela última vez, para mostrar atividade aos administradores e medir o uso ativo.',
             'Respostas de convidados: se você responde por um link de convidado, guardamos o nome informado e a sua resposta, sem criar conta.',
@@ -256,7 +256,7 @@ export function PrivacyEs() {
             'Tu identidad de Steam, solo si eliges vincular Steam: tu Steam ID, tu nombre de perfil (persona) y tu foto de perfil de Steam, que copiamos para que tu avatar siga funcionando dentro de PartyUp.',
             'Los identificadores de juego que ingresas para las plataformas en las que juegas.',
             'Datos de disponibilidad: los bloques semanales y los cambios puntuales que marcas como libre u ocupado.',
-            'Sesiones y encuestas que creas, aceptas, rechazas o votas, junto con sus títulos, notas, juegos y horarios.',
+            'Sesiones y encuestas que creas, aceptas, rechazas o en las que votas, junto con sus títulos, notas, juegos y horarios.',
             'Notificaciones generadas para ti dentro de la aplicación y tus preferencias de notificación, incluidas las suscripciones push si activas push.',
             'Cuándo usaste PartyUp por última vez, para mostrar actividad a la administración y medir el uso activo.',
             'Respuestas de invitados: si respondes mediante un enlace de invitado, guardamos el nombre que indicas y tu respuesta, sin crear una cuenta.',
@@ -278,7 +278,7 @@ export function PrivacyEs() {
           personas estuvieron activas en un período, cuántas sesiones y
           encuestas se crearon, con qué frecuencia una propuesta se convierte
           en sesión confirmada y con qué frecuencia quien organiza vuelve a
-          agendar. No existe una tubería de seguimiento aparte: ningún rastreador
+          agendar. No existe un sistema de seguimiento aparte: ningún rastreador
           publicitario, ningún servicio de analítica de terceros, ninguna
           grabación de sesión y ningún perfilado publicitario o entre sitios.
           La medida de &quot;personas activas&quot; y la vista de última

@@ -1,1 +1,1 @@
-{{ActorName}} correspondeu a um de seus amigos da Steam.
+{{ActorName}} está na sua lista de amigos da Steam.

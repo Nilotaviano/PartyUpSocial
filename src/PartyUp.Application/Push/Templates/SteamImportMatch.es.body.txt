@@ -1,1 +1,1 @@
-{{ActorName}} coincidió con uno de tus amigos de Steam.
+{{ActorName}} está en tu lista de amigos de Steam.

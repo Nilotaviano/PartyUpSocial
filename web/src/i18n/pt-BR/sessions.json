@@ -126,10 +126,10 @@
   },
   "mute": {
     "on": "Silenciar",
-    "off": "Reativar",
+    "off": "Dessilenciar",
     "copy": "Silenciar suprime tudo sobre esta sessão, exceto seu lembrete enquanto você estiver Confirmado ou Talvez. Reativar não recupera nada — o que foi perdido enquanto estava silenciado não fica na fila para ser entregue depois.",
     "mutedAnnouncement": "Sessão silenciada.",
-    "unmutedAnnouncement": "Sessão reativada."
+    "unmutedAnnouncement": "Sessão dessilenciada."
   },
   "list": {
     "upcoming": "Próximas sessões",
@@ -143,7 +143,7 @@
     "claimHeading": "Entrar nesta sessão",
     "displayName": "Nome de exibição",
     "respond": "Responder",
-    "live": "Esta sessão está ao vivo.",
+    "live": "Esta sessão está em andamento.",
     "canceled": "Esta sessão foi cancelada.",
     "revoked": "Este link foi revogado.",
     "removed": "Você foi removido desta sessão.",

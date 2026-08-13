@@ -1,1 +1,1 @@
-{{SubjectTitle}} eligió {{OptionStart}}.
+Se definió el horario de {{SubjectTitle}}: {{OptionStart}}.

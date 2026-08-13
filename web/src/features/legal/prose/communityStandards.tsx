@@ -184,7 +184,7 @@ export function CommunityStandardsEs() {
         <P>
           Los nombres de usuario y los nombres visibles pasan por un filtro de
           groserías, y los campos de texto anteriores tienen límites de largo y
-          de caracteres. El filtro es un piso, no un permiso: algo que lo
+          de caracteres. El filtro es un mínimo, no una autorización: algo que lo
           atraviesa igual puede incumplir estas normas.
         </P>
       </Section>

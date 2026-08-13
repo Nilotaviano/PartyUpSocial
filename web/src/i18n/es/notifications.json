@@ -29,7 +29,7 @@
   },
   "item": {
     "unreadPrefix": "Sin leer",
-    "anonymous": "Usuario anónimo",
+    "anonymous": "Usuario Anónimo",
     "types": {
       "sessionInvitation": "Invitación a sesión",
       "sessionConfirmed": "Sesión confirmada",

@@ -5,5 +5,5 @@
   "usernameCooldown": "Nomes de usuário podem ser alterados uma vez a cada 30 dias.",
   "actions": { "saveUsername": "Salvar nome de usuário", "saveDisplayName": "Salvar nome de exibição", "saveAvatar": "Salvar avatar", "saveTimeZone": "Salvar fuso horário" },
   "timeZoneField": { "hint": "Digite para filtrar por cidade ou região.", "invalid": "Escolha um fuso horário da lista." },
-  "platformLinks": { "title": "Contas vinculadas", "empty": "Nenhuma conta vinculada ainda.", "item": "{{platform}}: {{handle}}", "unlink": "Desvincular {{platform}}", "steamUnlinkNotice": "Desvincular a Steam remove seus dados de persona salvos e o método de entrada." }
+  "platformLinks": { "title": "Contas vinculadas", "empty": "Nenhuma conta vinculada ainda.", "item": "{{platform}}: {{handle}}", "unlink": "Desvincular {{platform}}", "steamUnlinkNotice": "Desvincular a Steam remove os dados de perfil da Steam salvos e o método de entrada." }
 }

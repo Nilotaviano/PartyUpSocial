@@ -91,7 +91,7 @@
     "heading": "Lista de espera",
     "promote": "Promover",
     "reject": "Quitar de la lista de espera",
-    "vacancy": "Se abrió un lugar.",
+    "vacancy": "Se liberó un cupo.",
     "added": "Añadido a la lista de espera.",
     "promoted": "Promovido desde la lista de espera."
   },
@@ -127,7 +127,7 @@
   "mute": {
     "on": "Silenciar",
     "off": "Dejar de silenciar",
-    "copy": "Silenciar suprime todo sobre esta sesión excepto tu recordatorio mientras estés en Voy o Tal vez. Dejar de silenciar no recupera nada — lo que se perdió mientras estaba silenciado no se pondrá en cola para entregarse después.",
+    "copy": "Silenciar suprime todo sobre esta sesión excepto tu recordatorio mientras tu respuesta sea Confirmado o Tal vez. Dejar de silenciar no recupera nada — lo que se perdió mientras estaba silenciado no se pondrá en cola para entregarse después.",
     "mutedAnnouncement": "Sesión silenciada.",
     "unmutedAnnouncement": "Se dejó de silenciar la sesión."
   },

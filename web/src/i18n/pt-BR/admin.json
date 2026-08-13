@@ -18,16 +18,16 @@
       "confirmationRate": "Taxa de confirmação"
     },
     "notes": {
-      "sessionsCreated": "Sessões criadas já inclui as sessões geradas por enquetes finalizadas, então nunca some esse número com enquetes criadas.",
+      "sessionsCreated": "Sessões criadas já inclui as sessões geradas por enquetes finalizadas, então nunca adicione esse número ao de enquetes criadas.",
       "proposals": "Propostas é o denominador da confirmação: sessões de horário fixo sem enquete de origem, mais as enquetes. Uma enquete finalizada conta uma vez, nunca duas.",
       "repeat": "Quem começou a organizar há pouco tempo teve menos janela para agendar de novo, e isso derruba a taxa por si só — leia sempre junto com os números brutos."
     },
     "repeat": {
-      "heading": "Reincidência de agendamento",
+      "heading": "Agendamento recorrente",
       "window": "Agendou de novo em até {{days}} dias da primeira criação",
-      "rate": "Taxa de reincidência",
+      "rate": "Taxa de recorrência",
       "organizers": "Organizadores",
-      "repeatOrganizers": "Organizadores reincidentes"
+      "repeatOrganizers": "Organizadores recorrentes"
     },
     "usersLink": "Gerenciar contas",
     "noValue": "—",

@@ -20,7 +20,7 @@
     "duration": "Duração (minutos)",
     "platform": "Plataforma",
     "game": "Jogo",
-    "gameFreeText": "Digitar o nome do jogo",
+    "gameFreeText": "Digite o nome do jogo",
     "notes": "Notas",
     "min": "Presença mínima",
     "max": "Capacidade máxima",
@@ -31,7 +31,7 @@
     "defaults": "Padrões: mínimo 4, máximo 4, 2 horas, prazo de 24 horas, sem plataforma, não privada.",
     "submit": "Criar enquete",
     "platformOther": "Outra",
-    "steamAppId": "ID do app na Steam",
+    "steamAppId": "ID do aplicativo Steam",
     "steamAppIdHelp": "Opcional. O número na URL da loja Steam do jogo, por exemplo 730 para Counter-Strike 2.",
     "gamePicker": {
       "label": "Buscar no catálogo da Steam",
@@ -62,6 +62,7 @@
     "emptyDiscoverable": "Nenhuma enquete aberta para descobrir no momento.",
     "loadMore": "Carregar mais",
     "optionCount": "{{count}} opção",
+    "optionCount_one": "{{count}} opção",
     "optionCount_other": "{{count}} opções"
   },
   "status": {
@@ -76,7 +77,7 @@
   "detail": {
     "options": "Opções",
     "roster": "Votantes",
-    "anonymous": "Usuário anônimo",
+    "anonymous": "Usuário Anônimo",
     "removed": "Removido",
     "deadline": "A votação encerra {{deadline}}.",
     "awaitingSelectionNotice": "A votação encerrou. O organizador está escolhendo um horário.",
@@ -85,9 +86,12 @@
     "viewSession": "Ver a sessão",
     "expiredNotice": "Esta enquete expirou sem uma seleção.",
     "canceledNotice": "Esta enquete foi cancelada.",
-    "tallyAvailable": "{{count}} disponível",
-    "tallyMaybe": "{{count}} talvez",
-    "tallyUnavailable": "{{count}} indisponível",
+    "tallyAvailable_one": "{{count}} disponível",
+    "tallyAvailable_other": "{{count}} disponíveis",
+    "tallyMaybe_one": "{{count}} talvez",
+    "tallyMaybe_other": "{{count}} talvez",
+    "tallyUnavailable_one": "{{count}} indisponível",
+    "tallyUnavailable_other": "{{count}} indisponíveis",
     "tallyNone": "Ainda não há votos.",
     "yourVote": "Seu voto: {{value}}",
     "noVoteYet": "Você ainda não votou nesta opção."
@@ -96,7 +100,7 @@
     "available": "Disponível",
     "maybe": "Talvez",
     "unavailable": "Indisponível",
-    "legend": "Vote para {{time}}",
+    "legend": "Votar em {{time}}",
     "controlLabel": "{{time}}, {{value}}",
     "updated": "Seu voto foi salvo."
   },
@@ -111,10 +115,10 @@
   },
   "mute": {
     "on": "Silenciar",
-    "off": "Reativar",
-    "copy": "Silenciar suprime tudo sobre esta enquete, exceto seu lembrete enquanto você estiver Confirmado ou Talvez. Reativar não recupera nada — o que foi perdido enquanto estava silenciada não fica na fila para ser entregue depois.",
+    "off": "Dessilenciar",
+    "copy": "Silenciar suprime tudo sobre esta enquete, exceto seu lembrete enquanto seu voto for Disponível ou Talvez. Reativar não recupera nada — o que foi perdido enquanto estava silenciada não fica na fila para ser entregue depois.",
     "mutedAnnouncement": "Enquete silenciada.",
-    "unmutedAnnouncement": "Enquete reativada.",
+    "unmutedAnnouncement": "Enquete dessilenciada.",
     "disabledTerminal": "Silenciar não está disponível quando uma enquete é finalizada, expira ou é cancelada. Para uma enquete finalizada, silencie a sessão criada por ela."
   },
   "leave": {
@@ -184,7 +188,7 @@
       "poll_invalid_transition": "Essa alteração não é mais possível.",
       "poll_invites_closed": "Esta enquete não está mais aceitando convites.",
       "poll_participant_removed": "Você não tem mais acesso a esta enquete.",
-      "poll_conflict": "Esse convidado já reivindicou o link dele e não pode ser revogado. Remova-o em vez disso.",
+      "poll_conflict": "Esse convidado já usou o link dele e não pode ser revogado. Remova o convidado em vez disso.",
       "poll_guest_not_found": "Esse convidado não pôde ser encontrado.",
       "poll_selection_window_closed": "A janela de seleção desta enquete encerrou.",
       "poll_zero_options": "Esta enquete não tem opções restantes.",

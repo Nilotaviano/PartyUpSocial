@@ -62,6 +62,7 @@
     "emptyDiscoverable": "No open polls to discover right now.",
     "loadMore": "Load more",
     "optionCount": "{{count}} option",
+    "optionCount_one": "{{count}} option",
     "optionCount_other": "{{count}} options"
   },
   "status": {
@@ -85,9 +86,12 @@
     "viewSession": "View the session",
     "expiredNotice": "This poll expired without a selection.",
     "canceledNotice": "This poll was canceled.",
-    "tallyAvailable": "{{count}} available",
-    "tallyMaybe": "{{count}} maybe",
-    "tallyUnavailable": "{{count}} unavailable",
+    "tallyAvailable_one": "{{count}} available",
+    "tallyAvailable_other": "{{count}} available",
+    "tallyMaybe_one": "{{count}} maybe",
+    "tallyMaybe_other": "{{count}} maybe",
+    "tallyUnavailable_one": "{{count}} unavailable",
+    "tallyUnavailable_other": "{{count}} unavailable",
     "tallyNone": "No votes yet.",
     "yourVote": "Your vote: {{value}}",
     "noVoteYet": "You have not voted on this option yet."
@@ -112,7 +116,7 @@
   "mute": {
     "on": "Mute",
     "off": "Unmute",
-    "copy": "Muting suppresses everything about this poll except your reminder while you're Going or Maybe. Unmuting does not backfill — nothing missed while muted is queued to deliver later.",
+    "copy": "Muting suppresses everything about this poll except your reminder while your vote is Available or Maybe. Unmuting does not backfill — nothing missed while muted is queued to deliver later.",
     "mutedAnnouncement": "Poll muted.",
     "unmutedAnnouncement": "Poll unmuted.",
     "disabledTerminal": "Muting is not available once a poll is finalized, expired, or canceled. For a finalized poll, mute the session it created instead."
