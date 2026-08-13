@@ -1019,3 +1019,23 @@ every entry in that list.
 `notificationsPage.*`; `sessions.json`/`polls.json` each gain their own `mute.*` block (poll's carries
 an additional `disabledTerminal` string) — every key ships en/pt-BR/es in this commit, verified by the
 shipped `i18n.keys.test.ts` parity gate (no new namespace, no `index.ts` change).
+
+## Styling overhaul (UI/UX design pass, S1a–S8) test citations
+
+`STYLING_OVERHAUL_DESIGN.md` (converged rev 5) is markup/CSS/i18n only — no decision changed, so
+every row below is an **added** fact on an existing D-number, never a rewritten one. The design's
+§8 names the only three pre-existing tests it was allowed to rewrite (`FriendsAccessibility`'s
+focus-restore fact and `FriendsPage.test.tsx`'s block/`_D105` unfriend flows, all three because the
+destructive control moved behind an ActionMenu); anything else failing would have been a slice defect.
+
+| Decision | Overhaul citations |
+|---|---|
+| D-139 | `ActionMenu.test.tsx` — `every menu item clears 44px and carries a highlight treatment_D139` (Radix items use `data-[highlighted]:`, not `focus-visible`, so the shipped class-duty loop could not have reached them), `the trigger carries the icon-button recipe and the focus-ring triple_D139`, `a destructive item reads as danger text and states its consequence in the item_D139`; `FriendsAccessibility.test.tsx` — `OpenRowMenu_MeetsMenuItemDuties_D139` (the page-level pass over a real opened row menu); `PollAccessibility.test.tsx` — `every role=radio vote control meets the 44px touch target and visible-focus duties_D139` (scoped to the `role=radio` **button** controls; the bare native finalize inputs are exempt by design §3.2 — their 44px duty is the ≥44px wrapping-label row); `RadioControlDuty.test.tsx` — `hand-rolled radio controls carry the touch-target and focus duty_D139` over ThemeToggle and AvatarPicker; `AxeAuditTests.PushPromptStatusBanner_HasNoWcagViolation_D139` and `AxeAuditTests.FriendActionMenuOpen_HasNoWcagViolation_D139` — the two new interaction states (`status-banner-visible`, `friend-actionmenu-open`), both themes, still zero `AxeExclusions` |
+| D-140 | `PollAccessibility.test.tsx` — `an option row class list is identical whether or not the viewer has voted on it_D140`: the §1 VotingGrid carve-out restyled the option `<li>` chrome and added the viewer's own vote as a text restatement, so the class list stays unconditional and an elapsed option is still not dimmed |
+| D-074 | `SessionStatusHero.test.tsx` — `shows the progress line only while unconfirmed_D074`: a Confirmed session shows the chip alone, because D-074's Going-waitlist grace makes a below-minimum Confirmed legitimate and a denominator would contradict it |
+| D-062 | `SessionStatusHero.test.tsx` — `counts only non-waitlisted Going rows in the progress numerator_D062` (mirrors `IsActiveGoing`), plus `adds the waitlist sentence only when the session has a maximum capacity` |
+| D-084 | `SessionStatusHero.test.tsx` — `never mutates a response while the keyboard traverses the group_D084` and `keeps each RSVP choice a pressed-button, not a radio_D084`: the SegmentStrip skin is presentational only, so the RSVP group cannot have been turned into a radiogroup and reintroduced D-084's arrow-key hazard |
+| D-095 | `SessionStatusHero.test.tsx` — `adds the in-progress chip alongside the status chip_D095`: the shipped `detail.inProgress` string becomes a supplementary chip beside the new five-status chip, never a replacement for it |
+
+`SessionStatusHero.test.tsx` also carries `renders no chip for a status this build does not know`
+(unknown status → no chip, the design's floor) — no D-number, since no decision names it.
