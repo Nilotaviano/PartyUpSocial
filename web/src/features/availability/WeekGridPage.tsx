@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router'
 import { isApiError } from '../../api/client'
@@ -221,6 +221,17 @@ export function WeekGridPage() {
     const anchor = new Date(zonedNow.getTime() + weekOffset * 7 * DAY_MS)
     return startOfLocaleWeek(anchor, weekStartsOnIso(i18n.language))
   }, [mountInstant, timeZone, weekOffset, i18n.language])
+  // The now-line's clock (§9 S2): `WeekGrid` is zone-free, so the conversion
+  // to the viewer's profile zone happens here, at the same `instantToFakeLocal`
+  // boundary every other grid Date crosses, and re-derives on a minute tick.
+  const [now, setNow] = useState<Date | null>(null)
+  useEffect(() => {
+    const tick = () => setNow(instantToFakeLocal(new Date().toISOString(), timeZone))
+    tick()
+    const interval = setInterval(tick, 60_000)
+    return () => clearInterval(interval)
+  }, [timeZone])
+
   const weekEnd = new Date(weekStart.getTime() + 7 * DAY_MS)
   const from = fakeLocalToInstant(weekStart, timeZone)
   const to = fakeLocalToInstant(weekEnd, timeZone)
@@ -806,6 +817,7 @@ export function WeekGridPage() {
                 endHour={END_HOUR}
                 friendRanges={friendRanges}
                 merged={merged}
+                now={now}
                 occurrences={occurrences}
                 pollOptionEntries={pollOptionEntries}
                 sessionEntries={sessionEntries}

@@ -83,10 +83,17 @@ export type WeekGridProps = {
   onAdjustOccurrence?: (adjustment: GridAdjustment) => void
   dayLabels: string[]
   timeLabelFormatter: (date: Date) => string
+  /** The current wall-clock instant in the same fake-local convention as
+   * `weekStart` (CALENDAR_DESIGN.md §9 S2). The caller owns the minute tick
+   * and the zone conversion; this component only diffs the value against
+   * `weekStart`/`startHour`/`endHour` to place the today tint and the
+   * presentational now-line. */
+  now?: Date | null
 }
 
 const SLOT_MINUTES = 15
 const SLOT_MS = SLOT_MINUTES * 60_000
+const DAY_MS = 24 * 60 * 60 * 1000
 const LONG_PRESS_MS = 400
 const MOVE_CANCEL_PX = 10
 const AUTO_SCROLL_EDGE_PX = 32
@@ -214,6 +221,11 @@ type BandMeta = {
 
 const DAY_COUNT = 7
 
+// §9 S2 simulates the prototype's per-column cards on the unchanged row-major
+// DOM: the inter-column gap is a margin carried by every cell of a column
+// (header chip included), never a restructured grid.
+const COLUMN_GAP = 'mx-[3px]'
+
 /** §8's band metadata: a per-day indexed lookup replacing the per-cell
  * linear scans over every occurrence/merged/friend/session/poll array, plus
  * start/middle/end span info per entry (visible-range clamped) that the
@@ -330,9 +342,29 @@ export function WeekGrid({
   onAdjustOccurrence,
   dayLabels,
   timeLabelFormatter,
+  now = null,
 }: WeekGridProps) {
   const { t } = useTranslation('availability')
   const slots = slotsPerDay(startHour, endHour)
+  // Zone-free by contract (see `weekStart`): "today" and the now-line position
+  // are pure differences between the injected fake-local `now` and this grid's
+  // own `weekStart`/`startHour` window — never `new Date()` or a zone lookup.
+  const todayIndex = useMemo(() => {
+    if (!now) return null
+    const day = Math.floor((now.getTime() - weekStart.getTime()) / DAY_MS)
+    return day >= 0 && day < DAY_COUNT ? day : null
+  }, [now, weekStart])
+  const nowMarker = useMemo(() => {
+    if (!now || todayIndex === null) return null
+    const dayStart = cellTime(weekStart, todayIndex, 0, startHour)
+    const offset = now.getTime() - dayStart.getTime()
+    if (offset < 0 || offset >= slots * SLOT_MS) return null
+    return {
+      day: todayIndex,
+      slot: Math.floor(offset / SLOT_MS),
+      fraction: (offset % SLOT_MS) / SLOT_MS,
+    }
+  }, [now, todayIndex, weekStart, startHour, slots])
   const bandMeta = useMemo(
     () =>
       computeBandMeta(
@@ -865,7 +897,7 @@ export function WeekGrid({
   const dayIndexes = [0, 1, 2, 3, 4, 5, 6]
 
   return (
-    <div>
+    <div className="surface p-2 sm:p-3">
       {/* The grid has no scrollport of its own: it renders at natural height and
           the document scrolls (nested vertical scrolling is what this replaces).
           Horizontal scrolling survives only below `sm`, where seven 44px columns
@@ -881,20 +913,34 @@ export function WeekGrid({
         role="grid"
         onMouseUp={handleMouseUp}
       >
-        <div className="sticky top-0 z-20 flex bg-card" role="row">
+        {/* §9 S2: a translucent blurred strip carrying one small card chip per
+            day. The sticky mechanism itself is unchanged. */}
+        <div className="sticky top-0 z-20 flex bg-page/90 pb-1 backdrop-blur" role="row">
           <div
             aria-colindex={1}
-            className="sticky left-0 z-10 min-h-11 w-16 shrink-0 bg-card"
+            className="sticky left-0 z-10 min-h-11 w-14 shrink-0 bg-page/90"
             role="columnheader"
           />
           {dayIndexes.map((day) => (
             <div
               key={day}
               aria-colindex={day + 2}
-              className="min-h-11 min-w-11 flex-1 text-center font-display text-sm font-medium text-ink"
+              className={`${COLUMN_GAP} flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center rounded-xl border px-1 py-1 text-center ${
+                day === todayIndex
+                  ? 'border-primary/60 bg-primary/15'
+                  : 'border-ink/15 bg-card'
+              }`}
               role="columnheader"
             >
-              {dayLabels[day]}
+              <span className="font-display text-[13px] font-bold leading-tight text-ink">
+                {dayLabels[day]}
+              </span>
+              <span
+                aria-hidden="true"
+                className="text-[11px] leading-tight tabular-nums text-ink-soft"
+              >
+                {cellTime(weekStart, day, 0, 0).getUTCDate()}
+              </span>
             </div>
           ))}
         </div>
@@ -903,7 +949,7 @@ export function WeekGrid({
             <div
               aria-colindex={1}
               aria-rowindex={slot + 2}
-              className="sticky left-0 z-10 min-h-11 w-16 shrink-0 bg-card pr-2 text-right text-xs text-ink-soft"
+              className="sticky left-0 z-10 min-h-11 w-14 shrink-0 bg-card pr-2 text-right font-display text-[11px] font-semibold tabular-nums text-ink-soft"
               role="rowheader"
             >
               {slot % 4 === 0
@@ -914,6 +960,7 @@ export function WeekGrid({
               const occurrence = occurrenceAt(day, slot)
               const busy = mergedAt(day, slot)
               const cellFriends = friendsAt(day, slot)
+              const glyphFriends = friendGlyphRangesAt(day, slot)
               const cellSessions = sessionsAt(day, slot)
               const cellPollOptions = pollOptionsAt(day, slot)
               const inSelection =
@@ -962,17 +1009,24 @@ export function WeekGrid({
                 bandActive && !isRunStart
                   ? 'border-t-0'
                   : isHourLine
-                    ? 'border-t border-t-ink/45'
-                    : 'border-t border-t-ink/20'
+                    ? 'border-t border-t-grid-hour'
+                    : 'border-t border-t-grid-line'
               const roundedTop = isRunStart && !mergedCell?.clampedAtStart
               const roundedBottom = isRunEnd && !mergedCell?.clampedAtEnd
+              // The column-card corners are the first/last row's own corners;
+              // a band edge landing there keeps its own (tighter) radius so
+              // the band read never disappears into the card outline.
               const roundingClass = [
-                roundedTop ? 'rounded-t-md' : '',
-                roundedBottom ? 'rounded-b-md' : '',
+                roundedTop ? 'rounded-t-lg' : slot === 0 ? 'rounded-t-2xl' : '',
+                roundedBottom ? 'rounded-b-lg' : slot === slots - 1 ? 'rounded-b-2xl' : '',
               ]
                 .filter(Boolean)
                 .join(' ')
-              const bottomBorderClass = slot === slots - 1 ? 'border-b border-b-ink/25' : ''
+              const bottomBorderClass = slot === slots - 1 ? 'border-b border-b-grid-hour' : ''
+              const isTodayColumn = day === todayIndex
+              const columnEdgeClass = isTodayColumn
+                ? 'border-x-primary/40'
+                : 'border-x-grid-hour'
 
               // §3: the selection ring is drawn around the *band*, not per
               // cell. A drag/keyboard selection is always one column wide
@@ -1027,7 +1081,7 @@ export function WeekGrid({
                   aria-colindex={day + 2}
                   aria-label={labelParts.join(' – ')}
                   aria-rowindex={slot + 2}
-                  className={`relative isolate min-h-11 min-w-11 flex-1 border-x border-ink/25 ${topBorderClass} ${bottomBorderClass} ${roundingClass} bg-free data-[busy=true]:bg-busy focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus data-[state=selected]:before:absolute data-[state=selected]:before:inset-0 data-[state=selected]:before:z-[-1] data-[state=selected]:before:bg-ink/6 data-[state=selected]:before:content-[''] data-[selection-edge~=top]:border-t-2 data-[selection-edge~=top]:border-t-ink data-[selection-edge~=bottom]:border-b-2 data-[selection-edge~=bottom]:border-b-ink data-[selection-edge~=left]:border-l-2 data-[selection-edge~=left]:border-l-ink data-[selection-edge~=right]:border-r-2 data-[selection-edge~=right]:border-r-ink`}
+                  className={`relative isolate ${COLUMN_GAP} min-h-11 min-w-11 flex-1 border-x ${columnEdgeClass} ${topBorderClass} ${bottomBorderClass} ${roundingClass} bg-free data-[busy=true]:bg-busy focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus data-[state=selected]:before:absolute data-[state=selected]:before:inset-0 data-[state=selected]:before:z-[-1] data-[state=selected]:before:bg-ink/6 data-[state=selected]:before:content-[''] data-[selection-edge~=top]:border-t-2 data-[selection-edge~=top]:border-t-ink data-[selection-edge~=bottom]:border-b-2 data-[selection-edge~=bottom]:border-b-ink data-[selection-edge~=left]:border-l-2 data-[selection-edge~=left]:border-l-ink data-[selection-edge~=right]:border-r-2 data-[selection-edge~=right]:border-r-ink`}
                   data-busy={busy || undefined}
                   data-selection-edge={selectionEdges || undefined}
                   data-state={state}
@@ -1083,28 +1137,34 @@ export function WeekGrid({
                     </button>
                   )}
                   {busy && (
-                    <span aria-hidden="true" className="text-xs text-busy-ink">
+                    <span
+                      aria-hidden="true"
+                      className="font-display text-[11px] font-bold tabular-nums text-busy-ink"
+                    >
                       &bull;
                     </span>
                   )}
                   {occurrence && <span className="sr-only">{t('a11y.busy')}</span>}
-                  {friendGlyphRangesAt(day, slot).length > 0 && (
+                  {/* Non-identifying by contract (D-076): a neutral disc, and a
+                      "+N" cap when the segment covers more than one friend —
+                      never a per-friend hue or avatar. */}
+                  {glyphFriends.length > 0 && (
                     <span
                       aria-hidden="true"
-                      className="block text-xs text-ink"
+                      className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full border border-ink/40 bg-busy px-1 text-[10px] font-bold leading-none text-busy-ink"
                       data-layer="friend"
                     >
-                      &#9675;
+                      {glyphFriends.length > 1 ? `+${glyphFriends.length}` : ''}
                     </span>
                   )}
                   {sessionLabelsAt(day, slot).map((session) => (
                     <span
                       key={session.id}
                       aria-hidden="true"
-                      className={`block truncate text-[10px] leading-tight ${
+                      className={`block truncate rounded-xl border-2 border-ink/70 bg-accent px-1.5 py-0.5 font-display text-[11px] leading-tight text-accent-ink ${
                         session.viewerRelation === 'inherited'
-                          ? 'italic text-free-ink'
-                          : 'font-semibold text-free-ink'
+                          ? 'italic font-semibold'
+                          : 'font-extrabold'
                       }`}
                       data-layer="session"
                       data-viewer-relation={session.viewerRelation}
@@ -1118,16 +1178,30 @@ export function WeekGrid({
                     <span
                       key={option.id}
                       aria-hidden="true"
-                      // §1-ratified pairs only: grid cells are `free | busy | selected`, never a
-                      // `maybe` background, so `maybe-ink` text here would be an unratified
-                      // pairing. `free-ink` is the shipped session-title choice for exactly this
-                      // reason — it passes on both free and busy fills (PHASE5_1_DESIGN.md:53).
-                      className="block truncate text-[10px] italic leading-tight text-free-ink"
+                      // Same pill geometry as a session span, on the ratified card/ink pair with
+                      // a dashed edge for the "proposed, not booked" read — never `free-ink` on a
+                      // new fill, which would be an unratified pairing the axe lane has to
+                      // exclude (CALENDAR_DESIGN.md §9 S2).
+                      className="block truncate rounded-xl border-2 border-dashed border-ink/45 bg-card px-1.5 py-0.5 font-display text-[11px] font-bold leading-tight text-ink"
                       data-layer="poll-option"
                     >
                       {option.pollTitle}
                     </span>
                   ))}
+                  {/* Presentational only (§9 S2): the accessible name already
+                      carries the slot's own time, so a screen reader gains
+                      nothing from a second "it is now" node. */}
+                  {nowMarker && nowMarker.day === day && nowMarker.slot === slot && (
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 z-20 flex items-center"
+                      data-layer="now"
+                      style={{ top: `${nowMarker.fraction * 100}%` }}
+                    >
+                      <span className="block h-1.5 w-1.5 shrink-0 rounded-full bg-danger" />
+                      <span className="block h-px flex-1 bg-danger" />
+                    </span>
+                  )}
                 </div>
               )
             })}

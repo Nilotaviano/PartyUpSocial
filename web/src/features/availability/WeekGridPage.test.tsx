@@ -52,6 +52,7 @@ function renderGrid(props: {
   onAdjustOccurrence?: ReturnType<typeof vi.fn<(adjustment: GridAdjustment) => void>>
   startHour?: number
   endHour?: number
+  now?: Date | null
 }) {
   const onCreateBlock = props.onCreateBlock ?? vi.fn<(range: GridRange) => void>()
   const onEditOccurrence = props.onEditOccurrence ?? vi.fn<(id: string) => void>()
@@ -61,6 +62,7 @@ function renderGrid(props: {
       endHour={props.endHour ?? 11}
       friendRanges={props.friendRanges ?? []}
       merged={props.merged ?? []}
+      now={props.now ?? null}
       occurrences={props.occurrences ?? []}
       pollOptionEntries={props.pollOptionEntries ?? []}
       sessionEntries={props.sessionEntries ?? []}
@@ -620,14 +622,14 @@ describe('WeekGrid §8 band rendering', () => {
     const middleCell = screen.getByRole('gridcell', { name: '9:15 – Busy' })
     const endCell = screen.getByRole('gridcell', { name: '9:30 – Busy' })
 
-    expect(startCell.className).toMatch(/rounded-t-md/)
+    expect(startCell.className).toMatch(/rounded-t-lg/)
     expect(startCell.className).not.toMatch(/border-t-0/)
     // The internal 15-minute border between two cells of the same band is
     // suppressed on every cell but the run's start.
     expect(middleCell.className).toMatch(/border-t-0/)
-    expect(middleCell.className).not.toMatch(/rounded-(t|b)-md/)
+    expect(middleCell.className).not.toMatch(/rounded-(t|b)-lg/)
     expect(endCell.className).toMatch(/border-t-0/)
-    expect(endCell.className).toMatch(/rounded-b-md/)
+    expect(endCell.className).toMatch(/rounded-b-lg/)
   })
 
   it('flattens the visible edge when the band continues past the viewport', () => {
@@ -640,7 +642,7 @@ describe('WeekGrid §8 band rendering', () => {
     renderGrid({ occurrences, merged })
 
     const firstVisibleCell = screen.getByRole('gridcell', { name: '9:00 – Busy' })
-    expect(firstVisibleCell.className).not.toMatch(/rounded-t-md/)
+    expect(firstVisibleCell.className).not.toMatch(/rounded-t-lg/)
   })
 
   it('renders a session title once per band, at the band start only', () => {
@@ -704,6 +706,51 @@ describe('WeekGrid §8 band rendering', () => {
     expect(startCell.querySelector('[data-layer="session"]')).toBeNull()
     const secondCell = screen.getByRole('gridcell', { name: '9:15 – Raid night' })
     expect(secondCell.querySelector('[data-layer="session"]')).toHaveTextContent('Raid night')
+  })
+})
+
+describe('WeekGrid §9 now-line', () => {
+  it('marks the current time on today’s column only, inside the visible hours', () => {
+    // weekStart is 2026-08-10 (day 0), so 2026-08-11 09:30 is day 1 — the
+    // grid derives that purely by diffing the injected fake-local `now`
+    // against weekStart, never from the host clock.
+    renderGrid({ now: localDate(9, 30, 11) })
+
+    const markers = document.querySelectorAll('[data-layer="now"]')
+    expect(markers).toHaveLength(1)
+    const cell = markers[0].closest('[role="gridcell"]')
+    expect(cell).toHaveAttribute('aria-label', '9:30')
+    expect(cell).toHaveAttribute('aria-colindex', '3')
+  })
+
+  it('is presentational only, hidden from assistive technology', () => {
+    // 09:37:30 is half way through the 9:30–9:45 slot.
+    renderGrid({ now: new Date(Date.UTC(2026, 7, 11, 9, 37, 30, 0)) })
+
+    const marker = document.querySelector('[data-layer="now"]')
+    expect(marker).toHaveAttribute('aria-hidden', 'true')
+    // Positioned within the slot it falls in, not pinned to a cell edge.
+    expect((marker as HTMLElement).style.top).toBe('50%')
+    expect(marker?.closest('[role="gridcell"]')).toHaveAttribute('aria-label', '9:30')
+  })
+
+  it('renders nothing when now falls outside the visible hour range', () => {
+    // 07:00 is before the grid's 9:00 floor; the day is still in the week.
+    renderGrid({ now: localDate(7, 0, 11) })
+
+    expect(document.querySelectorAll('[data-layer="now"]')).toHaveLength(0)
+  })
+
+  it('renders nothing when now falls outside the displayed week', () => {
+    renderGrid({ now: localDate(9, 30, 20) })
+
+    expect(document.querySelectorAll('[data-layer="now"]')).toHaveLength(0)
+  })
+
+  it('renders nothing when no clock is injected', () => {
+    renderGrid({})
+
+    expect(document.querySelectorAll('[data-layer="now"]')).toHaveLength(0)
   })
 })
 
@@ -839,6 +886,46 @@ describe('WeekGridPage viewport', () => {
     expect(screen.getByTestId('early-hours-status')).toHaveTextContent(
       'Earlier hours hidden. The grid now starts in the morning.',
     )
+  })
+})
+
+describe('WeekGridPage now-line clock', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-08-10T12:00:00.000Z'))
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') {
+        return Promise.resolve({ data: profileResponse({ timeZone: 'America/New_York' }) })
+      }
+      if (path === '/api/v1/calendar') {
+        return Promise.resolve({
+          data: calendarResponse({
+            start: '2026-08-10T18:00:00.000Z',
+            end: '2026-08-10T18:30:00.000Z',
+          }),
+        })
+      }
+      throw new Error(`Unexpected GET ${path}`)
+    })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // The page owns the clock and the zone: 12:00Z is 08:00 in the viewer's
+  // profile zone, so the marker lands on the 8:00 AM slot — proof the value
+  // crossed the shipped `instantToFakeLocal` boundary rather than being read
+  // off the host's own local time inside the grid.
+  it('passes a fake-local now through to the grid_D046', async () => {
+    renderPage()
+
+    await screen.findAllByRole('gridcell', { name: /Busy/ }, { timeout: 5000 })
+
+    const markers = document.querySelectorAll('[data-layer="now"]')
+    expect(markers).toHaveLength(1)
+    const cell = markers[0].closest('[role="gridcell"]')
+    expect(cell?.getAttribute('aria-label')).toMatch(/^8:00\s?AM$/)
   })
 })
 
