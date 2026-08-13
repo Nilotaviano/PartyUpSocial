@@ -1,14 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, Navigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { AvatarDisc } from '../friends/AvatarDisc'
 import { avatarImgUrl } from '../friends/avatarImage'
 import { Button } from '../../components/ui/button'
-import { raisedInteractiveClasses } from '../../components/ui/classes'
+import {
+  chipClasses,
+  quietChipClasses,
+  raisedInteractiveClasses,
+  segmentItemClasses,
+} from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
+import { IdentityRow } from '../../components/ui/identityRow'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section, SectionCard } from '../../components/ui/section'
+import { SegmentStrip } from '../../components/ui/segmentStrip'
 import { useSession } from '../../auth/useSession'
+import { SessionStatusChip } from './SessionStatusChip'
 import {
   approveJoinRequest,
   cancelSession,
@@ -182,11 +193,30 @@ function RemoveGuestDialog({
   )
 }
 
+type RosterIdentityProps = {
+  actions?: ReactNode
+  avatar: ReactNode
+  displayName: string
+  masked: boolean
+}
+
+/**
+ * A roster/waitlist person. The masked arm is a separate call rather than a
+ * computed `variant` prop so the D-076 row keeps IdentityRow's own type-level
+ * guarantee that no username can ride along with it.
+ */
+function RosterIdentity({ actions, avatar, displayName, masked }: RosterIdentityProps) {
+  return masked ? (
+    <IdentityRow actions={actions} avatar={avatar} displayName={displayName} variant="masked" />
+  ) : (
+    <IdentityRow actions={actions} avatar={avatar} displayName={displayName} variant="full" />
+  )
+}
+
 export function SessionDetailPage() {
   const { t, i18n } = useTranslation(['sessions', 'errors', 'common'])
   const { sessionId = '' } = useParams()
   const queryClient = useQueryClient()
-  const heading = useRef<HTMLHeadingElement>(null)
   const [status, setStatus] = useState('')
   const { data: session } = useSession()
 
@@ -214,10 +244,6 @@ export function SessionDetailPage() {
     queryFn: () => getJoinRequests(sessionId),
     enabled: Boolean(sessionId) && isOrganizer,
   })
-
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
 
   async function afterMutation(message: string, options?: { removeDetail?: boolean }) {
     setStatus(message)
@@ -338,297 +364,341 @@ export function SessionDetailPage() {
   // it on for a Removed viewer whose status isn't knowable yet.
   const canRequestJoin = Boolean(data) && viewerEntry?.status !== 'removed'
   const inProgress = data ? isSessionInProgress(data) : false
+  const maxCapacity = data?.maxCapacity ?? null
+
+  function rosterRow(entry: (typeof going)[number]) {
+    return (
+      <li
+        key={entry.participationId}
+        className="border-t border-ink/25 py-2 first:border-t-0"
+        data-testid={`roster-entry-${entry.participationId}`}
+      >
+        <RosterIdentity
+          actions={
+            isOrganizer && entry.origin === 'guestLink' ? (
+              <RemoveGuestDialog
+                displayName={entry.displayName ?? t('detail.anonymous')}
+                pending={removeGuestParticipant.isPending}
+                onConfirm={() => removeGuestParticipant.mutate(entry.participationId)}
+              />
+            ) : undefined
+          }
+          avatar={
+            <AvatarDisc
+              emoji={entry.avatar?.emoji}
+              imgUrl={avatarImgUrl(entry.avatar)}
+              masked={entry.displayName === null}
+              seed={entry.userId ?? entry.guestIdentityId ?? entry.participationId}
+              size="xs"
+            />
+          }
+          displayName={entry.displayName ?? t('detail.anonymous')}
+          masked={entry.displayName === null}
+        />
+      </li>
+    )
+  }
 
   return (
-    <main
-      className="mx-auto max-w-4xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-session-detail"
-    >
-      <h1
-        ref={heading}
-        aria-live="polite"
-        tabIndex={-1}
-        className="text-display font-display font-bold text-ink focus:outline-none"
-      >
-        {data?.title ?? t('common.loading', { ns: 'common' })}
-      </h1>
+    <main data-testid="screen-session-detail">
+      <PageScaffold>
+        <PageHeader
+          actions={
+            data && isOrganizer ? (
+              <>
+                <Link
+                  className={`inline-flex items-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+                  to={`/sessions/${sessionId}/edit`}
+                >
+                  {t('edit.heading')}
+                </Link>
+                <Link
+                  className={`inline-flex items-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+                  to={`/sessions/${sessionId}/invite`}
+                >
+                  {t('invite.heading')}
+                </Link>
+              </>
+            ) : undefined
+          }
+          live
+          meta={
+            data ? (
+              <div className="flex w-full flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <SessionStatusChip status={data.status} />
+                  {inProgress && <span className={chipClasses}>{t('detail.inProgress')}</span>}
+                </div>
+                {data.status === 'unconfirmed' && (
+                  <p className="font-body text-body text-ink">
+                    {t('detail.progress', {
+                      going: going.length,
+                      min: Number(data.minAttendance),
+                    })}
+                    {maxCapacity !== null && ` ${t('detail.progressWaitlist')}`}
+                  </p>
+                )}
+              </div>
+            ) : undefined
+          }
+          title={data?.title ?? t('common.loading', { ns: 'common' })}
+        />
 
-      <p aria-live="polite" className="text-ink">
-        {status}
-      </p>
-
-      {anyError && (
-        <p ref={(node) => node?.focus()} role="alert" tabIndex={-1}>
-          {t(
-            isApiError(anyError) ? `errors.codes.${anyError.code}` : 'errors.generic',
-            { defaultValue: t('errors.generic') },
-          )}
+        <p aria-live="polite" className="text-ink">
+          {status}
         </p>
-      )}
 
-      {data && (
-        <>
-          <p className="text-ink">
-            {new Intl.DateTimeFormat(i18n.language, {
-              dateStyle: 'medium',
-              timeStyle: 'short',
-              timeZone: viewerTimeZone,
-            }).format(new Date(data.startTime))}
-            {inProgress && (
-              <span className="ml-2 rounded-full border-2 border-ink bg-accent px-2 py-0.5 font-display text-xs font-bold text-accent-ink dark:border-accent-ink">
-                {t('detail.inProgress')}
-              </span>
+        {anyError && (
+          <p ref={(node) => node?.focus()} role="alert" tabIndex={-1}>
+            {t(
+              isApiError(anyError) ? `errors.codes.${anyError.code}` : 'errors.generic',
+              { defaultValue: t('errors.generic') },
             )}
           </p>
-          {data.notes && <p className="text-ink">{data.notes}</p>}
+        )}
 
-          {isOrganizer && (
-            <div className="flex flex-wrap gap-2">
-              <Link
-                className={`inline-flex items-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
-                to={`/sessions/${sessionId}/edit`}
-              >
-                {t('edit.heading')}
-              </Link>
-              <Link
-                className={`inline-flex items-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
-                to={`/sessions/${sessionId}/invite`}
-              >
-                {t('invite.heading')}
-              </Link>
-              <CancelSessionDialog
-                pending={cancel.isPending}
-                onConfirm={() => cancel.mutate()}
-              />
-            </div>
-          )}
-
-          <section aria-labelledby="rsvp-heading">
-            <h2 id="rsvp-heading" className="text-h2 font-display font-semibold text-ink">
-              {t('rsvp.heading')}
-            </h2>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {(['Going', 'Maybe', 'Declined'] as const).map((choice) => {
-                const pressed = viewerEntry?.status === choice.toLowerCase()
-                return (
-                  <Button
-                    key={choice}
-                    aria-pressed={pressed}
-                    disabled={respond.isPending}
-                    type="button"
-                    variant={pressed ? 'primary' : 'neutral'}
-                    onClick={() => respond.mutate(choice)}
-                  >
-                    {t(`rsvp.${choice.toLowerCase()}`)}
-                  </Button>
-                )
-              })}
-              <Button
-                disabled={leave.isPending}
-                type="button"
-                variant="neutral"
-                onClick={() => leave.mutate()}
-              >
-                {t('rsvp.leave')}
-              </Button>
-            </div>
-
-            {canRequestJoin && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button
-                  disabled={join.isPending}
-                  type="button"
-                  variant="neutral"
-                  onClick={() => join.mutate()}
-                >
-                  {t('join.request')}
-                </Button>
-                <Button
-                  disabled={withdraw.isPending}
-                  type="button"
-                  variant="neutral"
-                  onClick={() => withdraw.mutate()}
-                >
-                  {t('join.withdraw')}
-                </Button>
+        {data && (
+          <>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={quietChipClasses}>
+                  {new Intl.DateTimeFormat(i18n.language, {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                    timeZone: viewerTimeZone,
+                  }).format(new Date(data.startTime))}
+                </span>
+                {data.platform && <span className={quietChipClasses}>{data.platform}</span>}
+                {data.game?.name && <span className={quietChipClasses}>{data.game.name}</span>}
+                {data.muted && <span className={quietChipClasses}>{t('detail.muted')}</span>}
               </div>
-            )}
-
-            <div className="mt-4">
-              <label className="font-body font-semibold text-ink" htmlFor="reminder-select">
-                {t('reminder.label')}
-              </label>
-              <select
-                className="mt-1 min-h-11 rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                id="reminder-select"
-                value={viewerEntry?.reminderChoice ?? ''}
-                onChange={(event) =>
-                  reminder.mutate(
-                    (event.target.value || null) as ReminderChoiceValue,
-                  )
-                }
-              >
-                {reminderOptions.map((option) => (
-                  <option key={option.key} value={option.value ?? ''}>
-                    {t(option.key)}
-                  </option>
-                ))}
-              </select>
+              {data.notes && <p className="text-ink">{data.notes}</p>}
             </div>
 
-            <div className="mt-4">
-              <Button
-                aria-busy={mute.isPending}
-                aria-pressed={data.muted}
-                disabled={mute.isPending}
-                type="button"
-                variant={data.muted ? 'primary' : 'neutral'}
-                onClick={() => mute.mutate()}
-              >
-                {data.muted ? t('mute.off') : t('mute.on')}
-              </Button>
-              <p className="mt-1 text-ink-soft">{t('mute.copy')}</p>
-            </div>
-          </section>
-
-          {isOrganizer && joinRequests.data && joinRequests.data.items.length > 0 && (
-            <section aria-labelledby="join-requests-heading">
-              <h2
-                id="join-requests-heading"
-                className="text-h2 font-display font-semibold text-ink"
-              >
-                {t('join.request')}
-              </h2>
-              <ul className="mt-2 space-y-2">
-                {joinRequests.data.items.map((request) => (
-                  <li
-                    key={request.id}
-                    className="flex items-center justify-between gap-2 rounded-card border-2 border-ink bg-card p-3"
-                  >
-                    <span className="text-ink">
-                      {request.requester?.displayName ?? t('detail.anonymous')}
-                    </span>
-                    <span className="flex gap-2">
-                      <Button
+            <SectionCard title={t('rsvp.heading')} titleId="rsvp-heading">
+              <div aria-labelledby="rsvp-heading" role="group">
+                <SegmentStrip>
+                  {(['Going', 'Maybe', 'Declined'] as const).map((choice) => {
+                    const pressed = viewerEntry?.status === choice.toLowerCase()
+                    return (
+                      <button
+                        key={choice}
+                        aria-pressed={pressed}
+                        className={segmentItemClasses(pressed)}
+                        disabled={respond.isPending}
                         type="button"
-                        variant="ghost"
-                        onClick={() => approve.mutate(request.id)}
+                        onClick={() => respond.mutate(choice)}
                       >
-                        {t('join.approve')}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => reject.mutate(request.id)}
-                      >
-                        {t('join.reject')}
-                      </Button>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+                        {t(`rsvp.${choice.toLowerCase()}`)}
+                      </button>
+                    )
+                  })}
+                </SegmentStrip>
+              </div>
 
-          <section aria-label={t('a11y.rosterLabel')} aria-labelledby="roster-heading">
-            <h2 id="roster-heading" className="text-h2 font-display font-semibold text-ink">
-              {t('detail.roster')}
-            </h2>
-            {(
-              [
-                ['going', going],
-                ['maybe', maybe],
-                ['declined', declined],
-                ['pending', pending],
-              ] as const
-            ).map(([key, entries]) => (
-              <div key={key} className="mt-3">
-                <h3 className="font-display font-semibold text-ink">
-                  {t(`detail.${key}`)} ({entries.length})
-                </h3>
-                <ul>
-                  {entries.map((entry) => (
-                    <li
-                      key={entry.participationId}
-                      className="flex items-center justify-between gap-2 py-1"
-                      data-testid={`roster-entry-${entry.participationId}`}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  disabled={leave.isPending}
+                  type="button"
+                  variant="ghost"
+                  onClick={() => leave.mutate()}
+                >
+                  {t('rsvp.leave')}
+                </Button>
+                {canRequestJoin && (
+                  <>
+                    <Button
+                      disabled={join.isPending}
+                      type="button"
+                      variant="ghost"
+                      onClick={() => join.mutate()}
                     >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <AvatarDisc
-                          emoji={entry.avatar?.emoji}
-                          imgUrl={avatarImgUrl(entry.avatar)}
-                          masked={entry.displayName === null}
-                          seed={entry.userId ?? entry.guestIdentityId ?? entry.participationId}
-                          size="xs"
-                        />
-                        <span className="truncate text-ink">
-                          {entry.displayName ?? t('detail.anonymous')}
-                        </span>
-                      </span>
-                      {isOrganizer && entry.origin === 'guestLink' && (
-                        <RemoveGuestDialog
-                          displayName={entry.displayName ?? t('detail.anonymous')}
-                          pending={removeGuestParticipant.isPending}
-                          onConfirm={() =>
-                            removeGuestParticipant.mutate(entry.participationId)
-                          }
-                        />
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                      {t('join.request')}
+                    </Button>
+                    <Button
+                      disabled={withdraw.isPending}
+                      type="button"
+                      variant="ghost"
+                      onClick={() => withdraw.mutate()}
+                    >
+                      {t('join.withdraw')}
+                    </Button>
+                  </>
+                )}
               </div>
-            ))}
-          </section>
+            </SectionCard>
 
-          {waitlisted.length > 0 && (
-            <section aria-label={t('a11y.waitlistLabel')} aria-labelledby="waitlist-heading">
-              <h2 id="waitlist-heading" className="text-h2 font-display font-semibold text-ink">
-                {t('waitlist.heading')} ({waitlisted.length})
-              </h2>
-              <ul>
-                {waitlisted.map((entry) => (
-                  <li
-                    key={entry.participationId}
-                    className="flex items-center justify-between gap-2 py-1"
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <AvatarDisc
-                        emoji={entry.avatar?.emoji}
-                        imgUrl={avatarImgUrl(entry.avatar)}
-                        masked={entry.displayName === null}
-                        seed={entry.userId ?? entry.guestIdentityId ?? entry.participationId}
-                        size="xs"
-                      />
-                      <span className="truncate text-ink">
-                        {entry.displayName ?? t('detail.anonymous')}
+            {isOrganizer && joinRequests.data && joinRequests.data.items.length > 0 && (
+              <Section
+                title={`${t('detail.joinRequests')} (${joinRequests.data.items.length})`}
+                titleId="join-requests-heading"
+              >
+                <ul>
+                  {joinRequests.data.items.map((request) => (
+                    <li
+                      key={request.id}
+                      className="flex flex-wrap items-center justify-between gap-2 border-t border-ink/25 py-2 first:border-t-0"
+                    >
+                      <span className="text-ink">
+                        {request.requester?.displayName ?? t('detail.anonymous')}
                       </span>
-                    </span>
-                    {isOrganizer && (
                       <span className="flex gap-2">
                         <Button
                           type="button"
                           variant="ghost"
-                          onClick={() => promote.mutate(entry.participationId)}
+                          onClick={() => approve.mutate(request.id)}
                         >
-                          {t('waitlist.promote')}
+                          {t('join.approve')}
                         </Button>
                         <Button
                           type="button"
                           variant="ghost"
-                          onClick={() => rejectWaitlist.mutate(entry.participationId)}
+                          onClick={() => reject.mutate(request.id)}
                         >
-                          {t('waitlist.reject')}
+                          {t('join.reject')}
                         </Button>
                       </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-        </>
-      )}
+                    </li>
+                  ))}
+                </ul>
+              </Section>
+            )}
+
+            <Section
+              label={t('a11y.rosterLabel')}
+              labelledBy="roster-heading"
+              title={t('detail.roster')}
+              titleId="roster-heading"
+            >
+              {(
+                [
+                  ['going', going],
+                  ['maybe', maybe],
+                  ['declined', declined],
+                  ['pending', pending],
+                ] as const
+              ).map(([key, entries]) => (
+                <div key={key} className="flex flex-col gap-2">
+                  <h3 className="font-display font-semibold text-ink">
+                    {t(`detail.${key}`)} ({entries.length})
+                  </h3>
+                  <ul>{entries.map(rosterRow)}</ul>
+                </div>
+              ))}
+            </Section>
+
+            {waitlisted.length > 0 && (
+              <Section
+                label={t('a11y.waitlistLabel')}
+                labelledBy="waitlist-heading"
+                title={`${t('waitlist.heading')} (${waitlisted.length})`}
+                titleId="waitlist-heading"
+              >
+                <ul>
+                  {waitlisted.map((entry) => (
+                    <li
+                      key={entry.participationId}
+                      className="border-t border-ink/25 py-2 first:border-t-0"
+                    >
+                      <RosterIdentity
+                        actions={
+                          isOrganizer ? (
+                            <>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => promote.mutate(entry.participationId)}
+                              >
+                                {t('waitlist.promote')}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => rejectWaitlist.mutate(entry.participationId)}
+                              >
+                                {t('waitlist.reject')}
+                              </Button>
+                            </>
+                          ) : undefined
+                        }
+                        avatar={
+                          <AvatarDisc
+                            emoji={entry.avatar?.emoji}
+                            imgUrl={avatarImgUrl(entry.avatar)}
+                            masked={entry.displayName === null}
+                            seed={
+                              entry.userId ?? entry.guestIdentityId ?? entry.participationId
+                            }
+                            size="xs"
+                          />
+                        }
+                        displayName={entry.displayName ?? t('detail.anonymous')}
+                        masked={entry.displayName === null}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </Section>
+            )}
+
+            <Section
+              title={t('detail.notificationsHeading')}
+              titleId="session-notifications-heading"
+            >
+              <div className="flex flex-wrap items-end gap-6">
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    className="font-body font-semibold text-ink"
+                    htmlFor="reminder-select"
+                  >
+                    {t('reminder.label')}
+                  </label>
+                  <select
+                    className="control-frame control-select min-h-11 px-3 py-2 font-body text-body"
+                    id="reminder-select"
+                    value={viewerEntry?.reminderChoice ?? ''}
+                    onChange={(event) =>
+                      reminder.mutate((event.target.value || null) as ReminderChoiceValue)
+                    }
+                  >
+                    {reminderOptions.map((option) => (
+                      <option key={option.key} value={option.value ?? ''}>
+                        {t(option.key)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <Button
+                  aria-busy={mute.isPending}
+                  aria-pressed={data.muted}
+                  disabled={mute.isPending}
+                  type="button"
+                  variant={data.muted ? 'primary' : 'neutral'}
+                  onClick={() => mute.mutate()}
+                >
+                  {data.muted ? t('mute.off') : t('mute.on')}
+                </Button>
+              </div>
+              <p className="font-body text-meta text-ink-soft">{t('mute.copy')}</p>
+            </Section>
+
+            {isOrganizer && (
+              <SectionCard
+                title={t('detail.dangerZone')}
+                titleId="session-danger-heading"
+              >
+                <div className="flex flex-wrap gap-2">
+                  <CancelSessionDialog
+                    pending={cancel.isPending}
+                    onConfirm={() => cancel.mutate()}
+                  />
+                </div>
+              </SectionCard>
+            )}
+          </>
+        )}
+      </PageScaffold>
     </main>
   )
 }
+

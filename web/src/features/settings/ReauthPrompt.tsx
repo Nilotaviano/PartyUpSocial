@@ -155,6 +155,9 @@ export function ReauthPrompt({
           className="fixed inset-0 z-40 bg-scrim"
           data-testid="reauth-overlay"
         />
+        {/* `max-h-[calc(100dvh_-_2rem)]` keeps this scrolling dialog inside the
+            visual viewport on a short mobile screen; no `max-h-*` utility is
+            dvh-relative. */}
         <Dialog.Content
           aria-describedby="reauth-description"
           className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh_-_2rem)] w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-card border-2 border-ink bg-card p-6 shadow-offset-dialog focus:outline-none"

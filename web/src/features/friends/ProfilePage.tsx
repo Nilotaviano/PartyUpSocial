@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router'
 import type { components } from '../../api/schema'
 import { client, isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { IdentityRow } from '../../components/ui/identityRow'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
 import { validateFriendContinuation } from '../../auth/friendContinuation'
 import { AvatarDisc } from './AvatarDisc'
 import { avatarImgUrl } from './avatarImage'
@@ -101,22 +104,19 @@ export function ProfileActionCard({
     >
       {profile.disclosure === 'full' ? (
         <>
-          <div className="flex items-center gap-3">
-            <AvatarDisc
-              emoji={profile.avatar.emoji}
-              imgUrl={avatarImgUrl(profile.avatar)}
-              seed={profile.userId}
-              size="sm"
-            />
-            <div>
-              <h2 className="font-display text-h3 font-semibold text-ink">
-                {profile.displayName}
-              </h2>
-              <p className="font-mono text-meta text-ink-soft">
-                @{profile.username}
-              </p>
-            </div>
-          </div>
+          <IdentityRow
+            avatar={
+              <AvatarDisc
+                emoji={profile.avatar.emoji}
+                imgUrl={avatarImgUrl(profile.avatar)}
+                seed={profile.userId}
+                size="sm"
+              />
+            }
+            displayName={profile.displayName}
+            nameAs="h2"
+            username={profile.username}
+          />
           {profile.platforms.length > 0 && (
             <ul className="mt-4 space-y-1" aria-label={t('profile.platforms')}>
               {profile.platforms.map((platform) => (
@@ -132,9 +132,8 @@ export function ProfileActionCard({
         </>
       ) : (
         <>
-          <h2 className="font-mono text-h3 font-semibold text-ink">
-            @{profile.username}
-          </h2>
+          {/* D-068/D-188: only the username is on the wire before acceptance. */}
+          <IdentityRow nameAs="h2" username={profile.username} variant="handle" />
           <p className="sr-only">{t('profile.usernameOnly')}</p>
         </>
       )}
@@ -147,7 +146,7 @@ export function ProfileActionCard({
           <Button
             aria-busy={action.isPending}
             disabled={action.isPending}
-            variant="neutral"
+            variant="primary"
             onClick={() => action.mutate('send')}
           >
             {t('actions.sendRequest')}
@@ -158,7 +157,7 @@ export function ProfileActionCard({
             <Button
               aria-busy={action.isPending}
               disabled={action.isPending}
-              variant="neutral"
+              variant="primary"
               onClick={() => action.mutate('accept')}
             >
               {t('actions.accept')}
@@ -192,16 +191,21 @@ export function ProfileActionCard({
             }}
           />
         )}
+        {/*
+          §3.3: block stays one plain danger-text button with its consequence
+          visible beside it — never a filled red button leading the card.
+        */}
         <Button
           aria-busy={action.isPending}
+          className="text-danger"
           disabled={action.isPending}
-          variant="danger"
+          variant="ghost"
           onClick={() => action.mutate('block')}
         >
           {t('actions.block')}
         </Button>
       </div>
-      <p className="mt-3 text-ink-soft">
+      <p className="mt-3 text-meta text-ink-soft">
         {t('profile.blockConsequence')}
       </p>
       <p aria-live="polite" className="mt-3 text-ink">
@@ -246,25 +250,15 @@ export function ProfileResolution({ username }: { username: string }) {
 export function ProfilePage() {
   const { t } = useTranslation('friends')
   const { username = '' } = useParams()
-  const heading = useRef<HTMLHeadingElement>(null)
-
-  useEffect(() => {
-    heading.current?.focus()
-  }, [username])
 
   return (
-    <main
-      className="mx-auto max-w-2xl space-y-5 p-4 sm:p-8"
-      data-testid="screen-friend-profile"
-    >
-      <h1
-        ref={heading}
-        tabIndex={-1}
-        className="font-display text-h1 font-bold text-ink focus:outline-none"
-      >
-        {t('pages.profile')}
-      </h1>
-      <ProfileResolution username={username} />
+    <main data-testid="screen-friend-profile">
+      <PageScaffold width="form">
+        {/* Keyed on the username so opening a different profile re-runs the
+            header's focus-on-mount contract, as the shipped effect did. */}
+        <PageHeader key={username} title={t('pages.profile')} />
+        <ProfileResolution username={username} />
+      </PageScaffold>
     </main>
   )
 }

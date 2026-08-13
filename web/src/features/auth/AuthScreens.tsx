@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
@@ -8,11 +8,17 @@ import {
   isApiError,
   refreshAntiforgeryToken,
 } from '../../api/client'
+import { BrandMark } from '../../components/ui/brandMark'
 import { Button } from '../../components/ui/button'
 import { Checkbox } from '../../components/ui/checkbox'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
+import { FormField, FormShell, formShellClasses } from '../../components/ui/formShell'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section } from '../../components/ui/section'
+import { StatusBanner } from '../../components/ui/statusBanner'
 import { startExternalProviderWithRetry } from '../../auth/externalIntent'
 import {
   readAuthNext,
@@ -129,15 +135,104 @@ function safeAgeGateReturnTo(value: string | undefined) {
 function ErrorAlert({ error }: { error: unknown }) {
   const { t } = useTranslation('errors')
   return error ? (
-    <p role="alert">
+    <StatusBanner role="alert" variant="danger">
       {t(isApiError(error) ? error.code : 'generic', {
         defaultValue: t('generic'),
       })}
-    </p>
+    </StatusBanner>
   ) : null
 }
 
+/**
+ * The shared auth column (STYLING_OVERHAUL_DESIGN.md §3.6): brand mark, then a
+ * centred `max-w-form` stack. The h1 comes from PageHeader, so every auth
+ * screen carries the §1 focus-on-mount contract the rest of the app has.
+ */
+function AuthScreen({
+  testId,
+  title,
+  children,
+}: {
+  testId: string
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <main data-testid={testId}>
+      <PageScaffold className="items-center" width="form">
+        <BrandMark className="h-9 w-9 text-ink" />
+        <div className="flex w-full flex-col gap-6">
+          <PageHeader align="center" title={title} />
+          {children}
+        </div>
+      </PageScaffold>
+    </main>
+  )
+}
+
 const linkButtonBase = `inline-flex items-center justify-center gap-2 px-4 py-2 ${raisedInteractiveClasses}`
+
+/**
+ * Decoration for the welcome "how it works" band (§3.6): the hero's own
+ * vocabulary — outlined time blocks — reduced to a step-sized figure. Purely
+ * `aria-hidden`; each step carries its meaning in its title and body.
+ */
+function HowFigure({ step }: { step: 1 | 2 | 3 }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-12 w-12 text-ink"
+      fill="none"
+      focusable="false"
+      viewBox="0 0 48 48"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {step === 1 && (
+        <>
+          <rect className="fill-free" height="12" rx="3" stroke="currentColor" strokeWidth="2.5" width="16" x="4" y="6" />
+          <rect className="fill-busy" height="12" rx="3" stroke="currentColor" strokeWidth="2.5" width="16" x="28" y="6" />
+          <rect className="fill-busy" height="12" rx="3" stroke="currentColor" strokeWidth="2.5" width="16" x="4" y="30" />
+          <rect className="fill-free" height="12" rx="3" stroke="currentColor" strokeWidth="2.5" width="16" x="28" y="30" />
+        </>
+      )}
+      {step === 2 && (
+        <>
+          <rect className="fill-free" height="20" rx="4" stroke="currentColor" strokeWidth="2.5" width="24" x="4" y="8" />
+          <rect className="fill-primary" height="20" rx="4" stroke="currentColor" strokeWidth="2.5" width="24" x="20" y="20" />
+        </>
+      )}
+      {step === 3 && (
+        <>
+          <rect className="fill-primary" height="28" rx="5" stroke="currentColor" strokeWidth="2.5" width="36" x="6" y="10" />
+          <path d="M15 24l6 6 12-12" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" />
+        </>
+      )}
+    </svg>
+  )
+}
+
+function HowItWorks() {
+  const { t } = useTranslation('auth')
+
+  return (
+    <ol className="grid gap-6 sm:grid-cols-3">
+      {([1, 2, 3] as const).map((step) => (
+        <li
+          key={step}
+          className="flex flex-col items-start gap-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card"
+        >
+          <HowFigure step={step} />
+          <h2 className="font-display text-h3 font-semibold text-ink">
+            {t(`welcome.how.${step}.title`)}
+          </h2>
+          <p className="font-body text-body text-ink-soft">
+            {t(`welcome.how.${step}.body`)}
+          </p>
+        </li>
+      ))}
+    </ol>
+  )
+}
 
 export function Welcome() {
   const { t } = useTranslation(['common', 'auth'])
@@ -180,14 +275,18 @@ export function Welcome() {
 
   return (
     <main
-      className="mx-auto flex min-h-[80vh] max-w-3xl flex-col justify-center gap-8 p-4 sm:p-8"
+      className="mx-auto flex w-full max-w-page flex-col gap-12 px-4 py-8 sm:px-8 sm:py-12"
       data-testid="screen-welcome"
     >
-      <div className="grid items-center gap-10 sm:grid-cols-[3fr_2fr]">
+      <div className="grid items-center gap-10 py-6 sm:grid-cols-[3fr_2fr] sm:py-12">
         <div className="space-y-6">
-          <span className="inline-flex items-center rounded-full border-2 border-ink bg-accent px-3 py-1 font-display text-xs font-bold uppercase tracking-widest text-accent-ink dark:border-accent-ink">
+          <span className="inline-flex items-center gap-2 rounded-full border-2 border-ink bg-accent px-3 py-1 font-display text-xs font-bold uppercase tracking-widest text-accent-ink dark:border-accent-ink">
+            <BrandMark className="h-4 w-4" />
             {t('pages.welcome')}
           </span>
+          {/* `max-w-[16ch]` caps the tagline's measure in characters, and
+              `leading-[1.05]` is the display line-height (`--text-display--line-height`)
+              carried onto a hero size the type scale does not name. */}
           <h1 className="max-w-[16ch] font-display text-4xl leading-[1.05] font-extrabold text-ink sm:text-5xl">
             {t('app.tagline')}
           </h1>
@@ -247,7 +346,7 @@ export function Welcome() {
             ].map((fill, index) => (
               <span
                 key={index}
-                className={`h-7 rounded-[0.3rem] border border-ink/15 ${fill} ${
+                className={`h-7 rounded-sm border border-ink/15 ${fill} ${
                   index === 6 || index === 11 ? 'ring-2 ring-ink ring-inset' : ''
                 }`}
               />
@@ -258,6 +357,7 @@ export function Welcome() {
           </div>
         </div>
       </div>
+      <HowItWorks />
     </main>
   )
 }
@@ -285,28 +385,30 @@ export function AgeGate() {
   }
 
   return (
-    <main
-      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-age-gate"
-    >
-      <h1 className="text-h1 font-display font-bold text-ink">
-        {t('ageGate.title')}
-      </h1>
-      <div className="flex items-center gap-2">
-        <Checkbox.Root
-          id="age-gate"
-          checked={checked}
-          onCheckedChange={(value: boolean | 'indeterminate') =>
-            setChecked(value === true)
-          }
-        />
-        <Label htmlFor="age-gate">{t('ageGate.attestation')}</Label>
+    <AuthScreen testId="screen-age-gate" title={t('ageGate.title')}>
+      <div className={`${formShellClasses} sm:p-8`}>
+        <div className="flex items-center gap-3">
+          <Checkbox.Root
+            id="age-gate"
+            checked={checked}
+            onCheckedChange={(value: boolean | 'indeterminate') =>
+              setChecked(value === true)
+            }
+          />
+          <Label htmlFor="age-gate">{t('ageGate.attestation')}</Label>
+        </div>
+        {attempted && !checked && (
+          <StatusBanner role="alert" variant="danger">
+            {t('ageGate.required')}
+          </StatusBanner>
+        )}
+        <div className="flex">
+          <Button className="ml-auto" variant="primary" onClick={continueGate}>
+            {t('common.continue', { ns: 'common' })}
+          </Button>
+        </div>
       </div>
-      {attempted && !checked && <p role="alert">{t('ageGate.required')}</p>}
-      <Button variant="primary" onClick={continueGate}>
-        {t('common.continue', { ns: 'common' })}
-      </Button>
-    </main>
+    </AuthScreen>
   )
 }
 
@@ -401,16 +503,16 @@ export function Login() {
   }
 
   return (
-    <main
-      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-login"
-    >
-      <h1 className="text-h1 font-display font-bold text-ink">
-        {t('pages.login')}
-      </h1>
-      <form className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card" noValidate onSubmit={submit}>
-        <div>
-          <Label htmlFor="login-email">{t('fields.email')}</Label>
+    <AuthScreen testId="screen-login" title={t('pages.login')}>
+      <FormShell
+        onSubmit={submit}
+        submit={
+          <Button type="submit" variant="primary">
+            {t('actions.signIn')}
+          </Button>
+        }
+      >
+        <FormField htmlFor="login-email" label={t('fields.email')}>
           <Input
             id="login-email"
             type="email"
@@ -425,9 +527,8 @@ export function Login() {
               {t(emailError === 'required' ? 'fields.emailRequired' : 'fields.emailInvalid')}
             </p>
           )}
-        </div>
-        <div>
-          <Label htmlFor="login-password">{t('fields.password')}</Label>
+        </FormField>
+        <FormField htmlFor="login-password" label={t('fields.password')}>
           <Input
             id="login-password"
             type="password"
@@ -438,29 +539,32 @@ export function Login() {
             required
           />
           {passwordMissing && <p id="login-password-error" role="alert">{t('fields.passwordRequired')}</p>}
+        </FormField>
+      </FormShell>
+      <Section className="gap-3">
+        <div className="flex flex-wrap gap-3">
+          <Button variant="neutral" onClick={() => void magic()}>
+            {t('actions.emailLink')}
+          </Button>
+          {session?.providers.includes('google') && (
+            <Button variant="neutral" onClick={() => void external('google')}>
+              {t('providers.google')}
+            </Button>
+          )}
+          {session?.providers.includes('steam') && (
+            <Button variant="neutral" onClick={() => void external('steam')}>
+              {t('providers.steam')}
+            </Button>
+          )}
         </div>
-        <Button type="submit" variant="primary">
-          {t('actions.signIn')}
-        </Button>
-      </form>
-      <Button variant="neutral" onClick={() => void magic()}>
-        {t('actions.emailLink')}
-      </Button>
-      {sent && <p role="status">{t('messages.checkInbox')}</p>}
-      <div className="flex flex-wrap gap-3">
-        {session?.providers.includes('google') && (
-          <Button variant="neutral" onClick={() => void external('google')}>
-            {t('providers.google')}
-          </Button>
+        {sent && (
+          <StatusBanner role="status" variant="success">
+            {t('messages.checkInbox')}
+          </StatusBanner>
         )}
-        {session?.providers.includes('steam') && (
-          <Button variant="neutral" onClick={() => void external('steam')}>
-            {t('providers.steam')}
-          </Button>
-        )}
-      </div>
+      </Section>
       <ErrorAlert error={error} />
-    </main>
+    </AuthScreen>
   )
 }
 
@@ -534,19 +638,21 @@ export function Register() {
   }, [])
 
   return (
-    <main
-      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-register"
-    >
-      <h1 className="text-h1 font-display font-bold text-ink">
-        {t('pages.register')}
-      </h1>
+    <AuthScreen testId="screen-register" title={t('pages.register')}>
       {sent ? (
-        <p role="status">{t('messages.checkInbox')}</p>
+        <StatusBanner role="status" variant="success">
+          {t('messages.checkInbox')}
+        </StatusBanner>
       ) : (
-        <form className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card" noValidate onSubmit={submit}>
-          <div>
-            <Label htmlFor="register-email">{t('fields.email')}</Label>
+        <FormShell
+          onSubmit={submit}
+          submit={
+            <Button type="submit" variant="primary">
+              {t('actions.createAccount')}
+            </Button>
+          }
+        >
+          <FormField htmlFor="register-email" label={t('fields.email')}>
             <Input
               id="register-email"
               type="email"
@@ -561,14 +667,11 @@ export function Register() {
                 {t(emailError === 'required' ? 'fields.emailRequired' : 'fields.emailInvalid')}
               </p>
             )}
-          </div>
-          <Button type="submit" variant="primary">
-            {t('actions.createAccount')}
-          </Button>
-        </form>
+          </FormField>
+        </FormShell>
       )}
       <ErrorAlert error={error} />
-    </main>
+    </AuthScreen>
   )
 }
 
@@ -616,16 +719,14 @@ export function MagicLink() {
   }, [authData, navigate, queryClient])
 
   return (
-    <main
-      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-auth-magic"
-    >
-      <h1 className="text-h1 font-display font-bold text-ink">
-        {t('pages.magic')}
-      </h1>
-      {!authData.token && <p role="alert">{t('messages.invalidLink')}</p>}
+    <AuthScreen testId="screen-auth-magic" title={t('pages.magic')}>
+      {!authData.token && (
+        <StatusBanner role="alert" variant="danger">
+          {t('messages.invalidLink')}
+        </StatusBanner>
+      )}
       <ErrorAlert error={error} />
-    </main>
+    </AuthScreen>
   )
 }
 
@@ -696,15 +797,9 @@ export function AuthCallback() {
   }, [location.search, navigate, queryClient, reauth])
 
   return (
-    <main
-      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-auth-callback"
-    >
-      <h1 className="text-h1 font-display font-bold text-ink">
-        {t('pages.callback')}
-      </h1>
+    <AuthScreen testId="screen-auth-callback" title={t('pages.callback')}>
       <ErrorAlert error={error} />
-    </main>
+    </AuthScreen>
   )
 }
 
@@ -803,20 +898,26 @@ function TokenForm({
   }
 
   return (
-    <main
-      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
-      data-testid={'screen-auth-' + page}
-    >
-      <h1 className="text-h1 font-display font-bold text-ink">
-        {t('pages.' + page)}
-      </h1>
+    <AuthScreen testId={'screen-auth-' + page} title={t('pages.' + page)}>
       {!authData.token ? (
-        <p role="alert">{t('messages.invalidLink')}</p>
+        <StatusBanner role="alert" variant="danger">
+          {t('messages.invalidLink')}
+        </StatusBanner>
       ) : (
-        <form className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card" noValidate onSubmit={submit}>
+        <FormShell
+          onSubmit={submit}
+          submit={
+            <Button type="submit" variant="primary">
+              {t('actions.continue')}
+            </Button>
+          }
+        >
           {password && (
-            <div>
-              <Label htmlFor={page + '-password'}>{t('fields.password')}</Label>
+            <FormField
+              hint={t('fields.passwordHint')}
+              htmlFor={page + '-password'}
+              label={t('fields.password')}
+            >
               <Input
                 id={page + '-password'}
                 type="password"
@@ -831,26 +932,17 @@ function TokenForm({
                 aria-invalid={passwordTooShort || undefined}
                 required
               />
-              <p
-                id={page + '-password-hint'}
-                className="text-body-sm text-ink-soft"
-              >
-                {t('fields.passwordHint')}
-              </p>
               {passwordTooShort && (
                 <p id={page + '-password-error'} role="alert">
                   {t('fields.passwordTooShort')}
                 </p>
               )}
-            </div>
+            </FormField>
           )}
-          <Button type="submit" variant="primary">
-            {t('actions.continue')}
-          </Button>
-        </form>
+        </FormShell>
       )}
       <ErrorAlert error={error} />
-    </main>
+    </AuthScreen>
   )
 }
 
@@ -897,18 +989,19 @@ export function ConfirmIdentity() {
   }, [navigate, token])
 
   return (
-    <main
-      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-auth-confirm-identity"
+    <AuthScreen
+      testId="screen-auth-confirm-identity"
+      title={t('pages.confirmIdentity')}
     >
-      <h1 className="text-h1 font-display font-bold text-ink">
-        {t('pages.confirmIdentity')}
-      </h1>
       {token ? (
-        <p>{t('messages.confirmedIdentity')}</p>
+        <StatusBanner variant="success">
+          {t('messages.confirmedIdentity')}
+        </StatusBanner>
       ) : (
-        <p role="alert">{t('messages.invalidLink')}</p>
+        <StatusBanner role="alert" variant="danger">
+          {t('messages.invalidLink')}
+        </StatusBanner>
       )}
-    </main>
+    </AuthScreen>
   )
 }

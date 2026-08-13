@@ -1,9 +1,16 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { segmentItemClasses, segmentStripClasses } from '../../components/ui/classes'
+import { EmptyState } from '../../components/ui/emptyState'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold, PageSlot } from '../../components/ui/pageScaffold'
+import { Section } from '../../components/ui/section'
+import { StatusBanner } from '../../components/ui/statusBanner'
+import { useToast } from '../../components/ui/toastStore'
 import { AvatarDisc } from '../friends/AvatarDisc'
 import { avatarImgUrl } from '../friends/avatarImage'
 import {
@@ -112,10 +119,10 @@ function NotificationRow({
 
   return (
     <li
-      className="rounded-card border-2 border-ink bg-card p-4 shadow-offset-card"
+      className="border-t border-ink/25 first:border-t-0"
       data-testid={`notification-${notification.id}`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3 px-2 py-3">
         <div className="flex min-w-0 items-start gap-2">
           {namesAPerson && (
             <AvatarDisc
@@ -171,27 +178,30 @@ function NotificationRow({
 
 export function NotificationCenterPage() {
   const { t } = useTranslation(['notifications', 'common'])
-  const heading = useRef<HTMLHeadingElement>(null)
   const [scope, setScope] = useState<NotificationScope>('all')
   const queryClient = useQueryClient()
+  const toast = useToast()
   const { items, isPending, error, nextCursor, isFetchingNextPage, loadMore } =
     useNotificationScope(scope)
 
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
-
-  // Ruling 1: opening the center is a read-only GET — neither this effect
-  // nor render ever calls a mark-read mutation. Only the explicit controls
-  // below do.
+  // Ruling 1: opening the center is a read-only GET — neither an effect nor
+  // render ever calls a mark-read mutation. Only the explicit controls below
+  // do. The toast is additive visual chrome (§3.5) on top of the shipped
+  // strings; it carries no announcement duty of its own.
   const markRead = useMutation({
     mutationFn: markNotificationRead,
-    onSuccess: () => invalidateNotifications(queryClient),
+    onSuccess: async () => {
+      toast({ message: t('toastCopy.markedRead') })
+      await invalidateNotifications(queryClient)
+    },
   })
 
   const markAllRead = useMutation({
     mutationFn: markAllNotificationsRead,
-    onSuccess: () => invalidateNotifications(queryClient),
+    onSuccess: async () => {
+      toast({ message: t('toastCopy.markedAllRead') })
+      await invalidateNotifications(queryClient)
+    },
   })
 
   // Gated on the unread-count query, not the loaded page (F2): a user whose
@@ -204,88 +214,87 @@ export function NotificationCenterPage() {
   const hasUnread = (unreadCountQuery.data ?? 0) > 0
 
   return (
-    <main
-      className="mx-auto max-w-3xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-notifications"
-    >
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <h1
-          ref={heading}
-          tabIndex={-1}
-          className="text-display font-display font-bold text-ink focus:outline-none"
-        >
-          {t('list.heading')}
-        </h1>
-        <Button
-          aria-busy={markAllRead.isPending}
-          disabled={markAllRead.isPending || !hasUnread}
-          variant="neutral"
-          onClick={() => markAllRead.mutate()}
-        >
-          {t('actions.markAllRead')}
-        </Button>
-      </header>
+    <main data-testid="screen-notifications">
+      <PageScaffold>
+        <PageHeader
+          actions={
+            <Button
+              aria-busy={markAllRead.isPending}
+              disabled={markAllRead.isPending || !hasUnread}
+              variant="neutral"
+              onClick={() => markAllRead.mutate()}
+            >
+              {t('actions.markAllRead')}
+            </Button>
+          }
+          title={t('list.heading')}
+        />
+        <PageSlot />
 
-      <div aria-label={t('nav.label')} className="flex gap-2" role="tablist">
-        {(['all', 'unread'] as const).map((option) => (
-          <button
-            key={option}
-            aria-selected={scope === option}
-            className={`min-h-11 rounded-control border-2 border-ink px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-              scope === option
-                ? 'bg-primary font-semibold text-primary-ink'
-                : 'bg-card text-ink-soft'
-            }`}
-            role="tab"
-            type="button"
-            onClick={() => setScope(option)}
-          >
-            {t(`list.scope.${option}`)}
-          </button>
-        ))}
-      </div>
-
-      {isPending && (
-        <p className="motion-safe:animate-pulse text-ink-soft" role="status">
-          {t('common.loading', { ns: 'common' })}
-        </p>
-      )}
-
-      {error && (
-        <p role="alert">
-          {t(isApiError(error) ? `errors.codes.${error.code}` : 'errors.generic', {
-            defaultValue: t('errors.generic'),
-          })}
-        </p>
-      )}
-
-      {!isPending && items.length === 0 && !error && (
-        <p className="text-ink-soft">{t(`list.empty.${scope}`)}</p>
-      )}
-
-      {items.length > 0 && (
-        <ul className="space-y-3">
-          {items.map((item) => (
-            <NotificationRow
-              key={item.id}
-              isMarking={markRead.isPending && markRead.variables === item.id}
-              notification={item}
-              onMarkRead={(id) => markRead.mutate(id)}
-            />
+        {/* SegmentStrip skin (§3.2) on the shipped tablist semantics — the
+            roles, accessible names and handler are untouched. */}
+        <div aria-label={t('nav.label')} className={segmentStripClasses} role="tablist">
+          {(['all', 'unread'] as const).map((option) => (
+            <button
+              key={option}
+              aria-selected={scope === option}
+              className={segmentItemClasses(scope === option)}
+              role="tab"
+              type="button"
+              onClick={() => setScope(option)}
+            >
+              {t(`list.scope.${option}`)}
+            </button>
           ))}
-        </ul>
-      )}
+        </div>
 
-      {nextCursor && (
-        <Button
-          aria-busy={isFetchingNextPage}
-          disabled={isFetchingNextPage}
-          variant="neutral"
-          onClick={loadMore}
-        >
-          {t('list.loadMore')}
-        </Button>
-      )}
+        {isPending && (
+          <p className="motion-safe:animate-pulse text-ink-soft" role="status">
+            {t('common.loading', { ns: 'common' })}
+          </p>
+        )}
+
+        {error && (
+          <StatusBanner role="alert" variant="danger">
+            {t(isApiError(error) ? `errors.codes.${error.code}` : 'errors.generic', {
+              defaultValue: t('errors.generic'),
+            })}
+          </StatusBanner>
+        )}
+
+        {/* An empty inbox is a good terminal state, so it is quiet: no CTA. */}
+        {!isPending && items.length === 0 && !error && (
+          <EmptyState illustration="🔔" variant="quiet">
+            {t(`list.empty.${scope}`)}
+          </EmptyState>
+        )}
+
+        {items.length > 0 && (
+          <Section label={t('list.heading')}>
+            <ul>
+              {items.map((item) => (
+                <NotificationRow
+                  key={item.id}
+                  isMarking={markRead.isPending && markRead.variables === item.id}
+                  notification={item}
+                  onMarkRead={(id) => markRead.mutate(id)}
+                />
+              ))}
+            </ul>
+          </Section>
+        )}
+
+        {nextCursor && (
+          <Button
+            aria-busy={isFetchingNextPage}
+            disabled={isFetchingNextPage}
+            variant="neutral"
+            onClick={loadMore}
+          >
+            {t('list.loadMore')}
+          </Button>
+        )}
+      </PageScaffold>
     </main>
   )
 }

@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router'
 import { client, isApiError } from '../../api/client'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
 import {
   isWellFormedFriendCode,
   normalizeFriendCode,
@@ -64,30 +66,20 @@ export function AddFriendPage() {
   const { t } = useTranslation('friends')
   const navigate = useNavigate()
   const { code = '' } = useParams()
-  const heading = useRef<HTMLHeadingElement>(null)
-
-  useEffect(() => {
-    heading.current?.focus()
-  }, [code])
 
   return (
-    <main
-      className="mx-auto max-w-2xl space-y-5 p-4 sm:p-8"
-      data-testid="screen-add-friend"
-    >
-      <h1
-        ref={heading}
-        tabIndex={-1}
-        className="font-display text-h1 font-bold text-ink focus:outline-none"
-      >
-        {t('pages.add')}
-      </h1>
-      <FriendCodeInput
-        key={code}
-        initialValue={normalizeFriendCode(code)}
-        onResolve={(friendCode) => navigate('/add/' + friendCode)}
-      />
-      <FriendCodeResolution friendCode={code} />
+    <main data-testid="screen-add-friend">
+      <PageScaffold width="form">
+        {/* Keyed on the code so a lookup for a different code re-runs the
+            header's focus-on-mount contract, as the shipped effect did. */}
+        <PageHeader key={code} title={t('pages.add')} />
+        <FriendCodeInput
+          key={code}
+          initialValue={normalizeFriendCode(code)}
+          onResolve={(friendCode) => navigate('/add/' + friendCode)}
+        />
+        <FriendCodeResolution friendCode={code} />
+      </PageScaffold>
     </main>
   )
 }

@@ -19,12 +19,10 @@
     },
     "upcoming": {
       "heading": "Próximas",
-      "empty": "Nenhuma sessão futura.",
       "seeAll": "Ver todas"
     },
     "discoverable": {
       "heading": "Descobrir sessões",
-      "empty": "Nenhuma sessão para descobrir no momento.",
       "seeAll": "Ver todas"
     }
   },
@@ -33,5 +31,16 @@
     "empty": "Nenhuma sessão para descobrir no momento.",
     "loadMore": "Carregar mais",
     "organizedBy": "Organizado por {{name}}"
+  },
+  "emptyState": {
+    "home": {
+      "body": "Nada por aqui ainda. Compartilhe seu código de amigo para chamar a galera, ou crie uma sessão e escolha um horário.",
+      "cta": "Compartilhar meu código",
+      "ctaSecondary": "Criar sessão"
+    },
+    "discover": {
+      "body": "Nada aberto para entrar agora. Adicione alguns amigos e as sessões públicas deles aparecem aqui.",
+      "cta": "Encontrar amigos"
+    }
   }
 }

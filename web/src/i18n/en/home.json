@@ -19,12 +19,10 @@
     },
     "upcoming": {
       "heading": "Upcoming",
-      "empty": "No upcoming sessions.",
       "seeAll": "See all"
     },
     "discoverable": {
       "heading": "Discover sessions",
-      "empty": "No sessions to discover right now.",
       "seeAll": "See all"
     }
   },
@@ -33,5 +31,16 @@
     "empty": "No sessions to discover right now.",
     "loadMore": "Load more",
     "organizedBy": "Organized by {{name}}"
+  },
+  "emptyState": {
+    "home": {
+      "body": "Nothing here yet. Share your friend code to get people on board, or start a session and pick a time.",
+      "cta": "Share your code",
+      "ctaSecondary": "New session"
+    },
+    "discover": {
+      "body": "Nothing open to join right now. Add a few friends and their public sessions will show up here.",
+      "cta": "Find friends"
+    }
   }
 }

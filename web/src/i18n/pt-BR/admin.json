@@ -67,6 +67,7 @@
     "unknown": "Não informado",
     "banned": "Banida em {{date}}",
     "notBanned": "Sem banimento",
+    "dangerZone": "Zona de perigo",
     "lifecycles": {
       "onboarding": "Em configuração",
       "active": "Ativa",

@@ -67,6 +67,7 @@
     "unknown": "Sin definir",
     "banned": "Vetada el {{date}}",
     "notBanned": "Sin veto",
+    "dangerZone": "Zona de peligro",
     "lifecycles": {
       "onboarding": "En configuración",
       "active": "Activa",

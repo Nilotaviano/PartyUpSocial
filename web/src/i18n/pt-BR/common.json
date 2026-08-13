@@ -23,5 +23,18 @@
     "app": "Início",
     "accountDeletion": "Excluir conta",
     "accountDeletionConfirm": "Confirmar exclusão da conta"
+  },
+  "actions": {
+    "more": "Mais ações",
+    "dismiss": "Dispensar",
+    "retry": "Tentar novamente"
+  },
+  "toast": {
+    "regionLabel": "Avisos",
+    "dismissLabel": "Dispensar notificação"
+  },
+  "form": {
+    "dateHint": "Escolha uma data e hora no seu fuso horário.",
+    "dateEcho": "Selecionado: {{date}}"
   }
 }

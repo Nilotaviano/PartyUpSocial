@@ -21,5 +21,8 @@
   "messages": {
     "platformLinksOptional": "Platform linking is optional."
   },
-  "progress": "Step {{current}} of {{total}}: {{step}}"
+  "progress": "Step {{current}} of {{total}}: {{step}}",
+  "onboarding": {
+    "progress": "Setup progress"
+  }
 }

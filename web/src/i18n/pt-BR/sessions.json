@@ -68,7 +68,26 @@
     "pending": "Pendente",
     "waitlisted": "Na lista de espera",
     "anonymous": "Usuário Anônimo",
-    "inProgress": "Em andamento"
+    "inProgress": "Em andamento",
+    "muted": "Silenciada",
+    "progress": "{{going}} de {{min}} confirmados.",
+    "progressWaitlist": "Quando lotar, as próximas respostas entram na lista de espera.",
+    "joinRequests": "Pedidos de entrada",
+    "notificationsHeading": "Notificações desta sessão",
+    "dangerZone": "Zona de risco"
+  },
+  "status": {
+    "unconfirmed": "Aguardando jogadores",
+    "confirmed": "Confirmada",
+    "completed": "Concluída",
+    "expired": "Expirada",
+    "canceled": "Cancelada"
+  },
+  "emptyState": {
+    "sessions": {
+      "body": "Nada na agenda ainda. Crie uma sessão e convide seus amigos.",
+      "cta": "Criar sessão"
+    }
   },
   "rsvp": {
     "heading": "Sua resposta",

@@ -99,12 +99,21 @@ export function VotingGrid({
         return (
           <li
             key={option.id}
-            className="rounded-card border-2 border-ink bg-card p-3"
+            className="flex flex-col gap-1 border-t border-ink/25 py-3 first:border-t-0"
             data-testid={`poll-option-${option.id}`}
           >
-            <p className="font-display font-semibold text-ink">{timeText}</p>
-            <p className="text-ink-soft" data-testid={`poll-option-tally-${option.id}`}>
+            <p className="font-display text-h3 font-semibold text-ink">{timeText}</p>
+            <p
+              className="font-body text-meta text-ink-soft"
+              data-testid={`poll-option-tally-${option.id}`}
+            >
               {optionTallyText(option, t)}
+            </p>
+            {/* Text only — the `<li>` class list above stays unconditional (D-140). */}
+            <p className="font-body text-meta text-ink">
+              {current
+                ? t('detail.yourVote', { value: t(`vote.${current}`) })
+                : t('detail.noVoteYet')}
             </p>
             <div
               aria-busy={rowBusy}

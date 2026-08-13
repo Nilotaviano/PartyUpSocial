@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { chipClasses } from '../../components/ui/classes'
 import { pollWindowState, type PollWindow } from './pollQueries'
 
 /**
@@ -37,8 +38,6 @@ export function PollStatusChip({ poll }: { poll: PollWindow }) {
   }
 
   return (
-    <span className="rounded-full border-2 border-ink bg-accent px-2 py-0.5 font-display text-xs font-bold text-accent-ink dark:border-accent-ink">
-      {label}
-    </span>
+    <span className={chipClasses}>{label}</span>
   )
 }

@@ -23,5 +23,18 @@
     "app": "Home",
     "accountDeletion": "Delete account",
     "accountDeletionConfirm": "Confirm account deletion"
+  },
+  "actions": {
+    "more": "More actions",
+    "dismiss": "Dismiss",
+    "retry": "Try again"
+  },
+  "toast": {
+    "regionLabel": "Alerts",
+    "dismissLabel": "Dismiss notification"
+  },
+  "form": {
+    "dateHint": "Pick a date and time in your own time zone.",
+    "dateEcho": "Selected: {{date}}"
   }
 }

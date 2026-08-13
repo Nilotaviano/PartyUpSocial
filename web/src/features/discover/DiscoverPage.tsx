@@ -1,10 +1,17 @@
 import { useQueries } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { quietChipClasses, raisedInteractiveClasses } from '../../components/ui/classes'
+import { EmptyState } from '../../components/ui/emptyState'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section } from '../../components/ui/section'
+import { StatusBanner } from '../../components/ui/statusBanner'
 import { getDiscoverSessions, homeKeys } from '../home/homeQueries'
+import { SessionStatusChip } from '../sessions/SessionStatusChip'
 
 /**
  * D-149's dedicated Discover surface — `scope=discover` on the shipped
@@ -14,7 +21,6 @@ import { getDiscoverSessions, homeKeys } from '../home/homeQueries'
  */
 export function DiscoverPage() {
   const { t, i18n } = useTranslation(['home', 'sessions', 'errors', 'common'])
-  const heading = useRef<HTMLHeadingElement>(null)
 
   const [cursors, setCursors] = useState<(string | undefined)[]>([undefined])
 
@@ -24,10 +30,6 @@ export function DiscoverPage() {
       queryFn: () => getDiscoverSessions(cursor),
     })),
   })
-
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
 
   const items = pages.flatMap((page) => page.data?.items ?? [])
   const isPending = pages[0]?.isPending ?? true
@@ -42,69 +44,88 @@ export function DiscoverPage() {
   })
 
   return (
-    <main
-      className="mx-auto max-w-4xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-discover"
-    >
-      <h1
-        ref={heading}
-        tabIndex={-1}
-        className="text-display font-display font-bold text-ink focus:outline-none"
-      >
-        {t('discover.heading')}
-      </h1>
+    <main data-testid="screen-discover">
+      <PageScaffold>
+        <PageHeader title={t('discover.heading')} />
 
-      {isPending && (
-        <p role="status" className="motion-safe:animate-pulse text-ink-soft">
-          {t('common.loading', { ns: 'common' })}
-        </p>
-      )}
+        {isPending && (
+          <p className="motion-safe:animate-pulse text-ink-soft" role="status">
+            {t('common.loading', { ns: 'common' })}
+          </p>
+        )}
 
-      {error && (
-        <p role="alert">
-          {t(isApiError(error) ? `errors.codes.${error.code}` : 'errors.generic', {
-            ns: 'sessions',
-            defaultValue: t('errors.generic', { ns: 'sessions' }),
-          })}
-        </p>
-      )}
+        {error && (
+          <StatusBanner role="alert" variant="danger">
+            {t(isApiError(error) ? `errors.codes.${error.code}` : 'errors.generic', {
+              ns: 'sessions',
+              defaultValue: t('errors.generic', { ns: 'sessions' }),
+            })}
+          </StatusBanner>
+        )}
 
-      {!isPending && items.length === 0 && <p className="text-ink-soft">{t('discover.empty')}</p>}
-
-      {items.length > 0 && (
-        <ul className="space-y-3">
-          {items.map((session) => (
-            <li key={session.id}>
+        {!isPending && items.length === 0 && (
+          <EmptyState
+            action={
               <Link
-                className="block rounded-card border-2 border-ink bg-card p-4 shadow-offset-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                data-viewer-relation={session.viewerRelation}
-                to={`/sessions/${session.id}`}
+                className={`inline-flex items-center gap-2 bg-primary px-4 py-2 text-primary-ink ${raisedInteractiveClasses}`}
+                to="/friends"
               >
-                <p className="font-display font-semibold text-ink">{session.title}</p>
-                <p className="text-ink-soft">
-                  {timeFormat.format(new Date(session.startTime))}
-                </p>
-                <p className="text-ink-soft">
-                  {t('discover.organizedBy', {
-                    name: session.organizer.displayName ?? t('detail.anonymous', { ns: 'sessions' }),
-                  })}
-                </p>
+                {t('emptyState.discover.cta')}
               </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+            }
+            illustration="🔭"
+            title={t('discover.empty')}
+          >
+            {t('emptyState.discover.body')}
+          </EmptyState>
+        )}
 
-      {nextCursor && (
-        <Button
-          aria-busy={isFetchingNextPage}
-          disabled={isFetchingNextPage}
-          variant="neutral"
-          onClick={() => setCursors((current) => [...current, nextCursor])}
-        >
-          {t('discover.loadMore')}
-        </Button>
-      )}
+        {items.length > 0 && (
+          <Section label={t('discover.heading')}>
+            <ul>
+              {items.map((session) => (
+                <li key={session.id} className="border-t border-ink/25 first:border-t-0">
+                  <Link
+                    className="flex flex-col gap-1 rounded-control px-2 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                    data-viewer-relation={session.viewerRelation}
+                    to={`/sessions/${session.id}`}
+                  >
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-display font-semibold text-ink">
+                        {session.title}
+                      </span>
+                      <SessionStatusChip status={session.status} />
+                    </span>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className={quietChipClasses}>
+                        {timeFormat.format(new Date(session.startTime))}
+                      </span>
+                    </span>
+                    <span className="text-meta text-ink-soft">
+                      {t('discover.organizedBy', {
+                        name:
+                          session.organizer.displayName ??
+                          t('detail.anonymous', { ns: 'sessions' }),
+                      })}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
+
+        {nextCursor && (
+          <Button
+            aria-busy={isFetchingNextPage}
+            disabled={isFetchingNextPage}
+            variant="neutral"
+            onClick={() => setCursors((current) => [...current, nextCursor])}
+          >
+            {t('discover.loadMore')}
+          </Button>
+        )}
+      </PageScaffold>
     </main>
   )
 }

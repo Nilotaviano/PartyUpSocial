@@ -1,8 +1,11 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { getViewerProfile, viewerProfileKey } from '../sessions/sessionQueries'
 import { Button } from '../../components/ui/button'
+import { usePageSlot } from '../../components/ui/pageSlotContext'
+import { StatusBanner } from '../../components/ui/statusBanner'
 import {
   PushPermissionDeniedError,
   enablePushInThisBrowser,
@@ -23,6 +26,15 @@ export function PushEnableCard() {
   const { t } = useTranslation('notifications')
   const [asked, setAsked] = useState(() => hasAskedForPushInThisBrowser())
   const [showFallback, setShowFallback] = useState(false)
+  // §3.5/R3: a migrated page offers a slot below its PageHeader and the card
+  // portals into it; every other page (and every provider-less test) keeps the
+  // shell position, so both arms — prompt and D-175 fallback — render wherever
+  // this component happens to be mounted.
+  const slot = usePageSlot()
+
+  function place(content: ReactNode) {
+    return slot ? createPortal(content, slot) : content
+  }
 
   const profile = useQuery({ queryKey: viewerProfileKey, queryFn: getViewerProfile })
   const eligible = profile.data?.pushPromptEligible ?? false
@@ -66,10 +78,17 @@ export function PushEnableCard() {
   }
 
   if (showFallback) {
-    return (
-      <p className="mx-auto max-w-6xl px-4 py-2 text-ink-soft sm:px-8" role="status">
+    return place(
+      <p
+        className={
+          slot
+            ? 'text-ink-soft'
+            : 'mx-auto w-full max-w-page px-4 py-2 text-ink-soft sm:px-8'
+        }
+        role="status"
+      >
         {t('enable.fallback')}
-      </p>
+      </p>,
     )
   }
 
@@ -77,32 +96,42 @@ export function PushEnableCard() {
     return null
   }
 
-  return (
+  return place(
     <section
       aria-labelledby="push-enable-heading"
-      className="mx-auto mt-4 max-w-6xl rounded-card border-2 border-ink bg-card p-4 shadow-offset-card sm:mx-8"
+      className={
+        slot ? 'w-full' : 'mx-auto w-full max-w-page px-4 pt-4 sm:px-8'
+      }
       data-testid="push-enable-card"
     >
-      <h2 className="font-display text-h3 font-semibold text-ink" id="push-enable-heading">
-        {t('enable.title')}
-      </h2>
-      <p className="mt-1 text-ink-soft">{t('enable.body')}</p>
+      <StatusBanner
+        actions={
+          <>
+            <Button
+              aria-busy={enable.isPending}
+              disabled={enable.isPending}
+              variant="primary"
+              onClick={() => enable.mutate()}
+            >
+              {t('enable.confirm')}
+            </Button>
+            <Button disabled={enable.isPending} variant="neutral" onClick={dismiss}>
+              {t('enable.dismiss')}
+            </Button>
+          </>
+        }
+        variant="info"
+      >
+        <h2 className="font-display font-semibold text-body" id="push-enable-heading">
+          {t('enable.title')}
+        </h2>{' '}
+        {t('enable.body')}
+      </StatusBanner>
       {enable.isError && !(enable.error instanceof PushPermissionDeniedError) && (
-        <p role="alert">{t('enable.error')}</p>
+        <p className="mt-2 text-ink" role="alert">
+          {t('enable.error')}
+        </p>
       )}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button
-          aria-busy={enable.isPending}
-          disabled={enable.isPending}
-          variant="primary"
-          onClick={() => enable.mutate()}
-        >
-          {t('enable.confirm')}
-        </Button>
-        <Button disabled={enable.isPending} variant="neutral" onClick={dismiss}>
-          {t('enable.dismiss')}
-        </Button>
-      </div>
-    </section>
+    </section>,
   )
 }

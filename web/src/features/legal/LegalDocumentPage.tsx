@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
 import { LEGAL_UPDATED_AT } from './legalLocale'
 
 /**
@@ -20,7 +22,6 @@ export function LegalDocumentPage({
   children: ReactNode
 }) {
   const { t, i18n } = useTranslation('legal')
-  const heading = useRef<HTMLHeadingElement>(null)
   const updatedAt = useMemo(
     () =>
       // LEGAL_UPDATED_AT is a calendar date, not an instant: without an explicit UTC zone,
@@ -31,37 +32,28 @@ export function LegalDocumentPage({
     [i18n.language],
   )
 
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
-
   return (
-    <main
-      className="mx-auto max-w-3xl space-y-6 p-4 sm:p-8"
-      data-testid={testId}
-    >
-      <h1
-        ref={heading}
-        tabIndex={-1}
-        className="text-display font-display font-bold text-ink focus:outline-none"
+    <main data-testid={testId}>
+      <PageScaffold
+        className="gap-6"
+        width="form"
       >
-        {title}
-      </h1>
+        <PageHeader
+          meta={`${t('updatedLabel')}: ${updatedAt}`}
+          title={title}
+        />
 
-      <p
-        className="rounded-card border-2 border-ink bg-accent p-4 font-display font-semibold text-accent-ink"
-        data-testid="legal-draft-banner"
-        role="note"
-        aria-label={t('draft.label')}
-      >
-        {t('draft.banner')}
-      </p>
+        <p
+          className="rounded-card border-2 border-ink bg-accent p-4 font-display font-semibold text-accent-ink dark:border-accent-ink"
+          data-testid="legal-draft-banner"
+          role="note"
+          aria-label={t('draft.label')}
+        >
+          {t('draft.banner')}
+        </p>
 
-      <p className="text-ink-soft">
-        {t('updatedLabel')}: {updatedAt}
-      </p>
-
-      <div className="space-y-8">{children}</div>
+        <div className="flex flex-col gap-8">{children}</div>
+      </PageScaffold>
     </main>
   )
 }

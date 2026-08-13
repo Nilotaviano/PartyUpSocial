@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { segmentItemClasses, segmentStripClasses } from '../../components/ui/classes'
 import {
   getStoredThemePreference,
   setThemePreference,
@@ -53,16 +54,19 @@ export function ThemeToggle() {
   }
 
   return (
+    // SegmentStrip skin (§3.2) applied to this radiogroup directly rather than
+    // through the wrapper component: the roving-focus lookup below walks
+    // `parentElement`, so the strip has to *be* the radiogroup, not wrap it.
     <div
       aria-label={t('theme.legend')}
-      className="flex flex-wrap gap-2"
+      className={`${segmentStripClasses} max-w-form`}
       role="radiogroup"
     >
       {OPTIONS.map((option) => (
         <button
           key={option}
           aria-checked={preference === option}
-          className="min-h-11 rounded-full border-2 border-ink px-4 py-2 font-display text-sm font-bold text-ink aria-checked:bg-accent aria-checked:text-accent-ink dark:aria-checked:border-accent-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className={segmentItemClasses(preference === option, 'min-w-11')}
           role="radio"
           tabIndex={preference === option ? 0 : -1}
           type="button"

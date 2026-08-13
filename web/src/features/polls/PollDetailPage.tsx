@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, Navigate, useNavigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
@@ -7,8 +7,17 @@ import { useSession } from '../../auth/useSession'
 import { AvatarDisc } from '../friends/AvatarDisc'
 import { avatarImgUrl } from '../friends/avatarImage'
 import { Button } from '../../components/ui/button'
-import { raisedInteractiveClasses } from '../../components/ui/classes'
+import {
+  fieldControlClasses,
+  raisedInteractiveClasses,
+} from '../../components/ui/classes'
+import { DateEcho } from '../../components/ui/dateEcho'
 import { Dialog } from '../../components/ui/dialog'
+import { IdentityRow } from '../../components/ui/identityRow'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section, SectionCard } from '../../components/ui/section'
+import { StatusBanner } from '../../components/ui/statusBanner'
 import {
   cancelPoll,
   createPollGuestLinks,
@@ -229,45 +238,45 @@ function GuestPanel({ pollId, roster, canMint, onError, clearError }: GuestPanel
   const claimedGuests = roster.filter((entry) => entry.guestIdentityId && entry.isActive)
 
   return (
-    <section aria-labelledby="poll-guests-heading">
-      <h2 id="poll-guests-heading" className="text-h2 font-display font-semibold text-ink">
-        {t('guests.heading')}
-      </h2>
-
+    <Section title={t('guests.heading')} titleId="poll-guests-heading">
       {canMint && (
-        <>
-          <label className="mt-2 block font-body font-semibold text-ink" htmlFor="poll-guest-link-count">
-            {t('create.guestLinks')}
-          </label>
-          <input
-            className="mt-1 min-h-11 w-24 rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            id="poll-guest-link-count"
-            max={20}
-            min={1}
-            type="number"
-            value={linkCount}
-            onChange={(event) => setLinkCount(event.target.value)}
-          />
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col gap-1.5">
+            <label
+              className="font-body font-semibold text-ink"
+              htmlFor="poll-guest-link-count"
+            >
+              {t('create.guestLinks')}
+            </label>
+            <input
+              className={`${fieldControlClasses} w-24`}
+              id="poll-guest-link-count"
+              max={20}
+              min={1}
+              type="number"
+              value={linkCount}
+              onChange={(event) => setLinkCount(event.target.value)}
+            />
+          </div>
           <Button
             aria-busy={mint.isPending}
-            className="ml-2"
             disabled={mint.isPending}
             variant="neutral"
             onClick={() => mint.mutate()}
           >
             {t('guests.mint')}
           </Button>
-        </>
+        </div>
       )}
 
       {guestLinks.length > 0 && (
-        <ul className="mt-3 space-y-2">
+        <ul>
           {guestLinks.map((link) => (
             <li
               key={link.guestLinkId}
-              className="flex items-center justify-between gap-2 rounded-card border-2 border-ink bg-card p-3"
+              className="grid grid-cols-[1fr_auto] items-center gap-2 border-t border-ink/25 py-2 first:border-t-0"
             >
-              <span className="min-w-0 flex-1 truncate font-mono text-ink">{link.url}</span>
+              <span className="min-w-0 truncate font-mono text-ink">{link.url}</span>
               <span className="flex flex-none gap-2">
                 <Button
                   aria-label={t('a11y.copyLink')}
@@ -292,23 +301,28 @@ function GuestPanel({ pollId, roster, canMint, onError, clearError }: GuestPanel
       )}
 
       {claimedGuests.length > 0 && (
-        <ul className="mt-3 space-y-1">
+        <ul>
           {claimedGuests.map((entry) => (
             <li
               key={entry.participationId}
-              className="flex items-center justify-between gap-2 py-1"
+              className="border-t border-ink/25 py-2 first:border-t-0"
             >
-              <span className="text-ink">{entry.displayName ?? t('detail.anonymous')}</span>
-              <RemoveGuestDialog
+              <IdentityRow
+                actions={
+                  <RemoveGuestDialog
+                    displayName={entry.displayName ?? t('detail.anonymous')}
+                    pending={remove.isPending}
+                    onConfirm={() => remove.mutate(entry.guestIdentityId as string)}
+                  />
+                }
                 displayName={entry.displayName ?? t('detail.anonymous')}
-                pending={remove.isPending}
-                onConfirm={() => remove.mutate(entry.guestIdentityId as string)}
+                variant="full"
               />
             </li>
           ))}
         </ul>
       )}
-    </section>
+    </Section>
   )
 }
 
@@ -439,10 +453,7 @@ function FinalizeSection({ pollId, locale, early, onError }: FinalizeSectionProp
 
   if (preview.isError) {
     return (
-      <section aria-labelledby="poll-finalize-heading">
-        <h2 id="poll-finalize-heading" className="text-h2 font-display font-semibold text-ink">
-          {t('finalize.heading')}
-        </h2>
+      <Section title={t('finalize.heading')} titleId="poll-finalize-heading">
         <p role="alert">
           {t(
             isApiError(preview.error)
@@ -451,15 +462,15 @@ function FinalizeSection({ pollId, locale, early, onError }: FinalizeSectionProp
             { defaultValue: t('errors.generic') },
           )}
         </p>
-      </section>
+      </Section>
     )
   }
 
   return (
-    <section aria-labelledby="poll-finalize-heading">
-      <h2 id="poll-finalize-heading" className="text-h2 font-display font-semibold text-ink">
-        {t(early ? 'finalize.earlyHeading' : 'finalize.heading')}
-      </h2>
+    <Section
+      title={t(early ? 'finalize.earlyHeading' : 'finalize.heading')}
+      titleId="poll-finalize-heading"
+    >
       {early && (
         <p className="text-ink" data-testid="finalize-early-notice">
           {t('finalize.earlyNotice')}
@@ -470,7 +481,7 @@ function FinalizeSection({ pollId, locale, early, onError }: FinalizeSectionProp
       {preview.isPending && <p role="status">{t('common.loading', { ns: 'common' })}</p>}
 
       {options.length > 0 && (
-        <fieldset className="mt-3 space-y-3">
+        <fieldset className="flex flex-col gap-3">
           <legend className="sr-only">{t('finalize.chooseOption')}</legend>
           {options.map((option) => {
             const optionText = new Intl.DateTimeFormat(locale, {
@@ -482,7 +493,7 @@ function FinalizeSection({ pollId, locale, early, onError }: FinalizeSectionProp
             return (
               <label
                 key={option.optionId}
-                className="block rounded-card border-2 border-ink bg-card p-3 shadow-offset-card"
+                className="control-frame block p-3"
                 data-testid={`finalize-option-${option.optionId}`}
               >
                 <span className="flex items-center gap-2 font-display font-semibold text-ink">
@@ -558,7 +569,7 @@ function FinalizeSection({ pollId, locale, early, onError }: FinalizeSectionProp
       )}
 
       {selected && (
-        <div className="mt-3">
+        <div className="flex flex-wrap gap-2">
           <FinalizeDialog
             early={early}
             locale={locale}
@@ -568,7 +579,7 @@ function FinalizeSection({ pollId, locale, early, onError }: FinalizeSectionProp
           />
         </div>
       )}
-    </section>
+    </Section>
   )
 }
 
@@ -581,7 +592,6 @@ export function PollDetailPage() {
   const { pollId = '' } = useParams()
   const { data: session } = useSession()
   const queryClient = useQueryClient()
-  const heading = useRef<HTMLHeadingElement>(null)
   const [status, setStatus] = useState('')
   const [pendingOptionId, setPendingOptionId] = useState<string | null>(null)
   const [suggestValue, setSuggestValue] = useState('')
@@ -597,10 +607,6 @@ export function PollDetailPage() {
     enabled: Boolean(pollId),
     retry: false,
   })
-
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
 
   async function afterVote(message: string) {
     setStatus(message)
@@ -726,235 +732,237 @@ export function PollDetailPage() {
     mute.error
 
   return (
-    <main
-      className="mx-auto max-w-4xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-poll-detail"
-    >
-      <h1
-        ref={heading}
-        aria-live="polite"
-        tabIndex={-1}
-        className="text-display font-display font-bold text-ink focus:outline-none"
-      >
-        {data?.title ?? t('common.loading', { ns: 'common' })}
-      </h1>
-
-      <p aria-live="polite" className="text-ink">
-        {status}
-      </p>
-
-      {Boolean(detail.error || mutationError) && (
-        <p role="alert">
-          {(() => {
-            const anyError = detail.error ?? mutationError
-            return t(
-              isApiError(anyError) ? `errors.codes.${anyError.code}` : 'errors.generic',
-              { defaultValue: t('errors.generic') },
-            )
-          })()}
-        </p>
-      )}
-
-      {data && (
-        <>
-          <p className="flex flex-wrap items-center gap-2 text-ink">
-            <PollStatusChip poll={data} />
-          </p>
-
-          {data.notes && <p className="text-ink">{data.notes}</p>}
-
-          {windowState === 'polling' && (
-            <p className="text-ink-soft">{t('detail.deadline', { deadline: deadlineText })}</p>
-          )}
-
-          {windowState === 'awaitingSelection' && (
-            <p role="status">{t('detail.awaitingSelectionNotice')}</p>
-          )}
-
-          {windowState === 'expiredPending' && (
-            <p role="status">{t('detail.expiredPendingNotice')}</p>
-          )}
-
-          {data.status === 'finalized' && (
-            <p role="status">
-              {data.createdSessionId ? (
-                <>
-                  {t('detail.finalizedNotice')}{' '}
-                  <Link
-                    className="font-semibold text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                    to={`/sessions/${data.createdSessionId}`}
-                  >
-                    {t('detail.viewSession')}
-                  </Link>
-                </>
-              ) : (
-                t('detail.finalizedNotice')
-              )}
-            </p>
-          )}
-
-          {data.status === 'expired' && <p role="status">{t('detail.expiredNotice')}</p>}
-          {data.status === 'canceled' && <p role="status">{t('detail.canceledNotice')}</p>}
-
-          <div>
-            <Button
-              aria-busy={mute.isPending}
-              aria-pressed={data.muted}
-              disabled={mute.isPending || isTerminal}
-              type="button"
-              variant={data.muted ? 'primary' : 'neutral'}
-              onClick={() => mute.mutate()}
-            >
-              {data.muted ? t('mute.off') : t('mute.on')}
-            </Button>
-            <p className="mt-1 text-ink-soft">
-              {isTerminal ? t('mute.disabledTerminal') : t('mute.copy')}
-            </p>
-          </div>
-
-          <section aria-labelledby="poll-options-heading">
-            <h2
-              id="poll-options-heading"
-              className="text-h2 font-display font-semibold text-ink"
-            >
-              {t('detail.options')}
-            </h2>
-            <VotingGrid
-              disabled={!isPolling}
-              locale={i18n.language}
-              options={data.options}
-              pendingOptionId={pendingOptionId}
-              onVote={handleVote}
-            />
-
-            {isPolling && (
-              <form
-                className="mt-4 flex flex-wrap items-end gap-2"
-                onSubmit={handleSuggest}
-              >
-                <div className="flex-1">
-                  <label
-                    className="block font-body font-semibold text-ink"
-                    htmlFor="suggest-option-value"
-                  >
-                    {t('suggest.heading')}
-                  </label>
-                  <input
-                    className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                    id="suggest-option-value"
-                    step={900}
-                    type="datetime-local"
-                    value={suggestValue}
-                    onChange={(event) => setSuggestValue(event.target.value)}
-                  />
-                </div>
-                <Button
-                  aria-busy={suggest.isPending}
-                  disabled={suggest.isPending}
-                  type="submit"
-                  variant="neutral"
-                >
-                  {t('suggest.add')}
-                </Button>
-              </form>
-            )}
-            {suggestNotice && (
-              <p aria-live="polite" className="mt-1 text-ink-soft" role="status">
-                {suggestNotice}
-              </p>
-            )}
-            {suggestError && (
-              <p role="alert">{suggestError}</p>
-            )}
-          </section>
-
-          {canLeave && (
-            <div>
-              <Button
-                aria-busy={leave.isPending}
-                data-testid="poll-leave"
-                disabled={leave.isPending}
-                type="button"
-                variant="neutral"
-                onClick={() => leave.mutate()}
-              >
-                {t('leave.action')}
-              </Button>
-              <p className="mt-1 text-ink-soft">{t('leave.help')}</p>
-            </div>
-          )}
-
-          <section aria-labelledby="poll-roster-heading">
-            <h2
-              id="poll-roster-heading"
-              className="text-h2 font-display font-semibold text-ink"
-            >
-              {t('detail.roster')}
-            </h2>
-            <ul className="mt-2">
-              {data.roster.map((entry) => (
-                <li
-                  key={entry.participationId}
-                  className="flex items-center justify-between gap-2 py-1"
-                  data-testid={`poll-roster-entry-${entry.participationId}`}
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <AvatarDisc
-                      emoji={entry.avatar?.emoji}
-                      imgUrl={avatarImgUrl(entry.avatar)}
-                      masked={entry.displayName === null}
-                      seed={entry.userId ?? entry.guestIdentityId ?? entry.participationId}
-                      size="xs"
-                    />
-                    <span className="truncate text-ink">
-                      {entry.displayName ?? t('detail.anonymous')}
-                    </span>
-                  </span>
-                  {!entry.isActive && (
-                    <span className="text-ink-soft">{t('detail.removed')}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          {isOrganizer && (windowState === 'awaitingSelection' || windowState === 'polling') && (
-            <FinalizeSection
-              early={windowState === 'polling'}
-              locale={i18n.language}
-              pollId={pollId}
-              onError={setFinalizeError}
-            />
-          )}
-
-          {isOrganizer && (windowState === 'polling' || windowState === 'awaitingSelection') && (
-            <div>
-              <CancelPollDialog pending={cancel.isPending} onConfirm={() => cancel.mutate()} />
-            </div>
-          )}
-
-          {isOrganizer && windowState === 'polling' && (
-            <div>
+    <main data-testid="screen-poll-detail">
+      <PageScaffold>
+        <PageHeader
+          actions={
+            data && isOrganizer && windowState === 'polling' ? (
               <Link
                 className={`inline-flex items-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
                 to={`/polls/${pollId}/invite`}
               >
                 {t('invite.heading')}
               </Link>
-            </div>
-          )}
+            ) : undefined
+          }
+          live
+          meta={data ? <PollStatusChip poll={data} /> : undefined}
+          title={data?.title ?? t('common.loading', { ns: 'common' })}
+        />
 
-          {isOrganizer && (windowState === 'polling' || windowState === 'awaitingSelection') && (
-            <GuestPanel
-              canMint={windowState === 'polling'}
-              clearError={() => setGuestPanelError(null)}
-              pollId={pollId}
-              roster={data.roster}
-              onError={setGuestPanelError}
-            />
-          )}
-        </>
-      )}
+        <p aria-live="polite" className="text-ink">
+          {status}
+        </p>
+
+        {Boolean(detail.error || mutationError) && (
+          <StatusBanner role="alert" variant="danger">
+            {(() => {
+              const anyError = detail.error ?? mutationError
+              return t(
+                isApiError(anyError) ? `errors.codes.${anyError.code}` : 'errors.generic',
+                { defaultValue: t('errors.generic') },
+              )
+            })()}
+          </StatusBanner>
+        )}
+
+        {data && (
+          <>
+            <div className="flex flex-col gap-2">
+              {data.notes && <p className="text-ink">{data.notes}</p>}
+
+              {windowState === 'polling' && (
+                <p className="text-ink-soft">
+                  {t('detail.deadline', { deadline: deadlineText })}
+                </p>
+              )}
+
+              {windowState === 'awaitingSelection' && (
+                <p role="status">{t('detail.awaitingSelectionNotice')}</p>
+              )}
+
+              {windowState === 'expiredPending' && (
+                <p role="status">{t('detail.expiredPendingNotice')}</p>
+              )}
+
+              {data.status === 'finalized' && (
+                <p role="status">
+                  {data.createdSessionId ? (
+                    <>
+                      {t('detail.finalizedNotice')}{' '}
+                      <Link
+                        className="font-semibold text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                        to={`/sessions/${data.createdSessionId}`}
+                      >
+                        {t('detail.viewSession')}
+                      </Link>
+                    </>
+                  ) : (
+                    t('detail.finalizedNotice')
+                  )}
+                </p>
+              )}
+
+              {data.status === 'expired' && <p role="status">{t('detail.expiredNotice')}</p>}
+              {data.status === 'canceled' && <p role="status">{t('detail.canceledNotice')}</p>}
+            </div>
+
+            <Section title={t('detail.options')} titleId="poll-options-heading">
+              <VotingGrid
+                disabled={!isPolling}
+                locale={i18n.language}
+                options={data.options}
+                pendingOptionId={pendingOptionId}
+                onVote={handleVote}
+              />
+            </Section>
+
+            {/*
+              No heading on the suggest section: the field's own visible label already
+              reads "Suggest a time", and a section heading repeating it would give the
+              section the same accessible name as the control it introduces.
+            */}
+            {isPolling && (
+              <Section>
+                <form className="flex flex-wrap items-end gap-2" onSubmit={handleSuggest}>
+                  <div className="flex flex-1 flex-col gap-1.5">
+                    <label
+                      className="font-body font-semibold text-ink"
+                      htmlFor="suggest-option-value"
+                    >
+                      {t('suggest.heading')}
+                    </label>
+                    <input
+                      className={fieldControlClasses}
+                      id="suggest-option-value"
+                      step={900}
+                      type="datetime-local"
+                      value={suggestValue}
+                      onChange={(event) => setSuggestValue(event.target.value)}
+                    />
+                    <DateEcho value={suggestValue} />
+                  </div>
+                  <Button
+                    aria-busy={suggest.isPending}
+                    disabled={suggest.isPending}
+                    type="submit"
+                    variant="neutral"
+                  >
+                    {t('suggest.add')}
+                  </Button>
+                </form>
+
+                {suggestNotice && (
+                  <p aria-live="polite" className="text-ink-soft" role="status">
+                    {suggestNotice}
+                  </p>
+                )}
+                {suggestError && <p role="alert">{suggestError}</p>}
+              </Section>
+            )}
+
+            {canLeave && (
+              <div className="flex flex-col gap-1.5">
+                <Button
+                  aria-busy={leave.isPending}
+                  className="self-start"
+                  data-testid="poll-leave"
+                  disabled={leave.isPending}
+                  type="button"
+                  variant="neutral"
+                  onClick={() => leave.mutate()}
+                >
+                  {t('leave.action')}
+                </Button>
+                <p className="font-body text-meta text-ink-soft">{t('leave.help')}</p>
+              </div>
+            )}
+
+            <Section title={t('detail.roster')} titleId="poll-roster-heading">
+              <ul>
+                {data.roster.map((entry) => (
+                  <li
+                    key={entry.participationId}
+                    className="border-t border-ink/25 py-2 first:border-t-0"
+                    data-testid={`poll-roster-entry-${entry.participationId}`}
+                  >
+                    <IdentityRow
+                      avatar={
+                        <AvatarDisc
+                          emoji={entry.avatar?.emoji}
+                          imgUrl={avatarImgUrl(entry.avatar)}
+                          masked={entry.displayName === null}
+                          seed={
+                            entry.userId ?? entry.guestIdentityId ?? entry.participationId
+                          }
+                          size="xs"
+                        />
+                      }
+                      displayName={entry.displayName ?? t('detail.anonymous')}
+                      meta={entry.isActive ? undefined : t('detail.removed')}
+                      variant={entry.displayName === null ? 'masked' : 'full'}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </Section>
+
+            {isOrganizer &&
+              (windowState === 'awaitingSelection' || windowState === 'polling') && (
+                <FinalizeSection
+                  early={windowState === 'polling'}
+                  locale={i18n.language}
+                  pollId={pollId}
+                  onError={setFinalizeError}
+                />
+              )}
+
+            {isOrganizer &&
+              (windowState === 'polling' || windowState === 'awaitingSelection') && (
+                <GuestPanel
+                  canMint={windowState === 'polling'}
+                  clearError={() => setGuestPanelError(null)}
+                  pollId={pollId}
+                  roster={data.roster}
+                  onError={setGuestPanelError}
+                />
+              )}
+
+            <Section
+              title={t('detail.notificationsHeading')}
+              titleId="poll-notifications-heading"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  aria-busy={mute.isPending}
+                  aria-pressed={data.muted}
+                  disabled={mute.isPending || isTerminal}
+                  type="button"
+                  variant={data.muted ? 'primary' : 'neutral'}
+                  onClick={() => mute.mutate()}
+                >
+                  {data.muted ? t('mute.off') : t('mute.on')}
+                </Button>
+              </div>
+              <p className="font-body text-meta text-ink-soft">
+                {isTerminal ? t('mute.disabledTerminal') : t('mute.copy')}
+              </p>
+            </Section>
+
+            {isOrganizer &&
+              (windowState === 'polling' || windowState === 'awaitingSelection') && (
+                <SectionCard title={t('detail.dangerZone')} titleId="poll-danger-heading">
+                  <div className="flex flex-wrap gap-2">
+                    <CancelPollDialog
+                      pending={cancel.isPending}
+                      onConfirm={() => cancel.mutate()}
+                    />
+                  </div>
+                </SectionCard>
+              )}
+          </>
+        )}
+      </PageScaffold>
     </main>
   )
 }

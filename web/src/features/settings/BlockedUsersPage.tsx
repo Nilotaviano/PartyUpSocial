@@ -1,9 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { NavLink } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { EmptyState } from '../../components/ui/emptyState'
+import { IdentityRow } from '../../components/ui/identityRow'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section } from '../../components/ui/section'
+import { StatusBanner } from '../../components/ui/statusBanner'
+import { SubNav } from '../../components/ui/subNav'
 import { AvatarDisc } from '../friends/AvatarDisc'
 import {
   friendKeys,
@@ -14,42 +20,23 @@ import {
 
 export function SettingsNavigation() {
   const { t } = useTranslation('settings')
-  const links = [
-    ['/settings/profile', t('navigation.profile')],
-    ['/settings/account', t('navigation.account')],
-    ['/settings/blocked', t('navigation.blocked')],
-    ['/settings/notifications', t('navigation.notifications')],
-  ] as const
 
   return (
-    <nav aria-label={t('navigation.label')} className="mb-6">
-      <ul className="flex flex-wrap gap-2">
-        {links.map(([to, label]) => (
-          <li key={to}>
-            <NavLink
-              className={({ isActive }) =>
-                `inline-flex min-h-11 items-center rounded-full border-2 px-4 py-2 font-display font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-                  isActive
-                    ? 'border-ink bg-accent text-accent-ink dark:border-accent-ink'
-                    : 'border-transparent text-ink-soft'
-                }`
-              }
-              end
-              to={to}
-            >
-              {label}
-            </NavLink>
-          </li>
-        ))}
-      </ul>
-    </nav>
+    <SubNav
+      items={[
+        { to: '/settings/profile', label: t('navigation.profile') },
+        { to: '/settings/account', label: t('navigation.account') },
+        { to: '/settings/blocked', label: t('navigation.blocked') },
+        { to: '/settings/notifications', label: t('navigation.notifications') },
+      ]}
+      label={t('navigation.label')}
+    />
   )
 }
 
 export function BlockedUsersPage() {
   const { t, i18n } = useTranslation(['friends', 'errors'])
   const queryClient = useQueryClient()
-  const heading = useRef<HTMLHeadingElement>(null)
   const [status, setStatus] = useState('')
   const blocks = useQuery({
     queryKey: friendKeys.blocks,
@@ -63,109 +50,94 @@ export function BlockedUsersPage() {
     },
   })
 
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
-
   return (
-    <main
-      className="mx-auto max-w-4xl p-4 sm:p-8"
-      data-testid="screen-settings-blocked"
-    >
-      <SettingsNavigation />
-      <h1
-        ref={heading}
-        tabIndex={-1}
-        className="font-display text-display font-bold text-ink focus:outline-none"
-      >
-        {t('pages.blocked')}
-      </h1>
-      <p className="mt-2 text-ink-soft">{t('empty.blockedHelp')}</p>
-      <p aria-live="polite" className="mt-3 text-ink">
-        {status}
-      </p>
+    <main data-testid="screen-settings-blocked">
+      <PageScaffold>
+        <PageHeader subtitle={t('empty.blockedHelp')} title={t('pages.blocked')} />
+        <SettingsNavigation />
+        <p aria-live="polite" className="text-ink">
+          {status}
+        </p>
 
-      {blocks.isPending && (
-        <p
-          aria-hidden="true"
-          className="mt-6 motion-safe:animate-pulse text-ink-soft"
-        >
-          {t('status.loading')}
-        </p>
-      )}
-      {blocks.error && (
-        <p className="mt-6" role="alert">
-          {t(isApiError(blocks.error) ? blocks.error.code : 'generic', {
-            ns: 'errors',
-            defaultValue: t('generic', { ns: 'errors' }),
-          })}
-        </p>
-      )}
-      {blocks.data?.length === 0 && (
-        <p className="mt-6 text-ink-soft">{t('empty.blocked')}</p>
-      )}
-      {blocks.data && blocks.data.length > 0 && (
-        <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-          {blocks.data.map((blocked) => {
-            const date = new Intl.DateTimeFormat(i18n.language, {
-              dateStyle: 'medium',
-            }).format(new Date(blocked.createdAt))
-            return (
-              <li
-                key={blocked.blockId}
-                className="flex flex-col items-start justify-between gap-4 rounded-card border-2 border-ink bg-card p-4 shadow-offset-card sm:flex-row sm:items-center"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  {/*
-                    D-192: the disc is neutral — masked, seeded from the stored
-                    username snapshot rather than a userId. `IBlockRepository`
-                    deliberately holds no join to the blocked `User`, so a
-                    live avatar here would make blocking a monitoring channel.
-                  */}
-                  <AvatarDisc masked seed={blocked.username} size="sm" />
-                  <div className="min-w-0">
-                    <p className="truncate font-mono font-semibold text-ink">
-                      @{blocked.username}
-                    </p>
-                    <p className="text-meta text-ink-soft">
-                      {t('labels.blockedOn', { date })}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  aria-busy={unblock.isPending}
-                  aria-label={`${t('actions.unblock')} @${blocked.username}`}
-                  className="shrink-0"
-                  disabled={unblock.isPending}
-                  variant="neutral"
-                  onClick={() =>
-                    unblock.mutate({
-                      kind: 'unblock',
-                      username: blocked.username,
-                      blockId: blocked.blockId,
-                    })
-                  }
-                >
-                  {t('actions.unblock')}
-                </Button>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-      {unblock.error && (
-        <p
-          ref={(node) => node?.focus()}
-          className="mt-4"
-          role="alert"
-          tabIndex={-1}
-        >
-          {t(isApiError(unblock.error) ? unblock.error.code : 'generic', {
-            ns: 'errors',
-            defaultValue: t('generic', { ns: 'errors' }),
-          })}
-        </p>
-      )}
+        {blocks.isPending && (
+          <p aria-hidden="true" className="motion-safe:animate-pulse text-ink-soft">
+            {t('status.loading')}
+          </p>
+        )}
+        {blocks.error && (
+          <StatusBanner role="alert" variant="danger">
+            {t(isApiError(blocks.error) ? blocks.error.code : 'generic', {
+              ns: 'errors',
+              defaultValue: t('generic', { ns: 'errors' }),
+            })}
+          </StatusBanner>
+        )}
+        {/* An empty blocked list is a good terminal state (§3.6): quiet, no CTA. */}
+        {blocks.data?.length === 0 && (
+          <EmptyState illustration="🛡️" variant="quiet">
+            {t('empty.blocked')}
+          </EmptyState>
+        )}
+        {blocks.data && blocks.data.length > 0 && (
+          <Section label={t('pages.blocked')}>
+            <ul>
+              {blocks.data.map((blocked) => {
+                const date = new Intl.DateTimeFormat(i18n.language, {
+                  dateStyle: 'medium',
+                }).format(new Date(blocked.createdAt))
+                return (
+                  <li
+                    key={blocked.blockId}
+                    className="border-t border-ink/25 first:border-t-0"
+                  >
+                    <IdentityRow
+                      actions={
+                        <Button
+                          aria-busy={unblock.isPending}
+                          aria-label={`${t('actions.unblock')} @${blocked.username}`}
+                          disabled={unblock.isPending}
+                          variant="neutral"
+                          onClick={() =>
+                            unblock.mutate({
+                              kind: 'unblock',
+                              username: blocked.username,
+                              blockId: blocked.blockId,
+                            })
+                          }
+                        >
+                          {t('actions.unblock')}
+                        </Button>
+                      }
+                      avatar={
+                        /*
+                          D-192: the disc is neutral — masked, seeded from the stored
+                          username snapshot rather than a userId. `IBlockRepository`
+                          deliberately holds no join to the blocked `User`, so a
+                          live avatar here would make blocking a monitoring channel.
+                        */
+                        <AvatarDisc masked seed={blocked.username} size="sm" />
+                      }
+                      className="px-2 py-3"
+                      displayName={
+                        <span className="font-mono">@{blocked.username}</span>
+                      }
+                      meta={t('labels.blockedOn', { date })}
+                    />
+                  </li>
+                )
+              })}
+            </ul>
+          </Section>
+        )}
+        {unblock.error && (
+          <p ref={(node) => node?.focus()} role="alert" tabIndex={-1}>
+            {t(isApiError(unblock.error) ? unblock.error.code : 'generic', {
+              ns: 'errors',
+              defaultValue: t('generic', { ns: 'errors' }),
+            })}
+          </p>
+        )}
+      </PageScaffold>
     </main>
   )
 }

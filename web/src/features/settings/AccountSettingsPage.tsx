@@ -7,9 +7,13 @@ import { ApiError, client, isApiError } from '../../api/client'
 import { useSession, sessionQueryKey } from '../../auth/useSession'
 import { startExternalProviderWithRetry } from '../../auth/externalIntent'
 import { Button } from '../../components/ui/button'
-import { Label } from '../../components/ui/label'
+import { FormField } from '../../components/ui/formShell'
 import { Input } from '../../components/ui/input'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section, SectionCard } from '../../components/ui/section'
 import { Select } from '../../components/ui/select'
+import { StatusBanner } from '../../components/ui/statusBanner'
 import { TimeZoneField, isKnownTimeZone } from '../../components/TimeZoneField'
 import { ReauthPrompt, type ReauthAction } from './ReauthPrompt'
 import { clearPendingSettingsAction, getPendingSettingsAction } from './reauthAction'
@@ -284,74 +288,80 @@ export function AccountSettingsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl space-y-8 p-4 sm:p-8" data-testid="screen-settings-account">
+    <main data-testid="screen-settings-account">
+      <PageScaffold>
+      <PageHeader title={t('pages.account')} />
       <SettingsNavigation />
-      <h1 className="font-display text-display font-bold text-ink">{t('pages.account')}</h1>
       {(location.state as { identityConfirmed?: boolean } | null)?.identityConfirmed && <p className="text-ink" role="status">{t('reauth.confirmedIdentityChooseAction')}</p>}
-      <section aria-labelledby="account-email-heading" className="space-y-1">
-        <h2 className="font-display text-h2 font-semibold text-ink" id="account-email-heading">{t('email.title')}</h2>
+      <Section title={t('email.title')} titleId="account-email-heading">
         <p className="text-ink-soft">{emailMethod?.detail ?? t('email.unavailable')}</p>
-      </section>
-      <section aria-labelledby="account-password-heading" className="space-y-2">
-        <h2 className="font-display text-h2 font-semibold text-ink" id="account-password-heading">{t('password.title')}</h2>
-        <p className="text-ink-soft">{hasPassword ? t('password.enabled') : t('password.notSet')}</p>
+      </Section>
+      <Section
+        description={hasPassword ? t('password.enabled') : t('password.notSet')}
+        title={t('password.title')}
+        titleId="account-password-heading"
+      >
         {hasPassword ? (
-          <form className="space-y-2" noValidate onSubmit={(event) => void submitChangePassword(event)}>
-            <Label htmlFor="password-current">{t('password.currentLabel')}</Label>
-            <Input
-              id="password-current"
-              type="password"
-              value={currentPassword}
-              onChange={(event) => setCurrentPassword(event.target.value)}
-              aria-invalid={changeCurrentMissing || changeWrongCurrent || undefined}
-              aria-describedby={
-                changeCurrentMissing
-                  ? 'password-current-error'
-                  : changeWrongCurrent
-                    ? 'password-current-incorrect'
-                    : undefined
-              }
-              required
-            />
+          <form className="flex max-w-form flex-col gap-4" noValidate onSubmit={(event) => void submitChangePassword(event)}>
+            <FormField htmlFor="password-current" label={t('password.currentLabel')}>
+              <Input
+                id="password-current"
+                type="password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                aria-invalid={changeCurrentMissing || changeWrongCurrent || undefined}
+                aria-describedby={
+                  changeCurrentMissing
+                    ? 'password-current-error'
+                    : changeWrongCurrent
+                      ? 'password-current-incorrect'
+                      : undefined
+                }
+                required
+              />
+            </FormField>
             {changeCurrentMissing && <p id="password-current-error" role="alert">{t('password.currentRequired')}</p>}
-            <Label htmlFor="password-change-new">{t('password.newLabel')}</Label>
-            <Input
-              id="password-change-new"
-              type="password"
-              value={changeNewPassword}
-              onChange={(event) => setChangeNewPassword(event.target.value)}
-              minLength={PASSWORD_MIN_LENGTH}
-              aria-describedby={changeTooShort ? 'password-change-new-hint password-change-new-error' : 'password-change-new-hint'}
-              aria-invalid={changeTooShort || undefined}
-              required
-            />
+            <FormField htmlFor="password-change-new" label={t('password.newLabel')}>
+              <Input
+                id="password-change-new"
+                type="password"
+                value={changeNewPassword}
+                onChange={(event) => setChangeNewPassword(event.target.value)}
+                minLength={PASSWORD_MIN_LENGTH}
+                aria-describedby={changeTooShort ? 'password-change-new-hint password-change-new-error' : 'password-change-new-hint'}
+                aria-invalid={changeTooShort || undefined}
+                required
+              />
+            </FormField>
             <p className="text-body-sm text-ink-soft" id="password-change-new-hint">{t('password.hint')}</p>
-            <Button type="submit" variant="primary">{t('password.changeSubmit')}</Button>
+            <Button className="self-start" type="submit" variant="primary">{t('password.changeSubmit')}</Button>
             {changeTooShort && <p id="password-change-new-error" role="alert">{t('password.tooShort')}</p>}
             {changeWrongCurrent && <p id="password-current-incorrect" role="alert">{t('password.currentIncorrect')}</p>}
             {changeErrorMessage && <p role="alert">{changeErrorMessage}</p>}
             {changeSuccess && <p className="text-ink" role="status">{t('password.changeSuccess')}</p>}
           </form>
         ) : setPasswordProof ? (
-          <form className="space-y-2" noValidate onSubmit={(event) => void submitSetPassword(event)}>
-            <Label htmlFor="password-set-new">{t('password.newLabel')}</Label>
-            <Input
-              id="password-set-new"
-              type="password"
-              value={setPasswordValue}
-              onChange={(event) => setSetPasswordValue(event.target.value)}
-              minLength={PASSWORD_MIN_LENGTH}
-              aria-describedby={setPasswordTooShort ? 'password-set-new-hint password-set-new-error' : 'password-set-new-hint'}
-              aria-invalid={setPasswordTooShort || undefined}
-              required
-            />
+          <form className="flex max-w-form flex-col gap-4" noValidate onSubmit={(event) => void submitSetPassword(event)}>
+            <FormField htmlFor="password-set-new" label={t('password.newLabel')}>
+              <Input
+                id="password-set-new"
+                type="password"
+                value={setPasswordValue}
+                onChange={(event) => setSetPasswordValue(event.target.value)}
+                minLength={PASSWORD_MIN_LENGTH}
+                aria-describedby={setPasswordTooShort ? 'password-set-new-hint password-set-new-error' : 'password-set-new-hint'}
+                aria-invalid={setPasswordTooShort || undefined}
+                required
+              />
+            </FormField>
             <p className="text-body-sm text-ink-soft" id="password-set-new-hint">{t('password.hint')}</p>
-            <Button type="submit" variant="primary">{t('password.setSubmit')}</Button>
+            <Button className="self-start" type="submit" variant="primary">{t('password.setSubmit')}</Button>
             {setPasswordTooShort && <p id="password-set-new-error" role="alert">{t('password.tooShort')}</p>}
             {setPasswordErrorMessage && <p role="alert">{setPasswordErrorMessage}</p>}
           </form>
         ) : (
           <Button
+            className="self-start"
             variant="neutral"
             onClick={(event) => {
               setReturnFocusTo(event.currentTarget)
@@ -362,15 +372,14 @@ export function AccountSettingsPage() {
           </Button>
         )}
         {setPasswordSuccess && <p className="text-ink" role="status">{t('password.setSuccess')}</p>}
-      </section>
-      <section aria-labelledby="auth-methods-heading" className="space-y-3">
-        <h2 className="font-display text-h2 font-semibold text-ink" id="auth-methods-heading">{t('authMethods.title')}</h2>
+      </Section>
+      <Section title={t('authMethods.title')} titleId="auth-methods-heading">
         {isPending ? (
           <p className="text-ink-soft">{t('loading')}</p>
         ) : (
-          <ul className="space-y-2">
+          <ul>
             {methods.map((method) => (
-              <li className="flex flex-wrap items-center justify-between gap-2 rounded-card border-2 border-ink bg-card p-3 shadow-offset-card" key={method.kind}>
+              <li className="flex flex-wrap items-center justify-between gap-2 border-t border-ink/25 px-2 py-3 first:border-t-0" key={method.kind}>
                 <span className="text-ink">{method.detail ?? authMethodName(method.kind)}</span>
                 {method.removable && (
                   <Button
@@ -391,7 +400,7 @@ export function AccountSettingsPage() {
           </ul>
         )}
         {unlinkedProviders.length > 0 && (
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <h3 className="font-display text-h3 font-semibold text-ink">{t('authMethods.linkTitle')}</h3>
             <div className="flex flex-wrap gap-2">
               {unlinkedProviders.map((provider) => (
@@ -411,49 +420,51 @@ export function AccountSettingsPage() {
             </div>
           </div>
         )}
-      </section>
-      <section aria-labelledby="language-heading" className="space-y-2">
-        <h2 className="font-display text-h2 font-semibold text-ink" id="language-heading">{t('language.title')}</h2>
-        <Label htmlFor="locale">{t('language.label')}</Label>
-        <Select.Root value={locale} onValueChange={(value) => void saveLocale(value)}>
-          <Select.Trigger id="locale" aria-label={t('language.label')}>
-            <Select.Value />
-          </Select.Trigger>
-          <Select.Portal>
-            <Select.Content>
-              <Select.Viewport>
-                <Select.Item value="en">
-                  <Select.ItemText>{t('language.en')}</Select.ItemText>
-                </Select.Item>
-                <Select.Item value="pt-BR">
-                  <Select.ItemText>{t('language.ptBR')}</Select.ItemText>
-                </Select.Item>
-                <Select.Item value="es">
-                  <Select.ItemText>{t('language.es')}</Select.ItemText>
-                </Select.Item>
-              </Select.Viewport>
-            </Select.Content>
-          </Select.Portal>
-        </Select.Root>
-        {saved && <p className="text-ink" role="status">{t('language.saved')}</p>}
-      </section>
-      <section aria-labelledby="theme-heading" className="space-y-2">
-        <h2 className="font-display text-h2 font-semibold text-ink" id="theme-heading">{t('theme.title')}</h2>
+      </Section>
+      <Section title={t('language.title')} titleId="language-heading">
+        <div className="flex max-w-form flex-col gap-1.5">
+          <label className="font-body font-semibold text-ink" htmlFor="locale">{t('language.label')}</label>
+          <Select.Root value={locale} onValueChange={(value) => void saveLocale(value)}>
+            <Select.Trigger id="locale" aria-label={t('language.label')}>
+              <Select.Value />
+            </Select.Trigger>
+            <Select.Portal>
+              <Select.Content>
+                <Select.Viewport>
+                  <Select.Item value="en">
+                    <Select.ItemText>{t('language.en')}</Select.ItemText>
+                  </Select.Item>
+                  <Select.Item value="pt-BR">
+                    <Select.ItemText>{t('language.ptBR')}</Select.ItemText>
+                  </Select.Item>
+                  <Select.Item value="es">
+                    <Select.ItemText>{t('language.es')}</Select.ItemText>
+                  </Select.Item>
+                </Select.Viewport>
+              </Select.Content>
+            </Select.Portal>
+          </Select.Root>
+          {saved && <p className="text-ink" role="status">{t('language.saved')}</p>}
+        </div>
+      </Section>
+      <Section title={t('theme.title')} titleId="theme-heading">
         <ThemeToggle />
-      </section>
-      <section aria-labelledby="tour-heading" className="space-y-2">
-        <h2 className="font-display text-h2 font-semibold text-ink" id="tour-heading">{t('replay.title', { ns: 'tour' })}</h2>
-        <p className="text-ink-soft">{t('replay.body', { ns: 'tour' })}</p>
+      </Section>
+      <Section
+        description={t('replay.body', { ns: 'tour' })}
+        title={t('replay.title', { ns: 'tour' })}
+        titleId="tour-heading"
+      >
         <Button
+          className="self-start"
           variant="neutral"
           onClick={() => navigate('/app', { state: { replayTour: true } })}
         >
           {t('replay.action', { ns: 'tour' })}
         </Button>
-      </section>
-      <section aria-labelledby="time-zone-heading" className="space-y-2">
-        <h2 className="font-display text-h2 font-semibold text-ink" id="time-zone-heading">{t('fields.timeZone', { ns: 'profile' })}</h2>
-        <form className="space-y-2" noValidate onSubmit={(event) => void saveTimeZone(event)}>
+      </Section>
+      <Section title={t('fields.timeZone', { ns: 'profile' })} titleId="time-zone-heading">
+        <form className="flex max-w-form flex-col gap-4" noValidate onSubmit={(event) => void saveTimeZone(event)}>
           <TimeZoneField
             defaultValue={session?.profile?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
             errorMessage={timeZoneInvalid ? t('timeZoneField.invalid', { ns: 'profile' }) : undefined}
@@ -463,14 +474,17 @@ export function AccountSettingsPage() {
             name="timeZone"
             storedZone={session?.profile?.timeZone}
           />
-          <Button type="submit" variant="primary">{t('actions.saveTimeZone', { ns: 'profile' })}</Button>
+          <Button className="self-start" type="submit" variant="primary">{t('actions.saveTimeZone', { ns: 'profile' })}</Button>
         </form>
-      </section>
-      <section aria-labelledby="delete-account-heading" className="space-y-2">
-        <h2 className="font-display text-h2 font-semibold text-ink" id="delete-account-heading">{t('delete.title')}</h2>
-        <p className="text-ink-soft">{t('delete.grace')}</p>
-        <p className="text-ink-soft">{t('delete.loginCancels')}</p>
+      </Section>
+      {/* Hazard boundary (§3.1): the one SectionCard on this page. */}
+      <SectionCard title={t('delete.title')} titleId="delete-account-heading">
+        <div className="flex flex-col gap-2">
+          <p className="text-ink-soft">{t('delete.grace')}</p>
+          <p className="text-ink-soft">{t('delete.loginCancels')}</p>
+        </div>
         <Button
+          className="self-start"
           variant="danger"
           onClick={(event) => {
             setReturnFocusTo(event.currentTarget)
@@ -480,8 +494,8 @@ export function AccountSettingsPage() {
           {t('delete.start')}
         </Button>
         {graceEndsAt && <p className="text-ink" role="status">{t('delete.scheduled', { graceEndsAt })}</p>}
-      </section>
-      {errorMessage && <p role="alert">{errorMessage}</p>}
+      </SectionCard>
+      {errorMessage && <StatusBanner role="alert" variant="danger">{errorMessage}</StatusBanner>}
       <ReauthPrompt
         action={action}
         methods={methods}
@@ -494,6 +508,7 @@ export function AccountSettingsPage() {
         onConfirmed={confirmAction}
         returnFocusTo={returnFocusTo}
       />
+      </PageScaffold>
     </main>
   )
 }

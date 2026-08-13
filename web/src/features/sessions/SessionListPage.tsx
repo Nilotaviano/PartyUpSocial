@@ -1,10 +1,20 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
-import { raisedInteractiveClasses } from '../../components/ui/classes'
+import {
+  chipClasses,
+  quietChipClasses,
+  raisedInteractiveClasses,
+} from '../../components/ui/classes'
+import { EmptyState } from '../../components/ui/emptyState'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section } from '../../components/ui/section'
+import { StatusBanner } from '../../components/ui/statusBanner'
+import { SessionStatusChip } from './SessionStatusChip'
 import {
   getSessionList,
   getViewerProfile,
@@ -20,7 +30,6 @@ type SessionListPageProps = {
 
 export function SessionListPage({ scope }: SessionListPageProps) {
   const { t, i18n } = useTranslation(['sessions', 'errors', 'common'])
-  const heading = useRef<HTMLHeadingElement>(null)
 
   // D-038/D-046: times render in the viewer's profile time zone, not the
   // browser's, falling back to the browser zone only until the profile
@@ -45,10 +54,6 @@ export function SessionListPage({ scope }: SessionListPageProps) {
     })),
   })
 
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
-
   const headingText = scope === 'upcoming' ? t('list.upcoming') : t('list.history')
   const emptyText = scope === 'upcoming' ? t('list.emptyUpcoming') : t('list.emptyHistory')
   const items = pages.flatMap((page) => page.data?.items ?? [])
@@ -59,86 +64,104 @@ export function SessionListPage({ scope }: SessionListPageProps) {
   const isFetchingNextPage = pages.length > 1 && (lastPage?.isFetching ?? false)
 
   return (
-    <main
-      className="mx-auto max-w-4xl space-y-6 p-4 sm:p-8"
-      data-testid={`screen-sessions-${scope}`}
-    >
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <h1
-          ref={heading}
-          tabIndex={-1}
-          className="text-display font-display font-bold text-ink focus:outline-none"
-        >
-          {headingText}
-        </h1>
-        {scope === 'upcoming' && (
-          <Link
-            className={`inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
-            to="/sessions/new"
-          >
-            {t('create.heading')}
-          </Link>
+    <main data-testid={`screen-sessions-${scope}`}>
+      <PageScaffold>
+        <PageHeader
+          actions={
+            scope === 'upcoming' ? (
+              <Link
+                className={`inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
+                to="/sessions/new"
+              >
+                {t('create.heading')}
+              </Link>
+            ) : undefined
+          }
+          title={headingText}
+        />
+
+        {isPending && (
+          <p role="status" className="motion-safe:animate-pulse text-ink-soft">
+            {t('common.loading', { ns: 'common' })}
+          </p>
         )}
-      </header>
 
-      {isPending && (
-        <p role="status" className="motion-safe:animate-pulse text-ink-soft">
-          {t('common.loading', { ns: 'common' })}
-        </p>
-      )}
+        {error && (
+          <StatusBanner role="alert" variant="danger">
+            {t(isApiError(error) ? `errors.codes.${error.code}` : 'errors.generic', {
+              defaultValue: t('errors.generic'),
+            })}
+          </StatusBanner>
+        )}
 
-      {error && (
-        <p role="alert">
-          {t(isApiError(error) ? `errors.codes.${error.code}` : 'errors.generic', {
-            defaultValue: t('errors.generic'),
-          })}
-        </p>
-      )}
+        {!isPending && items.length === 0 && (
+          <EmptyState
+            action={
+              <Link
+                className={`inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
+                to="/sessions/new"
+              >
+                {t('emptyState.sessions.cta')}
+              </Link>
+            }
+            illustration="🎲"
+            title={emptyText}
+          >
+            {t('emptyState.sessions.body')}
+          </EmptyState>
+        )}
 
-      {!isPending && items.length === 0 && <p className="text-ink-soft">{emptyText}</p>}
-
-      {items.length > 0 && (
-        <ul className="space-y-3">
-          {items.map((session) => {
-            const inProgress = scope === 'upcoming' && isSessionInProgress(session)
-            return (
-              <li key={session.id}>
-                <Link
-                  className="block rounded-card border-2 border-ink bg-card p-4 shadow-offset-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                  to={`/sessions/${session.id}`}
-                >
-                  <p className="font-display font-semibold text-ink">
-                    {session.title}
-                    {inProgress && (
-                      <span className="ml-2 rounded-full border-2 border-ink bg-accent px-2 py-0.5 font-display text-xs font-bold text-accent-ink dark:border-accent-ink">
-                        {t('list.inProgress')}
+        {items.length > 0 && (
+          <Section label={headingText}>
+            <ul>
+              {items.map((session) => {
+                const inProgress = scope === 'upcoming' && isSessionInProgress(session)
+                return (
+                  <li key={session.id} className="border-t border-ink/25 first:border-t-0">
+                    <Link
+                      className="flex flex-col gap-1 rounded-control px-2 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                      to={`/sessions/${session.id}`}
+                    >
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="font-display font-semibold text-ink">
+                          {session.title}
+                        </span>
+                        <SessionStatusChip status={session.status} />
+                        {inProgress && (
+                          <span className={chipClasses}>{t('list.inProgress')}</span>
+                        )}
                       </span>
-                    )}
-                  </p>
-                  <p className="text-ink-soft">
-                    {new Intl.DateTimeFormat(i18n.language, {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                      timeZone: viewerTimeZone,
-                    }).format(new Date(session.startTime))}
-                  </p>
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className={quietChipClasses}>
+                          {new Intl.DateTimeFormat(i18n.language, {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                            timeZone: viewerTimeZone,
+                          }).format(new Date(session.startTime))}
+                        </span>
+                        {session.platform && (
+                          <span className={quietChipClasses}>{session.platform}</span>
+                        )}
+                      </span>
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </Section>
+        )}
 
-      {nextCursor && (
-        <Button
-          aria-busy={isFetchingNextPage}
-          disabled={isFetchingNextPage}
-          variant="neutral"
-          onClick={() => setCursors((current) => [...current, nextCursor])}
-        >
-          {t('list.loadMore')}
-        </Button>
-      )}
+        {nextCursor && (
+          <Button
+            aria-busy={isFetchingNextPage}
+            disabled={isFetchingNextPage}
+            variant="neutral"
+            onClick={() => setCursors((current) => [...current, nextCursor])}
+          >
+            {t('list.loadMore')}
+          </Button>
+        )}
+      </PageScaffold>
     </main>
   )
 }

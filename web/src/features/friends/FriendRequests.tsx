@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { EmptyState } from '../../components/ui/emptyState'
+import { IdentityRow } from '../../components/ui/identityRow'
 import {
   invalidateFriendGraph,
   runFriendGraphAction,
@@ -39,10 +41,12 @@ export function FriendRequests({
   })
 
   if (items.length === 0) {
+    // An empty request queue is a good terminal state, so it takes the quiet
+    // variant (STYLING_OVERHAUL_DESIGN.md §3.6) rather than a CTA.
     return (
-      <p className="text-ink-soft">
+      <EmptyState illustration="✉️" variant="quiet">
         {t(direction === 'incoming' ? 'empty.incoming' : 'empty.outgoing')}
-      </p>
+      </EmptyState>
     )
   }
 
@@ -63,9 +67,8 @@ export function FriendRequests({
         {items.map((request) => (
           <li key={request.friendshipId}>
             <article className="flex h-full flex-col justify-between gap-4 rounded-card border-2 border-ink bg-card p-4 shadow-offset-card">
-              <p className="font-mono font-semibold text-ink">
-                @{request.username}
-              </p>
+              {/* D-068/D-188: a pending request exposes the username and nothing else. */}
+              <IdentityRow username={request.username} variant="handle" />
               <div className="flex flex-wrap gap-2">
                 {direction === 'incoming' ? (
                   <>
@@ -73,7 +76,7 @@ export function FriendRequests({
                       aria-busy={action.isPending}
                       aria-label={`${t('actions.accept')} @${request.username}`}
                       disabled={action.isPending}
-                      variant="neutral"
+                      variant="primary"
                       onClick={() => mutate('accept', request)}
                     >
                       {t('actions.accept')}

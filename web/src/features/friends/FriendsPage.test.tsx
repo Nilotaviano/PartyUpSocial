@@ -56,6 +56,14 @@ const requests = {
   ],
 }
 
+function openRowMenu() {
+  // Radix's trigger opens on `pointerdown` (mouse), not `click`.
+  fireEvent.pointerDown(
+    screen.getByRole('button', { name: 'More actions @friend.one' }),
+    { button: 0, pointerType: 'mouse' },
+  )
+}
+
 function renderPage() {
   return render(
     <QueryClientProvider
@@ -174,7 +182,12 @@ describe('FriendsPageTests', () => {
       ),
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Block @friend.one' }))
+    // Blocking a friend now runs from the row's ActionMenu
+    // (STYLING_OVERHAUL_DESIGN.md §3.3) — still one click, no confirmation.
+    openRowMenu()
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: /Block @friend\.one/ }),
+    )
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith('/api/v1/blocks', {
         params: { header: { 'X-CSRF-TOKEN': '' } },
@@ -188,12 +201,13 @@ describe('FriendsPageTests', () => {
   it('Unfriend_RequiresConfirmationAndShowsNoNotificationCopy_D105', async () => {
     renderPage()
 
-    const trigger = await screen.findByRole('button', {
-      name: 'Remove friend @friend.one',
-    })
-    fireEvent.click(trigger)
+    await screen.findByText('Friend One')
+    openRowMenu()
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: /Remove friend/ }),
+    )
 
-    const dialog = screen.getByRole('dialog')
+    const dialog = await screen.findByRole('dialog')
     expect(
       within(dialog).getByText('Shared sessions stay unchanged.', {
         exact: false,

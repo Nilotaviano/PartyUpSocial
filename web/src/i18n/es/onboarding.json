@@ -21,5 +21,8 @@
   "messages": {
     "platformLinksOptional": "La vinculación de plataformas es opcional."
   },
-  "progress": "Paso {{current}} de {{total}}: {{step}}"
+  "progress": "Paso {{current}} de {{total}}: {{step}}",
+  "onboarding": {
+    "progress": "Progreso de la configuración"
+  }
 }

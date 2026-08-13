@@ -1,8 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { client, isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { IdentityRow } from '../../components/ui/identityRow'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section } from '../../components/ui/section'
 import { AvatarDisc } from './AvatarDisc'
 import { avatarImgUrl } from './avatarImage'
 import {
@@ -35,13 +39,8 @@ async function importSteamFriends() {
 export function SteamImportPage() {
   const { t } = useTranslation(['friends', 'errors'])
   const queryClient = useQueryClient()
-  const heading = useRef<HTMLHeadingElement>(null)
   const [view, setView] = useState<ImportView>()
   const [status, setStatus] = useState('')
-
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
 
   const importer = useMutation({
     mutationFn: importSteamFriends,
@@ -131,187 +130,192 @@ export function SteamImportPage() {
   }
 
   return (
-    <main
-      className="mx-auto max-w-4xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-steam-import"
-    >
-      <h1
-        ref={heading}
-        tabIndex={-1}
-        className="font-display text-display font-bold text-ink focus:outline-none"
-      >
-        {t('pages.importSteam')}
-      </h1>
-      <Button
-        aria-busy={importer.isPending}
-        disabled={importer.isPending}
-        variant="primary"
-        onClick={() => importer.mutate()}
-      >
-        {result?.state === 'upstream_failure'
-          ? t('actions.retry')
-          : t('actions.importSteam')}
-      </Button>
-
-      {error && (
-        <p ref={(node) => node?.focus()} role="alert" tabIndex={-1}>
-          {t(isApiError(error) ? error.code : 'generic', {
-            ns: 'errors',
-            defaultValue: t('generic', { ns: 'errors' }),
-          })}
-        </p>
-      )}
-      <p aria-live="polite" className="text-ink">
-        {status}
-      </p>
-
-      {result && titleKey && (
-        <section aria-labelledby="steam-result-heading" className="space-y-4">
-          <h2
-            id="steam-result-heading"
-            className="font-display text-h2 font-semibold text-ink"
-          >
-            {t(titleKey)}
-          </h2>
-          {bodyKey && <p className="text-ink-soft">{t(bodyKey)}</p>}
-          {result.state === 'private_profile' && (
-            <a
-              className="inline-flex min-h-11 items-center text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-              href="https://steamcommunity.com/my/edit/settings"
-              rel="noreferrer"
-              target="_blank"
+    <main data-testid="screen-steam-import">
+      <PageScaffold>
+        <PageHeader
+          actions={
+            <Button
+              aria-busy={importer.isPending}
+              disabled={importer.isPending}
+              variant="primary"
+              onClick={() => importer.mutate()}
             >
-              {t('steam.privateHelp')}
-            </a>
-          )}
+              {result?.state === 'upstream_failure'
+                ? t('actions.retry')
+                : t('actions.importSteam')}
+            </Button>
+          }
+          title={t('pages.importSteam')}
+        />
 
-          {view.matches.length > 0 && (
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {view.matches.map((match, index) => (
-                <li key={`${match.username}:${index}`}>
-                  <article className="rounded-card border-2 border-ink bg-card p-4 shadow-offset-card">
-                    <div className="flex items-center gap-2">
-                      <AvatarDisc
-                        emoji={match.avatar.emoji}
-                        imgUrl={avatarImgUrl(match.avatar)}
-                        seed={match.userId}
-                        size="sm"
-                      />
-                      <h3 className="min-w-0 truncate font-mono font-semibold text-ink">
-                        @{match.username}
-                      </h3>
-                    </div>
-                    <p className="mt-1 text-ink-soft">
-                      {t('steam.matchDescription', {
-                        username: match.username,
-                      })}
-                    </p>
-                    {match.state === 'actionable' ? (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <Button
-                          aria-busy={graphAction.isPending}
-                          aria-label={`${t('actions.sendRequest')} @${match.username}`}
-                          disabled={graphAction.isPending}
-                          variant="neutral"
-                          onClick={() =>
-                            act({ kind: 'send', username: match.username })
-                          }
-                        >
-                          {t('actions.sendRequest')}
-                        </Button>
-                        <Button
-                          aria-busy={graphAction.isPending}
-                          aria-label={`${t('actions.block')} @${match.username}`}
-                          disabled={graphAction.isPending}
-                          variant="danger"
-                          onClick={() =>
-                            act({ kind: 'block', username: match.username })
-                          }
-                        >
-                          {t('actions.block')}
-                        </Button>
-                      </div>
-                    ) : (
-                      <p className="mt-3 text-ink-soft">
-                        {t(
-                          match.state === 'accepted'
-                            ? 'status.friends'
-                            : 'status.pendingOutgoing',
-                        )}
-                      </p>
-                    )}
-                    {match.state === 'actionable' && (
-                      <p className="mt-3 text-ink-soft">
-                        {t('profile.blockConsequence')}
-                      </p>
-                    )}
-                  </article>
-                </li>
-              ))}
-            </ul>
-          )}
+        {error && (
+          <p ref={(node) => node?.focus()} role="alert" tabIndex={-1}>
+            {t(isApiError(error) ? error.code : 'generic', {
+              ns: 'errors',
+              defaultValue: t('generic', { ns: 'errors' }),
+            })}
+          </p>
+        )}
+        <p aria-live="polite" className="text-ink">
+          {status}
+        </p>
 
-          {'unmatched' in result && result.unmatched.length > 0 && (
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {result.unmatched.map((friend) => (
-                <li key={friend.steamId64}>
-                  <article className="flex h-full flex-col justify-between gap-4 rounded-card border-2 border-ink bg-card p-4 shadow-offset-card">
-                    <div className="flex items-center gap-3">
-                      {friend.avatarUrl ? (
-                        <img
-                          alt=""
-                          className="h-12 w-12 rounded-full border-2 border-ink"
-                          height="48"
-                          src={friend.avatarUrl}
-                          width="48"
-                        />
-                      ) : (
-                        <AvatarDisc seed={friend.steamId64} size="sm" />
-                      )}
-                      <div className="min-w-0">
-                        {friend.personaName && (
-                          <h3 className="break-words font-display font-semibold text-ink">
-                            {friend.personaName}
-                          </h3>
-                        )}
-                        <p className="text-ink-soft">
-                          {t('steam.unmatchedDescription')}
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      aria-label={`${t('actions.copyInvitationLink')} ${friend.personaName ?? friend.steamId64}`}
-                      variant="neutral"
-                      onClick={() => void copyInvitation(friend.invitationUrl)}
-                    >
-                      {t('actions.copyInvitationLink')}
-                    </Button>
-                  </article>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {(result.state === 'not_configured' ||
-            result.state === 'zero_matches' ||
-            result.state === 'zero_friends' ||
-            result.state === 'private_profile' ||
-            result.state === 'upstream_failure') && (
-            <div className="rounded-card border-2 border-ink bg-card p-4">
-              <p className="break-all text-ink-soft">
-                {result.invitationUrl}
-              </p>
-              <Button
-                className="mt-3"
-                variant="neutral"
-                onClick={() => void copyInvitation(result.invitationUrl)}
+        {result && titleKey && (
+          <Section
+            description={bodyKey ? t(bodyKey) : undefined}
+            title={t(titleKey)}
+            titleId="steam-result-heading"
+          >
+            {result.state === 'private_profile' && (
+              <a
+                className="inline-flex min-h-11 items-center text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                href="https://steamcommunity.com/my/edit/settings"
+                rel="noreferrer"
+                target="_blank"
               >
-                {t('actions.copyInvitationLink')}
-              </Button>
-            </div>
-          )}
-        </section>
-      )}
+                {t('steam.privateHelp')}
+              </a>
+            )}
+
+            {view.matches.length > 0 && (
+              <ul className="flex flex-col border-b border-ink/25">
+                {view.matches.map((match, index) => (
+                  <li key={`${match.username}:${index}`}>
+                    <article className="flex flex-col gap-2 border-t border-ink/25 py-3">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                          <AvatarDisc
+                            emoji={match.avatar.emoji}
+                            imgUrl={avatarImgUrl(match.avatar)}
+                            seed={match.userId}
+                            size="sm"
+                          />
+                          {/* D-068/D-188: a Steam match exposes the username only. */}
+                          <IdentityRow
+                            meta={t('steam.matchDescription', {
+                              username: match.username,
+                            })}
+                            nameAs="h3"
+                            username={match.username}
+                            variant="handle"
+                          />
+                        </div>
+                        {match.state === 'actionable' ? (
+                          <div className="flex flex-none flex-wrap items-center gap-2">
+                            <Button
+                              aria-busy={graphAction.isPending}
+                              aria-label={`${t('actions.sendRequest')} @${match.username}`}
+                              disabled={graphAction.isPending}
+                              variant="primary"
+                              onClick={() =>
+                                act({ kind: 'send', username: match.username })
+                              }
+                            >
+                              {t('actions.sendRequest')}
+                            </Button>
+                            {/*
+                              §3.3: block stays one plain danger-text button with
+                              its consequence sentence visible under the row.
+                            */}
+                            <Button
+                              aria-busy={graphAction.isPending}
+                              aria-label={`${t('actions.block')} @${match.username}`}
+                              className="text-danger"
+                              disabled={graphAction.isPending}
+                              variant="ghost"
+                              onClick={() =>
+                                act({ kind: 'block', username: match.username })
+                              }
+                            >
+                              {t('actions.block')}
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="flex-none text-meta text-ink-soft">
+                            {t(
+                              match.state === 'accepted'
+                                ? 'status.friends'
+                                : 'status.pendingOutgoing',
+                            )}
+                          </p>
+                        )}
+                      </div>
+                      {match.state === 'actionable' && (
+                        <p className="text-meta text-ink-soft">
+                          {t('profile.blockConsequence')}
+                        </p>
+                      )}
+                    </article>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {'unmatched' in result && result.unmatched.length > 0 && (
+              <ul className="flex flex-col border-b border-ink/25">
+                {result.unmatched.map((friend) => (
+                  <li key={friend.steamId64}>
+                    <article className="flex flex-col gap-3 border-t border-ink/25 py-3 sm:flex-row sm:items-center">
+                      <IdentityRow
+                        avatar={
+                          friend.avatarUrl ? (
+                            <img
+                              alt=""
+                              className="h-12 w-12 flex-none rounded-full border-2 border-ink"
+                              height="48"
+                              src={friend.avatarUrl}
+                              width="48"
+                            />
+                          ) : (
+                            <AvatarDisc seed={friend.steamId64} size="sm" />
+                          )
+                        }
+                        className="flex-1"
+                        // An unmatched Steam friend may carry no persona name at
+                        // all; the description becomes the row's name rather
+                        // than leaving an empty heading behind.
+                        displayName={
+                          friend.personaName ?? t('steam.unmatchedDescription')
+                        }
+                        meta={
+                          friend.personaName
+                            ? t('steam.unmatchedDescription')
+                            : undefined
+                        }
+                        nameAs={friend.personaName ? 'h3' : 'span'}
+                      />
+                      <Button
+                        aria-label={`${t('actions.copyInvitationLink')} ${friend.personaName ?? friend.steamId64}`}
+                        className="flex-none"
+                        variant="neutral"
+                        onClick={() => void copyInvitation(friend.invitationUrl)}
+                      >
+                        {t('actions.copyInvitationLink')}
+                      </Button>
+                    </article>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {(result.state === 'not_configured' ||
+              result.state === 'zero_matches' ||
+              result.state === 'zero_friends' ||
+              result.state === 'private_profile' ||
+              result.state === 'upstream_failure') && (
+              <div className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-card border-2 border-ink bg-card p-4 shadow-offset-card">
+                <p className="truncate text-ink-soft">{result.invitationUrl}</p>
+                <Button
+                  variant="neutral"
+                  onClick={() => void copyInvitation(result.invitationUrl)}
+                >
+                  {t('actions.copyInvitationLink')}
+                </Button>
+              </div>
+            )}
+          </Section>
+        )}
+      </PageScaffold>
     </main>
   )
 }

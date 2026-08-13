@@ -4,8 +4,18 @@ import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import {
+  fieldControlClasses,
+  quietChipClasses,
+  segmentItemClasses,
+} from '../../components/ui/classes'
+import { DateEcho } from '../../components/ui/dateEcho'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section, SectionCard } from '../../components/ui/section'
+import { SegmentStrip } from '../../components/ui/segmentStrip'
+import { StatusBanner } from '../../components/ui/statusBanner'
 import {
   claimGuestPoll,
   getGuestPoll,
@@ -94,26 +104,28 @@ export function GuestSessionPage() {
 
   function renderInvalid(extra?: unknown) {
     return (
-      <main
-        className="mx-auto max-w-xl space-y-4 p-4 sm:p-8"
-        data-testid="screen-guest-invalid"
-      >
-        <h1
-          ref={heading}
-          tabIndex={-1}
-          className="text-h1 font-display font-bold text-ink focus:outline-none"
-        >
-          {t('guest.invalid')}
-        </h1>
-        <p className="text-ink-soft">{t('guest.linkExpiredReopen')}</p>
-        {extra != null &&
-          isApiError(extra) &&
-          extra.code !== 'session_not_found' &&
-          extra.code !== 'poll_not_found' && (
-          <p role="alert">
-            {t(extra.code, { ns: 'errors', defaultValue: t('generic', { ns: 'errors' }) })}
-          </p>
-        )}
+      <main data-testid="screen-guest-invalid">
+        <PageScaffold width="form">
+          <h1
+            ref={heading}
+            tabIndex={-1}
+            className="text-h1 font-display font-bold text-ink focus:outline-none"
+          >
+            {t('guest.invalid')}
+          </h1>
+          <p className="text-ink-soft">{t('guest.linkExpiredReopen')}</p>
+          {extra != null &&
+            isApiError(extra) &&
+            extra.code !== 'session_not_found' &&
+            extra.code !== 'poll_not_found' && (
+              <StatusBanner role="alert" variant="danger">
+                {t(extra.code, {
+                  ns: 'errors',
+                  defaultValue: t('generic', { ns: 'errors' }),
+                })}
+              </StatusBanner>
+            )}
+        </PageScaffold>
       </main>
     )
   }
@@ -131,34 +143,32 @@ export function GuestSessionPage() {
       return renderInvalid(pollDetail.error)
     }
     return (
-      <main
-        className="mx-auto max-w-xl space-y-4 p-4 sm:p-8"
-        data-testid="screen-guest-session"
-      >
-        <h1
-          ref={heading}
-          tabIndex={-1}
-          className="text-h1 font-display font-bold text-ink focus:outline-none"
-        >
-          {t('common.loading', { ns: 'common' })}
-        </h1>
+      <main data-testid="screen-guest-session">
+        <PageScaffold width="form">
+          <h1
+            ref={heading}
+            tabIndex={-1}
+            className="text-h1 font-display font-bold text-ink focus:outline-none"
+          >
+            {t('common.loading', { ns: 'common' })}
+          </h1>
+        </PageScaffold>
       </main>
     )
   }
 
   if (!detail.data) {
     return (
-      <main
-        className="mx-auto max-w-xl space-y-4 p-4 sm:p-8"
-        data-testid="screen-guest-session"
-      >
-        <h1
-          ref={heading}
-          tabIndex={-1}
-          className="text-h1 font-display font-bold text-ink focus:outline-none"
-        >
-          {t('common.loading', { ns: 'common' })}
-        </h1>
+      <main data-testid="screen-guest-session">
+        <PageScaffold width="form">
+          <h1
+            ref={heading}
+            tabIndex={-1}
+            className="text-h1 font-display font-bold text-ink focus:outline-none"
+          >
+            {t('common.loading', { ns: 'common' })}
+          </h1>
+        </PageScaffold>
       </main>
     )
   }
@@ -167,17 +177,16 @@ export function GuestSessionPage() {
 
   if (view.state !== 'live') {
     return (
-      <main
-        className="mx-auto max-w-xl space-y-4 p-4 sm:p-8"
-        data-testid="screen-guest-terminal"
-      >
-        <h1
-          ref={heading}
-          tabIndex={-1}
-          className="text-h1 font-display font-bold text-ink focus:outline-none"
-        >
-          {t(guestTerminalLocaleKey(view.state))}
-        </h1>
+      <main data-testid="screen-guest-terminal">
+        <PageScaffold width="form">
+          <h1
+            ref={heading}
+            tabIndex={-1}
+            className="text-h1 font-display font-bold text-ink focus:outline-none"
+          >
+            {t(guestTerminalLocaleKey(view.state))}
+          </h1>
+        </PageScaffold>
       </main>
     )
   }
@@ -186,134 +195,153 @@ export function GuestSessionPage() {
   const hasClaimed = Boolean(view.guestIdentityId)
 
   return (
-    <main
-      className="mx-auto max-w-xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-guest-session"
-    >
-      <h1
-        ref={heading}
-        aria-live="polite"
-        tabIndex={-1}
-        className="text-h1 font-display font-bold text-ink focus:outline-none"
-      >
-        {view.title ?? t('guest.claimHeading')}
-      </h1>
-
-      <p aria-live="polite" className="text-body text-ink">
-        {status}
-      </p>
-
-      {mutationError && (
-        <p ref={(node) => node?.focus()} role="alert" tabIndex={-1}>
-          {t(
-            isApiError(mutationError)
-              ? `errors.codes.${mutationError.code}`
-              : 'errors.generic',
-            { defaultValue: t('errors.generic') },
-          )}
-        </p>
-      )}
-
-      <p className="text-ink-soft">{t('guest.live')}</p>
-
-      {view.startTime && (
-        <p>
-          {new Intl.DateTimeFormat(i18n.language, {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-          }).format(new Date(view.startTime))}
-        </p>
-      )}
-      <p className="text-meta text-ink-soft">{t('guest.timezone')}</p>
-
-      {view.platform && <p>{view.platform}</p>}
-      {view.game?.name && <p>{view.game.name}</p>}
-      {view.notes && <p>{view.notes}</p>}
-
-      {!hasClaimed && (
-        <form
-          className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card"
-          onSubmit={(event) => {
-            event.preventDefault()
-            claim.mutate()
-          }}
+    <main data-testid="screen-guest-session">
+      <PageScaffold width="form">
+        <h1
+          ref={heading}
+          aria-live="polite"
+          tabIndex={-1}
+          className="text-h1 font-display font-bold text-ink focus:outline-none"
         >
-          <h2 className="text-h2 font-display font-semibold text-ink">
-            {t('guest.claimHeading')}
-          </h2>
-          <div>
-            <Label htmlFor="guest-display-name">{t('guest.displayName')}</Label>
-            <Input
-              id="guest-display-name"
-              required
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-            />
-          </div>
-          <fieldset>
-            <legend>{t('rsvp.heading')}</legend>
-            {rsvpChoices.map((choice) => (
-              <label key={choice} className="mr-3 inline-flex items-center gap-2">
-                <input
-                  checked={claimResponse === choice}
-                  name="claim-response"
-                  type="radio"
-                  onChange={() => setClaimResponse(choice)}
-                />
-                {t(`rsvp.${choice.toLowerCase()}`)}
-              </label>
-            ))}
-          </fieldset>
-          <Button aria-busy={claim.isPending} disabled={claim.isPending} type="submit" variant="primary">
-            {t('guest.respond')}
-          </Button>
-        </form>
-      )}
+          {view.title ?? t('guest.claimHeading')}
+        </h1>
 
-      {hasClaimed && (
-        <>
+        <p aria-live="polite" className="text-body text-ink">
+          {status}
+        </p>
+
+        {mutationError && (
+          <p ref={(node) => node?.focus()} role="alert" tabIndex={-1}>
+            {t(
+              isApiError(mutationError)
+                ? `errors.codes.${mutationError.code}`
+                : 'errors.generic',
+              { defaultValue: t('errors.generic') },
+            )}
+          </p>
+        )}
+
+        <div className="flex flex-col gap-3">
+          <p className="text-ink-soft">{t('guest.live')}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            {view.startTime && (
+              <span className={quietChipClasses}>
+                {new Intl.DateTimeFormat(i18n.language, {
+                  dateStyle: 'medium',
+                  timeStyle: 'short',
+                }).format(new Date(view.startTime))}
+              </span>
+            )}
+            {view.platform && <span className={quietChipClasses}>{view.platform}</span>}
+            {view.game?.name && <span className={quietChipClasses}>{view.game.name}</span>}
+          </div>
+          <p className="text-meta text-ink-soft">{t('guest.timezone')}</p>
+          {view.notes && <p className="text-ink">{view.notes}</p>}
+        </div>
+
+        {!hasClaimed && (
           <form
-            className="flex flex-wrap items-end gap-2"
+            className="flex flex-col gap-4 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card"
             onSubmit={(event) => {
               event.preventDefault()
-              rename.mutate(renameInput.current?.value ?? '')
+              claim.mutate()
             }}
           >
-            <div>
-              <Label htmlFor="guest-rename">{t('guest.displayName')}</Label>
-              <input
-                key={view.guestIdentityId}
-                ref={renameInput}
-                className="min-h-11 rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                defaultValue={view.displayName ?? ''}
-                id="guest-rename"
+            <h2 className="text-h2 font-display font-semibold text-ink">
+              {t('guest.claimHeading')}
+            </h2>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="guest-display-name">{t('guest.displayName')}</Label>
+              <Input
+                id="guest-display-name"
                 required
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
               />
             </div>
-            <Button aria-busy={rename.isPending} disabled={rename.isPending} type="submit" variant="primary">
+            <fieldset className="flex flex-col gap-2">
+              <legend className="font-body font-semibold text-ink">
+                {t('rsvp.heading')}
+              </legend>
+              {rsvpChoices.map((choice) => (
+                <label
+                  key={choice}
+                  className="control-frame flex min-h-11 items-center gap-3 px-3 py-2 font-body text-body"
+                >
+                  <input
+                    checked={claimResponse === choice}
+                    name="claim-response"
+                    type="radio"
+                    onChange={() => setClaimResponse(choice)}
+                  />
+                  {t(`rsvp.${choice.toLowerCase()}`)}
+                </label>
+              ))}
+            </fieldset>
+            <Button
+              aria-busy={claim.isPending}
+              className="self-end"
+              disabled={claim.isPending}
+              type="submit"
+              variant="primary"
+            >
               {t('guest.respond')}
             </Button>
           </form>
+        )}
 
-          <div className="flex flex-wrap gap-2">
-            {rsvpChoices.map((choice) => {
-              const pressed = view.response?.toLowerCase() === choice.toLowerCase()
-              return (
+        {hasClaimed && (
+          <SectionCard title={t('rsvp.heading')} titleId="guest-rsvp-heading">
+              <form
+                className="flex flex-wrap items-end gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  rename.mutate(renameInput.current?.value ?? '')
+                }}
+              >
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="guest-rename">{t('guest.displayName')}</Label>
+                  <input
+                    key={view.guestIdentityId}
+                    ref={renameInput}
+                    className={`${fieldControlClasses} w-auto`}
+                    defaultValue={view.displayName ?? ''}
+                    id="guest-rename"
+                    required
+                  />
+                </div>
                 <Button
-                  key={choice}
-                  aria-pressed={pressed}
-                  disabled={respond.isPending}
-                  type="button"
-                  variant={pressed ? 'primary' : 'neutral'}
-                  onClick={() => respond.mutate(choice)}
+                  aria-busy={rename.isPending}
+                  disabled={rename.isPending}
+                  type="submit"
+                  variant="primary"
                 >
-                  {t(`rsvp.${choice.toLowerCase()}`)}
+                  {t('guest.respond')}
                 </Button>
-              )
-            })}
-          </div>
-        </>
-      )}
+              </form>
+
+              <div aria-labelledby="guest-rsvp-heading" role="group">
+                <SegmentStrip>
+                  {rsvpChoices.map((choice) => {
+                    const pressed = view.response?.toLowerCase() === choice.toLowerCase()
+                    return (
+                      <button
+                        key={choice}
+                        aria-pressed={pressed}
+                        className={segmentItemClasses(pressed)}
+                        disabled={respond.isPending}
+                        type="button"
+                        onClick={() => respond.mutate(choice)}
+                      >
+                        {t(`rsvp.${choice.toLowerCase()}`)}
+                      </button>
+                    )
+                  })}
+                </SegmentStrip>
+              </div>
+          </SectionCard>
+        )}
+      </PageScaffold>
     </main>
   )
 }
@@ -386,14 +414,16 @@ function GuestPollBranch({ guestLinkId, heading, view }: GuestPollBranchProps) {
 
   if (view.state !== 'live') {
     return (
-      <main className="mx-auto max-w-xl space-y-4 p-4 sm:p-8" data-testid="screen-guest-terminal">
-        <h1
-          ref={heading}
-          tabIndex={-1}
-          className="text-h1 font-display font-bold text-ink focus:outline-none"
-        >
-          {t(guestPollTerminalLocaleKey(view.state))}
-        </h1>
+      <main data-testid="screen-guest-terminal">
+        <PageScaffold width="form">
+          <h1
+            ref={heading}
+            tabIndex={-1}
+            className="text-h1 font-display font-bold text-ink focus:outline-none"
+          >
+            {t(guestPollTerminalLocaleKey(view.state))}
+          </h1>
+        </PageScaffold>
       </main>
     )
   }
@@ -415,122 +445,143 @@ function GuestPollBranch({ guestLinkId, heading, view }: GuestPollBranchProps) {
   }
 
   return (
-    <main className="mx-auto max-w-xl space-y-6 p-4 sm:p-8" data-testid="screen-guest-poll">
-      <h1
-        ref={heading}
-        aria-live="polite"
-        tabIndex={-1}
-        className="text-h1 font-display font-bold text-ink focus:outline-none"
-      >
-        {view.title ?? t('guestPoll.claimHeading')}
-      </h1>
+    <main data-testid="screen-guest-poll">
+      <PageScaffold width="form">
+        <h1
+          ref={heading}
+          aria-live="polite"
+          tabIndex={-1}
+          className="text-h1 font-display font-bold text-ink focus:outline-none"
+        >
+          {view.title ?? t('guestPoll.claimHeading')}
+        </h1>
 
-      <p aria-live="polite" className="text-body text-ink">
-        {status}
-      </p>
-
-      {mutationError && (
-        <p ref={(node) => node?.focus()} role="alert" tabIndex={-1}>
-          {t(
-            isApiError(mutationError)
-              ? `errors.codes.${mutationError.code}`
-              : 'errors.generic',
-            { defaultValue: t('errors.generic') },
-          )}
+        <p aria-live="polite" className="text-body text-ink">
+          {status}
         </p>
-      )}
 
-      <p className="text-ink-soft">{t('guestPoll.live')}</p>
-      {view.notes && <p>{view.notes}</p>}
+        {mutationError && (
+          <p ref={(node) => node?.focus()} role="alert" tabIndex={-1}>
+            {t(
+              isApiError(mutationError)
+                ? `errors.codes.${mutationError.code}`
+                : 'errors.generic',
+              { defaultValue: t('errors.generic') },
+            )}
+          </p>
+        )}
 
-      {!hasClaimed && (
-        <form
-          className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card"
-          onSubmit={(event) => {
-            event.preventDefault()
-            claim.mutate()
-          }}
-        >
-          <h2 className="text-h2 font-display font-semibold text-ink">
-            {t('guestPoll.claimHeading')}
-          </h2>
-          <div>
-            <Label htmlFor="guest-poll-display-name">{t('guestPoll.displayName')}</Label>
-            <Input
-              id="guest-poll-display-name"
-              required
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-            />
-          </div>
-          <Button aria-busy={claim.isPending} disabled={claim.isPending} type="submit" variant="primary">
-            {t('guestPoll.join')}
-          </Button>
-        </form>
-      )}
+        <div className="flex flex-col gap-2">
+          <p className="text-ink-soft">{t('guestPoll.live')}</p>
+          {view.notes && <p className="text-ink">{view.notes}</p>}
+        </div>
 
-      {hasClaimed && (
-        <form
-          className="flex flex-wrap items-end gap-2"
-          onSubmit={(event) => {
-            event.preventDefault()
-            rename.mutate(renameInput.current?.value ?? '')
-          }}
-        >
-          <div>
-            <Label htmlFor="guest-poll-rename">{t('guestPoll.displayName')}</Label>
-            <input
-              key={view.guestIdentityId}
-              ref={renameInput}
-              className="min-h-11 rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-              defaultValue={view.displayName ?? ''}
-              id="guest-poll-rename"
-              required
-            />
-          </div>
-          <Button aria-busy={rename.isPending} disabled={rename.isPending} type="submit" variant="primary">
-            {t('guestPoll.join')}
-          </Button>
-        </form>
-      )}
-
-      <section aria-labelledby="guest-poll-options-heading">
-        <h2 id="guest-poll-options-heading" className="text-h2 font-display font-semibold text-ink">
-          {t('detail.options')}
-        </h2>
-        <VotingGrid
-          disabled={!hasClaimed}
-          locale={i18n.language}
-          options={view.options ?? []}
-          pendingOptionId={pendingOptionId}
-          onVote={(optionId, choice) => vote.mutate({ optionId, choice })}
-        />
-
-        {hasClaimed && (
-          <form className="mt-4 flex flex-wrap items-end gap-2" onSubmit={handleSuggest}>
-            <div className="flex-1">
-              <label
-                className="block font-body font-semibold text-ink"
-                htmlFor="guest-suggest-option-value"
-              >
-                {t('suggest.heading')}
-              </label>
-              <input
-                className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                id="guest-suggest-option-value"
-                step={900}
-                type="datetime-local"
-                value={suggestValue}
-                onChange={(event) => setSuggestValue(event.target.value)}
+        {!hasClaimed && (
+          <form
+            className="flex flex-col gap-4 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card"
+            onSubmit={(event) => {
+              event.preventDefault()
+              claim.mutate()
+            }}
+          >
+            <h2 className="text-h2 font-display font-semibold text-ink">
+              {t('guestPoll.claimHeading')}
+            </h2>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="guest-poll-display-name">{t('guestPoll.displayName')}</Label>
+              <Input
+                id="guest-poll-display-name"
+                required
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
               />
             </div>
-            <Button aria-busy={suggest.isPending} disabled={suggest.isPending} type="submit" variant="neutral">
-              {t('suggest.add')}
+            <Button
+              aria-busy={claim.isPending}
+              className="self-end"
+              disabled={claim.isPending}
+              type="submit"
+              variant="primary"
+            >
+              {t('guestPoll.join')}
             </Button>
           </form>
         )}
-        {suggestError && <p role="alert">{suggestError}</p>}
-      </section>
+
+        {hasClaimed && (
+          <form
+            className="flex flex-wrap items-end gap-2"
+            onSubmit={(event) => {
+              event.preventDefault()
+              rename.mutate(renameInput.current?.value ?? '')
+            }}
+          >
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="guest-poll-rename">{t('guestPoll.displayName')}</Label>
+              <input
+                key={view.guestIdentityId}
+                ref={renameInput}
+                className={`${fieldControlClasses} w-auto`}
+                defaultValue={view.displayName ?? ''}
+                id="guest-poll-rename"
+                required
+              />
+            </div>
+            <Button
+              aria-busy={rename.isPending}
+              disabled={rename.isPending}
+              type="submit"
+              variant="primary"
+            >
+              {t('guestPoll.join')}
+            </Button>
+          </form>
+        )}
+
+        <Section title={t('detail.options')} titleId="guest-poll-options-heading">
+          <VotingGrid
+            disabled={!hasClaimed}
+            locale={i18n.language}
+            options={view.options ?? []}
+            pendingOptionId={pendingOptionId}
+            onVote={(optionId, choice) => vote.mutate({ optionId, choice })}
+          />
+        </Section>
+
+        {/* Unnamed, for the same reason as PollDetailPage's suggest section. */}
+        {hasClaimed && (
+          <Section>
+            <form className="flex flex-wrap items-end gap-2" onSubmit={handleSuggest}>
+              <div className="flex flex-1 flex-col gap-1.5">
+                <label
+                  className="font-body font-semibold text-ink"
+                  htmlFor="guest-suggest-option-value"
+                >
+                  {t('suggest.heading')}
+                </label>
+                <input
+                  className={fieldControlClasses}
+                  id="guest-suggest-option-value"
+                  step={900}
+                  type="datetime-local"
+                  value={suggestValue}
+                  onChange={(event) => setSuggestValue(event.target.value)}
+                />
+                <DateEcho value={suggestValue} />
+              </div>
+              <Button
+                aria-busy={suggest.isPending}
+                disabled={suggest.isPending}
+                type="submit"
+                variant="neutral"
+              >
+                {t('suggest.add')}
+              </Button>
+            </form>
+            {suggestError && <p role="alert">{suggestError}</p>}
+          </Section>
+        )}
+      </PageScaffold>
     </main>
   )
 }

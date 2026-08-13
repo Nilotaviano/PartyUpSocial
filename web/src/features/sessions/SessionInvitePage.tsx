@@ -1,11 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Navigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
-import { raisedInteractiveClasses } from '../../components/ui/classes'
+import {
+  controlRowClasses,
+  fieldControlClasses,
+  raisedInteractiveClasses,
+} from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section, SectionCard } from '../../components/ui/section'
+import { StatusBanner } from '../../components/ui/statusBanner'
 import { AvatarDisc } from '../friends/AvatarDisc'
 import { avatarImgUrl } from '../friends/avatarImage'
 import { friendKeys, getFriends } from '../friends/friendGraph'
@@ -87,7 +95,6 @@ export function SessionInvitePage() {
   const { t } = useTranslation(['sessions', 'errors'])
   const { sessionId = '' } = useParams()
   const queryClient = useQueryClient()
-  const heading = useRef<HTMLHeadingElement>(null)
   const [status, setStatus] = useState('')
   const [selected, setSelected] = useState<string[]>([])
   const [guestLinks, setGuestLinks] = useState<GuestLinkInvitation[]>([])
@@ -104,10 +111,6 @@ export function SessionInvitePage() {
     queryKey: friendKeys.friends,
     queryFn: getFriends,
   })
-
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
 
   const invite = useMutation({
     mutationFn: () => inviteUsers(sessionId, selected),
@@ -150,128 +153,123 @@ export function SessionInvitePage() {
   const anyError = invite.error ?? createLinks.error ?? revoke.error
 
   return (
-    <main
-      className="mx-auto max-w-2xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-session-invite"
-    >
-      <h1
-        ref={heading}
-        tabIndex={-1}
-        className="text-display font-display font-bold text-ink focus:outline-none"
-      >
-        {t('invite.heading')}
-      </h1>
+    <main data-testid="screen-session-invite">
+      <PageScaffold width="form">
+        <PageHeader title={t('invite.heading')} />
 
-      <p aria-live="polite" className="text-ink">
-        {status}
-      </p>
-
-      {anyError && (
-        <p role="alert">
-          {t(
-            isApiError(anyError) ? `errors.codes.${anyError.code}` : 'errors.generic',
-            { defaultValue: t('errors.generic') },
-          )}
+        <p aria-live="polite" className="text-ink">
+          {status}
         </p>
-      )}
 
-      <section aria-labelledby="invite-registered-heading">
-        <h2 id="invite-registered-heading" className="text-h2 font-display font-semibold text-ink">
-          {t('invite.registered')}
-        </h2>
-        <ul className="mt-2 space-y-1">
-          {(friends.data ?? []).map((friend) => (
-            <li key={friend.friendshipId}>
-              <label className="inline-flex min-h-11 items-center gap-2 text-ink">
-                <input
-                  checked={selected.includes(friend.userId)}
-                  type="checkbox"
-                  onChange={(event) => {
-                    const checked = event.target.checked
-                    setSelected((current) =>
-                      checked
-                        ? [...current, friend.userId]
-                        : current.filter((id) => id !== friend.userId),
-                    )
-                  }}
-                />
-                <AvatarDisc
-                  emoji={friend.avatar.emoji}
-                  imgUrl={avatarImgUrl(friend.avatar)}
-                  seed={friend.userId}
-                  size="xs"
-                />
-                {friend.displayName} (@{friend.username})
-              </label>
-            </li>
-          ))}
-        </ul>
-        <Button
-          aria-busy={invite.isPending}
-          className="mt-3"
-          disabled={invite.isPending || selected.length === 0}
-          variant="primary"
-          onClick={() => invite.mutate()}
+        {anyError && (
+          <StatusBanner role="alert" variant="danger">
+            {t(
+              isApiError(anyError) ? `errors.codes.${anyError.code}` : 'errors.generic',
+              { defaultValue: t('errors.generic') },
+            )}
+          </StatusBanner>
+        )}
+
+        <Section
+          actions={
+            <Button
+              aria-busy={invite.isPending}
+              disabled={invite.isPending || selected.length === 0}
+              variant="primary"
+              onClick={() => invite.mutate()}
+            >
+              {t('invite.registered')}
+            </Button>
+          }
+          title={t('invite.registered')}
+          titleId="invite-registered-heading"
         >
-          {t('invite.registered')}
-        </Button>
-      </section>
-
-      <section aria-labelledby="invite-guest-heading">
-        <h2 id="invite-guest-heading" className="text-h2 font-display font-semibold text-ink">
-          {t('invite.guest')}
-        </h2>
-        <label className="mt-2 block font-body font-semibold text-ink" htmlFor="guest-link-count">
-          {t('create.guestLinks')}
-        </label>
-        <input
-          className="mt-1 min-h-11 w-24 rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-          id="guest-link-count"
-          max={20}
-          min={1}
-          type="number"
-          value={linkCount}
-          onChange={(event) => setLinkCount(event.target.value)}
-        />
-        <Button
-          aria-busy={createLinks.isPending}
-          className="ml-2"
-          disabled={createLinks.isPending}
-          variant="neutral"
-          onClick={() => createLinks.mutate()}
-        >
-          {t('invite.createLink')}
-        </Button>
-
-        {guestLinks.length > 0 && (
-          <ul className="mt-3 space-y-2">
-            {guestLinks.map((link) => (
-              <li
-                key={link.guestLinkId}
-                className="flex items-center justify-between gap-2 rounded-card border-2 border-ink bg-card p-3"
-              >
-                <span className="min-w-0 flex-1 truncate font-mono text-ink">
-                  {link.url}
-                </span>
-                <span className="flex flex-none gap-2">
-                  <Button
-                    aria-label={t('a11y.copyLink')}
-                    type="button"
-                    variant="ghost"
-                    onClick={() => void copy(link.url)}
-                  >
-                    {t('invite.copyLink')}
-                  </Button>
-                  <RevokeGuestLinkDialog
-                    pending={revoke.isPending}
-                    onConfirm={() => revoke.mutate(link.guestLinkId)}
+          <ul className="flex flex-col gap-2">
+            {(friends.data ?? []).map((friend) => (
+              <li key={friend.friendshipId}>
+                <label className={`${controlRowClasses} text-ink`}>
+                  <input
+                    checked={selected.includes(friend.userId)}
+                    type="checkbox"
+                    onChange={(event) => {
+                      const checked = event.target.checked
+                      setSelected((current) =>
+                        checked
+                          ? [...current, friend.userId]
+                          : current.filter((id) => id !== friend.userId),
+                      )
+                    }}
                   />
-                </span>
+                  <AvatarDisc
+                    emoji={friend.avatar.emoji}
+                    imgUrl={avatarImgUrl(friend.avatar)}
+                    seed={friend.userId}
+                    size="xs"
+                  />
+                  {friend.displayName} (@{friend.username})
+                </label>
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </Section>
+
+        <SectionCard title={t('invite.guest')} titleId="invite-guest-heading">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-col gap-1.5">
+              <label
+                className="font-body font-semibold text-ink"
+                htmlFor="guest-link-count"
+              >
+                {t('create.guestLinks')}
+              </label>
+              <input
+                className={`${fieldControlClasses} w-24`}
+                id="guest-link-count"
+                max={20}
+                min={1}
+                type="number"
+                value={linkCount}
+                onChange={(event) => setLinkCount(event.target.value)}
+              />
+            </div>
+            <Button
+              aria-busy={createLinks.isPending}
+              disabled={createLinks.isPending}
+              variant="neutral"
+              onClick={() => createLinks.mutate()}
+            >
+              {t('invite.createLink')}
+            </Button>
+          </div>
+
+          {guestLinks.length > 0 && (
+            <ul>
+              {guestLinks.map((link) => (
+                <li
+                  key={link.guestLinkId}
+                  className="grid grid-cols-[1fr_auto] items-center gap-2 border-t border-ink/25 py-2 first:border-t-0"
+                >
+                  <span className="min-w-0 truncate font-mono text-ink">{link.url}</span>
+                  <span className="flex flex-none gap-2">
+                    <Button
+                      aria-label={t('a11y.copyLink')}
+                      type="button"
+                      variant="ghost"
+                      onClick={() => void copy(link.url)}
+                    >
+                      {t('invite.copyLink')}
+                    </Button>
+                    <RevokeGuestLinkDialog
+                      pending={revoke.isPending}
+                      onConfirm={() => revoke.mutate(link.guestLinkId)}
+                    />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
+      </PageScaffold>
     </main>
   )
 }

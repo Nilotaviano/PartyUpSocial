@@ -1,10 +1,15 @@
 import { useQueries } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
-import { raisedInteractiveClasses } from '../../components/ui/classes'
+import { quietChipClasses, raisedInteractiveClasses } from '../../components/ui/classes'
+import { EmptyState } from '../../components/ui/emptyState'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section } from '../../components/ui/section'
+import { StatusBanner } from '../../components/ui/statusBanner'
 import { getPollList, pollKeys, type PollBand, type PollSummary } from './pollQueries'
 import { PollStatusChip } from './PollStatusChip'
 
@@ -41,39 +46,35 @@ function usePollBand(band: PollBand) {
   }
 }
 
-function PollCard({ poll }: { poll: PollSummary }) {
+function PollRow({ poll }: { poll: PollSummary }) {
   const { t, i18n } = useTranslation('polls')
   return (
-    <li>
+    <li className="border-t border-ink/25 first:border-t-0">
       <Link
-        className="block rounded-card border-2 border-ink bg-card p-4 shadow-offset-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        className="flex flex-col gap-1 rounded-control px-2 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         to={`/polls/${poll.id}`}
       >
-        <p className="flex flex-wrap items-center gap-2 font-display font-semibold text-ink">
-          {poll.title}
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="font-display font-semibold text-ink">{poll.title}</span>
           <PollStatusChip poll={poll} />
-        </p>
-        <p className="text-ink-soft">
-          {t('list.optionCount', { count: Number(poll.optionCount) })}
-        </p>
-        <p className="text-ink-soft">
-          {new Intl.DateTimeFormat(i18n.language, {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-          }).format(new Date(poll.createdAt))}
-        </p>
+        </span>
+        <span className="flex flex-wrap items-center gap-2">
+          <span className={quietChipClasses}>
+            {t('list.optionCount', { count: Number(poll.optionCount) })}
+          </span>
+          <span className={quietChipClasses}>
+            {new Intl.DateTimeFormat(i18n.language, {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            }).format(new Date(poll.createdAt))}
+          </span>
+        </span>
       </Link>
     </li>
   )
 }
 
-function PollBandSection({
-  band,
-  headingId,
-}: {
-  band: PollBand
-  headingId: string
-}) {
+function PollBandSection({ band, headingId }: { band: PollBand; headingId: string }) {
   const { t } = useTranslation(['polls', 'errors', 'common'])
   const { items, isPending, error, nextCursor, isFetchingNextPage, loadMore } =
     usePollBand(band)
@@ -82,11 +83,10 @@ function PollBandSection({
     band === 'involved' ? t('list.emptyInvolved') : t('list.emptyDiscoverable')
 
   return (
-    <section aria-labelledby={headingId}>
-      <h2 id={headingId} className="text-h2 font-display font-semibold text-ink">
-        {band === 'involved' ? t('list.involved') : t('list.discoverable')}
-      </h2>
-
+    <Section
+      title={band === 'involved' ? t('list.involved') : t('list.discoverable')}
+      titleId={headingId}
+    >
       {isPending && (
         <p role="status" className="motion-safe:animate-pulse text-ink-soft">
           {t('common.loading', { ns: 'common' })}
@@ -94,21 +94,45 @@ function PollBandSection({
       )}
 
       {error && (
-        <p role="alert">
+        <StatusBanner role="alert" variant="danger">
           {t(isApiError(error) ? `errors.codes.${error.code}` : 'errors.generic', {
             defaultValue: t('errors.generic'),
           })}
-        </p>
+        </StatusBanner>
       )}
 
-      {!isPending && items.length === 0 && !error && (
-        <p className="text-ink-soft">{emptyText}</p>
+      {/*
+        The discoverable band's empty is a good terminal state — nothing is wrong when
+        nobody else has an open poll — so it stays quiet; only the viewer's own band
+        offers the way out (§3.6).
+      */}
+      {!isPending && items.length === 0 && !error && band === 'involved' && (
+        <EmptyState
+          action={
+            <Link
+              className={`inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
+              to="/polls/new"
+            >
+              {t('emptyState.polls.cta')}
+            </Link>
+          }
+          illustration="🗳️"
+          title={emptyText}
+        >
+          {t('emptyState.polls.body')}
+        </EmptyState>
+      )}
+
+      {!isPending && items.length === 0 && !error && band !== 'involved' && (
+        <EmptyState illustration="🔭" variant="quiet">
+          {emptyText}
+        </EmptyState>
       )}
 
       {items.length > 0 && (
-        <ul className="mt-2 space-y-3">
+        <ul>
           {items.map((poll) => (
-            <PollCard key={poll.id} poll={poll} />
+            <PollRow key={poll.id} poll={poll} />
           ))}
         </ul>
       )}
@@ -116,7 +140,7 @@ function PollBandSection({
       {nextCursor && (
         <Button
           aria-busy={isFetchingNextPage}
-          className="mt-3"
+          className="self-start"
           disabled={isFetchingNextPage}
           variant="neutral"
           onClick={loadMore}
@@ -124,41 +148,31 @@ function PollBandSection({
           {t('list.loadMore')}
         </Button>
       )}
-    </section>
+    </Section>
   )
 }
 
 export function PollListPage() {
   const { t } = useTranslation('polls')
-  const heading = useRef<HTMLHeadingElement>(null)
-
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
 
   return (
-    <main
-      className="mx-auto max-w-4xl space-y-8 p-4 sm:p-8"
-      data-testid="screen-polls"
-    >
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <h1
-          ref={heading}
-          tabIndex={-1}
-          className="text-display font-display font-bold text-ink focus:outline-none"
-        >
-          {t('list.heading')}
-        </h1>
-        <Link
-          className={`inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
-          to="/polls/new"
-        >
-          {t('create.heading')}
-        </Link>
-      </header>
+    <main data-testid="screen-polls">
+      <PageScaffold>
+        <PageHeader
+          actions={
+            <Link
+              className={`inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
+              to="/polls/new"
+            >
+              {t('create.heading')}
+            </Link>
+          }
+          title={t('list.heading')}
+        />
 
-      <PollBandSection band="involved" headingId="polls-involved-heading" />
-      <PollBandSection band="discoverable" headingId="polls-discoverable-heading" />
+        <PollBandSection band="involved" headingId="polls-involved-heading" />
+        <PollBandSection band="discoverable" headingId="polls-discoverable-heading" />
+      </PageScaffold>
     </main>
   )
 }

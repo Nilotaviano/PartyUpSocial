@@ -1,9 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { client, isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { fieldSelectClasses } from '../../components/ui/classes'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section } from '../../components/ui/section'
+import { StatusBanner } from '../../components/ui/statusBanner'
 import { getViewerProfile, viewerProfileKey } from '../sessions/sessionQueries'
 import {
   disablePushInThisBrowser,
@@ -83,7 +88,6 @@ async function changeEmailNotifications(enabled: boolean) {
 export function NotificationSettingsPage() {
   const { t } = useTranslation(['settings', 'errors'])
   const queryClient = useQueryClient()
-  const heading = useRef<HTMLHeadingElement>(null)
   const [pushEnabled, setPushEnabled] = useState(() => isPushEnabledInThisBrowser())
   const [pushError, setPushError] = useState<unknown>(null)
   const [reminderSaved, setReminderSaved] = useState(false)
@@ -91,10 +95,6 @@ export function NotificationSettingsPage() {
 
   const profile = useQuery({ queryKey: viewerProfileKey, queryFn: getViewerProfile })
   const emailNotificationsEnabled = profile.data?.emailNotificationsEnabled ?? true
-
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
 
   const togglePush = useMutation({
     mutationFn: async () => {
@@ -130,130 +130,132 @@ export function NotificationSettingsPage() {
   })
 
   return (
-    <main
-      className="mx-auto max-w-3xl space-y-8 p-4 sm:p-8"
-      data-testid="screen-settings-notifications"
-    >
-      <SettingsNavigation />
-      <h1
-        ref={heading}
-        tabIndex={-1}
-        className="font-display text-display font-bold text-ink focus:outline-none"
-      >
-        {t('notificationsPage.heading')}
-      </h1>
+    <main data-testid="screen-settings-notifications">
+      <PageScaffold>
+        <PageHeader title={t('notificationsPage.heading')} />
+        <SettingsNavigation />
 
-      <section aria-labelledby="push-heading" className="space-y-2">
-        <h2 className="font-display text-h2 font-semibold text-ink" id="push-heading">
-          {t('notificationsPage.push.title')}
-        </h2>
-        <p className="text-ink-soft">{t('notificationsPage.push.description')}</p>
-        {!supported ? (
-          <p className="text-ink-soft" role="status">
-            {t('notificationsPage.push.unsupported')}
-          </p>
-        ) : (
-          <Button
-            aria-busy={togglePush.isPending}
-            aria-pressed={pushEnabled}
-            disabled={togglePush.isPending}
-            variant={pushEnabled ? 'primary' : 'neutral'}
-            onClick={() => togglePush.mutate()}
+        <Section
+          description={t('notificationsPage.push.description')}
+          title={t('notificationsPage.push.title')}
+          titleId="push-heading"
+        >
+          {!supported ? (
+            <p className="text-ink-soft" role="status">
+              {t('notificationsPage.push.unsupported')}
+            </p>
+          ) : (
+            <Button
+              aria-busy={togglePush.isPending}
+              aria-pressed={pushEnabled}
+              className="self-start"
+              disabled={togglePush.isPending}
+              variant={pushEnabled ? 'primary' : 'neutral'}
+              onClick={() => togglePush.mutate()}
+            >
+              {pushEnabled
+                ? t('notificationsPage.push.toggleOff')
+                : t('notificationsPage.push.toggleOn')}
+            </Button>
+          )}
+          {Boolean(pushError) && (
+            <StatusBanner role="alert" variant="danger">
+              {t('notificationsPage.push.error')}
+            </StatusBanner>
+          )}
+        </Section>
+
+        <Section
+          title={t('notificationsPage.reminderDefault.title')}
+          titleId="reminder-default-heading"
+        >
+          <div className="flex max-w-form flex-col gap-2">
+            <label
+              className="block font-body font-semibold text-ink"
+              htmlFor="reminder-default-select"
+            >
+              {t('notificationsPage.reminderDefault.label')}
+            </label>
+            <select
+              className={fieldSelectClasses}
+              disabled={profile.isPending}
+              id="reminder-default-select"
+              value={
+                (profile.data?.reminderDefault &&
+                  fromWireValue[profile.data.reminderDefault]) ??
+                'Off'
+              }
+              onChange={(event) => {
+                setReminderSaved(false)
+                reminderDefault.mutate(event.target.value as ReminderDefaultValue)
+              }}
+            >
+              {reminderOptions.map((option) => (
+                <option key={option.key} value={option.value}>
+                  {t(option.key)}
+                </option>
+              ))}
+            </select>
+            {reminderSaved && (
+              <p className="text-ink" role="status">
+                {t('notificationsPage.reminderDefault.saved')}
+              </p>
+            )}
+            {reminderDefault.isError && (
+              <StatusBanner role="alert" variant="danger">
+                {t(
+                  isApiError(reminderDefault.error)
+                    ? reminderDefault.error.code
+                    : 'generic',
+                  { ns: 'errors', defaultValue: t('generic', { ns: 'errors' }) },
+                )}
+              </StatusBanner>
+            )}
+          </div>
+        </Section>
+
+        <Section
+          description={t('notificationsPage.mute.description')}
+          title={t('notificationsPage.mute.title')}
+          titleId="mute-heading"
+        >
+          <Link
+            className="self-start font-semibold text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            to="/sessions/upcoming"
           >
-            {pushEnabled
-              ? t('notificationsPage.push.toggleOff')
-              : t('notificationsPage.push.toggleOn')}
+            {t('notificationsPage.mute.link')}
+          </Link>
+        </Section>
+
+        <Section
+          description={t('notificationsPage.email.description')}
+          title={t('notificationsPage.email.title')}
+          titleId="email-notifications-heading"
+        >
+          <Button
+            aria-busy={emailNotifications.isPending}
+            aria-pressed={emailNotificationsEnabled}
+            className="self-start"
+            disabled={emailNotifications.isPending || profile.isPending}
+            variant={emailNotificationsEnabled ? 'primary' : 'neutral'}
+            onClick={() => emailNotifications.mutate(!emailNotificationsEnabled)}
+          >
+            {emailNotificationsEnabled
+              ? t('notificationsPage.email.toggleOff')
+              : t('notificationsPage.email.toggleOn')}
           </Button>
-        )}
-        {Boolean(pushError) && (
-          <p role="alert">{t('notificationsPage.push.error')}</p>
-        )}
-      </section>
-
-      <section aria-labelledby="reminder-default-heading" className="space-y-2">
-        <h2 className="font-display text-h2 font-semibold text-ink" id="reminder-default-heading">
-          {t('notificationsPage.reminderDefault.title')}
-        </h2>
-        <label className="block font-body font-semibold text-ink" htmlFor="reminder-default-select">
-          {t('notificationsPage.reminderDefault.label')}
-        </label>
-        <select
-          className="mt-1 min-h-11 rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-          disabled={profile.isPending}
-          id="reminder-default-select"
-          value={
-            (profile.data?.reminderDefault && fromWireValue[profile.data.reminderDefault]) ??
-            'Off'
-          }
-          onChange={(event) => {
-            setReminderSaved(false)
-            reminderDefault.mutate(event.target.value as ReminderDefaultValue)
-          }}
-        >
-          {reminderOptions.map((option) => (
-            <option key={option.key} value={option.value}>
-              {t(option.key)}
-            </option>
-          ))}
-        </select>
-        {reminderSaved && (
-          <p className="text-ink" role="status">
-            {t('notificationsPage.reminderDefault.saved')}
-          </p>
-        )}
-        {reminderDefault.isError && (
-          <p role="alert">
-            {t(
-              isApiError(reminderDefault.error)
-                ? reminderDefault.error.code
-                : 'generic',
-              { ns: 'errors', defaultValue: t('generic', { ns: 'errors' }) },
-            )}
-          </p>
-        )}
-      </section>
-
-      <section aria-labelledby="mute-heading" className="space-y-2">
-        <h2 className="font-display text-h2 font-semibold text-ink" id="mute-heading">
-          {t('notificationsPage.mute.title')}
-        </h2>
-        <p className="text-ink-soft">{t('notificationsPage.mute.description')}</p>
-        <Link
-          className="font-semibold text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-          to="/sessions/upcoming"
-        >
-          {t('notificationsPage.mute.link')}
-        </Link>
-      </section>
-
-      <section aria-labelledby="email-notifications-heading" className="space-y-2">
-        <h2
-          className="font-display text-h2 font-semibold text-ink"
-          id="email-notifications-heading"
-        >
-          {t('notificationsPage.email.title')}
-        </h2>
-        <p className="text-ink-soft">{t('notificationsPage.email.description')}</p>
-        <Button
-          aria-busy={emailNotifications.isPending}
-          aria-pressed={emailNotificationsEnabled}
-          disabled={emailNotifications.isPending || profile.isPending}
-          variant={emailNotificationsEnabled ? 'primary' : 'neutral'}
-          onClick={() => emailNotifications.mutate(!emailNotificationsEnabled)}
-        >
-          {emailNotificationsEnabled
-            ? t('notificationsPage.email.toggleOff')
-            : t('notificationsPage.email.toggleOn')}
-        </Button>
-        {emailNotifications.isError && (
-          <p role="alert">
-            {t(
-              isApiError(emailNotifications.error) ? emailNotifications.error.code : 'generic',
-              { ns: 'errors', defaultValue: t('generic', { ns: 'errors' }) },
-            )}
-          </p>
-        )}
-      </section>
+          {emailNotifications.isError && (
+            <StatusBanner role="alert" variant="danger">
+              {t(
+                isApiError(emailNotifications.error)
+                  ? emailNotifications.error.code
+                  : 'generic',
+                { ns: 'errors', defaultValue: t('generic', { ns: 'errors' }) },
+              )}
+            </StatusBanner>
+          )}
+        </Section>
+      </PageScaffold>
     </main>
   )
 }

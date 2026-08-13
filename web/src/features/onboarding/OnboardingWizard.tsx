@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useReducer, useState, type FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation, useNavigate } from 'react-router'
@@ -14,9 +14,14 @@ import {
   withFriendContinuation,
 } from '../../auth/friendContinuation'
 import { getSession, sessionQueryKey, useSession } from '../../auth/useSession'
+import { BrandMark } from '../../components/ui/brandMark'
 import { Button } from '../../components/ui/button'
+import { FormField, formShellClasses } from '../../components/ui/formShell'
 import { Input } from '../../components/ui/input'
-import { Label } from '../../components/ui/label'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section, SectionCard } from '../../components/ui/section'
+import { StatusBanner } from '../../components/ui/statusBanner'
 import { TimeZoneField, isKnownTimeZone } from '../../components/TimeZoneField'
 import { FriendCodeInput } from '../friends/FriendCodeInput'
 import { FriendCodeResolution } from '../friends/AddFriendPage'
@@ -142,23 +147,26 @@ export function UsernameStep({
     : null
 
   return (
-    <form onSubmit={submit}>
-      <Label htmlFor="username">{t('fields.username')}</Label>
-      <Input
-        id="username"
-        value={username}
-        onChange={(event) => setUsername(event.target.value)}
-        aria-describedby={message ? 'username-error' : undefined}
-        required
-      />
+    <form className="flex flex-col gap-5" onSubmit={submit}>
+      <FormField htmlFor="username" label={t('fields.username')}>
+        <Input
+          id="username"
+          value={username}
+          onChange={(event) => setUsername(event.target.value)}
+          aria-describedby={message ? 'username-error' : undefined}
+          required
+        />
+      </FormField>
       {message && (
         <p id="username-error" role="alert">
           {message}
         </p>
       )}
-      <Button type="submit" variant="primary">
-        {t('actions.continue')}
-      </Button>
+      <div className="flex">
+        <Button className="ml-auto" type="submit" variant="primary">
+          {t('actions.continue')}
+        </Button>
+      </div>
     </form>
   )
 }
@@ -174,21 +182,25 @@ function DisplayNameStep({
   const [displayName, setDisplayName] = useState(value ?? '')
   return (
     <form
+      className="flex flex-col gap-5"
       onSubmit={(event) => {
         event.preventDefault()
         onNext(displayName)
       }}
     >
-      <Label htmlFor="display-name">{t('fields.displayName')}</Label>
-      <Input
-        id="display-name"
-        value={displayName}
-        onChange={(event) => setDisplayName(event.target.value)}
-        required
-      />
-      <Button type="submit" variant="primary">
-        {t('actions.continue')}
-      </Button>
+      <FormField htmlFor="display-name" label={t('fields.displayName')}>
+        <Input
+          id="display-name"
+          value={displayName}
+          onChange={(event) => setDisplayName(event.target.value)}
+          required
+        />
+      </FormField>
+      <div className="flex">
+        <Button className="ml-auto" type="submit" variant="primary">
+          {t('actions.continue')}
+        </Button>
+      </div>
     </form>
   )
 }
@@ -203,14 +215,17 @@ function AvatarStep({
   const { t } = useTranslation('onboarding')
   const [emoji, setEmoji] = useState(value?.emoji ?? AVATAR_CATALOG[0].glyph)
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-5">
       <AvatarPicker idPrefix="onboarding-avatar" value={emoji} onChange={setEmoji} />
-      <Button
-        variant="primary"
-        onClick={() => onNext({ kind: 'emoji', emoji, platformLinkId: null })}
-      >
-        {t('actions.continue')}
-      </Button>
+      <div className="flex">
+        <Button
+          className="ml-auto"
+          variant="primary"
+          onClick={() => onNext({ kind: 'emoji', emoji, platformLinkId: null })}
+        >
+          {t('actions.continue')}
+        </Button>
+      </div>
     </div>
   )
 }
@@ -229,6 +244,7 @@ function TimeZoneStep({
   const [invalid, setInvalid] = useState(false)
   return (
     <form
+      className="flex flex-col gap-5"
       noValidate
       onSubmit={(event) => {
         event.preventDefault()
@@ -249,9 +265,11 @@ function TimeZoneStep({
         onChange={(event) => setTimeZone(event.target.value)}
         value={timeZone}
       />
-      <Button type="submit" variant="primary">
-        {t('actions.continue')}
-      </Button>
+      <div className="flex">
+        <Button className="ml-auto" type="submit" variant="primary">
+          {t('actions.continue')}
+        </Button>
+      </div>
     </form>
   )
 }
@@ -281,51 +299,40 @@ function FriendsEducation({
   }, [])
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-8">
       <p className="max-w-prose text-ink-soft">{t('onboarding.body')}</p>
       {continuation && (
-        <section
-          aria-labelledby="continued-profile-heading"
-          className="space-y-3"
+        <Section
+          title={t('onboarding.continuation')}
+          titleId="continued-profile-heading"
         >
-          <h2
-            id="continued-profile-heading"
-            className="text-h2 font-display font-semibold text-ink"
-          >
-            {t('onboarding.continuation')}
-          </h2>
           <ContinuationCard continuation={continuation} />
-        </section>
+        </Section>
       )}
-      <section
-        aria-labelledby="find-by-code-heading"
-        className="space-y-3 rounded-card border-2 border-ink bg-card p-5 shadow-offset-card"
+      <SectionCard
+        title={t('sections.findByCode')}
+        titleId="find-by-code-heading"
       >
-        <h2
-          id="find-by-code-heading"
-          className="text-h2 font-display font-semibold text-ink"
-        >
-          {t('sections.findByCode')}
-        </h2>
         <FriendCodeInput
           onResolve={(friendCode) => navigate('/add/' + friendCode)}
         />
-      </section>
+      </SectionCard>
       <ShareCard />
-      <section aria-labelledby="steam-onboarding-heading" className="space-y-2">
-        <h2
-          id="steam-onboarding-heading"
-          className="text-h2 font-display font-semibold text-ink"
-        >
-          {t('pages.importSteam')}
-        </h2>
+      <Section
+        className="gap-3"
+        title={t('pages.importSteam')}
+        titleId="steam-onboarding-heading"
+      >
         <p>{t('onboarding.steamOptional')}</p>
         <Link className="font-semibold text-ink underline" to="/friends/import/steam">
           {t('actions.importSteam')}
         </Link>
-      </section>
+      </Section>
+      {/* The finish slap ships as-is (§3.6): `scale-[1.06]` sits between the
+          `scale-105`/`scale-110` steps, and `transition-[scale,box-shadow]`
+          names the two animated properties — neither has a utility. */}
       <div
-        className={`flex flex-wrap items-center gap-3 rounded-card border-2 border-ink bg-card p-5 motion-safe:transition-[scale,box-shadow] motion-safe:duration-300 motion-safe:ease-out ${
+        className={`flex flex-wrap items-center justify-center gap-3 rounded-card border-2 border-ink bg-card p-5 motion-safe:transition-[scale,box-shadow] motion-safe:duration-300 motion-safe:ease-out ${
           settled ? 'scale-100 shadow-offset-card' : 'scale-[1.06] shadow-offset-dialog'
         }`}
       >
@@ -362,7 +369,6 @@ export function OnboardingWizard() {
         body,
       }),
   })
-  const heading = useRef<HTMLHeadingElement>(null)
   const continuation = readFriendContinuation(location.search)
   const requested = fromPath(location.pathname)
   const activationAllowsFriends = isActive || activation !== 'idle'
@@ -385,10 +391,6 @@ export function OnboardingWizard() {
       })
     }
   }, [continuation, current, navigate, requested])
-
-  useEffect(() => {
-    heading.current?.focus()
-  }, [current])
 
   function advance(update: Partial<ProfileDraft>) {
     const updated = { ...draft, ...update }
@@ -439,25 +441,50 @@ export function OnboardingWizard() {
     friends: 'pages.friends',
   }
 
-  return (
-    <main
-      className="mx-auto max-w-3xl space-y-5 p-4 sm:p-8"
-      data-testid="screen-onboarding"
-    >
-      <p aria-live="polite">
+  const currentIndex = steps.indexOf(current)
+  // The friends step hosts its own cards (ShareCard, find-by-code), and a
+  // bordered card never contains another (design §3.1), so only the five form
+  // steps sit inside the wizard card.
+  const inCard = current !== 'friends'
+
+  const wizardHeader = (
+    <div className="flex flex-col items-center gap-3">
+      <ol
+        aria-label={t('onboarding.progress')}
+        className="flex items-center gap-2"
+      >
+        {steps.map((step, index) => (
+          <li
+            key={step}
+            aria-current={index === currentIndex ? 'step' : undefined}
+            className={`h-3 w-3 rounded-full border-2 border-ink ${
+              index <= currentIndex ? 'bg-primary' : 'bg-page'
+            } ${
+              index === currentIndex
+                ? 'outline-2 outline-offset-2 outline-accent'
+                : ''
+            }`}
+          />
+        ))}
+      </ol>
+      <p aria-live="polite" className="font-body text-meta text-ink-soft">
         {t('progress', {
-          current: steps.indexOf(current) + 1,
+          current: currentIndex + 1,
           total: steps.length,
           step: t(labels[current]),
         })}
       </p>
-      <h1
-        ref={heading}
-        tabIndex={-1}
-        className="text-h1 font-display font-bold text-ink"
-      >
-        {t(labels[current])}
-      </h1>
+      <PageHeader
+        key={current}
+        align="center"
+        className="w-full"
+        title={t(labels[current])}
+      />
+    </div>
+  )
+
+  const wizardBody = (
+    <>
       {current === 'username' && (
         <UsernameStep
           value={draft.username}
@@ -483,49 +510,76 @@ export function OnboardingWizard() {
         />
       )}
       {current === 'link-platforms' && (
-        <>
+        <div className="flex flex-col gap-5">
           <p>{t('messages.platformLinksOptional')}</p>
-          <Button
-            aria-busy={complete.isPending}
-            disabled={complete.isPending}
-            variant="primary"
-            onClick={() => void activate()}
-          >
-            {t('actions.continue')}
-          </Button>
           {complete.error && (
-            <p role="alert">
+            <StatusBanner role="alert" variant="danger">
               {errorText(complete.error, (key, options) =>
                 t(key, { ns: 'errors', ...options }),
               )}
-            </p>
+            </StatusBanner>
           )}
-        </>
+          <div className="flex">
+            <Button
+              aria-busy={complete.isPending}
+              className="ml-auto"
+              disabled={complete.isPending}
+              variant="primary"
+              onClick={() => void activate()}
+            >
+              {t('actions.continue')}
+            </Button>
+          </div>
+        </div>
       )}
       {current === 'friends' && activation === 'refreshing' && (
         <p role="status">{t('friends:status.loading')}</p>
       )}
       {current === 'friends' && activation === 'error' && (
-        <section aria-labelledby="activation-refresh-error">
-          <h2
-            id="activation-refresh-error"
-            className="text-h2 font-display font-semibold text-ink"
+        <Section
+          title={t('friends:onboarding.refreshFailed')}
+          titleId="activation-refresh-error"
+        >
+          <StatusBanner
+            actions={
+              <Button
+                variant="neutral"
+                onClick={() => void refreshActivatedSession()}
+              >
+                {t('friends:actions.retry')}
+              </Button>
+            }
+            role="alert"
+            variant="danger"
           >
-            {t('friends:onboarding.refreshFailed')}
-          </h2>
-          <p role="alert">
             {errorText(refreshError, (key, options) =>
               t(key, { ns: 'errors', ...options }),
             )}
-          </p>
-          <Button variant="neutral" onClick={() => void refreshActivatedSession()}>
-            {t('friends:actions.retry')}
-          </Button>
-        </section>
+          </StatusBanner>
+        </Section>
       )}
       {current === 'friends' && activation === 'ready' && (
         <FriendsEducation continuation={continuation} />
       )}
+    </>
+  )
+
+  return (
+    <main data-testid="screen-onboarding">
+      <PageScaffold className="items-center" width="form">
+        <BrandMark className="h-9 w-9 text-ink" />
+        {inCard ? (
+          <div className={`${formShellClasses} w-full sm:p-8`}>
+            {wizardHeader}
+            {wizardBody}
+          </div>
+        ) : (
+          <div className="flex w-full flex-col gap-8">
+            {wizardHeader}
+            {wizardBody}
+          </div>
+        )}
+      </PageScaffold>
     </main>
   )
 }

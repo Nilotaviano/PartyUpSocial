@@ -7,7 +7,11 @@ import { ReauthPrompt, type ReauthAction } from '../settings/ReauthPrompt'
 import { clearPendingSettingsAction, getPendingSettingsAction } from '../settings/reauthAction'
 import { SettingsNavigation } from '../settings/BlockedUsersPage'
 import { Input } from '../../components/ui/input'
-import { Label } from '../../components/ui/label'
+import { FormField } from '../../components/ui/formShell'
+
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section } from '../../components/ui/section'
 import { TimeZoneField, isKnownTimeZone } from '../../components/TimeZoneField'
 import { AVATAR_CATALOG } from './avatarCatalog'
 import { AvatarPicker } from './AvatarPicker'
@@ -133,54 +137,95 @@ export function ProfileSettingsPage() {
   async function confirmAction(proof: { currentPassword?: string; reauthToken?: string }) {
     if (action?.kind === 'unlinkPlatform') await unlinkPlatform(action.id, proof)
   }
-  if (isPending) return <main className="mx-auto max-w-3xl space-y-6 p-4 sm:p-8" data-testid="screen-settings-profile"><SettingsNavigation /><p className="text-ink-soft">{t('loading')}</p></main>
+  if (isPending)
+    return (
+      <main data-testid="screen-settings-profile">
+        <PageScaffold>
+          <PageHeader title={t('pages.profile')} />
+          <SettingsNavigation />
+          <p className="text-ink-soft">{t('loading')}</p>
+        </PageScaffold>
+      </main>
+    )
 
   return (
-    <main className="mx-auto max-w-3xl space-y-6 p-4 sm:p-8" data-testid="screen-settings-profile">
-      <SettingsNavigation />
-      <h1 className="font-display text-display font-bold text-ink">{t('pages.profile')}</h1>
-      <ProfileError error={error} />
-      <form className="space-y-2" onSubmit={(event) => void save(event, '/api/v1/me/username')}>
-        <Label htmlFor="profile-username">{t('fields.username')}</Label>
-        <Input id="profile-username" name="username" defaultValue={profile?.username ?? ''} required />
-        <p className="text-meta text-ink-soft">{t('usernameCooldown')}</p>
-        <Button disabled={saving} type="submit" variant="primary">{t('actions.saveUsername')}</Button>
-      </form>
-      <form className="space-y-2" onSubmit={(event) => void save(event, '/api/v1/me/display-name')}>
-        <Label htmlFor="profile-display-name">{t('fields.displayName')}</Label>
-        <Input id="profile-display-name" name="displayName" defaultValue={profile?.displayName ?? ''} required />
-        <Button disabled={saving} type="submit" variant="neutral">{t('actions.saveDisplayName')}</Button>
-      </form>
-      <form className="space-y-2" onSubmit={(event) => void save(event, '/api/v1/me/avatar')}>
-        <p className="font-display text-sm font-bold text-ink" id="profile-avatar-label">{t('fields.avatar')}</p>
-        <AvatarField
-          defaultSelection={selectionFromAvatar(profile?.avatar, AVATAR_CATALOG[0].glyph)}
-          sources={avatarSourcesOf(profile)}
-        />
-        <Button disabled={saving} type="submit" variant="neutral">{t('actions.saveAvatar')}</Button>
-      </form>
-      <form className="space-y-2" noValidate onSubmit={(event) => void save(event, '/api/v1/me/time-zone')}>
-        <TimeZoneField
-          defaultValue={profile?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
-          errorMessage={timeZoneInvalid ? t('timeZoneField.invalid') : undefined}
-          hint={t('timeZoneField.hint')}
-          id="profile-time-zone"
-          label={t('fields.timeZone')}
-          name="timeZone"
-          storedZone={profile?.timeZone}
-        />
-        <Button disabled={saving} type="submit" variant="neutral">{t('actions.saveTimeZone')}</Button>
-      </form>
-      <section aria-labelledby="platform-links-heading" className="space-y-3">
-        <h2 className="font-display text-h2 font-semibold text-ink" id="platform-links-heading">{t('platformLinks.title')}</h2>
-        {profile?.platformLinks.length ? <ul className="space-y-3">{profile.platformLinks.map((link) => <li className="rounded-card border-2 border-ink bg-card p-4 shadow-offset-card" key={link.id}>
-          <span className="text-ink">{t('platformLinks.item', { platform: link.platform, handle: link.handle })}</span>
-          {link.platform.toLowerCase() === 'steam' && <p className="mt-1 text-meta text-ink-soft">{t('platformLinks.steamUnlinkNotice')}</p>}
-          <Button className="mt-2" variant="danger" onClick={() => void unlinkPlatform(link.id)}>{t('platformLinks.unlink', { platform: link.platform })}</Button>
-        </li>)}</ul> : <p className="text-ink-soft">{t('platformLinks.empty')}</p>}
-      </section>
-      <ProfileError error={formError} />
-      <ReauthPrompt action={action} methods={methods} onOpenChange={(open) => { if (!open) { clearPendingSettingsAction(); setAction(null) } }} onConfirmed={confirmAction} />
+    <main data-testid="screen-settings-profile">
+      <PageScaffold>
+        <PageHeader title={t('pages.profile')} />
+        <SettingsNavigation />
+        <ProfileError error={error} />
+        <form
+          className="flex max-w-form flex-col gap-4"
+          onSubmit={(event) => void save(event, '/api/v1/me/username')}
+        >
+          <FormField
+            hint={t('usernameCooldown')}
+            htmlFor="profile-username"
+            label={t('fields.username')}
+          >
+            <Input id="profile-username" name="username" defaultValue={profile?.username ?? ''} required />
+          </FormField>
+          <Button className="self-start" disabled={saving} type="submit" variant="primary">{t('actions.saveUsername')}</Button>
+        </form>
+        <form
+          className="flex max-w-form flex-col gap-4"
+          onSubmit={(event) => void save(event, '/api/v1/me/display-name')}
+        >
+          <FormField htmlFor="profile-display-name" label={t('fields.displayName')}>
+            <Input id="profile-display-name" name="displayName" defaultValue={profile?.displayName ?? ''} required />
+          </FormField>
+          <Button className="self-start" disabled={saving} type="submit" variant="neutral">{t('actions.saveDisplayName')}</Button>
+        </form>
+        <form
+          className="flex max-w-form flex-col gap-4"
+          onSubmit={(event) => void save(event, '/api/v1/me/avatar')}
+        >
+          {/* Not a `FormField`: the picker is a radiogroup labelled by this
+              node, and a `<label>` with no form control to point at would be a
+              broken association rather than a nicer one. */}
+          <p className="font-display text-sm font-bold text-ink" id="profile-avatar-label">{t('fields.avatar')}</p>
+          <AvatarField
+            defaultSelection={selectionFromAvatar(profile?.avatar, AVATAR_CATALOG[0].glyph)}
+            sources={avatarSourcesOf(profile)}
+          />
+          <Button className="self-start" disabled={saving} type="submit" variant="neutral">{t('actions.saveAvatar')}</Button>
+        </form>
+        <form
+          className="flex max-w-form flex-col gap-4"
+          noValidate
+          onSubmit={(event) => void save(event, '/api/v1/me/time-zone')}
+        >
+          <TimeZoneField
+            defaultValue={profile?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
+            errorMessage={timeZoneInvalid ? t('timeZoneField.invalid') : undefined}
+            hint={t('timeZoneField.hint')}
+            id="profile-time-zone"
+            label={t('fields.timeZone')}
+            name="timeZone"
+            storedZone={profile?.timeZone}
+          />
+          <Button className="self-start" disabled={saving} type="submit" variant="neutral">{t('actions.saveTimeZone')}</Button>
+        </form>
+        <Section title={t('platformLinks.title')} titleId="platform-links-heading">
+          {profile?.platformLinks.length ? (
+            <ul>
+              {profile.platformLinks.map((link) => (
+                <li className="border-t border-ink/25 first:border-t-0" key={link.id}>
+                  <div className="flex flex-col gap-2 px-2 py-3">
+                    <span className="text-ink">{t('platformLinks.item', { platform: link.platform, handle: link.handle })}</span>
+                    {link.platform.toLowerCase() === 'steam' && <p className="text-meta text-ink-soft">{t('platformLinks.steamUnlinkNotice')}</p>}
+                    <Button className="self-start" variant="danger" onClick={() => void unlinkPlatform(link.id)}>{t('platformLinks.unlink', { platform: link.platform })}</Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-ink-soft">{t('platformLinks.empty')}</p>
+          )}
+        </Section>
+        <ProfileError error={formError} />
+        <ReauthPrompt action={action} methods={methods} onOpenChange={(open) => { if (!open) { clearPendingSettingsAction(); setAction(null) } }} onConfirmed={confirmAction} />
+      </PageScaffold>
     </main>
   )
 }

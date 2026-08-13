@@ -68,7 +68,26 @@
     "pending": "Pending",
     "waitlisted": "Waitlisted",
     "anonymous": "Anonymous User",
-    "inProgress": "In progress"
+    "inProgress": "In progress",
+    "muted": "Muted",
+    "progress": "{{going}} of {{min}} confirmed.",
+    "progressWaitlist": "Once full, later responses join the waitlist.",
+    "joinRequests": "Join requests",
+    "notificationsHeading": "Notifications for this session",
+    "dangerZone": "Danger zone"
+  },
+  "status": {
+    "unconfirmed": "Waiting for players",
+    "confirmed": "Confirmed",
+    "completed": "Completed",
+    "expired": "Expired",
+    "canceled": "Canceled"
+  },
+  "emptyState": {
+    "sessions": {
+      "body": "Nothing on the calendar yet. Start a session and invite your friends.",
+      "cta": "New session"
+    }
   },
   "rsvp": {
     "heading": "Your response",

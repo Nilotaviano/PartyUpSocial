@@ -19,12 +19,10 @@
     },
     "upcoming": {
       "heading": "Próximas",
-      "empty": "No hay sesiones próximas.",
       "seeAll": "Ver todas"
     },
     "discoverable": {
       "heading": "Descubrir sesiones",
-      "empty": "No hay sesiones para descubrir en este momento.",
       "seeAll": "Ver todas"
     }
   },
@@ -33,5 +31,16 @@
     "empty": "No hay sesiones para descubrir en este momento.",
     "loadMore": "Cargar más",
     "organizedBy": "Organizado por {{name}}"
+  },
+  "emptyState": {
+    "home": {
+      "body": "Todavía no hay nada aquí. Comparte tu código de amigo para sumar gente, o crea una sesión y elige un horario.",
+      "cta": "Compartir mi código",
+      "ctaSecondary": "Crear sesión"
+    },
+    "discover": {
+      "body": "No hay nada abierto para unirse ahora. Agrega algunos amigos y sus sesiones públicas aparecerán aquí.",
+      "cta": "Buscar amigos"
+    }
   }
 }

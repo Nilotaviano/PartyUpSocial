@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
@@ -7,6 +7,10 @@ import { Button } from '../../components/ui/button'
 import { Checkbox } from '../../components/ui/checkbox'
 import { Dialog } from '../../components/ui/dialog'
 import { Label } from '../../components/ui/label'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section, SectionCard } from '../../components/ui/section'
+import { StatusBanner } from '../../components/ui/statusBanner'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
 import {
   adminKeys,
@@ -204,17 +208,12 @@ export function AdminUserDetailPage() {
   const { t, i18n } = useTranslation(['admin', 'common'])
   const { userId = '' } = useParams()
   const queryClient = useQueryClient()
-  const heading = useRef<HTMLHeadingElement>(null)
   const [announcement, setAnnouncement] = useState('')
   const user = useQuery({
     queryKey: adminKeys.user(userId),
     queryFn: () => getAdminUser(userId),
     retry: false,
   })
-
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
 
   const afterMutation = async (message: string) => {
     setAnnouncement(message)
@@ -248,10 +247,12 @@ export function AdminUserDetailPage() {
   // D-177 fail-closed parity — see AdminDashboardPage's own branch.
   if (user.isError && isApiError(user.error) && user.error.status === 404) {
     return (
-      <main className="mx-auto max-w-3xl p-4 sm:p-8" data-testid="screen-admin-user">
-        <p className="text-ink" role="alert">
-          {t('errors.codes.not_found')}
-        </p>
+      <main data-testid="screen-admin-user">
+        <PageScaffold width="form">
+          <p className="text-ink" role="alert">
+            {t('errors.codes.not_found')}
+          </p>
+        </PageScaffold>
       </main>
     )
   }
@@ -269,136 +270,139 @@ export function AdminUserDetailPage() {
   const pending = ban.isPending || unban.isPending || removeContent.isPending
 
   return (
-    <main
-      className="mx-auto max-w-3xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-admin-user"
-    >
-      <Link
-        className={`inline-flex items-center justify-center bg-card px-4 py-2 text-ink ${raisedInteractiveClasses}`}
-        to="/admin/users"
-      >
-        {t('user.back')}
-      </Link>
-
-      <h1
-        ref={heading}
-        tabIndex={-1}
-        className="text-display font-display font-bold text-ink focus:outline-none"
-      >
-        {name}
-      </h1>
-
-      {user.isPending && (
-        <p className="motion-safe:animate-pulse text-ink-soft" role="status">
-          {t('user.loading')}
-        </p>
-      )}
-
-      <p role="status">{announcement}</p>
-
-      {anyError && (
-        <p role="alert">
-          {t(
-            isApiError(anyError) ? `errors.codes.${anyError.code}` : 'errors.generic',
-            { defaultValue: t('errors.generic') },
-          )}
-        </p>
-      )}
-
-      {data && (
-        <>
-          <section aria-labelledby="admin-user-stats" className="space-y-3">
-            <h2
-              className="text-h2 font-display font-semibold text-ink"
-              id="admin-user-stats"
+    <main data-testid="screen-admin-user">
+      <PageScaffold>
+        <PageHeader
+          actions={
+            <Link
+              className={`inline-flex items-center justify-center bg-card px-4 py-2 text-ink ${raisedInteractiveClasses}`}
+              to="/admin/users"
             >
-              {t('user.statsHeading')}
-            </h2>
-            <dl className="grid gap-3 sm:grid-cols-2">
-              <Field
-                label={t('user.fields.username')}
-                value={data.username ?? t('user.unknown')}
-              />
-              <Field
-                label={t('user.fields.displayName')}
-                value={data.displayName ?? t('user.unknown')}
-              />
-              <Field
-                label={t('user.fields.email')}
-                value={data.email ?? t('user.unknown')}
-              />
-              <Field
-                label={t('user.fields.registered')}
-                value={date.format(new Date(data.created))}
-              />
-              <Field
-                label={t('user.fields.lastActivity')}
-                value={
-                  data.lastSeenAt === null
-                    ? t('user.neverActive')
-                    : dateTime.format(new Date(data.lastSeenAt))
-                }
-              />
-              <Field
-                label={t('user.fields.sessionsOrganized')}
-                value={number.format(numeric(data.sessionsOrganized))}
-              />
-              <Field
-                label={t('user.fields.sessionsJoined')}
-                value={number.format(numeric(data.sessionsJoined))}
-              />
-              <Field
-                label={t('user.fields.friendCount')}
-                value={number.format(numeric(data.friendCount))}
-              />
-              <Field
-                label={t('user.fields.lifecycle')}
-                value={t(`user.lifecycles.${data.lifecycle}`, {
-                  defaultValue: t('user.lifecycles.unknown'),
-                })}
-              />
-              <Field
-                label={t('user.fields.banState')}
-                value={
-                  data.bannedAt === null
-                    ? t('user.notBanned')
-                    : t('user.banned', { date: date.format(new Date(data.bannedAt)) })
-                }
-              />
-            </dl>
-          </section>
+              {t('user.back')}
+            </Link>
+          }
+          title={name}
+        />
 
-          <div className="flex flex-wrap gap-2">
-            {data.bannedAt === null ? (
-              <PlainActionDialog
-                action={t('user.ban.action')}
-                body={t('user.ban.body')}
-                cancel={t('user.ban.cancel')}
-                confirm={t('user.ban.confirm')}
-                pending={pending}
-                testId="admin-ban-action"
-                title={t('user.ban.title')}
-                onConfirm={() => start(ban)}
-              />
-            ) : (
-              <PlainActionDialog
-                action={t('user.unban.action')}
-                body={t('user.unban.body')}
-                cancel={t('user.unban.cancel')}
-                confirm={t('user.unban.confirm')}
-                pending={pending}
-                testId="admin-unban-action"
-                title={t('user.unban.title')}
-                onConfirm={() => start(unban)}
-              />
+        {user.isPending && (
+          <p className="motion-safe:animate-pulse text-ink-soft" role="status">
+            {t('user.loading')}
+          </p>
+        )}
+
+        <p role="status">{announcement}</p>
+
+        {anyError && (
+          <StatusBanner role="alert" variant="danger">
+            {t(
+              isApiError(anyError) ? `errors.codes.${anyError.code}` : 'errors.generic',
+              { defaultValue: t('errors.generic') },
             )}
-            <RemoveContentDialog
-              pending={pending}
-              onConfirm={() => start(removeContent)}
-            />
-          </div>
-        </>
-      )}
+          </StatusBanner>
+        )}
+
+        {data && (
+          <>
+            <Section title={t('user.statsHeading')} titleId="admin-user-stats">
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <Field
+                  label={t('user.fields.username')}
+                  value={data.username ?? t('user.unknown')}
+                />
+                <Field
+                  label={t('user.fields.displayName')}
+                  value={data.displayName ?? t('user.unknown')}
+                />
+                <Field
+                  label={t('user.fields.email')}
+                  value={data.email ?? t('user.unknown')}
+                />
+                <Field
+                  label={t('user.fields.registered')}
+                  value={date.format(new Date(data.created))}
+                />
+                <Field
+                  label={t('user.fields.lastActivity')}
+                  value={
+                    data.lastSeenAt === null
+                      ? t('user.neverActive')
+                      : dateTime.format(new Date(data.lastSeenAt))
+                  }
+                />
+                <Field
+                  label={t('user.fields.sessionsOrganized')}
+                  value={number.format(numeric(data.sessionsOrganized))}
+                />
+                <Field
+                  label={t('user.fields.sessionsJoined')}
+                  value={number.format(numeric(data.sessionsJoined))}
+                />
+                <Field
+                  label={t('user.fields.friendCount')}
+                  value={number.format(numeric(data.friendCount))}
+                />
+                <Field
+                  label={t('user.fields.lifecycle')}
+                  value={t(`user.lifecycles.${data.lifecycle}`, {
+                    defaultValue: t('user.lifecycles.unknown'),
+                  })}
+                />
+                <Field
+                  label={t('user.fields.banState')}
+                  value={
+                    data.bannedAt === null
+                      ? t('user.notBanned')
+                      : t('user.banned', { date: date.format(new Date(data.bannedAt)) })
+                  }
+                />
+              </dl>
+            </Section>
+
+            <div className="flex flex-wrap gap-2">
+              {data.bannedAt === null ? (
+                <PlainActionDialog
+                  action={t('user.ban.action')}
+                  body={t('user.ban.body')}
+                  cancel={t('user.ban.cancel')}
+                  confirm={t('user.ban.confirm')}
+                  pending={pending}
+                  testId="admin-ban-action"
+                  title={t('user.ban.title')}
+                  onConfirm={() => start(ban)}
+                />
+              ) : (
+                <PlainActionDialog
+                  action={t('user.unban.action')}
+                  body={t('user.unban.body')}
+                  cancel={t('user.unban.cancel')}
+                  confirm={t('user.unban.confirm')}
+                  pending={pending}
+                  testId="admin-unban-action"
+                  title={t('user.unban.title')}
+                  onConfirm={() => start(unban)}
+                />
+              )}
+            </div>
+
+            {/*
+              D-179/D-180: content removal never rides the ban action as an
+              option — it is its own row inside the hazard boundary, so the
+              irreversible arm is the only thing this card contains.
+            */}
+            <SectionCard title={t('user.dangerZone')}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="min-w-0 flex-1 text-ink-soft">
+                  {t('user.removeContent.warning')}
+                </p>
+                <RemoveContentDialog
+                  pending={pending}
+                  onConfirm={() => start(removeContent)}
+                />
+              </div>
+            </SectionCard>
+          </>
+        )}
+      </PageScaffold>
     </main>
   )
 }

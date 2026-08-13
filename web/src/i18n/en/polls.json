@@ -94,7 +94,9 @@
     "tallyUnavailable_other": "{{count}} unavailable",
     "tallyNone": "No votes yet.",
     "yourVote": "Your vote: {{value}}",
-    "noVoteYet": "You have not voted on this option yet."
+    "noVoteYet": "You have not voted on this option yet.",
+    "notificationsHeading": "Notifications for this poll",
+    "dangerZone": "Danger zone"
   },
   "vote": {
     "available": "Available",
@@ -206,5 +208,11 @@
     "validationSummary": "There were problems with your submission",
     "dialogLabel": "Confirmation dialog",
     "copyLink": "Copy invitation link"
+  },
+  "emptyState": {
+    "polls": {
+      "body": "No polls yet. Start one and let everyone pick a time that works.",
+      "cta": "Create a poll"
+    }
   }
 }

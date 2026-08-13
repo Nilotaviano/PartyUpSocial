@@ -62,6 +62,11 @@ function renderComponents() {
   )
 }
 
+function openMenu(trigger: HTMLElement) {
+  // Radix's trigger opens on `pointerdown` (mouse), not `click`.
+  fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' })
+}
+
 afterEach(cleanup)
 
 describe('FriendsAccessibilityTests', () => {
@@ -85,12 +90,19 @@ describe('FriendsAccessibilityTests', () => {
       screen.getByRole('button', { name: 'Reject request @pending.one' }),
     ).toBeInTheDocument()
 
+    // The row's destructive actions live behind its ActionMenu
+    // (STYLING_OVERHAUL_DESIGN.md §3.3), so the focus contract now runs
+    // trigger → menu → dialog → Escape → back to the trigger.
     const trigger = screen.getByRole('button', {
-      name: 'Remove friend @friend.one',
+      name: 'More actions @friend.one',
     })
     trigger.focus()
-    fireEvent.click(trigger)
-    const dialog = screen.getByRole('dialog')
+    openMenu(trigger)
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: /Remove friend/ }),
+    )
+
+    const dialog = await screen.findByRole('dialog')
     await waitFor(() =>
       expect(
         within(dialog).getByRole('button', { name: 'Cancel' }),
@@ -101,6 +113,24 @@ describe('FriendsAccessibilityTests', () => {
     await waitFor(() =>
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
     )
-    expect(trigger).toHaveFocus()
+    await waitFor(() => expect(trigger).toHaveFocus())
+  })
+
+  it('OpenRowMenu_MeetsMenuItemDuties_D139', async () => {
+    renderComponents()
+
+    openMenu(
+      screen.getByRole('button', { name: 'More actions @friend.one' }),
+    )
+
+    const items = await screen.findAllByRole('menuitem')
+    expect(items).toHaveLength(2)
+    for (const item of items) {
+      expect(item).toHaveClass('min-h-11')
+      expect(item.className).toMatch(/data-\[highlighted\]:/)
+    }
+    expect(
+      screen.getByRole('menuitem', { name: /Block @friend\.one/ }),
+    ).toHaveTextContent('Blocking removes your connection')
   })
 })

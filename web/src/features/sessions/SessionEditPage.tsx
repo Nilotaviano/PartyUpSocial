@@ -1,10 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
-import { raisedInteractiveClasses } from '../../components/ui/classes'
+import {
+  controlRowClasses,
+  fieldControlClasses,
+  raisedInteractiveClasses,
+} from '../../components/ui/classes'
+import { DateEcho } from '../../components/ui/dateEcho'
+import { FormField, FormShell } from '../../components/ui/formShell'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { StatusBanner } from '../../components/ui/statusBanner'
 import { useDirtyGuard } from '../../components/useDirtyGuard'
 import { DiscardDialog } from './SessionCreatePage'
 import {
@@ -54,7 +63,6 @@ export function SessionEditPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { sessionId = '' } = useParams()
-  const heading = useRef<HTMLHeadingElement>(null)
   const summaryRef = useRef<HTMLDivElement>(null)
   const cancelTrigger = useRef<HTMLButtonElement>(null)
   const [form, setForm] = useState<ReturnType<typeof formFrom>>()
@@ -70,10 +78,6 @@ export function SessionEditPage() {
     enabled: Boolean(sessionId),
     retry: false,
   })
-
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
 
   useDirtyGuard(dirty, {
     onBlockedNavigation: (target) => {
@@ -210,273 +214,245 @@ export function SessionEditPage() {
   const locked = detail.data ? isSessionInProgress(detail.data) : false
 
   return (
-    <main
-      className="mx-auto max-w-2xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-session-edit"
-    >
-      <h1
-        ref={heading}
-        tabIndex={-1}
-        className="text-display font-display font-bold text-ink focus:outline-none"
-      >
-        {t('edit.heading')}
-      </h1>
+    <main data-testid="screen-session-edit">
+      <PageScaffold width="form">
+        <PageHeader title={t('edit.heading')} />
 
-      {detail.isPending && (
-        <p role="status">{t('common.loading', { ns: 'common' })}</p>
-      )}
-      {detail.error && !form && (
-        <p role="alert">
-          {t(
-            isApiError(detail.error)
-              ? `errors.codes.${detail.error.code}`
-              : 'errors.generic',
-            { defaultValue: t('errors.generic') },
-          )}
-        </p>
-      )}
-
-      {conflictNotice && (
-        <p aria-live="polite">{t('edit.conflictRetry')}</p>
-      )}
-
-      {Object.keys(fieldErrors).length > 0 && (
-        <div
-          ref={summaryRef}
-          className="rounded-card border-2 border-danger bg-danger/10 p-4"
-          role="alert"
-          tabIndex={-1}
-        >
-          <p className="font-display font-semibold text-ink">
-            {t('a11y.validationSummary')}
-          </p>
-          <ul className="mt-2 list-disc pl-5 text-ink">
-            {Object.entries(fieldErrors).map(([field, message]) => (
-              <li key={field}>
-                <a
-                  className="font-semibold text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                  href={`#${fieldIds[field] ?? `field-${field}`}`}
-                >
-                  {message}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {save.error && (
-        <p role="alert">
-          {t(
-            isApiError(save.error)
-              ? `errors.codes.${save.error.code}`
-              : 'errors.generic',
-            { defaultValue: t('errors.generic') },
-          )}
-        </p>
-      )}
-
-      {form && (
-        <form className="space-y-5" noValidate onSubmit={handleSubmit}>
-          <div>
-            <label className="block font-body font-semibold text-ink" htmlFor="field-title">
-              {t('create.title')}
-            </label>
-            <input
-              aria-invalid={Boolean(fieldErrors.title)}
-              className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-              id="field-title"
-              value={form.title}
-              onChange={(event) => update('title', event.target.value)}
-            />
-            {fieldErrors.title && <p role="alert">{fieldErrors.title}</p>}
-          </div>
-
-          <div>
-            <label className="block font-body font-semibold text-ink" htmlFor="field-start">
-              {t('create.start')}
-            </label>
-            {locked ? (
-              <p>{t('edit.startLocked')}</p>
-            ) : (
-              <input
-                className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                id="field-start"
-                step={900}
-                type="datetime-local"
-                value={form.start}
-                onChange={(event) => update('start', event.target.value)}
-              />
+        {detail.isPending && <p role="status">{t('common.loading', { ns: 'common' })}</p>}
+        {detail.error && !form && (
+          <StatusBanner role="alert" variant="danger">
+            {t(
+              isApiError(detail.error)
+                ? `errors.codes.${detail.error.code}`
+                : 'errors.generic',
+              { defaultValue: t('errors.generic') },
             )}
-          </div>
+          </StatusBanner>
+        )}
 
-          <div>
-            <label
-              className="block font-body font-semibold text-ink"
-              htmlFor="field-min"
-            >
-              {t('create.min')}
-            </label>
-            {locked ? (
-              <p>{t('edit.minLocked')}</p>
-            ) : (
+        {conflictNotice && <p aria-live="polite">{t('edit.conflictRetry')}</p>}
+
+        {save.error && (
+          <StatusBanner role="alert" variant="danger">
+            {t(
+              isApiError(save.error) ? `errors.codes.${save.error.code}` : 'errors.generic',
+              { defaultValue: t('errors.generic') },
+            )}
+          </StatusBanner>
+        )}
+
+        {form && (
+          <FormShell
+            cancel={
+              <button
+                ref={cancelTrigger}
+                className={`px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+                type="button"
+                onClick={requestCancel}
+              >
+                {t('dirty.stay')}
+              </button>
+            }
+            header={
+              Object.keys(fieldErrors).length > 0 ? (
+                <div
+                  ref={summaryRef}
+                  className="rounded-card border-2 border-danger bg-danger/10 p-4"
+                  role="alert"
+                  tabIndex={-1}
+                >
+                  <p className="font-display font-semibold text-ink">
+                    {t('a11y.validationSummary')}
+                  </p>
+                  <ul className="mt-2 list-disc pl-5 text-ink">
+                    {Object.entries(fieldErrors).map(([field, message]) => (
+                      <li key={field}>
+                        <a
+                          className="font-semibold text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                          href={`#${fieldIds[field] ?? `field-${field}`}`}
+                        >
+                          {message}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : undefined
+            }
+            submit={
+              <Button
+                aria-busy={save.isPending}
+                disabled={save.isPending}
+                type="submit"
+                variant="primary"
+              >
+                {t('edit.save')}
+              </Button>
+            }
+            onSubmit={handleSubmit}
+          >
+            <FormField htmlFor="field-title" label={t('create.title')}>
               <input
-                aria-invalid={Boolean(fieldErrors.minAttendance)}
-                className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                id="field-min"
+                aria-invalid={Boolean(fieldErrors.title)}
+                className={fieldControlClasses}
+                id="field-title"
+                value={form.title}
+                onChange={(event) => update('title', event.target.value)}
+              />
+              {fieldErrors.title && <p role="alert">{fieldErrors.title}</p>}
+            </FormField>
+
+            <FormField htmlFor="field-start" label={t('create.start')}>
+              {locked ? (
+                <p>{t('edit.startLocked')}</p>
+              ) : (
+                <>
+                  <input
+                    className={fieldControlClasses}
+                    id="field-start"
+                    step={900}
+                    type="datetime-local"
+                    value={form.start}
+                    onChange={(event) => update('start', event.target.value)}
+                  />
+                  <DateEcho value={form.start} />
+                </>
+              )}
+            </FormField>
+
+            <FormField htmlFor="field-min" label={t('create.min')}>
+              {locked ? (
+                <p>{t('edit.minLocked')}</p>
+              ) : (
+                <input
+                  aria-invalid={Boolean(fieldErrors.minAttendance)}
+                  className={fieldControlClasses}
+                  id="field-min"
+                  min={1}
+                  type="number"
+                  value={form.minAttendance}
+                  onChange={(event) => update('minAttendance', event.target.value)}
+                />
+              )}
+              {fieldErrors.minAttendance && <p role="alert">{fieldErrors.minAttendance}</p>}
+            </FormField>
+
+            <FormField htmlFor="field-max" label={t('create.max')}>
+              <input
+                className={fieldControlClasses}
+                disabled={form.clearMax}
+                id="field-max"
                 min={1}
                 type="number"
-                value={form.minAttendance}
-                onChange={(event) => update('minAttendance', event.target.value)}
+                value={form.maxCapacity}
+                onChange={(event) => update('maxCapacity', event.target.value)}
               />
-            )}
-            {fieldErrors.minAttendance && (
-              <p role="alert">{fieldErrors.minAttendance}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block font-body font-semibold text-ink" htmlFor="field-max">
-              {t('create.max')}
-            </label>
-            <input
-              className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:text-ink-soft disabled:opacity-100"
-              disabled={form.clearMax}
-              id="field-max"
-              min={1}
-              type="number"
-              value={form.maxCapacity}
-              onChange={(event) => update('maxCapacity', event.target.value)}
-            />
-            <label className="mt-2 block inline-flex min-h-11 items-center gap-2">
-              <input
-                checked={form.clearMax}
-                type="checkbox"
-                onChange={(event) => update('clearMax', event.target.checked)}
-              />
-              {t('edit.clearMax')}
-            </label>
-          </div>
-
-          <div>
-            <label className="block font-body font-semibold text-ink" htmlFor="field-notes">
-              {t('create.notes')}
-            </label>
-            <textarea
-              className="mt-1 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:text-ink-soft disabled:opacity-100"
-              disabled={form.clearNotes}
-              id="field-notes"
-              value={form.notes}
-              onChange={(event) => update('notes', event.target.value)}
-            />
-            <label className="mt-2 inline-flex min-h-11 items-center gap-2">
-              <input
-                checked={form.clearNotes}
-                type="checkbox"
-                onChange={(event) => update('clearNotes', event.target.checked)}
-              />
-              {t('edit.clearNotes')}
-            </label>
-          </div>
-
-          <div>
-            {form.platform === 'Steam' && !form.clearGame ? (
-              <p className="block font-body font-semibold text-ink">
-                {t('create.game')}
-              </p>
-            ) : (
-              <label className="block font-body font-semibold text-ink" htmlFor="field-game">
-                {t('create.game')}
+              <label className={controlRowClasses}>
+                <input
+                  checked={form.clearMax}
+                  type="checkbox"
+                  onChange={(event) => update('clearMax', event.target.checked)}
+                />
+                {t('edit.clearMax')}
               </label>
-            )}
-            {form.platform === 'Steam' && !form.clearGame ? (
-              <SteamGamePicker
-                appIdError={fieldErrors.gameAppId}
-                appIdId="field-game-app-id"
-                appIdValue={form.gameAppId}
-                nameError={fieldErrors.gameName}
-                nameId="field-game"
-                nameValue={form.gameName}
-                t={t}
-                onAppIdChange={(appId) => update('gameAppId', appId)}
-                onNameChange={(name) => update('gameName', name)}
-                onSelect={({ name, appId }) => {
-                  setForm((current) =>
-                    current ? { ...current, gameName: name, gameAppId: appId } : current,
-                  )
-                  setDirty(true)
-                }}
-              />
-            ) : (
-              <input
-                className="mt-1 min-h-11 w-full rounded-control border-2 border-ink bg-card px-3 py-2 font-body text-body text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:bg-busy disabled:text-ink-soft disabled:opacity-100"
-                disabled={form.clearGame}
-                id="field-game"
-                value={form.gameName}
-                onChange={(event) => update('gameName', event.target.value)}
-              />
-            )}
-            <label className="mt-2 inline-flex min-h-11 items-center gap-2">
-              <input
-                checked={form.clearGame}
-                type="checkbox"
-                onChange={(event) => update('clearGame', event.target.checked)}
-              />
-              {t('edit.clearGame')}
-            </label>
-          </div>
+            </FormField>
 
-          <div>
-            <label className="inline-flex min-h-11 items-center gap-2">
-              <input
-                checked={form.isPrivate}
-                type="checkbox"
-                onChange={(event) => update('isPrivate', event.target.checked)}
+            <FormField htmlFor="field-notes" label={t('create.notes')}>
+              <textarea
+                className={fieldControlClasses}
+                disabled={form.clearNotes}
+                id="field-notes"
+                value={form.notes}
+                onChange={(event) => update('notes', event.target.value)}
               />
-              {t('create.private')}
-            </label>
-            <p className="mt-1 text-ink-soft">
-              {t('edit.privacyDisclosure')}
-            </p>
-          </div>
+              <label className={controlRowClasses}>
+                <input
+                  checked={form.clearNotes}
+                  type="checkbox"
+                  onChange={(event) => update('clearNotes', event.target.checked)}
+                />
+                {t('edit.clearNotes')}
+              </label>
+            </FormField>
 
-          <div className="flex flex-wrap justify-end gap-2">
-            <button
-              ref={cancelTrigger}
-              className={`px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
-              type="button"
-              onClick={requestCancel}
-            >
-              {t('dirty.stay')}
-            </button>
-            <Button
-              aria-busy={save.isPending}
-              disabled={save.isPending}
-              type="submit"
-              variant="primary"
-            >
-              {t('edit.save')}
-            </Button>
-          </div>
-        </form>
-      )}
+            <div className="flex flex-col gap-1.5">
+              {form.platform === 'Steam' && !form.clearGame ? (
+                <p className="block font-body font-semibold text-ink">{t('create.game')}</p>
+              ) : (
+                <label className="block font-body font-semibold text-ink" htmlFor="field-game">
+                  {t('create.game')}
+                </label>
+              )}
+              {form.platform === 'Steam' && !form.clearGame ? (
+                <SteamGamePicker
+                  appIdError={fieldErrors.gameAppId}
+                  appIdId="field-game-app-id"
+                  appIdValue={form.gameAppId}
+                  nameError={fieldErrors.gameName}
+                  nameId="field-game"
+                  nameValue={form.gameName}
+                  t={t}
+                  onAppIdChange={(appId) => update('gameAppId', appId)}
+                  onNameChange={(name) => update('gameName', name)}
+                  onSelect={({ name, appId }) => {
+                    setForm((current) =>
+                      current ? { ...current, gameName: name, gameAppId: appId } : current,
+                    )
+                    setDirty(true)
+                  }}
+                />
+              ) : (
+                <input
+                  className={fieldControlClasses}
+                  disabled={form.clearGame}
+                  id="field-game"
+                  value={form.gameName}
+                  onChange={(event) => update('gameName', event.target.value)}
+                />
+              )}
+              <label className={controlRowClasses}>
+                <input
+                  checked={form.clearGame}
+                  type="checkbox"
+                  onChange={(event) => update('clearGame', event.target.checked)}
+                />
+                {t('edit.clearGame')}
+              </label>
+            </div>
 
-      <DiscardDialog
-        open={discardOpen}
-        triggerRef={cancelTrigger}
-        onDiscard={() => {
-          setDiscardOpen(false)
-          setDirty(false)
-          const target = pendingNavigation ?? `/sessions/${sessionId}`
-          setPendingNavigation(null)
-          if (target === 'back') {
-            window.history.back()
-          } else {
-            navigate(target)
-          }
-        }}
-        onOpenChange={setDiscardOpen}
-      />
+            <div className="flex flex-col gap-1.5">
+              <label className={controlRowClasses}>
+                <input
+                  checked={form.isPrivate}
+                  type="checkbox"
+                  onChange={(event) => update('isPrivate', event.target.checked)}
+                />
+                {t('create.private')}
+              </label>
+              <p className="font-body text-meta text-ink-soft">
+                {t('edit.privacyDisclosure')}
+              </p>
+            </div>
+          </FormShell>
+        )}
+
+        <DiscardDialog
+          open={discardOpen}
+          triggerRef={cancelTrigger}
+          onDiscard={() => {
+            setDiscardOpen(false)
+            setDirty(false)
+            const target = pendingNavigation ?? `/sessions/${sessionId}`
+            setPendingNavigation(null)
+            if (target === 'back') {
+              window.history.back()
+            } else {
+              navigate(target)
+            }
+          }}
+          onOpenChange={setDiscardOpen}
+        />
+      </PageScaffold>
     </main>
   )
 }

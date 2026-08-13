@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import QRCode from 'react-qr-code'
 import { client, isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
+import { SectionCard } from '../../components/ui/section'
+import { useToast } from '../../components/ui/toastStore'
 
 // PHASE5_1_DESIGN.md §1/§3: QR modules always render --color-qr-ink on a
 // --color-qr chip in both themes (scannability; the pair is theme-invariant
@@ -18,9 +20,41 @@ async function getFriendShare() {
   return data
 }
 
+/**
+ * A shareable link and the button that copies it, on one line
+ * (STYLING_OVERHAUL_DESIGN.md §3.3): the link column is the only one allowed to
+ * shrink, and it truncates in CSS so the anchor's accessible name stays the
+ * whole URL.
+ */
+function ShareLinkRow({
+  description,
+  url,
+  action,
+}: {
+  description: ReactNode
+  url: string
+  action: ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-meta text-ink-soft">{description}</p>
+      <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+        <a
+          className="flex min-h-11 min-w-0 items-center rounded-control text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          href={url}
+        >
+          <span className="truncate">{url}</span>
+        </a>
+        {action}
+      </div>
+    </div>
+  )
+}
+
 export function ShareCard() {
   const { t } = useTranslation(['friends', 'errors'])
   const [announcement, setAnnouncement] = useState('')
+  const toast = useToast()
   const share = useQuery({
     queryKey: ['friend-share'],
     queryFn: getFriendShare,
@@ -29,23 +63,17 @@ export function ShareCard() {
   async function copy(value: string, label: string) {
     try {
       await navigator.clipboard.writeText(value)
+      // The live region stays the announcement source of truth (§3.5); the
+      // toast is the additive visible half of the same confirmation.
       setAnnouncement(t('live.copied', { label }))
+      toast({ message: t('live.copied', { label }) })
     } catch {
       setAnnouncement(t('generic', { ns: 'errors' }))
     }
   }
 
   return (
-    <section
-      aria-labelledby="friend-share-heading"
-      className="rounded-card border-2 border-ink bg-card p-5 shadow-offset-card"
-    >
-      <h2
-        id="friend-share-heading"
-        className="font-display text-h2 font-semibold text-ink"
-      >
-        {t('sections.share')}
-      </h2>
+    <SectionCard title={t('sections.share')} titleId="friend-share-heading">
       {share.isPending && <p className="text-ink-soft">{t('status.loading')}</p>}
       {share.error && (
         <p role="alert">
@@ -56,7 +84,7 @@ export function ShareCard() {
         </p>
       )}
       {share.data && (
-        <div className="mt-4 grid gap-5 sm:grid-cols-[auto_1fr] sm:items-center">
+        <div className="grid gap-6 sm:grid-cols-[auto_1fr] sm:items-start">
           <div aria-hidden="true" className="w-fit rounded-card bg-qr p-6">
             <QRCode
               aria-hidden="true"
@@ -66,14 +94,15 @@ export function ShareCard() {
               value={share.data.addUrl}
             />
           </div>
-          <div className="min-w-0 space-y-4">
+          <div className="flex min-w-0 flex-col gap-5">
             <p className="text-ink-soft">{t('qr.description')}</p>
-            <div>
-              <p className="text-ink-soft">{t('labels.friendCode')}</p>
-              <p className="select-all font-mono text-h1 font-bold tracking-widest text-ink">
+            <div className="flex flex-col gap-2">
+              <p className="text-meta text-ink-soft">{t('labels.friendCode')}</p>
+              <p className="select-all font-mono text-h2 font-bold tracking-widest text-ink">
                 {share.data.friendCode}
               </p>
               <Button
+                className="self-start"
                 variant="neutral"
                 onClick={() =>
                   void copy(share.data.friendCode, t('labels.friendCode'))
@@ -82,50 +111,40 @@ export function ShareCard() {
                 {t('actions.copyCode')}
               </Button>
             </div>
-            <div>
-              <p className="text-ink-soft">
-                {t('share.addLinkDescription')}
-              </p>
-              <a
-                className="inline-flex min-h-11 items-center break-all text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                href={share.data.addUrl}
-              >
-                {share.data.addUrl}
-              </a>
-              <Button
-                variant="neutral"
-                onClick={() =>
-                  void copy(share.data.addUrl, t('actions.copyAddLink'))
-                }
-              >
-                {t('actions.copyAddLink')}
-              </Button>
-            </div>
-            <div>
-              <p className="text-ink-soft">
-                {t('share.profileLinkDescription')}
-              </p>
-              <a
-                className="inline-flex min-h-11 items-center break-all text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                href={share.data.profileUrl}
-              >
-                {share.data.profileUrl}
-              </a>
-              <Button
-                variant="neutral"
-                onClick={() =>
-                  void copy(share.data.profileUrl, t('actions.copyProfileLink'))
-                }
-              >
-                {t('actions.copyProfileLink')}
-              </Button>
-            </div>
+            <ShareLinkRow
+              action={
+                <Button
+                  variant="neutral"
+                  onClick={() =>
+                    void copy(share.data.addUrl, t('actions.copyAddLink'))
+                  }
+                >
+                  {t('actions.copyAddLink')}
+                </Button>
+              }
+              description={t('share.addLinkDescription')}
+              url={share.data.addUrl}
+            />
+            <ShareLinkRow
+              action={
+                <Button
+                  variant="neutral"
+                  onClick={() =>
+                    void copy(share.data.profileUrl, t('actions.copyProfileLink'))
+                  }
+                >
+                  {t('actions.copyProfileLink')}
+                </Button>
+              }
+              description={t('share.profileLinkDescription')}
+              url={share.data.profileUrl}
+            />
           </div>
         </div>
       )}
-      <p aria-live="polite" className="mt-3 text-ink">
+      <p aria-live="polite" className="text-ink">
         {announcement}
       </p>
-    </section>
+    </SectionCard>
   )
 }

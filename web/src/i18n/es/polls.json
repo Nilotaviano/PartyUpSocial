@@ -94,7 +94,9 @@
     "tallyUnavailable_other": "{{count}} no disponibles",
     "tallyNone": "Aún no hay votos.",
     "yourVote": "Tu voto: {{value}}",
-    "noVoteYet": "Aún no has votado en esta opción."
+    "noVoteYet": "Aún no has votado en esta opción.",
+    "notificationsHeading": "Notificaciones de esta encuesta",
+    "dangerZone": "Zona de riesgo"
   },
   "vote": {
     "available": "Disponible",
@@ -206,5 +208,11 @@
     "validationSummary": "Hubo problemas con tu envío",
     "dialogLabel": "Cuadro de confirmación",
     "copyLink": "Copiar enlace de invitación"
+  },
+  "emptyState": {
+    "polls": {
+      "body": "Todavía no hay encuestas. Crea una y deja que todos elijan un horario que funcione.",
+      "cta": "Crear encuesta"
+    }
   }
 }
