@@ -2,6 +2,8 @@
 
 Product-behavior items here need a PRODUCT_SPEC decision (new or amended D-number) before implementation (CLAUDE.md: propose spec changes before implementing them).
 
+**Phase 8 machine work complete 2026-08-12** — admin dashboard + UI, legal docs (drafts), deletion e2e, i18n/WCAG/browser/security audits, k6 authoring all shipped; owner checklist at `PHASE8_DESIGN.md` §4. New backlog candidate from S7: duplicate poll-option suggestion succeeds silently (announces "added", adds nothing) — needs a spec ruling.
+
 **Admin UI is not tracked here** — owner placed it in Phase 8 (2026-08-10), sequenced *after* D-178's usage-dashboard queries exist. See `IMPLEMENTATION_PLAN.md` § Phase 8 for what already ships (`AdminEndpoints.cs`) and the constraints the client inherits (D-177's 404-to-non-admins posture; content removal not reversed by unban).
 
 - **Avatars wave B/C — picture sources (D-190/D-191/A-084)** — designed in `AVATARS_DESIGN.md`. Wave A (emoji catalog + picker + the D-188 Tier 2 fan-out + structural masking) **shipped**; waves B+C **shipped end-to-end 2026-08-12**, client included in `809ef47` (see TRACEABILITY.md D-190/D-191, AVATARS_DESIGN.md §3.5): `AvatarDisc`'s `<img>` arm (with the `onError`-to-glyph fallback so a transient failure doesn't read as a masked/anonymized user) and the settings source chooser consuming `MyProfileResponse.AvatarSources` alongside the emoji catalog. Onboarding stays emoji-only (§2.1), by design, not debt — no source chooser there. What remains:
