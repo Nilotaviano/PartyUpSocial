@@ -3,7 +3,7 @@ import * as CheckboxPrimitive from '@radix-ui/react-checkbox'
 import type { ComponentProps } from 'react'
 
 const rootClasses =
-  'inline-flex size-6 shrink-0 items-center justify-center rounded-[0.375rem] border-2 border-ink bg-card text-primary-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus data-[state=checked]:bg-primary disabled:pointer-events-none disabled:opacity-50'
+  'inline-flex size-6 shrink-0 items-center justify-center rounded-md border-2 border-ink bg-card text-primary-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus data-[state=checked]:bg-primary disabled:pointer-events-none disabled:opacity-50'
 
 function CheckboxRoot({
   className,

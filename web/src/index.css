@@ -30,6 +30,13 @@
   --radius-card: 1.125rem;
   --radius-control: 0.875rem;
 
+  /* Content widths — STYLING_OVERHAUL_DESIGN.md §3.0 (→ max-w-page / max-w-form) */
+  --container-page: 72rem;
+  --container-form: 44rem;
+
+  /* Named animations (→ animate-dialog-pop); keyframes below. */
+  --animate-dialog-pop: dialog-pop 120ms ease-out;
+
   /* Fonts */
   --font-display: 'Gabarito Variable', ui-sans-serif, system-ui, sans-serif;
   --font-body: 'Nunito Sans Variable', ui-sans-serif, system-ui, sans-serif;
@@ -114,20 +121,74 @@
   box-shadow: 1px 1px 0 var(--color-shadow);
 }
 
+/*
+ * Motion durations (STYLING_OVERHAUL_DESIGN.md §3.0) — named for the gesture,
+ * not the number, so the three tempos stay in step across components. Callers
+ * pair them with `motion-safe:` (PHASE5_1_DESIGN.md §3).
+ */
+@utility motion-press {
+  transition-duration: 80ms;
+}
+
+@utility motion-pop {
+  transition-duration: 120ms;
+}
+
+@utility motion-celebrate {
+  transition-duration: 300ms;
+}
+
+/*
+ * Native-control skins (STYLING_OVERHAUL_DESIGN.md §3.2). Skin only: every
+ * native control keeps its shipped DOM — wrapping labels included — and gains
+ * the cardstock look through classes alone.
+ */
+@utility control-frame {
+  border-width: 2px;
+  border-color: var(--color-ink);
+  border-radius: var(--radius-control);
+  background-color: var(--color-card);
+  color: var(--color-ink);
+
+  &:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}
+
+/*
+ * The chevron is a background image, not a mask or a pseudo-element: a <select>
+ * paints its own option list and honours neither on the control itself. A
+ * background image cannot read `currentColor` either, so the ink value is
+ * inlined per theme and the dark arm below (unlayered, so it beats the utility
+ * layer) carries the dark ink.
+ */
+@utility control-select {
+  appearance: none;
+  padding-right: calc(var(--spacing) * 10);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2320301c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right calc(var(--spacing) * 3) center;
+  background-size: 1rem 1rem;
+}
+
+[data-theme='dark'] .control-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23ede8d4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6l5 5 5-5'/%3E%3C/svg%3E");
+}
+
+@layer base {
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: var(--color-primary);
+  }
+}
+
 /* Belt-and-suspenders global focus rule, additive to per-element utilities (§3). */
 @layer base {
   :focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }
-}
-
-/* Migration bridge: un-restyled pages still use text-slate-500, which reads 4.24:1
- * on the new cardstock page background — below AA. Remap it to ink-soft (5.02:1 on
- * page, 5.53:1 on card) until slices S2-S5 replace the class; unlayered on purpose
- * so it beats the utility. Delete with the last text-slate-500 call site. */
-.text-slate-500 {
-  color: var(--color-ink-soft);
 }
 
 /* Dialog pop motion (§3) — applied to an inner wrapper by ui/dialog.tsx. */

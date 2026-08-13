@@ -4,6 +4,9 @@ import { RequireAuth } from './auth/RequireAuth'
 import { RequireOnboarded } from './auth/RequireOnboarded'
 import { useSession } from './auth/useSession'
 import { AppFooter } from './components/AppFooter'
+import { BrandMark } from './components/ui/brandMark'
+import { PageSlotProvider } from './components/ui/pageScaffold'
+import { ToastHost } from './components/ui/toastHost'
 import { AccountMenu } from './features/account/AccountMenu'
 import { AdminDashboardPage } from './features/admin/AdminDashboardPage'
 import { AdminUserDetailPage } from './features/admin/AdminUserDetailPage'
@@ -58,7 +61,7 @@ function AuthenticatedShell() {
   const { t } = useTranslation(['common', 'sessions', 'availability', 'home', 'polls'])
 
   return (
-    <div className="min-h-screen bg-page text-ink">
+    <div className="flex min-h-dvh flex-col bg-page text-ink">
       <header className="border-b-2 border-ink bg-card">
         <nav
           aria-label={t('navigation.label')}
@@ -66,17 +69,21 @@ function AuthenticatedShell() {
         >
           <NavLink
             aria-label={t('navigation.home')}
-            className="mr-auto inline-flex min-h-11 flex-none items-center rounded-control font-display font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className="mr-auto inline-flex min-h-11 flex-none items-center gap-2 rounded-control font-display font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             data-tour="home"
             end
             to="/app"
           >
+            <BrandMark />
             {t('app.name')}
           </NavLink>
-          <div className="flex min-w-0 items-center gap-2 overflow-x-auto [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]">
+          {/* The four bracketed utilities are raw CSS properties Tailwind has no
+              utility for: momentum scrolling, the two scrollbar-hiding halves
+              (Firefox + WebKit), and the §3.7 edge-fade mask. */}
+          <div className="flex min-w-0 snap-x snap-proximity items-center gap-2 overflow-x-auto [-webkit-overflow-scrolling:touch] [scrollbar-width:none] max-sm:[mask-image:linear-gradient(to_right,transparent,black_0.75rem,black_calc(100%-0.75rem),transparent)] [&::-webkit-scrollbar]:hidden">
             <NavLink
               className={({ isActive }) =>
-                `inline-flex min-h-11 flex-none items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+                `inline-flex min-h-11 flex-none snap-start items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                   isActive
                     ? 'bg-primary font-semibold text-primary-ink'
                     : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
@@ -89,7 +96,7 @@ function AuthenticatedShell() {
             </NavLink>
             <NavLink
               className={({ isActive }) =>
-                `inline-flex min-h-11 flex-none items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+                `inline-flex min-h-11 flex-none snap-start items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                   isActive
                     ? 'bg-primary font-semibold text-primary-ink'
                     : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
@@ -102,7 +109,7 @@ function AuthenticatedShell() {
             </NavLink>
             <NavLink
               className={({ isActive }) =>
-                `inline-flex min-h-11 flex-none items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+                `inline-flex min-h-11 flex-none snap-start items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                   isActive
                     ? 'bg-primary font-semibold text-primary-ink'
                     : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
@@ -115,7 +122,7 @@ function AuthenticatedShell() {
             </NavLink>
             <NavLink
               className={({ isActive }) =>
-                `inline-flex min-h-11 flex-none items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+                `inline-flex min-h-11 flex-none snap-start items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                   isActive
                     ? 'bg-primary font-semibold text-primary-ink'
                     : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
@@ -128,7 +135,7 @@ function AuthenticatedShell() {
             </NavLink>
             <NavLink
               className={({ isActive }) =>
-                `inline-flex min-h-11 flex-none items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+                `inline-flex min-h-11 flex-none snap-start items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                   isActive
                     ? 'bg-primary font-semibold text-primary-ink'
                     : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
@@ -144,9 +151,15 @@ function AuthenticatedShell() {
           </div>
         </nav>
       </header>
-      <PushEnableCard />
-      <TourOverlay />
-      <Outlet />
+      <ToastHost>
+        <PageSlotProvider>
+          <div className="flex flex-1 flex-col">
+            <PushEnableCard />
+            <TourOverlay />
+            <Outlet />
+          </div>
+        </PageSlotProvider>
+      </ToastHost>
       <AppFooter />
     </div>
   )
@@ -160,8 +173,8 @@ function AuthenticatedShell() {
  */
 function PublicShell() {
   return (
-    <div className="flex min-h-screen flex-col bg-page text-ink">
-      <div className="flex-1">
+    <div className="flex min-h-dvh flex-col bg-page text-ink">
+      <div className="flex flex-1 flex-col">
         <Outlet />
       </div>
       <AppFooter />

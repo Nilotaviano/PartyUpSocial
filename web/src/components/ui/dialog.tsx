@@ -25,7 +25,10 @@ function DialogOverlay({
  * The pop animation lives on an inner wrapper, never on Content itself:
  * Content carries each call site's own positioning classes (including the
  * centered dialog's `-translate-x-1/2 -translate-y-1/2`, which
- * AuthMethods.test.tsx asserts unchanged).
+ * AuthMethods.test.tsx asserts unchanged). Those call sites also size
+ * themselves `w-[calc(100%_-_2rem)] max-w-md`: the arbitrary value is the
+ * 1rem-per-side viewport gutter a fixed centered box needs at 360px, and no
+ * `w-*` utility expresses it.
  */
 function DialogContent({
   className,
@@ -34,7 +37,7 @@ function DialogContent({
 }: ComponentProps<typeof DialogPrimitive.Content>) {
   return (
     <DialogPrimitive.Content className={withLayer(className, 'z-50')} {...props}>
-      <div className="motion-safe:animate-[dialog-pop_120ms_ease-out]">
+      <div className="motion-safe:animate-dialog-pop">
         {children}
       </div>
     </DialogPrimitive.Content>

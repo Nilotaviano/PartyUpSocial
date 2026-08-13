@@ -8,7 +8,7 @@ const contentClasses =
   'overflow-hidden rounded-control border-2 border-ink bg-card font-body text-ink shadow-offset-card'
 const viewportClasses = 'p-1'
 const itemClasses =
-  'flex min-h-11 cursor-pointer items-center rounded-[0.375rem] px-3 py-2 outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-ink'
+  'flex min-h-11 cursor-pointer items-center rounded-md px-3 py-2 outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-ink'
 
 function SelectTrigger({
   className,
