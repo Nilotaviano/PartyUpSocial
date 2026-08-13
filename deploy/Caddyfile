@@ -1,6 +1,10 @@
 partyup.social {
 	encode zstd gzip
 
+	# Q7 (PHASE8_DESIGN.md §2): HSTS lives at the TLS terminator; every other security
+	# header is emitted app-side so the API's tests can assert them.
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
 	reverse_proxy app:8080
 
 	log {
