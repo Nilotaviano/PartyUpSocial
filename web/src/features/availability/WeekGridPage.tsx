@@ -732,21 +732,9 @@ export function WeekGridPage() {
   // D-111/D-135) and now gains the summary alongside it, at parity with the
   // week view rather than as a special case.
   const aside = (
-    <aside className="flex flex-col gap-4 lg:sticky lg:top-4 lg:space-y-4">
-      {summaryOpen && (
-        <div className="lg:hidden">
-          <AvailabilitySummary
-            deletingId={deletingId}
-            oneOffs={oneOffBlocks}
-            series={availabilitySeries}
-            timeZone={timeZone}
-            titleId="availability-summary-heading-mobile"
-            onDeleteBlock={(blockId) => deleteBlock.mutate(blockId)}
-            onDeleteSeries={(seriesId) => deleteSeries.mutate(seriesId)}
-          />
-        </div>
-      )}
+    <aside className="flex flex-col gap-4 lg:sticky lg:top-4">
       <button
+        aria-controls="availability-summary-mobile-panel"
         aria-expanded={summaryOpen}
         className="flex w-full items-center justify-between gap-2 rounded-card border border-ink/25 bg-card px-3 py-2 text-left lg:hidden"
         type="button"
@@ -761,6 +749,7 @@ export function WeekGridPage() {
               {t('summary.windowsCount', { count: availabilityWindowCount })}
             </span>
           )}
+          <span className="sr-only">{t(summaryOpen ? 'summary.collapse' : 'summary.expand')}</span>
         </span>
         <svg
           aria-hidden="true"
@@ -775,6 +764,19 @@ export function WeekGridPage() {
           <path d="m6 9 6 6 6-6" />
         </svg>
       </button>
+      {summaryOpen && (
+        <div className="lg:hidden" id="availability-summary-mobile-panel">
+          <AvailabilitySummary
+            deletingId={deletingId}
+            oneOffs={oneOffBlocks}
+            series={availabilitySeries}
+            timeZone={timeZone}
+            titleId="availability-summary-heading-mobile"
+            onDeleteBlock={(blockId) => deleteBlock.mutate(blockId)}
+            onDeleteSeries={(seriesId) => deleteSeries.mutate(seriesId)}
+          />
+        </div>
+      )}
       <div className="hidden lg:block">
         <AvailabilitySummary
           deletingId={deletingId}

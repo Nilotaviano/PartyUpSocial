@@ -1727,6 +1727,39 @@ describe('WeekGridPage §9 S4 aside layout', () => {
     expect(screen.getAllByRole('button', { name: /Delete/ })).toHaveLength(2)
   })
 
+  it('places the revealed panel after its trigger in DOM order and wires aria-controls_F1', async () => {
+    mockCalendar({ blockOccurrence: true })
+    renderPage()
+
+    await screen.findByRole('button', { name: /Delete/ })
+    const toggle = screen.getByRole('button', { name: /Your availability/ })
+    fireEvent.click(toggle)
+
+    const panelId = toggle.getAttribute('aria-controls')
+    expect(panelId).toBeTruthy()
+    const panel = document.getElementById(panelId!)
+    expect(panel).not.toBeNull()
+
+    // Bit 4 (DOCUMENT_POSITION_FOLLOWING) means `panel` comes after `toggle`
+    // in document order — a forward Tab from the button must land inside it.
+    const position = toggle.compareDocumentPosition(panel!)
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('announces the disclosure action verb via an sr-only span that flips with state_F2', async () => {
+    mockCalendar({ blockOccurrence: true })
+    renderPage()
+
+    await screen.findByRole('button', { name: /Delete/ })
+    const collapsedToggle = screen.getByRole('button', { name: /Show your availability/ })
+    expect(collapsedToggle).toBeInTheDocument()
+
+    fireEvent.click(collapsedToggle)
+
+    const expandedToggle = screen.getByRole('button', { name: /Hide your availability/ })
+    expect(expandedToggle).toBeInTheDocument()
+  })
+
   it('hosts both the summary and the legend in the aside on the agenda route too_S4', async () => {
     mockCalendar({
       series: [

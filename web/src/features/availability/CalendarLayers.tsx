@@ -84,6 +84,8 @@ export function CalendarLayers({ friends, pollItems = [], onChange }: CalendarLa
       <legend className="font-display text-h3 font-extrabold text-ink">
         {t('calendar.layers.heading')}
       </legend>
+      {/* Each swatch below matches what `WeekGrid.tsx` actually paints for
+          that layer, so the legend stays a truthful preview of the grid. */}
       <div className="flex flex-col gap-2">
         <label className={controlRowClasses}>
           <input
@@ -91,9 +93,6 @@ export function CalendarLayers({ friends, pollItems = [], onChange }: CalendarLa
             type="checkbox"
             onChange={(event) => setMyAvailability(event.target.checked)}
           />
-          {/* Matches the grid's own free-cell fill (`WeekGrid.tsx`'s `bg-free`
-              cell background) — a short band, since that layer paints as a
-              fill rather than a pill or disc. */}
           <span aria-hidden="true" className="h-3 w-5 rounded-full border border-ink/40 bg-free" />
           {t('calendar.layers.myAvailability')}
         </label>
@@ -103,9 +102,6 @@ export function CalendarLayers({ friends, pollItems = [], onChange }: CalendarLa
             type="checkbox"
             onChange={(event) => setFriendAvailability(event.target.checked)}
           />
-          {/* Matches the grid's neutral friend-glyph disc (`WeekGrid.tsx`'s
-              `border border-ink/40 bg-busy`) — never `bg-ink`, which the grid
-              itself never paints for this layer. */}
           <span aria-hidden="true" className="h-3 w-3 rounded-full border border-ink/40 bg-busy" />
           {t('calendar.layers.friendAvailability')}
         </label>
@@ -115,9 +111,6 @@ export function CalendarLayers({ friends, pollItems = [], onChange }: CalendarLa
             type="checkbox"
             onChange={(event) => setSessions(event.target.checked)}
           />
-          {/* Matches the grid's session pill (`WeekGrid.tsx`'s
-              `border-2 border-ink/70 bg-accent`) — never `bg-free-ink`, an
-              unratified pairing the grid itself never paints. */}
           <span
             aria-hidden="true"
             className="h-3 w-5 rounded-full border-2 border-ink/70 bg-accent"
@@ -130,9 +123,6 @@ export function CalendarLayers({ friends, pollItems = [], onChange }: CalendarLa
             type="checkbox"
             onChange={(event) => setPollOptions(event.target.checked)}
           />
-          {/* Matches the grid's dashed poll pill (`WeekGrid.tsx`'s
-              `border-2 border-dashed border-ink/45 bg-card`) — never
-              `bg-maybe`, a fill the grid itself never paints for this layer. */}
           <span
             aria-hidden="true"
             className="h-3 w-5 rounded-full border-2 border-dashed border-ink/45 bg-card"
