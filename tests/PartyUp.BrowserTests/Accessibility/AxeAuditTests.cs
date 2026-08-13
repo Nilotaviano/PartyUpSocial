@@ -820,6 +820,82 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
     }
 
     /// <summary>
+    /// D-139's push-enable prompt (D-147/D-159/D-175) — a `StatusBanner` reached only by an
+    /// account whose `pushPromptEligible` fact is true and who has not yet been asked in this
+    /// browser (`PushEnableCard.tsx`), never by initial-render alone. Mirrors
+    /// <see cref="Notifications.PushEnableFlowTests"/>'s eligibility arrangement: a fresh account
+    /// completes D-147's qualifying action (creating a private session, so no invitee is needed)
+    /// then a real navigation to `/app` forces the profile query to re-fetch the now-qualified
+    /// fact, which is what makes the card render at all.
+    /// </summary>
+    [Theory]
+    [InlineData(AuditedTheme.Light)]
+    [InlineData(AuditedTheme.Dark)]
+    public async Task PushPromptStatusBanner_HasNoWcagViolation_D139(AuditedTheme theme)
+    {
+        RegisteredUser recipient = await fixture.RegisterAndOnboardAsync(
+            await fixture.NewContextAsync(), "pushbanneraudit", "Push Banner Audit");
+
+        await recipient.Page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/sessions/new");
+        await recipient.Page.Locator("#field-title").FillAsync("Push banner axe session");
+        await recipient.Page.Locator("#field-start").FillAsync(
+            DateTime.UtcNow.AddDays(1).Date.AddHours(18).ToString(
+                "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture));
+        await recipient.Page.Locator("#field-duration").FillAsync("60");
+        await recipient.Page.Locator("#field-min").FillAsync("1");
+        await recipient.Page.Locator("#field-max").FillAsync("4");
+        await recipient.Page.GetByLabel("Private session").CheckAsync();
+        await recipient.Page.GetByRole(AriaRole.Button, new() { Name = "Create session" }).ClickAsync();
+        await recipient.Page.WaitForURLAsync(url => Regex.IsMatch(url, @"/sessions/[0-9a-fA-F-]{36}$"));
+
+        await AssertInteractionStateIsAxeCleanAsync(
+            "status-banner-visible",
+            theme,
+            recipient.Page.Context,
+            "/app",
+            async page =>
+            {
+                await page.GetByTestId("push-enable-card").WaitForAsync();
+            });
+    }
+
+    /// <summary>
+    /// STYLING_OVERHAUL_DESIGN.md §3.3/§7 S2: a friend row's destructive actions live behind an
+    /// ActionMenu, so the only state where those `menuitem`s exist at all is an opened menu — the
+    /// `/friends` route scan sees a closed trigger and nothing else. Needs a real friendship (the
+    /// row is the menu's host), which the shared audit organizer deliberately never has: its own
+    /// friend code is read off a zero-friend `/friends`, so befriending it would change what the
+    /// route cases scan. Two fresh accounts instead, mirroring the push-prompt fact above.
+    /// </summary>
+    [Theory]
+    [InlineData(AuditedTheme.Light)]
+    [InlineData(AuditedTheme.Dark)]
+    public async Task FriendActionMenuOpen_HasNoWcagViolation_D139(AuditedTheme theme)
+    {
+        RegisteredUser viewer = await fixture.RegisterAndOnboardAsync(
+            await fixture.NewContextAsync(), "friendmenuaudit", "Friend Menu Audit");
+        RegisteredUser peer = await fixture.RegisterAndOnboardAsync(
+            await fixture.NewContextAsync(), "friendmenupeer", "Friend Menu Peer");
+
+        // `viewer` accepts, so `peer` is the row on `viewer`'s own friends list.
+        await PlaywrightFixture.BefriendAsync(peer, viewer);
+
+        await AssertInteractionStateIsAxeCleanAsync(
+            "friend-actionmenu-open",
+            theme,
+            viewer.Page.Context,
+            "/friends",
+            async page =>
+            {
+                await page.GetByRole(
+                    AriaRole.Button, new() { Name = $"More actions @{peer.Username}" }).ClickAsync();
+                ILocator menu = page.GetByRole(AriaRole.Menu);
+                await menu.WaitForAsync();
+                await Assertions.Expect(menu.GetByRole(AriaRole.Menuitem).First).ToBeVisibleAsync();
+            });
+    }
+
+    /// <summary>
     /// Round-1 F8 (NOTE, detection-power proof): the 29/29-clean result above is only meaningful if
     /// this harness can actually catch a real violation — this negative control proves it can,
     /// independent of the app, by scanning a deliberately inaccessible DOM (an unlabeled input and

@@ -221,6 +221,45 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
             _ => _playwright.Chromium,
         };
         Browser = await engine.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+
+        if (!IsBuiltTopology)
+        {
+            await WarmDevServerAsync();
+        }
+    }
+
+    /// <summary>
+    /// Local topology only. <see cref="WaitForHttpReadyAsync"/> above only proves Vite's own dev
+    /// server is accepting connections — Vite transforms each module lazily, on the browser's
+    /// first request for it, so the styling overhaul's larger module graph can push a cold first
+    /// navigation past <see cref="NavigationTimeoutMs"/>'s fixed 30s ceiling even though the port
+    /// itself has been "ready" for a while (observed on WebKit: failures land on the first test of
+    /// a cold run only, 5/5 warm). The built topology serves a pre-built bundle (no lazy
+    /// transforms, `InitializeBuiltTopologyAsync`'s own remarks), so it never needs this. Runs
+    /// once, on its own throwaway page/no context (never <see cref="NewContextAsync"/> — this is
+    /// not a traced test context and must not appear in <see cref="_tracedContexts"/>), so every
+    /// real test's own first navigation lands on an already-transformed graph. Each step below
+    /// uses a generous (60s) timeout of its own — deliberately looser than
+    /// <see cref="NavigationTimeoutMs"/>'s 30s test ceiling — because this is a one-time upfront
+    /// cost paid before any test starts, not a per-test interaction; it would defeat the purpose
+    /// for the warm-up itself to time out at the same ceiling it exists to protect tests from.
+    /// </summary>
+    private async Task WarmDevServerAsync()
+    {
+        IPage page = await Browser.NewPageAsync();
+        try
+        {
+            string[] routes = [WebBaseUrl + "/welcome", WebBaseUrl + "/login", WebBaseUrl + "/register", WebBaseUrl + "/app"];
+            foreach (string route in routes)
+            {
+                await page.GotoAsync(route, new PageGotoOptions { Timeout = 60000 });
+                await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = 60000 });
+            }
+        }
+        finally
+        {
+            await page.CloseAsync();
+        }
     }
 
     private void InitializeLocalTopology()
