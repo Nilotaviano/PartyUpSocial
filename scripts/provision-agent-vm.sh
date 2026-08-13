@@ -32,17 +32,22 @@ sudo apt-get install -y \
   ca-certificates curl git jq tmux unzip zip build-essential \
   apt-transport-https gnupg lsb-release
 
-echo "== .NET ${DOTNET_CHANNEL} SDK (user-local, matches global.json-less repo) =="
-curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh
-bash /tmp/dotnet-install.sh --channel "${DOTNET_CHANNEL}" --install-dir "$HOME/.dotnet"
-if ! grep -q 'DOTNET_ROOT' "$HOME/.bashrc"; then
-  {
-    echo 'export DOTNET_ROOT="$HOME/.dotnet"'
-    echo 'export PATH="$HOME/.dotnet:$HOME/.dotnet/tools:$PATH"'
-  } >> "$HOME/.bashrc"
+echo "== .NET ${DOTNET_CHANNEL} SDK (apt) =="
+SDK_PKG="dotnet-sdk-${DOTNET_CHANNEL}"
+if ! sudo apt-get install -y "$SDK_PKG"; then
+  # Ubuntu's feed lags new majors sometimes — fall back to Microsoft's repo.
+  echo "-- ${SDK_PKG} not in Ubuntu's feed; adding packages.microsoft.com --"
+  curl -fsSL "https://packages.microsoft.com/config/ubuntu/$(. /etc/os-release && echo "$VERSION_ID")/packages-microsoft-prod.deb" \
+    -o /tmp/packages-microsoft-prod.deb
+  sudo dpkg -i /tmp/packages-microsoft-prod.deb
+  sudo apt-get update -y
+  sudo apt-get install -y "$SDK_PKG"
 fi
-export DOTNET_ROOT="$HOME/.dotnet"
-export PATH="$HOME/.dotnet:$HOME/.dotnet/tools:$PATH"
+# dotnet global tools (pwsh below) install to ~/.dotnet/tools regardless of SDK origin.
+if ! grep -q '.dotnet/tools' "$HOME/.bashrc"; then
+  echo 'export PATH="$HOME/.dotnet/tools:$PATH"' >> "$HOME/.bashrc"
+fi
+export PATH="$HOME/.dotnet/tools:$PATH"
 dotnet --version
 
 echo "== Node ${NODE_MAJOR} (NodeSource) =="
