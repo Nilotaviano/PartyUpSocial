@@ -64,9 +64,14 @@ describe('privacy policy', () => {
     // D-161's transparency half: derived measures, no third-party analytics.
     expect(text).toContain('derived measures')
     expect(text).toContain('no third-party analytics service')
-    // Q6 (ratified): 30-day backups, shared content until deletion.
+    // Q6 (ratified): 30-day backups, shared content until deletion. The policy must not claim
+    // security measures the deploy stack does not implement: backups are plain pg_dump, so any
+    // encryption claim is a controller misstatement under LGPD.
     expect(text).toContain('kept for 30 days')
+    expect(text.toLowerCase()).not.toContain('encrypt')
     expect(text).toContain('until your account is deleted')
+    // Collection list discloses the IP/rate-limit technical data the API actually processes.
+    expect(text).toContain('your IP address')
     // D-148 / D-158 / D-165 / D-072.
     expect(text).toContain('seven-day grace period')
     expect(text).toContain('automatically cancels the deletion')

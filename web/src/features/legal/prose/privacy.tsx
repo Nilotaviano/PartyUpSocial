@@ -25,6 +25,7 @@ export function PrivacyEn() {
             'In-app notifications generated for you, and your notification preferences, including push subscriptions if you enable push.',
             'When you last used PartyUp, to show activity to administrators and measure active use.',
             'Guest responses: if you answer through a guest link, we store the name you give and your response, without an account.',
+            'Technical data our servers see when you connect: your IP address, used for rate limiting and abuse protection, and short-lived technical logs of requests. We do not use it to profile you.',
           ]}
         />
       </Section>
@@ -69,7 +70,7 @@ export function PrivacyEn() {
           items={[
             'Your account data stays while your account exists.',
             'Content you shared into sessions and polls stays until your account is deleted, at which point the deletion effects below apply.',
-            'Encrypted database backups are kept for 30 days and then rotated out. Deleted data can survive in a backup for up to that long before it ages out.',
+            'Database backups are kept for 30 days and then rotated out. Deleted data can survive in a backup for up to that long before it ages out.',
           ]}
         />
       </Section>
@@ -141,6 +142,7 @@ export function PrivacyPtBR() {
             'Notificações geradas para você no aplicativo e suas preferências de notificação, incluindo assinaturas de push se você ativar push.',
             'Quando você usou o PartyUp pela última vez, para mostrar atividade aos administradores e medir o uso ativo.',
             'Respostas de convidados: se você responde por um link de convidado, guardamos o nome informado e a sua resposta, sem criar conta.',
+            'Dados técnicos que nossos servidores recebem quando você se conecta: seu endereço IP, usado para limitação de requisições e proteção contra abuso, e registros técnicos de curta duração. Não os usamos para criar perfis sobre você.',
           ]}
         />
       </Section>
@@ -186,7 +188,7 @@ export function PrivacyPtBR() {
           items={[
             'Os dados da sua conta permanecem enquanto a conta existir.',
             'O conteúdo que você compartilhou em sessões e enquetes permanece até a exclusão da sua conta, quando passam a valer os efeitos descritos abaixo.',
-            'Os backups criptografados do banco de dados são mantidos por 30 dias e depois rotacionados. Dados excluídos podem sobreviver em um backup por até esse prazo antes de expirarem.',
+            'Os backups do banco de dados são mantidos por 30 dias e depois rotacionados. Dados excluídos podem sobreviver em um backup por até esse prazo antes de expirarem.',
           ]}
         />
       </Section>
@@ -258,6 +260,7 @@ export function PrivacyEs() {
             'Notificaciones generadas para ti dentro de la aplicación y tus preferencias de notificación, incluidas las suscripciones push si activas push.',
             'Cuándo usaste PartyUp por última vez, para mostrar actividad a la administración y medir el uso activo.',
             'Respuestas de invitados: si respondes mediante un enlace de invitado, guardamos el nombre que indicas y tu respuesta, sin crear una cuenta.',
+            'Datos técnicos que nuestros servidores reciben cuando te conectas: tu dirección IP, usada para limitar solicitudes y proteger contra abusos, y registros técnicos de corta duración. No los usamos para elaborar perfiles sobre ti.',
           ]}
         />
       </Section>
@@ -304,7 +307,7 @@ export function PrivacyEs() {
           items={[
             'Los datos de tu cuenta permanecen mientras exista la cuenta.',
             'El contenido que compartiste en sesiones y encuestas permanece hasta que se elimine tu cuenta, momento en el que aplican los efectos descritos abajo.',
-            'Las copias de seguridad cifradas de la base de datos se conservan 30 días y luego se rotan. Los datos eliminados pueden sobrevivir en una copia de seguridad hasta ese plazo antes de expirar.',
+            'Las copias de seguridad de la base de datos se conservan 30 días y luego se rotan. Los datos eliminados pueden sobrevivir en una copia de seguridad hasta ese plazo antes de expirar.',
           ]}
         />
       </Section>
