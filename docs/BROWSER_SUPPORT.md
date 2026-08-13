@@ -37,7 +37,7 @@ The `browser` job in `.github/workflows/ci.yml` is one job per engine; `PARTYUP_
 | `browser (firefox)` | Firefox | `FullyQualifiedName~…` list | Curated subset of the *same* untagged flow classes |
 
 The firefox lane runs auth (the real register + onboard path every flow test performs), RSVP,
-availability-calendar keyboard create + occurrence-scope dialog, poll vote, and the
+availability-calendar keyboard create/edit/delete + occurrence-scope dialog, poll vote, and the
 notification-permission fallback. Running those on a
 second engine is **intended two-engine coverage, not an accidental double-run**: the chromium lane's
 filter is unchanged, and the `Browser!=` trait exclusion continues to apply only to engine-specific
@@ -50,16 +50,27 @@ misspelled variable that silently reran Chromium, or a filter that matched no fl
 instead of passing an empty one. `PlaywrightFixture` likewise throws on an unrecognized engine name
 rather than falling back to Chromium.
 
-## Known engine divergence (open)
+## Engine divergences found by this lane
 
-`AvailabilityCalendarFlowTests.KeyboardOnlyCreateEditDelete_D132` passes on Chromium and **fails on
-Firefox 151**: after the keyboard paint commits a one-time block, focusing that busy gridcell and
-pressing `Enter` does not open the "Edit availability" editor (30s timeout, local dev-topology run
-2026-08-12). The sibling `OccurrenceScopeDialogIsReachableWithoutAPointer_D143` performs the same
-focus + `Enter` on a *recurring-series* cell and passes on Firefox, so the divergence is specific to
-the one-time-block editor path. It is a genuine finding of this two-engine coverage, not a lane
-defect; the S8 slice's write set excludes `web/src`, so the fix is triaged separately and the D-143
-sibling carries the calendar seat in the firefox lane meanwhile.
+**Closed — the one-time-block editor (Phase 8 S7, 2026-08-12).** The lane's first finding was
+`AvailabilityCalendarFlowTests.KeyboardOnlyCreateEditDelete_D132` failing on Firefox 151 while
+passing on Chromium: after the keyboard paint committed a one-time block and the editor saved a
+moved block, `Enter` on the busy gridcell no longer opened "Edit availability". Root-caused to real
+app behaviour rather than a Gecko keyboard quirk — `WeekGridPage.tsx` closed the editor on the
+mutation's own response without awaiting the calendar refetch, and `BlockEditorDialog`'s
+`onCloseAutoFocus` then returned focus to the cell that had opened it, moments before the refetch
+repainted the block onto *different* cells. `Enter` on that now-free cell starts painting a new
+selection instead (proved by the live region reading "Selection started at 7:00 AM." at the failure
+point). Chromium's faster refetch won the race; Firefox lost it under load. Fixed by awaiting the
+invalidation before closing the editor (the shipped `createBlock` idiom), so focus is never returned
+into a stale grid. The test now runs in the firefox lane and is green on both engines.
+
+**Open — Gecko sub-pixel grid-cell height.** `AvailabilityCalendarFlowTests.GridCellsMeetGeometryFloor_D132`
+measures `43.999992px` for a `min-h-11` (44px) cell under Firefox 151 and fails its `>= 44` floor;
+Chromium reports exactly 44. This is a float artifact of Gecko's fractional layout, not a target-size
+defect (WCAG 2.2 AA's own 2.5.8 minimum is 24×24, and the rendered target is 44px to the viewer), so
+the assertion is left un-weakened and the fact stays a chromium-lane fact — the firefox lane selects
+the calendar seat per method, not per class. Re-check if Gecko's rounding changes.
 
 ## Residual owner duties (not automatable here)
 

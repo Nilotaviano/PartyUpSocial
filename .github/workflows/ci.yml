@@ -128,9 +128,13 @@ jobs:
           # costs `PlaywrightFixture`'s 65-second shared-rate-window barrier.
           # `BrowserEngineLaneTests` is the lane's liveness guard: it fails if the engine below did
           # not actually launch, so a filter or env typo cannot leave a silently green empty lane.
+          # The calendar seat is per method, not per class, for a second reason beyond registration
+          # cost: `GridCellsMeetGeometryFloor_D132` measures a Gecko sub-pixel rect (43.999992px
+          # against its 44px floor) and belongs to the chromium lane only — see
+          # docs/BROWSER_SUPPORT.md's engine-divergence section.
           - browser: firefox
             step-name: Firefox curated flows
-            filter: FullyQualifiedName~BrowserEngineLaneTests|FullyQualifiedName~SessionRegisteredFlowTests.KeyboardOnlyRsvp_TogglesGoingWithoutAMouse|FullyQualifiedName~AvailabilityCalendarFlowTests.OccurrenceScopeDialogIsReachableWithoutAPointer_D143|FullyQualifiedName~PollVotingFlowTests.RevisingAnExistingVote_KeepsFocusOnTheClickedControl_S6Gate|FullyQualifiedName~PushEnableFlowTests.EnableFlow_AbsentPushManagerShowsTheD175FallbackNotice_AndNeverPrompts_D175
+            filter: FullyQualifiedName~BrowserEngineLaneTests|FullyQualifiedName~SessionRegisteredFlowTests.KeyboardOnlyRsvp_TogglesGoingWithoutAMouse|FullyQualifiedName~AvailabilityCalendarFlowTests.OccurrenceScopeDialogIsReachableWithoutAPointer_D143|FullyQualifiedName~AvailabilityCalendarFlowTests.KeyboardOnlyCreateEditDelete_D132|FullyQualifiedName~PollVotingFlowTests.RevisingAnExistingVote_KeepsFocusOnTheClickedControl_S6Gate|FullyQualifiedName~PushEnableFlowTests.EnableFlow_AbsentPushManagerShowsTheD175FallbackNotice_AndNeverPrompts_D175
             install: firefox
             engine: firefox
     runs-on: ubuntu-latest

@@ -1160,6 +1160,79 @@ describe('WeekGridPage occurrence editing', () => {
     )
   })
 
+  // D-132/D-139: the editor's own close is what hands focus back to the grid
+  // cell that opened it (`BlockEditorDialog`'s `onCloseAutoFocus`). An edit
+  // repaints the block onto different cells, so closing on the PATCH response —
+  // before the calendar refetch has landed — returns a keyboard viewer to a cell
+  // that is about to stop being their block, and `Enter` there starts painting a
+  // new selection instead of reopening it. Found on Firefox 151 by the D-138
+  // two-engine lane, where the slower refetch loses that race every time.
+  it('keeps the editor open until the calendar refetch lands, so focus never returns into a stale grid_D132_D139', async () => {
+    let releaseRefetch: (() => void) | null = null
+    let calendarCalls = 0
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve({ data: profileResponse() })
+      if (path === '/api/v1/calendar') {
+        calendarCalls += 1
+        const payload = {
+          data: {
+            myAvailability: {
+              occurrences: [
+                {
+                  startTime: '2026-08-10T13:00:00.000Z',
+                  endTime: '2026-08-10T13:30:00.000Z',
+                  origin: { kind: 'block', blockId: 'block-1', seriesId: null, occurrenceDate: null },
+                },
+              ],
+              merged: [{ start: '2026-08-10T13:00:00.000Z', end: '2026-08-10T13:30:00.000Z' }],
+              range: { start: '2026-08-10T13:00:00.000Z', end: '2026-08-10T13:30:00.000Z' },
+            },
+            friendAvailability: [],
+            sessions: [],
+            pollOptions: [],
+          },
+        }
+        // The post-edit refetch is held open by hand: the assertion below is
+        // exactly that the dialog is still up while it is in flight.
+        if (calendarCalls > 1) {
+          return new Promise((resolve) => {
+            releaseRefetch = () => resolve(payload)
+          })
+        }
+        return Promise.resolve(payload)
+      }
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    api.patch.mockResolvedValue({ data: { blockId: 'block-1' } })
+
+    renderPage()
+
+    await screen.findAllByRole('gridcell', { name: /Busy/ }, { timeout: 5000 })
+    const busyCell = screen.getAllByRole('gridcell', { name: /Busy/ })[0]
+    busyCell.focus()
+    fireEvent.keyDown(busyCell, { key: 'Enter' })
+
+    const editDialog = await screen.findByRole('dialog')
+    expect(editDialog).toHaveTextContent('Edit availability')
+
+    fireEvent.change(screen.getByLabelText('Start time'), {
+      target: { value: '2026-08-10T15:00' },
+    })
+    fireEvent.change(screen.getByLabelText('End time'), {
+      target: { value: '2026-08-10T15:30' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    // The write itself has already gone out and been answered...
+    await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(releaseRefetch).not.toBeNull())
+    // ...yet the editor is still up, because the grid behind it is still stale.
+    expect(screen.getByRole('dialog')).toHaveTextContent('Edit availability')
+
+    releaseRefetch!()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
   it('rejects an end time at or before the start time locally, without a server round trip_D071', async () => {
     api.get.mockImplementation((path: string) => {
       if (path === '/api/v1/me') return Promise.resolve({ data: profileResponse() })

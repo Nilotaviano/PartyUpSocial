@@ -24,6 +24,11 @@ function isOffGrid(value: string): boolean {
 
 type BlockEditorDialogProps = {
   open: boolean
+  /** The dialog stays open until its write has refetched the calendar
+   * (`WeekGridPage.tsx`), so the form has to refuse a second submit in that
+   * window. `aria-busy` rather than `disabled`: disabling the submit button the
+   * viewer just activated would drop their focus to `document.body`. */
+  pending?: boolean
   initialStart: string
   initialEnd: string
   onOpenChange: (open: boolean) => void
@@ -39,6 +44,7 @@ type BlockEditorDialogProps = {
  */
 export function BlockEditorDialog({
   open,
+  pending = false,
   initialStart,
   initialEnd,
   onOpenChange,
@@ -87,9 +93,11 @@ export function BlockEditorDialog({
             {t('block.editHeading')}
           </Dialog.Title>
           <form
+            aria-busy={pending}
             className="mt-4 space-y-4"
             onSubmit={(event) => {
               event.preventDefault()
+              if (pending) return
               // Local-only: the server remains the authoritative validator
               // (`availability_validation`, §8) — this just saves a doomed
               // round trip and shows the reason before it happens.
@@ -140,7 +148,9 @@ export function BlockEditorDialog({
                 <button
                   className={`px-4 py-2 text-danger-ink bg-danger dark:border-danger-ink ${raisedInteractiveClasses}`}
                   type="button"
-                  onClick={onDelete}
+                  onClick={() => {
+                    if (!pending) onDelete()
+                  }}
                 >
                   {t('block.delete')}
                 </button>

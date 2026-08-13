@@ -250,18 +250,25 @@ export function WeekGridPage() {
       return invalidate()
     },
   })
+  // The editor closes only once the calendar query has actually refetched.
+  // `BlockEditorDialog` restores focus to the cell that opened it, and an edit
+  // repaints the block onto different cells — closing on the mutation's own
+  // response would hand a keyboard user focus on a cell whose content is still
+  // about to change, so `Enter` there starts painting a new selection instead
+  // of reopening the block (WCAG 3.2.2). `createBlock` above already awaits its
+  // invalidation for the same reason.
   const editBlock = useMutation({
     mutationFn: ({ blockId, body }: { blockId: string; body: { startTime: string; endTime: string } }) =>
       editAvailabilityBlock(blockId, body),
-    onSuccess: () => {
-      invalidate()
+    onSuccess: async () => {
+      await invalidate()
       setBlockDialogOpen(false)
     },
   })
   const deleteBlock = useMutation({
     mutationFn: deleteAvailabilityBlock,
-    onSuccess: () => {
-      invalidate()
+    onSuccess: async () => {
+      await invalidate()
       setBlockDialogOpen(false)
     },
   })
@@ -279,16 +286,16 @@ export function WeekGridPage() {
       occurrenceDate: string
       body: Parameters<typeof editAvailabilityOccurrence>[2]
     }) => editAvailabilityOccurrence(seriesId, occurrenceDate, body),
-    onSuccess: () => {
-      invalidate()
+    onSuccess: async () => {
+      await invalidate()
       setBlockDialogOpen(false)
     },
   })
   const deleteOccurrence = useMutation({
     mutationFn: ({ seriesId, occurrenceDate }: { seriesId: string; occurrenceDate: string }) =>
       deleteAvailabilityOccurrence(seriesId, occurrenceDate),
-    onSuccess: () => {
-      invalidate()
+    onSuccess: async () => {
+      await invalidate()
       setBlockDialogOpen(false)
     },
   })
@@ -879,6 +886,12 @@ export function WeekGridPage() {
         initialEnd={blockEditorValue.end}
         initialStart={blockEditorValue.start}
         open={blockDialogOpen}
+        pending={
+          editBlock.isPending ||
+          deleteBlock.isPending ||
+          editOccurrence.isPending ||
+          deleteOccurrence.isPending
+        }
         triggerRef={editTrigger}
         onDelete={handleDelete}
         onOpenChange={setBlockDialogOpen}
