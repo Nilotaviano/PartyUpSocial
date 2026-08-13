@@ -15,11 +15,15 @@ public sealed record SetSessionReminderResult(bool Succeeded, string? Code, Sess
 /// <summary>
 /// D-082's per-session <c>ReminderChoice</c> override (PHASE4_DESIGN.md §5.2). Rejected with
 /// <c>reminder_not_eligible</c> for a guest, a <c>Removed</c>/<c>Declined</c> row, a missing
-/// participation, or a terminal session; otherwise a §7.1 replan trigger.
+/// participation, or a terminal session; otherwise a §7.1 replan trigger. Access runs through
+/// <see cref="SessionActorVisibilityGate"/> first, so a caller the visibility engine denies gets the
+/// same <c>session_not_found</c> a missing session gives (A-055).
 /// </summary>
 public sealed class SetSessionReminderUseCase(
     ISessionRepository sessions,
     ISessionLockRepository sessionLocks,
+    IFriendshipRepository friendships,
+    IBlockRepository blocks,
     ISessionReminderHandoffWriter reminders,
     IUnitOfWork unitOfWork,
     IClock clock)
@@ -32,10 +36,14 @@ public sealed class SetSessionReminderUseCase(
         unitOfWork.ExecuteAsync(
             async ct =>
             {
-                await sessionLocks.LockUsersAsync([actorId], ct);
-                await sessionLocks.LockSessionsAsync([sessionId], ct);
-
-                SessionForUpdate? forUpdate = await sessions.LoadForUpdateAsync(sessionId, ct);
+                SessionForUpdate? forUpdate = await SessionActorVisibilityGate.LoadVisibleForUpdateAsync(
+                    sessionId,
+                    actorId,
+                    sessions,
+                    sessionLocks,
+                    friendships,
+                    blocks,
+                    ct);
                 if (forUpdate is null)
                 {
                     return SetSessionReminderResult.Failed("session_not_found");
@@ -43,13 +51,13 @@ public sealed class SetSessionReminderUseCase(
 
                 Session session = forUpdate.Session;
 
-                if (session.IsTerminal)
+                Participation? row = session.Find(ParticipantRef.ForUser(actorId));
+                if (row is null || row.IsRemoved || row.Status == ParticipationStatus.Declined)
                 {
                     return SetSessionReminderResult.Failed("reminder_not_eligible");
                 }
 
-                Participation? row = session.Find(ParticipantRef.ForUser(actorId));
-                if (row is null || row.IsRemoved || row.Status == ParticipationStatus.Declined)
+                if (session.IsTerminal)
                 {
                     return SetSessionReminderResult.Failed("reminder_not_eligible");
                 }

@@ -51,7 +51,14 @@ public sealed class SessionReminderHandoffTests
 
         var throwingMaterializer = new ThrowingSessionNotificationMaterializer();
         SessionParticipationUseCases throwingUseCase = new(
-            fixture.Sessions, fixture.Locks, throwingMaterializer, fixture.Reminders, fixture.UnitOfWork, fixture.Clock);
+            fixture.Sessions,
+            fixture.Locks,
+            fixture.Friendships,
+            fixture.Blocks,
+            throwingMaterializer,
+            fixture.Reminders,
+            fixture.UnitOfWork,
+            fixture.Clock);
 
         // D-055/§7.1: leaving replans (in the real writer, cancels) the departing participant's
         // handoff in the same transaction as the Declined write and the notification materialization.

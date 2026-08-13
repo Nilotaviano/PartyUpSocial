@@ -450,6 +450,8 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
     private static SessionParticipationUseCases BuildParticipationUseCases(AsyncServiceScope scope) => new(
         scope.ServiceProvider.GetRequiredService<ISessionRepository>(),
         scope.ServiceProvider.GetRequiredService<ISessionLockRepository>(),
+        scope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
+        scope.ServiceProvider.GetRequiredService<IBlockRepository>(),
         scope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
         scope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),

@@ -511,9 +511,12 @@ public sealed class Session : AggregateRoot
 
         ApplyDueTransitions(clock);
         Instant now = clock.GetCurrentInstant();
+
+        // Identity before state (A-055): a caller who is not on the roster must not learn the
+        // session's lifecycle state from a terminal_state/window_closed answer.
+        Participation row = RequireParticipation(participant);
         RequireRosterMutable(now, "RSVP");
 
-        Participation row = RequireParticipation(participant);
         int freeBefore = FreeSlots;
 
         if (row.Status is ParticipationStatus.Going or ParticipationStatus.Maybe)
@@ -544,9 +547,10 @@ public sealed class Session : AggregateRoot
         ApplyDueTransitions(clock);
 
         Instant now = clock.GetCurrentInstant();
-        RequireRosterMutable(now, "decline");
 
+        // Identity before state (A-055), as in Rsvp.
         Participation row = RequireParticipation(participant);
+        RequireRosterMutable(now, "decline");
 
         if (row.Status != ParticipationStatus.Pending)
         {

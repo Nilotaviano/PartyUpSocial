@@ -14,6 +14,8 @@ namespace PartyUp.Application.Sessions;
 public sealed class SessionParticipationUseCases(
     ISessionRepository sessions,
     ISessionLockRepository sessionLocks,
+    IFriendshipRepository friendships,
+    IBlockRepository blocks,
     ISessionNotificationMaterializer materializer,
     ISessionReminderHandoffWriter reminders,
     IUnitOfWork unitOfWork,
@@ -27,10 +29,14 @@ public sealed class SessionParticipationUseCases(
         unitOfWork.ExecuteAsync(
             async ct =>
             {
-                await sessionLocks.LockUsersAsync([actorId], ct);
-                await sessionLocks.LockSessionsAsync([sessionId], ct);
-
-                SessionForUpdate? forUpdate = await sessions.LoadForUpdateAsync(sessionId, ct);
+                SessionForUpdate? forUpdate = await SessionActorVisibilityGate.LoadVisibleForUpdateAsync(
+                    sessionId,
+                    actorId,
+                    sessions,
+                    sessionLocks,
+                    friendships,
+                    blocks,
+                    ct);
                 if (forUpdate is null)
                 {
                     return SessionCommandResult.Failed("session_not_found");

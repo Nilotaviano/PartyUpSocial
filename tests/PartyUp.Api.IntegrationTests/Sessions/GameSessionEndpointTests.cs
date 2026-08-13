@@ -1535,7 +1535,8 @@ internal static class SessionEndpointTestSupport
         int? maxCapacity = null,
         int leadMinutes = 20,
         int durationMinutes = 15,
-        bool isPrivate = true)
+        bool isPrivate = true,
+        IReadOnlyCollection<UserId>? invitees = null)
     {
         SessionDetails details = new(
             SessionTitle.Create("Support-seeded session"),
@@ -1547,7 +1548,7 @@ internal static class SessionEndpointTestSupport
             minAttendance,
             maxCapacity,
             isPrivate);
-        Session session = Session.Create(organizerId, details, [], factory.Clock);
+        Session session = Session.Create(organizerId, details, invitees ?? [], factory.Clock);
         _ = session.DequeueEvents();
 
         await using AsyncServiceScope scope = factory.Services.CreateAsyncScope();

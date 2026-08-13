@@ -434,13 +434,13 @@ internal sealed class SessionTestFixture
         new(Sessions, Locks, Friendships, Blocks, Materializer, Reminders, UnitOfWork, Clock, InviteEmails);
 
     internal SessionParticipationUseCases ParticipationUseCases() =>
-        new(Sessions, Locks, Materializer, Reminders, UnitOfWork, Clock);
+        new(Sessions, Locks, Friendships, Blocks, Materializer, Reminders, UnitOfWork, Clock);
 
     internal SessionJoinRequestUseCases JoinRequestUseCases() =>
         new(Sessions, Reads, Locks, Friendships, Blocks, Materializer, Reminders, UnitOfWork, Clock, InviteEmails);
 
     internal SetSessionReminderUseCase ReminderUseCase() =>
-        new(Sessions, Locks, Reminders, UnitOfWork, Clock);
+        new(Sessions, Locks, Friendships, Blocks, Reminders, UnitOfWork, Clock);
 
     internal SessionReadUseCases ReadUseCases() =>
         new(Sessions, Reads, Friendships, Blocks, Mutes);

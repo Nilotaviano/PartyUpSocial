@@ -21,11 +21,13 @@ public sealed class SetSessionReminderTests
         Assert.Contains((session.Id, fixture.InviteeId), fixture.Reminders.Replans);
         Assert.Equal(ReminderOffset.Min30, session.Find(ParticipantRef.ForUser(fixture.InviteeId))!.ReminderChoice);
 
-        // A guest (no participation at all under this user id) is rejected.
-        SetSessionReminderResult guestResult = await useCase.ExecuteAsync(
+        // A stranger (no participation at all under this user id) cannot see the session, so A-055
+        // requires the same session_not_found a missing session gives -- never an eligibility answer,
+        // which would confirm the session exists.
+        SetSessionReminderResult strangerResult = await useCase.ExecuteAsync(
             session.Id, UserId.New(), ReminderOffset.Hours1, default);
-        Assert.False(guestResult.Succeeded);
-        Assert.Equal("reminder_not_eligible", guestResult.Code);
+        Assert.False(strangerResult.Succeeded);
+        Assert.Equal("session_not_found", strangerResult.Code);
 
         // A Removed row is rejected.
         session.RemoveParticipation(ParticipantRef.ForUser(fixture.InviteeId), fixture.Clock);
