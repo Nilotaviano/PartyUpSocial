@@ -373,6 +373,25 @@ describe('WeekGrid pointer flow', () => {
 // the pointer coordinates, a keyboard or touch commit passes the
 // focused/last-selected cell's own measured rect.
 describe('WeekGrid commit anchor_S3', () => {
+  // Per element, never on `HTMLElement.prototype`: a prototype-wide stub makes
+  // every cell measure the same, so the assertion could only prove that *a*
+  // rect was taken — this pins the anchor to the specific cell measured.
+  function stubCellRect(cell: HTMLElement, top: number): DOMRect {
+    const rect = {
+      x: 10,
+      y: top,
+      width: 44,
+      height: 44,
+      top,
+      left: 10,
+      right: 54,
+      bottom: top + 44,
+      toJSON: () => ({}),
+    } as DOMRect
+    vi.spyOn(cell, 'getBoundingClientRect').mockReturnValue(rect)
+    return rect
+  }
+
   it('passes the pointer release coordinates as the anchor for a mouse commit', () => {
     const { onCreateBlock } = renderGrid({})
 
@@ -388,49 +407,33 @@ describe('WeekGrid commit anchor_S3', () => {
   })
 
   it('passes the focused cell rect as the anchor for a keyboard commit', () => {
-    const rect = {
-      x: 10,
-      y: 20,
-      width: 44,
-      height: 44,
-      top: 20,
-      left: 10,
-      right: 54,
-      bottom: 64,
-      toJSON: () => ({}),
-    } as DOMRect
-    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(rect)
     const { onCreateBlock } = renderGrid({})
 
-    const cell = screen.getAllByRole('gridcell', { name: '9:00' })[0]
-    cell.focus()
-    fireEvent.keyDown(cell, { key: 'Enter' })
-    fireEvent.keyDown(cell, { key: 'Enter' })
+    const start = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    const extended = screen.getAllByRole('gridcell', { name: '9:15' })[0]
+    const startRect = stubCellRect(start, 20)
+    const extendedRect = stubCellRect(extended, 64)
+
+    start.focus()
+    fireEvent.keyDown(start, { key: 'Enter' })
+    fireEvent.keyDown(start, { key: 'ArrowDown', shiftKey: true })
+    fireEvent.keyDown(extended, { key: 'Enter' })
 
     expect(onCreateBlock).toHaveBeenCalledTimes(1)
     const [, anchor] = onCreateBlock.mock.calls[0]
-    expect(anchor).toBe(rect)
-
-    spy.mockRestore()
+    expect(anchor).toBe(extendedRect)
+    expect(anchor).not.toBe(startRect)
   })
 
   it('passes the release cell rect as the anchor for a touch commit_P5TOUCH01', () => {
     vi.useFakeTimers()
-    const rect = {
-      x: 5,
-      y: 5,
-      width: 44,
-      height: 44,
-      top: 5,
-      left: 5,
-      right: 49,
-      bottom: 49,
-      toJSON: () => ({}),
-    } as DOMRect
-    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(rect)
     const { onCreateBlock } = renderGrid({})
 
     const start = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    const release = screen.getAllByRole('gridcell', { name: '9:15' })[0]
+    const startRect = stubCellRect(start, 5)
+    const releaseRect = stubCellRect(release, 49)
+
     fireEvent.pointerDown(start, { pointerType: 'touch', clientX: 5, clientY: 5 })
     // Flushes the long-press timer's state update to a committed render
     // before the liftoff event — matching a real long-press, where the two
@@ -438,13 +441,14 @@ describe('WeekGrid commit anchor_S3', () => {
     act(() => {
       vi.advanceTimersByTime(500)
     })
-    fireEvent.pointerUp(start, { pointerType: 'touch', clientX: 5, clientY: 5 })
+    fireEvent.pointerMove(release, { pointerType: 'touch', clientX: 5, clientY: 49 })
+    fireEvent.pointerUp(release, { pointerType: 'touch', clientX: 5, clientY: 49 })
 
     expect(onCreateBlock).toHaveBeenCalledTimes(1)
     const [, anchor] = onCreateBlock.mock.calls[0]
-    expect(anchor).toBe(rect)
+    expect(anchor).toBe(releaseRect)
+    expect(anchor).not.toBe(startRect)
 
-    spy.mockRestore()
     vi.useRealTimers()
   })
 })
@@ -1156,12 +1160,6 @@ describe('WeekGridPage commit step', () => {
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
   }, 20_000)
 
-  // §9 S3: Escape still closes the dialog and Radix still restores focus to
-  // whatever was focused before it opened — the mousedown that started the
-  // drag focuses `dragStart` (browsers focus a mousedown target by default),
-  // so that's the element the popover's own focus trap must hand back to.
-  // Radix's own Escape handling (`Dialog` in ui/dialog.tsx is untouched by
-  // this slice) — proof it still closes the popover/sheet without saving.
   it('closes on Escape without saving_S3', async () => {
     renderPage()
     await paintRange()
@@ -1171,20 +1169,6 @@ describe('WeekGridPage commit step', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(api.post).not.toHaveBeenCalled()
-  })
-
-  // Radix's `FocusScope` traps Tab inside the dialog — proof that contract
-  // (untouched, from the shared `Dialog` primitive) still holds after the
-  // restyle: cycling Tab never lands outside the dialog's own controls.
-  it('traps Tab focus inside the dialog_S3', async () => {
-    renderPage()
-    await paintRange()
-
-    const dialog = await screen.findByRole('dialog')
-    for (let i = 0; i < 6; i += 1) {
-      fireEvent.keyDown(dialog, { key: 'Tab', code: 'Tab' })
-      expect(dialog.contains(document.activeElement)).toBe(true)
-    }
   })
 
   it('renders as a ≥sm popover clamped inside the viewport_S3', async () => {

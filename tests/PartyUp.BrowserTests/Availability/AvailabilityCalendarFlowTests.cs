@@ -21,6 +21,12 @@ namespace PartyUp.BrowserTests.Availability;
 [Collection(PlaywrightSuite.Name)]
 public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
 {
+    /// <summary>
+    /// The commit dialog's accessible name is the painted range (`commit.range`), formatted in the
+    /// viewer's locale — matched on the "time separator time" shape so it survives any range value.
+    /// </summary>
+    private static readonly Regex CommitRangePattern = new(@"\d{1,2}:\d{2}.*\d{1,2}:\d{2}");
+
     private static readonly SemaphoreSlim SetupLock = new(1, 1);
     private static RegisteredUser? _organizer;
 
@@ -206,12 +212,38 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         // dialog's one-time/weekly choice is confirmed. Keyboard-only, so the choice is left at
         // its "Just this time" default (a one-time block, which the edit half below depends on)
         // and Save is reached and activated without a pointer.
-        ILocator commitDialog = page.GetByRole(AriaRole.Dialog);
-        await commitDialog.GetByText("Add this availability?").WaitForAsync();
+        // The dialog is named by the painted range itself ("08:00 AM–08:30 AM"), so it is matched
+        // on the time-range shape rather than on a fixed title string.
+        ILocator commitDialog = page.GetByRole(AriaRole.Dialog, new() { NameRegex = CommitRangePattern });
+        await commitDialog.WaitForAsync();
         await Assertions.Expect(busyCellsInDom).ToHaveCountAsync(baselineBusyInDom);
         await Assertions
             .Expect(commitDialog.GetByRole(AriaRole.Radio, new() { Name = "Just this time" }))
             .ToBeCheckedAsync();
+
+        // WCAG 2.4.3/2.1.2: the popover is modal, so Tab has to cycle within it — six presses is
+        // more than one full cycle of its controls (two recurrence radios, Cancel, Save).
+        for (int tab = 0; tab < 6; tab++)
+        {
+            await page.Keyboard.PressAsync("Tab");
+            bool insideDialog = await commitDialog.EvaluateAsync<bool>(
+                "node => node.contains(document.activeElement)");
+            Assert.True(insideDialog, $"Tab press {tab + 1} moved focus outside the commit dialog.");
+        }
+
+        // Dismissing hands focus back to the grid the paint came from, rather than dropping it on
+        // the document body — the keyboard viewer resumes where they left off.
+        await page.Keyboard.PressAsync("Escape");
+        await Assertions.Expect(commitDialog).Not.ToBeVisibleAsync();
+        await Assertions.Expect(page.Locator("[role=grid] [role=gridcell]:focus")).ToHaveCountAsync(1);
+        await Assertions.Expect(busyCellsInDom).ToHaveCountAsync(baselineBusyInDom);
+
+        // Paint again from the restored focus position and take the same commit dialog through to
+        // Save this time — the create half of this fact continues from here.
+        await page.Keyboard.PressAsync("Enter");
+        await page.Keyboard.PressAsync("Shift+ArrowDown");
+        await page.Keyboard.PressAsync("Enter");
+        await commitDialog.WaitForAsync();
 
         ILocator commitSave = commitDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true });
         await commitSave.FocusAsync();

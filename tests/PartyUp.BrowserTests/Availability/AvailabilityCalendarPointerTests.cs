@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
 namespace PartyUp.BrowserTests.Availability;
@@ -30,6 +31,12 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
     // `RegisterAndOnboardAsync` is browser-agnostic (takes an `IBrowserContext` parameter, never
     // touches `fixture.Browser`), so it works unmodified against the WebKit context this class
     // creates for itself below.
+    /// <summary>
+    /// The commit dialog's accessible name is the painted range (`commit.range`), formatted in the
+    /// viewer's locale — matched on the "time separator time" shape so it survives any range value.
+    /// </summary>
+    private static readonly Regex CommitRangePattern = new(@"\d{1,2}:\d{2}.*\d{1,2}:\d{2}");
+
     private const int LongPressSettleMs = 550;
     private const int ShortPressMs = 100;
     private const int AutoScrollSettleMs = 600;
@@ -90,8 +97,8 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
     /// </summary>
     private static async Task ConfirmCommitDialogAsync(IPage page)
     {
-        ILocator dialog = page.GetByRole(AriaRole.Dialog);
-        await dialog.GetByText("Add this availability?").WaitForAsync();
+        ILocator dialog = page.GetByRole(AriaRole.Dialog, new() { NameRegex = CommitRangePattern });
+        await dialog.WaitForAsync();
         await dialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await Assertions.Expect(dialog).Not.ToBeVisibleAsync();
     }
@@ -181,9 +188,9 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             // fact is about the auto-scroll, not about creating anything, so the proposal is
             // discarded — and it has to be dismissed before the grid is asserted against at all:
             // while that modal is up Radix `aria-hidden`s the page and no role locator resolves.
-            ILocator commitDialog = page.GetByRole(AriaRole.Dialog);
-            await commitDialog.GetByText("Add this availability?").WaitForAsync();
-            await commitDialog.GetByRole(AriaRole.Button, new() { Name = "Discard" }).ClickAsync();
+            ILocator commitDialog = page.GetByRole(AriaRole.Dialog, new() { NameRegex = CommitRangePattern });
+            await commitDialog.WaitForAsync();
+            await commitDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
             await Assertions.Expect(commitDialog).Not.ToBeVisibleAsync();
 
             await Assertions.Expect(grid).ToHaveAttributeAsync("data-touch-dragging", "false");

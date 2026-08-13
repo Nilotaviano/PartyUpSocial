@@ -386,6 +386,10 @@ export function WeekGrid({
   )
   const [focused, setFocused] = useState<Cursor>({ day: 0, slot: 0 })
   const [selection, setSelection] = useState<Selection | null>(null)
+  // A continuous-priority mousemove/pointermove render can still be pending when
+  // the discrete mouseup fires, so the committed range is read from this ref —
+  // updated in the same DOM event that calls `setSelection` — never from state.
+  const selectionRef = useRef<Selection | null>(null)
   const [liveMessage, setLiveMessage] = useState('')
   // Mirrors `dragging.current` as render state, for exactly one purpose:
   // gating `touch-action` on the grid container. Before a long-press fires,
@@ -526,7 +530,9 @@ export function WeekGrid({
   }
 
   function beginSelection(day: number, slot: number) {
-    setSelection({ day, anchorSlot: slot, endSlot: slot })
+    const next: Selection = { day, anchorSlot: slot, endSlot: slot }
+    selectionRef.current = next
+    setSelection(next)
     setLiveMessage(
       t('a11y.selectionStarted', {
         time: timeLabelFormatter(cellTime(weekStart, day, slot, startHour)),
@@ -535,11 +541,12 @@ export function WeekGrid({
   }
 
   function extendSelection(day: number, slot: number) {
-    setSelection((current) => {
-      if (!current || current.day !== day) return current
-      return { ...current, endSlot: slot }
-    })
-    if (selection) announceExtent(day, selection.anchorSlot, slot)
+    const current = selectionRef.current
+    if (!current || current.day !== day) return
+    const next: Selection = { ...current, endSlot: slot }
+    selectionRef.current = next
+    setSelection(next)
+    announceExtent(day, current.anchorSlot, slot)
   }
 
   // Falls back to a zero-size rect at the origin only when the cell was
@@ -565,11 +572,16 @@ export function WeekGrid({
         end: timeLabelFormatter(end),
       }),
     )
+    clearSelection()
+  }
+
+  function clearSelection() {
+    selectionRef.current = null
     setSelection(null)
   }
 
   function cancelSelection() {
-    setSelection(null)
+    clearSelection()
     setLiveMessage(t('a11y.selectionCanceled'))
   }
 
@@ -686,7 +698,7 @@ export function WeekGrid({
       case 'ArrowUp': {
         event.preventDefault()
         const nextSlot = Math.max(0, slot - 1)
-        if (event.shiftKey && selection && selection.day === day) {
+        if (event.shiftKey) {
           extendSelection(day, nextSlot)
         }
         setFocused({ day, slot: nextSlot })
@@ -695,7 +707,7 @@ export function WeekGrid({
       case 'ArrowDown': {
         event.preventDefault()
         const nextSlot = Math.min(slots - 1, slot + 1)
-        if (event.shiftKey && selection && selection.day === day) {
+        if (event.shiftKey) {
           extendSelection(day, nextSlot)
         }
         setFocused({ day, slot: nextSlot })
@@ -717,8 +729,9 @@ export function WeekGrid({
       case 'Enter':
       case ' ': {
         event.preventDefault()
-        if (selection) {
-          commitSelection(selection, cellRect(day, slot))
+        const pending = selectionRef.current
+        if (pending) {
+          commitSelection(pending, cellRect(day, slot))
           break
         }
         const occurrence = occurrenceAt(day, slot)
@@ -732,7 +745,7 @@ export function WeekGrid({
         break
       }
       case 'Escape': {
-        if (selection) {
+        if (selectionRef.current) {
           event.preventDefault()
           cancelSelection()
         }
@@ -789,20 +802,12 @@ export function WeekGrid({
     extendSelection(day, slot)
   }
 
-  // Commits by reading `selection` from this closure rather than through a
-  // `setSelection` functional updater: a `(current) => { onCreateBlock(...) }`
-  // callback runs during WeekGrid's own render pass (React invokes queued
-  // updaters there), and `onCreateBlock` sets state on the parent
-  // `WeekGridPage` — that combination is "update a component while
-  // rendering a different component", which React drops rather than applies.
-  // The plain event-handler closure is never stale here: a mouse/touch
-  // gesture's down/move/up are separate native events, and React commits the
-  // pending render from each before the next one is dispatched.
   function handleMouseUp(event: React.MouseEvent) {
     if (!dragging.current) return
     dragging.current = false
-    if (selection) commitSelection(selection, pointRect(event.clientX, event.clientY))
-    setSelection(null)
+    const pending = selectionRef.current
+    if (pending) commitSelection(pending, pointRect(event.clientX, event.clientY))
+    else clearSelection()
   }
 
   // A native `click` only fires when the same element received both
@@ -881,8 +886,9 @@ export function WeekGrid({
     if (wasLongPress) {
       dragging.current = false
       setIsTouchDragging(false)
-      if (selection) commitSelection(selection, cellRect(day, slot))
-      setSelection(null)
+      const pending = selectionRef.current
+      if (pending) commitSelection(pending, cellRect(day, slot))
+      else clearSelection()
       return
     }
     if (isTap) {
@@ -910,7 +916,7 @@ export function WeekGrid({
     if (dragging.current) {
       dragging.current = false
       setIsTouchDragging(false)
-      setSelection(null)
+      clearSelection()
     }
   }
 

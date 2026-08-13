@@ -687,8 +687,12 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
                 await page.Keyboard.PressAsync("Enter");
                 await page.Keyboard.PressAsync("Shift+ArrowDown");
                 await page.Keyboard.PressAsync("Enter");
-                await page.GetByRole(AriaRole.Dialog)
-                    .GetByText("Add this availability?").WaitForAsync();
+                // Named by the painted range itself, so it is matched on the time-range shape
+                // rather than on a fixed title string.
+                await page.GetByRole(
+                        AriaRole.Dialog,
+                        new() { NameRegex = new Regex(@"\d{1,2}:\d{2}.*\d{1,2}:\d{2}") })
+                    .WaitForAsync();
             });
 
         await AssertInteractionStateIsAxeCleanAsync(
