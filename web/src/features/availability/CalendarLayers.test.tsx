@@ -100,4 +100,36 @@ describe('CalendarLayers', () => {
     expect(localStorageSpy).not.toHaveBeenCalled()
     expect(historySpy).not.toHaveBeenCalled()
   })
+  // PHASE8_DESIGN.md §3 S7 (D-139, WCAG 1.4.1): the legend pairs each layer with a colour swatch,
+  // which is exactly the shape that fails "use of colour" if the swatch is the only thing
+  // distinguishing one layer from another. It does not here — every swatch is decorative
+  // (`aria-hidden`) and the meaning is carried by the control's own text label — but nothing
+  // asserted that, so a future restyle could quietly drop the text and leave colour alone.
+  it('codes every calendar layer by text, never by its colour swatch alone_D139', () => {
+    const onChange = vi.fn<(state: CalendarLayerState) => void>()
+    const { container } = render(
+      <CalendarLayers friends={[friend(0, 'Ana')]} onChange={onChange} />,
+    )
+
+    const layerNames = [
+      'My availability',
+      "Friends' availability",
+      'Sessions',
+      'Poll options',
+    ]
+    for (const name of layerNames) {
+      // A text-derived accessible name is the whole point: getByLabelText resolves it from the
+      // label's own text content, which is what a screen reader announces.
+      expect(screen.getByLabelText(name)).toHaveAttribute('type', 'checkbox')
+    }
+
+    // Every swatch is decorative and none of them carries text, so removing colour entirely
+    // leaves the legend fully readable.
+    const swatches = container.querySelectorAll('span.rounded-full')
+    expect(swatches.length).toBe(layerNames.length)
+    for (const swatch of swatches) {
+      expect(swatch).toHaveAttribute('aria-hidden', 'true')
+      expect(swatch.textContent).toBe('')
+    }
+  })
 })

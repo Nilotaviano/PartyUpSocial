@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
 namespace PartyUp.BrowserTests.Polls;
@@ -202,6 +203,151 @@ public sealed class PollVotingFlowTests(PlaywrightFixture fixture)
         await Assertions.Expect(available).ToHaveAttributeAsync("aria-checked", "true");
         await guestPage.GetByText("Your vote was saved.").WaitForAsync();
         Assert.DoesNotContain("token", guestPage.Url, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// PHASE8_DESIGN.md §3 S7: the poll grid's first real-browser keyboard/SR sweep. The Phase 6
+    /// facts above prove the APG traversal idiom; what had never been proven in a browser is that a
+    /// vote can be *cast* with the keyboard alone and that its result is observable to a screen
+    /// reader — the tally is plain text, not a color or a chart, so this reads that text back off the
+    /// live DOM rather than trusting the fill.
+    /// </summary>
+    [Fact]
+    public async Task PollGrid_KeyboardOnlyVoteCast_UpdatesTheSrObservableTally_D139()
+    {
+        RegisteredUser organizer = await GetOrganizerAsync();
+        string pollId = await CreatePrivatePollAsync(
+            organizer.Page, "SR tally proof " + Guid.NewGuid().ToString("N")[..6], DateTime.UtcNow.AddDays(2));
+        await organizer.Page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/polls/" + pollId);
+
+        ILocator firstOptionCard = organizer.Page.Locator("[data-testid^='poll-option-']").First;
+        ILocator tally = firstOptionCard.Locator("[data-testid^='poll-option-tally-']");
+        ILocator available = firstOptionCard.Locator("[data-testid^='vote-available-']");
+        ILocator maybe = firstOptionCard.Locator("[data-testid^='vote-maybe-']");
+
+        // The zero state is itself SR-observable text, not an absence of a glyph.
+        await Assertions.Expect(tally).ToHaveTextAsync("No votes yet.");
+
+        // Keyboard alone: the row's single tab stop, then Space — the ARIA radio activation key.
+        // No click, no pointer anywhere in this fact.
+        await available.FocusAsync();
+        await Assertions.Expect(available).ToBeFocusedAsync();
+        await organizer.Page.Keyboard.PressAsync(" ");
+
+        await organizer.Page.GetByText("Your vote was saved.").WaitForAsync();
+        await Assertions.Expect(available).ToHaveAttributeAsync("aria-checked", "true");
+        // The tally a screen reader reads is the proof the vote landed — a count in words, which
+        // no amount of fill color would supply.
+        await Assertions.Expect(tally).ToHaveTextAsync(new Regex(@"\b1 available\b"));
+
+        // Roving tabindex followed the checked control (APG): exactly one tab stop per row.
+        await Assertions.Expect(available).ToHaveAttributeAsync("tabindex", "0");
+        await Assertions.Expect(maybe).ToHaveAttributeAsync("tabindex", "-1");
+        Assert.Equal(
+            1,
+            await firstOptionCard.Locator("[role=radio][tabindex='0']").CountAsync());
+
+        // And the control's own accessible name carries the value, never the glyph alone.
+        await Assertions.Expect(available).ToHaveAttributeAsync(
+            "aria-label", new Regex(", Available$"));
+    }
+
+    /// <summary>
+    /// PHASE8_DESIGN.md §3 S7: suggest-option reached and submitted without a pointer, with its
+    /// outcome announced through a live region rather than only appearing as a new row.
+    /// </summary>
+    [Fact]
+    public async Task PollGrid_KeyboardOnlySuggestOption_AnnouncesAndAddsTheCandidate_D139()
+    {
+        RegisteredUser organizer = await GetOrganizerAsync();
+        string pollId = await CreatePrivatePollAsync(
+            organizer.Page, "Suggest proof " + Guid.NewGuid().ToString("N")[..6], DateTime.UtcNow.AddDays(2));
+        await organizer.Page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/polls/" + pollId);
+
+        // One radiogroup per option — `[data-testid^='poll-option-']` would also match each row's
+        // own `poll-option-tally-…` paragraph and count every option twice.
+        ILocator optionRows = organizer.Page.Locator("[data-testid^='vote-radiogroup-']");
+        // The poll is created with two candidate times; counting before they have rendered would
+        // baseline at zero and make the assertion below meaningless.
+        await Assertions.Expect(optionRows).ToHaveCountAsync(2);
+        int before = await optionRows.CountAsync();
+
+        ILocator field = organizer.Page.Locator("#suggest-option-value");
+        await field.FocusAsync();
+        await Assertions.Expect(field).ToBeFocusedAsync();
+        // Distinct from BOTH candidate times the fixture created (`firstOptionUtc` and
+        // `firstOptionUtc.AddDays(1)`, i.e. +2d and +3d), and floored to the hour so it also sits on
+        // the 15-minute grid the field's own `step` expects. A colliding suggestion is accepted and
+        // announced but adds no row, which is what made this assertion fail before.
+        DateTime suggested = DateTime.UtcNow.AddDays(5);
+        await field.FillAsync(OptionTimeValue(
+            new DateTime(suggested.Year, suggested.Month, suggested.Day, suggested.Hour, 0, 0, DateTimeKind.Utc)));
+
+        // Activation is the WCAG 2.1.1 claim: the submit control is reached and fired by keyboard.
+        ILocator submit = organizer.Page.GetByRole(AriaRole.Button, new() { Name = "Suggest" });
+        await submit.FocusAsync();
+        await Assertions.Expect(submit).ToBeFocusedAsync();
+        await organizer.Page.Keyboard.PressAsync("Enter");
+
+        // Announced, not merely rendered — the notice is a `role=status` live region.
+        await Assertions
+            .Expect(organizer.Page.GetByRole(AriaRole.Status)
+                .Filter(new() { HasText = "Your suggestion was added." }))
+            .ToBeVisibleAsync();
+        await Assertions.Expect(optionRows).ToHaveCountAsync(before + 1);
+    }
+
+    /// <summary>
+    /// PHASE8_DESIGN.md §3 S7: the guest arm of the same sweep — a guest reaches the claim step and
+    /// casts a vote over the poll-typed guest transport without a pointer, and sees the same
+    /// SR-observable tally the registered arm does (one component, two transports).
+    /// </summary>
+    [Fact]
+    public async Task PollGrid_GuestClaimsAndVotesWithTheKeyboardAlone_D139()
+    {
+        RegisteredUser organizer = await GetOrganizerAsync();
+        string pollId = await CreatePrivatePollAsync(
+            organizer.Page, "Guest keyboard proof " + Guid.NewGuid().ToString("N")[..6], DateTime.UtcNow.AddDays(2));
+        string url = await MintPollGuestLinkAsync(organizer.Page, pollId);
+
+        IBrowserContext guestContext = await fixture.NewContextAsync();
+        IPage guestPage = await guestContext.NewPageAsync();
+        try
+        {
+            await guestPage.GotoAsync(url);
+
+            ILocator nameField = guestPage.GetByLabel("Your name");
+            await nameField.FocusAsync();
+            await Assertions.Expect(nameField).ToBeFocusedAsync();
+            await nameField.FillAsync("Keyboard Guest");
+
+            ILocator join = guestPage.GetByRole(AriaRole.Button, new() { Name = "Join and vote" });
+            await join.FocusAsync();
+            await guestPage.Keyboard.PressAsync("Enter");
+
+            ILocator firstOptionCard = guestPage.Locator("[data-testid^='poll-option-']").First;
+            ILocator tally = firstOptionCard.Locator("[data-testid^='poll-option-tally-']");
+            ILocator available = firstOptionCard.Locator("[data-testid^='vote-available-']");
+            await Assertions.Expect(available).Not.ToBeDisabledAsync();
+            await Assertions.Expect(tally).ToHaveTextAsync("No votes yet.");
+
+            await available.FocusAsync();
+            await Assertions.Expect(available).ToBeFocusedAsync();
+            await guestPage.Keyboard.PressAsync(" ");
+
+            await guestPage.GetByText("Your vote was saved.").WaitForAsync();
+            await Assertions.Expect(available).ToHaveAttributeAsync("aria-checked", "true");
+            await Assertions.Expect(tally).ToHaveTextAsync(new Regex(@"\b1 available\b"));
+            Assert.Equal(
+                1,
+                await firstOptionCard.Locator("[role=radio][tabindex='0']").CountAsync());
+            // A-064: the guest credential never reaches the address bar.
+            Assert.DoesNotContain("token", guestPage.Url, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            await guestContext.CloseAsync();
+        }
     }
 
     /// <summary>

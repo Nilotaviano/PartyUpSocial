@@ -190,6 +190,31 @@ describe('PollDetailPage', () => {
     )
   })
 
+  // PHASE8_DESIGN.md §3 S7, Phase 7 residual routed here: muting is a state change with no
+  // visible consequence on this page beyond the button's own label, so it has to be announced.
+  // Until now that announcement was only ever proven on `SessionDetailPage`, whose implementation
+  // this shares — a shared implementation is not evidence that both call sites wired it up. These
+  // two prove it directly on the poll page, in both directions.
+  it.each([
+    ['mute', false, 'Mute', 'Poll muted.'],
+    ['unmute', true, 'Unmute', 'Poll unmuted.'],
+  ])(
+    'announces the %s outcome in a live region_D090_D139',
+    async (_action, muted, buttonName, announcement) => {
+      api.get.mockResolvedValue({ data: pollDetail({ status: 'polling', muted }) })
+      api.put.mockResolvedValue({ data: {} })
+      api.delete.mockResolvedValue({})
+      renderPage()
+
+      fireEvent.click(await screen.findByRole('button', { name: buttonName }))
+
+      const announced = await screen.findByText(announcement)
+      // Rendered is not enough: an assistive technology only hears this if the node it lands in
+      // is a polite live region.
+      expect(announced).toHaveAttribute('aria-live', 'polite')
+    },
+  )
+
   it.each(['finalized', 'expired', 'canceled'])(
     'disables the mute toggle on a terminal (%s) poll_D113',
     async (status) => {

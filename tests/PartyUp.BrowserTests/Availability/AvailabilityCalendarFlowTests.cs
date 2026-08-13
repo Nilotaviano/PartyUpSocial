@@ -268,6 +268,84 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         await Assertions.Expect(busyCells).ToHaveCountAsync(baselineBusyCount);
     }
 
+    /// <summary>
+    /// PHASE8_DESIGN.md §3 S7's calendar SR addition. `WeekGrid`'s selection is drawn with band
+    /// borders and a background tint — nothing a screen reader can perceive — so the *extent* of a
+    /// growing Shift+Arrow selection has to reach the viewer through the grid's `role=status` live
+    /// region instead. This reads that region back off the live DOM at each growth step, which is
+    /// the only way to prove the announcement actually changes as the range widens rather than
+    /// being emitted once and going stale.
+    /// </summary>
+    [Fact]
+    public async Task SelectionExtentIsAnnouncedAsTheKeyboardSelectionGrows_D139()
+    {
+        RegisteredUser organizer = await GetOrganizerAsync();
+        IPage page = organizer.Page;
+
+        await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/calendar");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        // The grid's own status region, not the page's other live regions (the early-hours notice
+        // and the app chrome's notification counter both carry one).
+        ILocator gridStatus = page.Locator("[role=grid]").Locator("xpath=..").GetByRole(AriaRole.Status);
+
+        await page.GetByRole(AriaRole.Gridcell).First.FocusAsync();
+        await page.Keyboard.PressAsync("Enter");
+        await Assertions.Expect(gridStatus).ToHaveTextAsync(new Regex("^Selection started at "));
+
+        // One slot of growth: the extent is now a range, and its end is the first slot boundary.
+        await page.Keyboard.PressAsync("Shift+ArrowDown");
+        await Assertions.Expect(gridStatus).ToHaveTextAsync(new Regex(@"^Selected .+ to .+\.$"));
+        string afterOne = await gridStatus.InnerTextAsync();
+
+        // A second growth must produce a *different* announcement — a live region that repeated the
+        // first message would leave the viewer with no idea the range had widened at all.
+        await page.Keyboard.PressAsync("Shift+ArrowDown");
+        await Assertions.Expect(gridStatus).Not.ToHaveTextAsync(afterOne);
+        await Assertions.Expect(gridStatus).ToHaveTextAsync(new Regex(@"^Selected .+ to .+\.$"));
+
+        // Escape leaves the calendar as it was found — nothing committed, and the cancellation is
+        // itself announced rather than silently dropping the selection.
+        await page.Keyboard.PressAsync("Escape");
+        await Assertions.Expect(gridStatus).ToHaveTextAsync("Selection canceled.");
+    }
+
+    /// <summary>
+    /// PHASE8_DESIGN.md §3 S7's agenda half (D-104): the agenda is the non-spatial view of the same
+    /// range, so it is the surface a screen-reader user actually reads — this pins that it is a
+    /// named list of list items whose text carries date, time span and title as words, never a
+    /// layout table or a set of positioned divs.
+    /// </summary>
+    [Fact]
+    public async Task AgendaViewIsANamedListWhoseRowsCarryTheirOwnText_D139()
+    {
+        RegisteredUser organizer = await GetOrganizerAsync();
+        IPage page = organizer.Page;
+
+        await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/app");
+        await SeedWeeklySeriesAsync(page);
+
+        await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/calendar/agenda");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        ILocator agenda = page.GetByRole(AriaRole.List, new() { Name = "Agenda" });
+        await agenda.WaitForAsync();
+
+        ILocator entries = agenda.GetByRole(AriaRole.Listitem);
+        Assert.True(
+            await entries.CountAsync() >= 1,
+            "the seeded series should put at least one entry in the agenda");
+
+        // Every row is self-describing text: a date, a start–end span, and a title. Read as one
+        // string because that is how a screen reader announces the row.
+        string firstRow = await entries.First.InnerTextAsync();
+        Assert.Matches(new Regex(@"\d"), firstRow);
+        Assert.Contains("–", firstRow, StringComparison.Ordinal);
+        Assert.False(
+            string.IsNullOrWhiteSpace(firstRow),
+            "an agenda row must not depend on anything but its own text");
+    }
+
     [Fact]
     public async Task OccurrenceScopeDialogIsReachableWithoutAPointer_D143()
     {
