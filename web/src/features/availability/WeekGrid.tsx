@@ -94,6 +94,16 @@ export type WeekGridProps = {
    * `weekStart`/`startHour`/`endHour` to place the today tint and the
    * presentational now-line. */
   now?: Date | null
+  /** The visible slice of the displayed week (CALENDAR_DESIGN.md §9 S5),
+   * indexed into it — rendering, band clamping, keyboard navigation,
+   * selection and touch all operate on these columns alone. Omitted means
+   * the full seven days. */
+  dayWindow?: { start: number; length: number }
+  /** Requests a one-day window shift when horizontal keyboard navigation
+   * reaches a window edge and the window is narrower than the week. The
+   * caller owns the window state, so it — not this component — decides what
+   * the next start is; focus lands on the newly revealed column. */
+  onDayWindowStartChange?: (nextStart: number) => void
 }
 
 const SLOT_MINUTES = 15
@@ -348,9 +358,14 @@ export function WeekGrid({
   dayLabels,
   timeLabelFormatter,
   now = null,
+  dayWindow,
+  onDayWindowStartChange,
 }: WeekGridProps) {
   const { t } = useTranslation('availability')
   const slots = slotsPerDay(startHour, endHour)
+  const windowStart = Math.min(Math.max(dayWindow?.start ?? 0, 0), DAY_COUNT - 1)
+  const windowLength = Math.min(dayWindow?.length ?? DAY_COUNT, DAY_COUNT - windowStart)
+  const windowEnd = windowStart + windowLength - 1
   // Zone-free by contract (see `weekStart`): "today" and the now-line position
   // are pure differences between the injected fake-local `now` and this grid's
   // own `weekStart`/`startHour` window — never `new Date()` or a zone lookup.
@@ -384,7 +399,7 @@ export function WeekGrid({
       ),
     [occurrences, merged, friendRanges, sessionEntries, pollOptionEntries, weekStart, startHour, slots],
   )
-  const [focused, setFocused] = useState<Cursor>({ day: 0, slot: 0 })
+  const [focused, setFocused] = useState<Cursor>(() => ({ day: windowStart, slot: 0 }))
   const [selection, setSelection] = useState<Selection | null>(null)
   // A continuous-priority mousemove/pointermove render can still be pending when
   // the discrete mouseup fires, so the committed range is read from this ref —
@@ -418,6 +433,19 @@ export function WeekGrid({
   // entered (Tab or a click) — the initial mount must not yank focus away
   // from the rest of the page.
   const hasInteracted = useRef(false)
+
+  // §9 S5: the roving tab stop is pulled back into the window without touching
+  // `focused` itself — a window move is a layout change, not a navigation, so
+  // it must not also pull DOM focus off whatever the viewer just operated (the
+  // day strip's own buttons). Only a real navigation writes `focused`, which is
+  // what the effect below keys on.
+  const focusedDay = Math.min(Math.max(focused.day, windowStart), windowEnd)
+
+  // §9 S5: a selection whose day scrolled out of the window is abandoned — it
+  // stops rendering here, and `pendingSelection` below drops the commit-time ref
+  // with it, so an off-screen range can never be extended or committed.
+  const visibleSelection =
+    selection && selection.day >= windowStart && selection.day <= windowEnd ? selection : null
 
   useEffect(() => {
     if (!hasInteracted.current) return
@@ -540,8 +568,21 @@ export function WeekGrid({
     )
   }
 
+  /** The committable selection: `null` once its day has left the visible
+   * window (§9 S5), which also drops the ref so the next gesture starts
+   * cleanly rather than extending something off-screen. */
+  function pendingSelection(): Selection | null {
+    const pending = selectionRef.current
+    if (!pending) return null
+    if (pending.day < windowStart || pending.day > windowEnd) {
+      clearSelection()
+      return null
+    }
+    return pending
+  }
+
   function extendSelection(day: number, slot: number) {
-    const current = selectionRef.current
+    const current = pendingSelection()
     if (!current || current.day !== day) return
     const next: Selection = { ...current, endSlot: slot }
     selectionRef.current = next
@@ -713,14 +754,29 @@ export function WeekGrid({
         setFocused({ day, slot: nextSlot })
         break
       }
+      // §9 S5: inside the window this is plain roving navigation. At a window
+      // edge — and only while the window is narrower than the week — it
+      // instead asks the caller to shift the window by one day and lands focus
+      // on the column that reveals. At a week edge it clamps, exactly as day
+      // 0/6 always has.
       case 'ArrowLeft': {
         event.preventDefault()
-        setFocused({ day: Math.max(0, day - 1), slot })
+        if (day === windowStart && windowLength < DAY_COUNT && windowStart > 0) {
+          onDayWindowStartChange?.(windowStart - 1)
+          setFocused({ day: windowStart - 1, slot })
+          break
+        }
+        setFocused({ day: Math.max(windowStart, day - 1), slot })
         break
       }
       case 'ArrowRight': {
         event.preventDefault()
-        setFocused({ day: Math.min(6, day + 1), slot })
+        if (day === windowEnd && windowLength < DAY_COUNT && windowEnd < DAY_COUNT - 1) {
+          onDayWindowStartChange?.(windowStart + 1)
+          setFocused({ day: windowEnd + 1, slot })
+          break
+        }
+        setFocused({ day: Math.min(windowEnd, day + 1), slot })
         break
       }
       // §8: Space mirrors Enter exactly — its behavior is state-dependent
@@ -729,7 +785,7 @@ export function WeekGrid({
       case 'Enter':
       case ' ': {
         event.preventDefault()
-        const pending = selectionRef.current
+        const pending = pendingSelection()
         if (pending) {
           commitSelection(pending, cellRect(day, slot))
           break
@@ -745,7 +801,7 @@ export function WeekGrid({
         break
       }
       case 'Escape': {
-        if (selectionRef.current) {
+        if (pendingSelection()) {
           event.preventDefault()
           cancelSelection()
         }
@@ -805,7 +861,7 @@ export function WeekGrid({
   function handleMouseUp(event: React.MouseEvent) {
     if (!dragging.current) return
     dragging.current = false
-    const pending = selectionRef.current
+    const pending = pendingSelection()
     if (pending) commitSelection(pending, pointRect(event.clientX, event.clientY))
     else clearSelection()
   }
@@ -886,7 +942,7 @@ export function WeekGrid({
     if (wasLongPress) {
       dragging.current = false
       setIsTouchDragging(false)
-      const pending = selectionRef.current
+      const pending = pendingSelection()
       if (pending) commitSelection(pending, cellRect(day, slot))
       else clearSelection()
       return
@@ -921,21 +977,17 @@ export function WeekGrid({
   }
 
   const slotIndexes = Array.from({ length: slots }, (_, index) => index)
-  const dayIndexes = [0, 1, 2, 3, 4, 5, 6]
+  const dayIndexes = Array.from({ length: windowLength }, (_, index) => windowStart + index)
 
   return (
     <div className="surface p-2 sm:p-3">
       {/* The grid has no scrollport of its own: it renders at natural height and
-          the document scrolls (nested vertical scrolling is what this replaces).
-          Horizontal scrolling survives only below `sm`, where seven 44px columns
-          plus the time gutter cannot fit a 360px viewport — that narrow case is
-          also the one where the day-header row cannot stick to the page, since a
-          scroll container captures its sticky descendants. */}
+          the document scrolls (nested vertical scrolling is what this replaces). */}
       <div
-        aria-colcount={8}
+        aria-colcount={windowLength + 1}
         aria-label={t('a11y.gridLabel')}
         aria-rowcount={slots + 1}
-        className={`max-sm:overflow-x-auto max-sm:[-webkit-overflow-scrolling:touch] ${isTouchDragging ? 'touch-none' : ''}`}
+        className={isTouchDragging ? 'touch-none' : ''}
         data-touch-dragging={isTouchDragging}
         role="grid"
         onMouseUp={handleMouseUp}
@@ -948,10 +1000,10 @@ export function WeekGrid({
             className="sticky left-0 z-10 min-h-11 w-14 shrink-0 bg-page/90"
             role="columnheader"
           />
-          {dayIndexes.map((day) => (
+          {dayIndexes.map((day, column) => (
             <div
               key={day}
-              aria-colindex={day + 2}
+              aria-colindex={column + 2}
               className={`${COLUMN_GAP} flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center rounded-xl border px-1 py-1 text-center ${
                 day === todayIndex
                   ? 'border-primary/60 bg-primary/15'
@@ -983,7 +1035,7 @@ export function WeekGrid({
                 ? timeLabelFormatter(cellTime(weekStart, 0, slot, startHour))
                 : ''}
             </div>
-            {dayIndexes.map((day) => {
+            {dayIndexes.map((day, column) => {
               const occurrence = occurrenceAt(day, slot)
               const busy = mergedAt(day, slot)
               const cellFriends = friendsAt(day, slot)
@@ -991,11 +1043,11 @@ export function WeekGrid({
               const cellSessions = sessionsAt(day, slot)
               const cellPollOptions = pollOptionsAt(day, slot)
               const inSelection =
-                selection &&
-                selection.day === day &&
-                slot >= Math.min(selection.anchorSlot, selection.endSlot) &&
-                slot <= Math.max(selection.anchorSlot, selection.endSlot)
-              const isFocused = focused.day === day && focused.slot === slot
+                visibleSelection &&
+                visibleSelection.day === day &&
+                slot >= Math.min(visibleSelection.anchorSlot, visibleSelection.endSlot) &&
+                slot <= Math.max(visibleSelection.anchorSlot, visibleSelection.endSlot)
+              const isFocused = focusedDay === day && focused.slot === slot
               const key = `${day}:${slot}`
               const cellStart = cellTime(weekStart, day, slot, startHour)
               const cellEnd = cellTime(weekStart, day, slot + 1, startHour)
@@ -1061,9 +1113,9 @@ export function WeekGrid({
               // every selected cell's own edges; only the top and bottom
               // band edges depend on position within the run.
               let selectionEdges = ''
-              if (inSelection && selection) {
-                const lo = Math.min(selection.anchorSlot, selection.endSlot)
-                const hi = Math.max(selection.anchorSlot, selection.endSlot)
+              if (inSelection && visibleSelection) {
+                const lo = Math.min(visibleSelection.anchorSlot, visibleSelection.endSlot)
+                const hi = Math.max(visibleSelection.anchorSlot, visibleSelection.endSlot)
                 const edges = ['left', 'right']
                 if (slot === lo) edges.push('top')
                 if (slot === hi) edges.push('bottom')
@@ -1072,8 +1124,11 @@ export function WeekGrid({
 
               // Every layer contributes to one accessible name per cell —
               // never a color-only signal, and never a second gridcell for
-              // an overlay (§10.3).
-              const labelParts = [timeLabelFormatter(cellTime(weekStart, day, slot, startHour))]
+              // an overlay (§10.3). The weekday leads it because `aria-colindex`
+              // is window-relative (§9 S5) and so cannot identify the day.
+              const labelParts = [
+                `${dayLabels[day]} ${timeLabelFormatter(cellTime(weekStart, day, slot, startHour))}`,
+              ]
               if (busy) labelParts.push(t('a11y.busy'))
               if (cellFriends.length === 1) {
                 labelParts.push(t('a11y.friendAvailable', { name: cellFriends[0].ownerLabel }))
@@ -1105,7 +1160,7 @@ export function WeekGrid({
                     if (node) cellRefs.current.set(key, node)
                     else cellRefs.current.delete(key)
                   }}
-                  aria-colindex={day + 2}
+                  aria-colindex={column + 2}
                   aria-label={labelParts.join(' – ')}
                   aria-rowindex={slot + 2}
                   className={`relative isolate ${COLUMN_GAP} min-h-11 min-w-11 flex-1 border-x ${columnEdgeClass} ${topBorderClass} ${bottomBorderClass} ${roundingClass} bg-free data-[busy=true]:bg-busy focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus data-[state=selected]:before:absolute data-[state=selected]:before:inset-0 data-[state=selected]:before:z-[-1] data-[state=selected]:before:bg-ink/6 data-[state=selected]:before:content-[''] data-[selection-edge~=top]:border-t-2 data-[selection-edge~=top]:border-t-ink data-[selection-edge~=bottom]:border-b-2 data-[selection-edge~=bottom]:border-b-ink data-[selection-edge~=left]:border-l-2 data-[selection-edge~=left]:border-l-ink data-[selection-edge~=right]:border-r-2 data-[selection-edge~=right]:border-r-ink`}

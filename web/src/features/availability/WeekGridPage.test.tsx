@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { useState } from 'react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -54,12 +55,14 @@ function renderGrid(props: {
   startHour?: number
   endHour?: number
   now?: Date | null
+  dayWindow?: { start: number; length: number }
 }) {
   const onCreateBlock = props.onCreateBlock ?? vi.fn<(range: GridRange, anchor: DOMRect) => void>()
   const onEditOccurrence = props.onEditOccurrence ?? vi.fn<(id: string) => void>()
   render(
     <WeekGrid
       dayLabels={dayLabels}
+      dayWindow={props.dayWindow}
       endHour={props.endHour ?? 11}
       friendRanges={props.friendRanges ?? []}
       merged={props.merged ?? []}
@@ -87,7 +90,7 @@ describe('WeekGrid keyboard flow', () => {
   it('creates extends commits and cancels a selection with the keyboard alone_D071_D132', () => {
     const { onCreateBlock } = renderGrid({})
 
-    const start = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    const start = screen.getAllByRole('gridcell', { name: 'Mon 9:00' })[0]
     start.focus()
     fireEvent.keyDown(start, { key: 'Enter' })
     expect(screen.getByRole('status')).toHaveTextContent('Selection started at 9:00.')
@@ -95,7 +98,7 @@ describe('WeekGrid keyboard flow', () => {
     fireEvent.keyDown(start, { key: 'ArrowDown', shiftKey: true })
     expect(screen.getByRole('status')).toHaveTextContent('Selected 9:00 to 9:30.')
 
-    const extended = screen.getAllByRole('gridcell', { name: '9:15' })[0]
+    const extended = screen.getAllByRole('gridcell', { name: 'Mon 9:15' })[0]
     fireEvent.keyDown(extended, { key: 'Enter' })
 
     expect(onCreateBlock).toHaveBeenCalledTimes(1)
@@ -108,7 +111,7 @@ describe('WeekGrid keyboard flow', () => {
       'Selected 9:00 to 9:30. Confirm how often it repeats.',
     )
 
-    const another = screen.getAllByRole('gridcell', { name: '10:00' })[0]
+    const another = screen.getAllByRole('gridcell', { name: 'Mon 10:00' })[0]
     another.focus()
     fireEvent.keyDown(another, { key: 'Enter' })
     fireEvent.keyDown(another, { key: 'Escape' })
@@ -120,7 +123,7 @@ describe('WeekGrid keyboard flow', () => {
   it('snaps both entry modes to fifteen minutes_D071', () => {
     const { onCreateBlock } = renderGrid({})
 
-    const keyboardCell = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    const keyboardCell = screen.getAllByRole('gridcell', { name: 'Mon 9:00' })[0]
     keyboardCell.focus()
     fireEvent.keyDown(keyboardCell, { key: 'Enter' })
     fireEvent.keyDown(keyboardCell, { key: 'ArrowDown', shiftKey: true })
@@ -133,8 +136,8 @@ describe('WeekGrid keyboard flow', () => {
 
     onCreateBlock.mockClear()
 
-    const dragStart = screen.getAllByRole('gridcell', { name: '10:00' })[0]
-    const dragEnd = screen.getAllByRole('gridcell', { name: '10:30' })[0]
+    const dragStart = screen.getAllByRole('gridcell', { name: 'Mon 10:00' })[0]
+    const dragEnd = screen.getAllByRole('gridcell', { name: 'Mon 10:30' })[0]
     fireEvent.mouseDown(dragStart, { button: 0 })
     fireEvent.mouseEnter(dragEnd)
     fireEvent.mouseUp(screen.getByRole('grid'))
@@ -170,17 +173,17 @@ describe('WeekGrid keyboard flow', () => {
     // client re-deriving the union from `occurrences` would paint 9:30 busy
     // too and fail this.
     for (const label of ['9:00', '9:15']) {
-      expect(screen.getByRole('gridcell', { name: `${label} – Busy` })).toHaveAttribute(
+      expect(screen.getByRole('gridcell', { name: `Mon ${label} – Busy` })).toHaveAttribute(
         'data-state',
         'busy',
       )
     }
-    const nineThirty = screen.getAllByRole('gridcell', { name: '9:30' })[0]
+    const nineThirty = screen.getAllByRole('gridcell', { name: 'Mon 9:30' })[0]
     expect(nineThirty).toHaveAttribute('data-state', 'free')
 
     // Both occurrences stay separately addressable for edit, including the
     // one `merged` doesn't fully paint.
-    fireEvent.keyDown(screen.getByRole('gridcell', { name: '9:00 – Busy' }), { key: 'Enter' })
+    fireEvent.keyDown(screen.getByRole('gridcell', { name: 'Mon 9:00 – Busy' }), { key: 'Enter' })
     expect(onEditOccurrence).toHaveBeenCalledWith('block-a')
 
     fireEvent.keyDown(nineThirty, { key: 'Enter' })
@@ -218,7 +221,7 @@ describe('WeekGrid keyboard flow', () => {
 
     // Ana's range and the organizer's session both cover 9:00–9:30, so one
     // cell carries both layers' markers plus one accessible name naming both.
-    const ownSessionCell = screen.getByRole('gridcell', { name: '9:00 – Ana available – Raid night' })
+    const ownSessionCell = screen.getByRole('gridcell', { name: 'Mon 9:00 – Ana available – Raid night' })
     expect(ownSessionCell.querySelector('[data-layer="friend"]')).not.toBeNull()
     const ownSessionLabel = ownSessionCell.querySelector('[data-layer="session"]')
     expect(ownSessionLabel).toHaveAttribute('data-viewer-relation', 'organizer')
@@ -227,7 +230,7 @@ describe('WeekGrid keyboard flow', () => {
     // The inherited/discoverable row is visibly distinct, and not by color
     // alone — a literal text label, not a class-only difference.
     const inheritedCell = screen.getByRole('gridcell', {
-      name: '10:00 – Open lobby (discoverable)',
+      name: 'Mon 10:00 – Open lobby (discoverable)',
     })
     const inheritedLabel = inheritedCell.querySelector('[data-layer="session"]')
     expect(inheritedLabel).toHaveAttribute('data-viewer-relation', 'inherited')
@@ -245,14 +248,14 @@ describe('WeekGrid keyboard flow', () => {
     expect(screen.getAllByRole('gridcell')).toHaveLength(56)
 
     const votedCell = screen.getByRole('gridcell', {
-      name: '9:00 – Raid night poll poll option, your vote available',
+      name: 'Mon 9:00 – Raid night poll poll option, your vote available',
     })
     expect(votedCell.querySelector('[data-layer="poll-option"]')).toHaveTextContent(
       'Raid night poll',
     )
 
     expect(
-      screen.getByRole('gridcell', { name: '10:00 – Board game poll poll option' }),
+      screen.getByRole('gridcell', { name: 'Mon 10:00 – Board game poll poll option' }),
     ).toBeInTheDocument()
   })
 
@@ -263,7 +266,7 @@ describe('WeekGrid keyboard flow', () => {
     ]
     renderGrid({ friendRanges })
 
-    expect(screen.getByRole('gridcell', { name: '9:00 – 2 friends available' })).toBeInTheDocument()
+    expect(screen.getByRole('gridcell', { name: 'Mon 9:00 – 2 friends available' })).toBeInTheDocument()
   })
 })
 
@@ -278,7 +281,7 @@ describe('WeekGrid pointer flow', () => {
   it('opens the editor on a mouse click on an existing block', () => {
     const { onEditOccurrence, onCreateBlock } = renderGrid({ occurrences })
 
-    const block = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    const block = screen.getAllByRole('gridcell', { name: 'Mon 9:00' })[0]
     fireEvent.mouseDown(block, { button: 0 })
     fireEvent.mouseUp(block)
     fireEvent.click(block)
@@ -294,7 +297,7 @@ describe('WeekGrid pointer flow', () => {
   it('opens the editor on a touch tap on an existing block_P5TOUCH01', () => {
     const { onEditOccurrence } = renderGrid({ occurrences })
 
-    const block = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    const block = screen.getAllByRole('gridcell', { name: 'Mon 9:00' })[0]
     fireEvent.pointerDown(block, { pointerType: 'touch', clientX: 10, clientY: 10 })
     fireEvent.pointerUp(block, { pointerType: 'touch', clientX: 10, clientY: 10 })
 
@@ -307,7 +310,7 @@ describe('WeekGrid pointer flow', () => {
   it('does not open the editor when a touch moves past the cancel threshold before lifting_P5TOUCH01', () => {
     const { onEditOccurrence } = renderGrid({ occurrences })
 
-    const block = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    const block = screen.getAllByRole('gridcell', { name: 'Mon 9:00' })[0]
     fireEvent.pointerDown(block, { pointerType: 'touch', clientX: 10, clientY: 10 })
     fireEvent.pointerMove(block, { pointerType: 'touch', clientX: 10, clientY: 40 })
     fireEvent.pointerUp(block, { pointerType: 'touch', clientX: 10, clientY: 40 })
@@ -322,8 +325,8 @@ describe('WeekGrid pointer flow', () => {
   it('still paints a block by dragging across empty cells with the mouse', () => {
     const { onCreateBlock } = renderGrid({})
 
-    const dragStart = screen.getAllByRole('gridcell', { name: '9:00' })[0]
-    const dragEnd = screen.getAllByRole('gridcell', { name: '9:30' })[0]
+    const dragStart = screen.getAllByRole('gridcell', { name: 'Mon 9:00' })[0]
+    const dragEnd = screen.getAllByRole('gridcell', { name: 'Mon 9:30' })[0]
     fireEvent.mouseDown(dragStart, { button: 0 })
     fireEvent.mouseEnter(dragEnd)
     fireEvent.mouseUp(screen.getByRole('grid'))
@@ -341,8 +344,8 @@ describe('WeekGrid pointer flow', () => {
   it('does not begin a paint selection when a mouse drag starts on an existing block', () => {
     const { onCreateBlock, onEditOccurrence } = renderGrid({ occurrences })
 
-    const block = screen.getAllByRole('gridcell', { name: '9:00' })[0]
-    const empty = screen.getAllByRole('gridcell', { name: '9:30' })[0]
+    const block = screen.getAllByRole('gridcell', { name: 'Mon 9:00' })[0]
+    const empty = screen.getAllByRole('gridcell', { name: 'Mon 9:30' })[0]
     fireEvent.mouseDown(block, { button: 0 })
     fireEvent.mouseEnter(empty)
     fireEvent.mouseUp(screen.getByRole('grid'))
@@ -361,7 +364,7 @@ describe('WeekGrid pointer flow', () => {
   it('still opens the editor with Enter from the keyboard', () => {
     const { onEditOccurrence } = renderGrid({ occurrences })
 
-    const block = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    const block = screen.getAllByRole('gridcell', { name: 'Mon 9:00' })[0]
     block.focus()
     fireEvent.keyDown(block, { key: 'Enter' })
     expect(onEditOccurrence).toHaveBeenCalledWith('block-a')
@@ -395,7 +398,7 @@ describe('WeekGrid commit anchor_S3', () => {
   it('passes the pointer release coordinates as the anchor for a mouse commit', () => {
     const { onCreateBlock } = renderGrid({})
 
-    const dragStart = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    const dragStart = screen.getAllByRole('gridcell', { name: 'Mon 9:00' })[0]
     fireEvent.mouseDown(dragStart, { button: 0 })
     fireEvent.mouseUp(screen.getByRole('grid'), { clientX: 111, clientY: 222 })
 
@@ -409,8 +412,8 @@ describe('WeekGrid commit anchor_S3', () => {
   it('passes the focused cell rect as the anchor for a keyboard commit', () => {
     const { onCreateBlock } = renderGrid({})
 
-    const start = screen.getAllByRole('gridcell', { name: '9:00' })[0]
-    const extended = screen.getAllByRole('gridcell', { name: '9:15' })[0]
+    const start = screen.getAllByRole('gridcell', { name: 'Mon 9:00' })[0]
+    const extended = screen.getAllByRole('gridcell', { name: 'Mon 9:15' })[0]
     const startRect = stubCellRect(start, 20)
     const extendedRect = stubCellRect(extended, 64)
 
@@ -429,8 +432,8 @@ describe('WeekGrid commit anchor_S3', () => {
     vi.useFakeTimers()
     const { onCreateBlock } = renderGrid({})
 
-    const start = screen.getAllByRole('gridcell', { name: '9:00' })[0]
-    const release = screen.getAllByRole('gridcell', { name: '9:15' })[0]
+    const start = screen.getAllByRole('gridcell', { name: 'Mon 9:00' })[0]
+    const release = screen.getAllByRole('gridcell', { name: 'Mon 9:15' })[0]
     const startRect = stubCellRect(start, 5)
     const releaseRect = stubCellRect(release, 49)
 
@@ -459,7 +462,7 @@ describe('WeekGrid resize handles', () => {
   ]
 
   function selectBlock() {
-    const block = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    const block = screen.getAllByRole('gridcell', { name: 'Mon 9:00' })[0]
     fireEvent.mouseDown(block, { button: 0 })
     fireEvent.mouseUp(block)
     fireEvent.click(block)
@@ -644,13 +647,13 @@ describe('WeekGrid Space activation_D071_D132', () => {
   it('mirrors Enter through the full keyboard selection flow with Space', () => {
     const { onCreateBlock } = renderGrid({})
 
-    const start = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    const start = screen.getAllByRole('gridcell', { name: 'Mon 9:00' })[0]
     start.focus()
     fireEvent.keyDown(start, { key: ' ' })
     expect(screen.getByRole('status')).toHaveTextContent('Selection started at 9:00.')
 
     fireEvent.keyDown(start, { key: 'ArrowDown', shiftKey: true })
-    const extended = screen.getAllByRole('gridcell', { name: '9:15' })[0]
+    const extended = screen.getAllByRole('gridcell', { name: 'Mon 9:15' })[0]
     fireEvent.keyDown(extended, { key: ' ' })
 
     expect(onCreateBlock).toHaveBeenCalledTimes(1)
@@ -665,7 +668,7 @@ describe('WeekGrid Space activation_D071_D132', () => {
     ]
     const { onEditOccurrence } = renderGrid({ occurrences })
 
-    const block = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    const block = screen.getAllByRole('gridcell', { name: 'Mon 9:00' })[0]
     block.focus()
     fireEvent.keyDown(block, { key: ' ' })
 
@@ -675,7 +678,7 @@ describe('WeekGrid Space activation_D071_D132', () => {
   it('cancels a selection with Escape after starting it with Space', () => {
     renderGrid({})
 
-    const cell = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    const cell = screen.getAllByRole('gridcell', { name: 'Mon 9:00' })[0]
     cell.focus()
     fireEvent.keyDown(cell, { key: ' ' })
     fireEvent.keyDown(cell, { key: 'Escape' })
@@ -686,7 +689,7 @@ describe('WeekGrid Space activation_D071_D132', () => {
   it('prevents the default (page scroll) on Space', () => {
     renderGrid({})
 
-    const cell = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    const cell = screen.getAllByRole('gridcell', { name: 'Mon 9:00' })[0]
     cell.focus()
     const notPrevented = fireEvent.keyDown(cell, { key: ' ' })
 
@@ -704,9 +707,9 @@ describe('WeekGrid §8 band rendering', () => {
     const merged: GridRange[] = [{ start: localDate(9, 0), end: localDate(9, 45) }]
     renderGrid({ occurrences, merged })
 
-    const startCell = screen.getByRole('gridcell', { name: '9:00 – Busy' })
-    const middleCell = screen.getByRole('gridcell', { name: '9:15 – Busy' })
-    const endCell = screen.getByRole('gridcell', { name: '9:30 – Busy' })
+    const startCell = screen.getByRole('gridcell', { name: 'Mon 9:00 – Busy' })
+    const middleCell = screen.getByRole('gridcell', { name: 'Mon 9:15 – Busy' })
+    const endCell = screen.getByRole('gridcell', { name: 'Mon 9:30 – Busy' })
 
     expect(startCell.className).toMatch(/rounded-t-lg/)
     expect(startCell.className).not.toMatch(/border-t-0/)
@@ -727,7 +730,7 @@ describe('WeekGrid §8 band rendering', () => {
     const merged: GridRange[] = [{ start: localDate(8, 0), end: localDate(9, 30) }]
     renderGrid({ occurrences, merged })
 
-    const firstVisibleCell = screen.getByRole('gridcell', { name: '9:00 – Busy' })
+    const firstVisibleCell = screen.getByRole('gridcell', { name: 'Mon 9:00 – Busy' })
     expect(firstVisibleCell.className).not.toMatch(/rounded-t-lg/)
   })
 
@@ -743,8 +746,8 @@ describe('WeekGrid §8 band rendering', () => {
     ]
     renderGrid({ sessionEntries })
 
-    const startCell = screen.getByRole('gridcell', { name: '9:00 – Raid night' })
-    const middleCell = screen.getByRole('gridcell', { name: '9:15 – Raid night' })
+    const startCell = screen.getByRole('gridcell', { name: 'Mon 9:00 – Raid night' })
+    const middleCell = screen.getByRole('gridcell', { name: 'Mon 9:15 – Raid night' })
     expect(startCell.querySelector('[data-layer="session"]')).toHaveTextContent('Raid night')
     expect(middleCell.querySelector('[data-layer="session"]')).toBeNull()
   })
@@ -755,8 +758,8 @@ describe('WeekGrid §8 band rendering', () => {
     ]
     renderGrid({ friendRanges })
 
-    const startCell = screen.getByRole('gridcell', { name: '9:00 – Ana available' })
-    const middleCell = screen.getByRole('gridcell', { name: '9:15 – Ana available' })
+    const startCell = screen.getByRole('gridcell', { name: 'Mon 9:00 – Ana available' })
+    const middleCell = screen.getByRole('gridcell', { name: 'Mon 9:15 – Ana available' })
     expect(startCell.querySelector('[data-layer="friend"]')).not.toBeNull()
     expect(middleCell.querySelector('[data-layer="friend"]')).toBeNull()
   })
@@ -777,7 +780,7 @@ describe('WeekGrid §8 band rendering', () => {
     const onAdjustOccurrence = vi.fn<(adjustment: GridAdjustment) => void>()
     renderGrid({ occurrences, sessionEntries, onAdjustOccurrence })
 
-    const startCell = screen.getAllByRole('gridcell', { name: '9:00 – Raid night' })[0]
+    const startCell = screen.getAllByRole('gridcell', { name: 'Mon 9:00 – Raid night' })[0]
     expect(startCell.querySelector('[data-layer="session"]')).toHaveTextContent('Raid night')
 
     // Selecting the block exposes the start-cell resize handle, which would
@@ -790,7 +793,7 @@ describe('WeekGrid §8 band rendering', () => {
       screen.getByRole('button', { name: 'Change start time' }),
     ).toBeInTheDocument()
     expect(startCell.querySelector('[data-layer="session"]')).toBeNull()
-    const secondCell = screen.getByRole('gridcell', { name: '9:15 – Raid night' })
+    const secondCell = screen.getByRole('gridcell', { name: 'Mon 9:15 – Raid night' })
     expect(secondCell.querySelector('[data-layer="session"]')).toHaveTextContent('Raid night')
   })
 })
@@ -805,7 +808,7 @@ describe('WeekGrid §9 now-line', () => {
     const markers = document.querySelectorAll('[data-layer="now"]')
     expect(markers).toHaveLength(1)
     const cell = markers[0].closest('[role="gridcell"]')
-    expect(cell).toHaveAttribute('aria-label', '9:30')
+    expect(cell).toHaveAttribute('aria-label', 'Tue 9:30')
     expect(cell).toHaveAttribute('aria-colindex', '3')
   })
 
@@ -817,7 +820,7 @@ describe('WeekGrid §9 now-line', () => {
     expect(marker).toHaveAttribute('aria-hidden', 'true')
     // Positioned within the slot it falls in, not pinned to a cell edge.
     expect((marker as HTMLElement).style.top).toBe('50%')
-    expect(marker?.closest('[role="gridcell"]')).toHaveAttribute('aria-label', '9:30')
+    expect(marker?.closest('[role="gridcell"]')).toHaveAttribute('aria-label', 'Tue 9:30')
   })
 
   it('renders nothing when now falls outside the visible hour range', () => {
@@ -1011,7 +1014,7 @@ describe('WeekGridPage now-line clock', () => {
     const markers = document.querySelectorAll('[data-layer="now"]')
     expect(markers).toHaveLength(1)
     const cell = markers[0].closest('[role="gridcell"]')
-    expect(cell?.getAttribute('aria-label')).toMatch(/^8:00\s?AM$/)
+    expect(cell?.getAttribute('aria-label')).toMatch(/^Mon 8:00\s?AM$/)
   })
 })
 
@@ -1050,10 +1053,18 @@ describe('WeekGridPage commit step', () => {
   // The same mouse drag the pointer suite paints with, driven against the
   // page (startHour 8) rather than a bare grid — 9:00 AM is free in the
   // fixture, whose only occurrence sits at 13:00.
-  async function paintRange() {
+  // `dayLabel` names the column to paint in: at `sm`+ the whole week renders
+  // and the fixture week's first column (Sunday, `en`) is used, but the §9 S5
+  // day window below `sm` shows only Mon–Wed around the fixture's today, so
+  // the bottom-sheet case has to paint inside that window.
+  async function paintRange(dayLabel = 'Sun') {
     await screen.findAllByRole('gridcell', { name: /Busy/ }, { timeout: 5000 })
-    const dragStart = screen.getAllByRole('gridcell', { name: /^9:00\s?AM$/ })[0]
-    const dragEnd = screen.getAllByRole('gridcell', { name: /^9:30\s?AM$/ })[0]
+    const dragStart = screen.getAllByRole('gridcell', {
+      name: new RegExp(`^${dayLabel} 9:00\\s?AM$`),
+    })[0]
+    const dragEnd = screen.getAllByRole('gridcell', {
+      name: new RegExp(`^${dayLabel} 9:30\\s?AM$`),
+    })[0]
     fireEvent.mouseDown(dragStart, { button: 0 })
     fireEvent.mouseEnter(dragEnd)
     fireEvent.mouseUp(screen.getByRole('grid'))
@@ -1204,7 +1215,7 @@ describe('WeekGridPage commit step', () => {
     })
 
     renderPage()
-    await paintRange()
+    await paintRange('Mon')
 
     const dialog = await screen.findByRole('dialog')
     expect(dialog.className).toMatch(/bottom-0/)
@@ -1782,5 +1793,371 @@ describe('WeekGridPage §9 S4 aside layout', () => {
     // aside alongside the summary.
     expect(screen.getByText('Layers')).toBeInTheDocument()
     expect(screen.getByLabelText('My availability')).toBeChecked()
+  })
+})
+
+// CALENDAR_DESIGN.md §9 S5: below `sm` the grid shows a three-day window into
+// the displayed week. The window is an index into that week — it never changes
+// which week is loaded except through the pager's own week rolls.
+describe('WeekGrid §9 S5 day window', () => {
+  const windowedGridProps = {
+    dayLabels,
+    endHour: 11,
+    merged: [] as GridRange[],
+    occurrences: [] as GridOccurrence[],
+    startHour: 9,
+    timeLabelFormatter,
+    weekStart: localDate(0),
+  }
+
+  function windowedColumnLabels() {
+    return screen
+      .getAllByRole('columnheader')
+      .slice(1)
+      .map((header) => header.querySelector('span')?.textContent)
+  }
+
+  it('renders only the windowed columns, with window-relative ARIA_S5', () => {
+    renderGrid({ dayWindow: { start: 2, length: 3 } })
+
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-colcount', '4')
+    expect(windowedColumnLabels()).toEqual(['Wed', 'Thu', 'Fri'])
+
+    // `aria-colindex` counts from the rowheader inside the window, so the
+    // weekday it can no longer identify is carried by the cell's own name.
+    expect(screen.getByRole('gridcell', { name: 'Wed 9:00' })).toHaveAttribute(
+      'aria-colindex',
+      '2',
+    )
+    expect(screen.getByRole('gridcell', { name: 'Fri 9:00' })).toHaveAttribute(
+      'aria-colindex',
+      '4',
+    )
+    expect(screen.queryByRole('gridcell', { name: 'Tue 9:00' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('gridcell', { name: 'Sat 9:00' })).not.toBeInTheDocument()
+  })
+
+  // The desktop contract: an explicit full-week window is the same grid the
+  // component renders with no window prop at all, node for node.
+  it('renders a full-week window identically to no window at all_S5', () => {
+    renderGrid({})
+    const withoutWindow = screen.getByRole('grid').outerHTML
+    cleanup()
+
+    renderGrid({ dayWindow: { start: 0, length: 7 } })
+    expect(screen.getByRole('grid').outerHTML).toBe(withoutWindow)
+  })
+
+  // A controlled harness: the window state lives in the parent (the page owns
+  // it in production), so the edge-navigation fact has to prove the request AND
+  // the focus landing after that state settles.
+  function WindowedHarness({ initialStart = 2 }: { initialStart?: number }) {
+    const [start, setStart] = useState(initialStart)
+    return (
+      <WeekGrid
+        {...windowedGridProps}
+        dayWindow={{ start, length: 3 }}
+        onCreateBlock={vi.fn()}
+        onDayWindowStartChange={setStart}
+        onEditOccurrence={vi.fn()}
+      />
+    )
+  }
+
+  it('moves the window by one day at a window edge and focuses the revealed column_S5', () => {
+    render(<WindowedHarness />)
+
+    const leftEdge = screen.getByRole('gridcell', { name: 'Wed 9:00' })
+    leftEdge.focus()
+    fireEvent.keyDown(leftEdge, { key: 'ArrowLeft' })
+
+    expect(windowedColumnLabels()).toEqual(['Tue', 'Wed', 'Thu'])
+    expect(screen.getByRole('gridcell', { name: 'Tue 9:00' })).toHaveFocus()
+
+    const rightEdge = screen.getByRole('gridcell', { name: 'Thu 9:00' })
+    fireEvent.keyDown(rightEdge, { key: 'ArrowRight' })
+
+    expect(windowedColumnLabels()).toEqual(['Wed', 'Thu', 'Fri'])
+    expect(screen.getByRole('gridcell', { name: 'Fri 9:00' })).toHaveFocus()
+  })
+
+  it('navigates inside the window without moving it_S5', () => {
+    render(<WindowedHarness />)
+
+    const middle = screen.getByRole('gridcell', { name: 'Thu 9:00' })
+    middle.focus()
+    fireEvent.keyDown(middle, { key: 'ArrowLeft' })
+
+    expect(windowedColumnLabels()).toEqual(['Wed', 'Thu', 'Fri'])
+    expect(screen.getByRole('gridcell', { name: 'Wed 9:00' })).toHaveFocus()
+  })
+
+  it('clamps at the week edges instead of wrapping_S5', () => {
+    const onDayWindowStartChange = vi.fn<(start: number) => void>()
+    const { rerender } = render(
+      <WeekGrid
+        {...windowedGridProps}
+        dayWindow={{ start: 0, length: 3 }}
+        onCreateBlock={vi.fn()}
+        onDayWindowStartChange={onDayWindowStartChange}
+        onEditOccurrence={vi.fn()}
+      />,
+    )
+
+    const weekStartCell = screen.getByRole('gridcell', { name: 'Mon 9:00' })
+    weekStartCell.focus()
+    fireEvent.keyDown(weekStartCell, { key: 'ArrowLeft' })
+    expect(onDayWindowStartChange).not.toHaveBeenCalled()
+    expect(weekStartCell).toHaveFocus()
+
+    rerender(
+      <WeekGrid
+        {...windowedGridProps}
+        dayWindow={{ start: 4, length: 3 }}
+        onCreateBlock={vi.fn()}
+        onDayWindowStartChange={onDayWindowStartChange}
+        onEditOccurrence={vi.fn()}
+      />,
+    )
+
+    const weekEndCell = screen.getByRole('gridcell', { name: 'Sun 9:00' })
+    weekEndCell.focus()
+    fireEvent.keyDown(weekEndCell, { key: 'ArrowRight' })
+    expect(onDayWindowStartChange).not.toHaveBeenCalled()
+    expect(weekEndCell).toHaveFocus()
+  })
+
+  it('never moves a full-week window from the keyboard_S5', () => {
+    const onDayWindowStartChange = vi.fn<(start: number) => void>()
+    render(
+      <WeekGrid
+        {...windowedGridProps}
+        dayWindow={{ start: 0, length: 7 }}
+        onCreateBlock={vi.fn()}
+        onDayWindowStartChange={onDayWindowStartChange}
+        onEditOccurrence={vi.fn()}
+      />,
+    )
+
+    const lastDay = screen.getByRole('gridcell', { name: 'Sun 9:00' })
+    lastDay.focus()
+    fireEvent.keyDown(lastDay, { key: 'ArrowRight' })
+
+    expect(onDayWindowStartChange).not.toHaveBeenCalled()
+    expect(lastDay).toHaveFocus()
+  })
+
+  // A pending selection on a day that scrolls out of the window is abandoned —
+  // both the rendered band and the commit-time ref, so the next Enter starts a
+  // fresh selection instead of committing the invisible one.
+  it('clears a selection whose day leaves the window_S5', () => {
+    const onCreateBlock = vi.fn<(range: GridRange, anchor: DOMRect) => void>()
+    const { rerender } = render(
+      <WeekGrid
+        {...windowedGridProps}
+        dayWindow={{ start: 0, length: 3 }}
+        onCreateBlock={onCreateBlock}
+        onEditOccurrence={vi.fn()}
+      />,
+    )
+
+    const start = screen.getByRole('gridcell', { name: 'Mon 9:00' })
+    start.focus()
+    fireEvent.keyDown(start, { key: 'Enter' })
+    expect(document.querySelectorAll('[data-selection-edge]').length).toBeGreaterThan(0)
+
+    rerender(
+      <WeekGrid
+        {...windowedGridProps}
+        dayWindow={{ start: 4, length: 3 }}
+        onCreateBlock={onCreateBlock}
+        onEditOccurrence={vi.fn()}
+      />,
+    )
+
+    expect(document.querySelectorAll('[data-selection-edge]')).toHaveLength(0)
+
+    const revealed = screen.getByRole('gridcell', { name: 'Fri 9:00' })
+    revealed.focus()
+    fireEvent.keyDown(revealed, { key: 'Enter' })
+
+    expect(onCreateBlock).not.toHaveBeenCalled()
+    expect(screen.getByRole('status')).toHaveTextContent('Selection started at 9:00.')
+  })
+})
+
+// CALENDAR_DESIGN.md §9 S5: the page owns the window state and the pager. The
+// fixture week is `en`'s Sunday-first week of 2026-08-09..15, so the day index
+// of "today" is what the initial-window rule clamps into [0, 4].
+describe('WeekGridPage §9 S5 day pager', () => {
+  const originalMatchMedia = window.matchMedia
+
+  function setViewport(isMobile: boolean) {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockReturnValue({
+        matches: isMobile,
+        media: '(max-width: 639px)',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    })
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-08-10T12:00:00.000Z'))
+    setViewport(true)
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve({ data: profileResponse() })
+      if (path === '/api/v1/calendar') {
+        return Promise.resolve({
+          data: calendarResponse({
+            start: '2026-08-10T13:00:00.000Z',
+            end: '2026-08-10T13:30:00.000Z',
+          }),
+        })
+      }
+      throw new Error(`Unexpected GET ${path}`)
+    })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: originalMatchMedia,
+    })
+  })
+
+  /** The visible window as "<weekday> <date>", which pins the week as well as
+   * the three days — a window that silently rolled a week would still show the
+   * same three weekday names. */
+  async function visibleWindow() {
+    const headers = await screen.findAllByRole('columnheader', {}, { timeout: 5000 })
+    return headers.slice(1).map((header) => {
+      const spans = header.querySelectorAll('span')
+      return `${spans[0].textContent} ${spans[1].textContent}`
+    })
+  }
+
+  it('anchors the initial window on today, clamped into the week_S5', async () => {
+    const expectations: [string, string[]][] = [
+      ['2026-08-09T12:00:00.000Z', ['Sun 9', 'Mon 10', 'Tue 11']],
+      ['2026-08-10T12:00:00.000Z', ['Mon 10', 'Tue 11', 'Wed 12']],
+      ['2026-08-11T12:00:00.000Z', ['Tue 11', 'Wed 12', 'Thu 13']],
+      ['2026-08-12T12:00:00.000Z', ['Wed 12', 'Thu 13', 'Fri 14']],
+      ['2026-08-13T12:00:00.000Z', ['Thu 13', 'Fri 14', 'Sat 15']],
+      // Friday and Saturday clamp: the window cannot start past day 4 without
+      // running off the end of the displayed week.
+      ['2026-08-14T12:00:00.000Z', ['Thu 13', 'Fri 14', 'Sat 15']],
+      ['2026-08-15T12:00:00.000Z', ['Thu 13', 'Fri 14', 'Sat 15']],
+    ]
+
+    for (const [instant, expected] of expectations) {
+      vi.setSystemTime(new Date(instant))
+      renderPage()
+      expect(await visibleWindow()).toEqual(expected)
+      cleanup()
+    }
+  })
+
+  it('starts at the first three days of a week that does not contain today_S5', async () => {
+    renderPage()
+    expect(await visibleWindow()).toEqual(['Mon 10', 'Tue 11', 'Wed 12'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next week' }))
+
+    expect(await visibleWindow()).toEqual(['Sun 16', 'Mon 17', 'Tue 18'])
+  })
+
+  it('jumps the window from the day strip, clamped into the week_S5', async () => {
+    renderPage()
+    await visibleWindow()
+
+    const strip = screen.getByRole('group', { name: 'Days shown' })
+    fireEvent.click(within(strip).getByRole('button', { name: 'Show Sat' }))
+
+    expect(await visibleWindow()).toEqual(['Thu 13', 'Fri 14', 'Sat 15'])
+    expect(within(strip).getByRole('button', { name: 'Show Sat' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(within(strip).getByRole('button', { name: 'Show Sun' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+  })
+
+  it('marks today in the day strip_S5', async () => {
+    renderPage()
+    await visibleWindow()
+
+    const strip = screen.getByRole('group', { name: 'Days shown' })
+    const todayButton = within(strip).getByRole('button', { name: 'Show Mon, today' })
+    expect(todayButton).toHaveAttribute('aria-current', 'date')
+    expect(todayButton.className).toMatch(/underline/)
+  })
+
+  it('steps the window by a day and rolls the week at its edges_S5', async () => {
+    renderPage()
+    expect(await visibleWindow()).toEqual(['Mon 10', 'Tue 11', 'Wed 12'])
+
+    const previousDay = screen.getByRole('button', { name: 'Show the earlier day' })
+    fireEvent.click(previousDay)
+    expect(await visibleWindow()).toEqual(['Sun 9', 'Mon 10', 'Tue 11'])
+
+    // At the week's start the step rolls into the previous week and lands the
+    // window at its end, so the move still reads as one day back.
+    fireEvent.click(previousDay)
+    expect(await visibleWindow()).toEqual(['Thu 6', 'Fri 7', 'Sat 8'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show the later day' }))
+    expect(await visibleWindow()).toEqual(['Sun 9', 'Mon 10', 'Tue 11'])
+  })
+
+  it('returns to the week and window containing today_S5', async () => {
+    renderPage()
+    await visibleWindow()
+
+    const previousDay = screen.getByRole('button', { name: 'Show the earlier day' })
+    fireEvent.click(previousDay)
+    fireEvent.click(previousDay)
+    expect(await visibleWindow()).toEqual(['Thu 6', 'Fri 7', 'Sat 8'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Today' }))
+
+    expect(await visibleWindow()).toEqual(['Mon 10', 'Tue 11', 'Wed 12'])
+  })
+
+  // The horizontal-scroll fallback is gone, which is what lets the day-header
+  // row stick to the page below `sm` — a scroll container captures its own
+  // sticky descendants.
+  it('keeps the header row sticky below sm with no horizontal scrollport_S5', async () => {
+    renderPage()
+    await visibleWindow()
+
+    const grid = screen.getByRole('grid')
+    expect(grid.className).not.toMatch(/overflow-x-(auto|scroll)/)
+    const headerRow = within(grid).getAllByRole('row')[0]
+    expect(headerRow.className).toMatch(/sticky/)
+    expect(headerRow.className).toMatch(/top-0/)
+  })
+
+  it('shows the whole week and no pager at sm and above_S5', async () => {
+    setViewport(false)
+    renderPage()
+
+    expect(await visibleWindow()).toEqual([
+      'Sun 9',
+      'Mon 10',
+      'Tue 11',
+      'Wed 12',
+      'Thu 13',
+      'Fri 14',
+      'Sat 15',
+    ])
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-colcount', '8')
+    expect(screen.queryByTestId('day-pager')).not.toBeInTheDocument()
   })
 })

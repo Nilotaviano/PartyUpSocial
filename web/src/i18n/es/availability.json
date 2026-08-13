@@ -8,6 +8,15 @@
     "agenda": "Agenda",
     "previousWeek": "Semana anterior",
     "nextWeek": "Semana siguiente",
+    "dayPager": {
+      "label": "Días mostrados",
+      "previousDay": "Mostrar el día anterior",
+      "nextDay": "Mostrar el día siguiente",
+      "showDay": "Mostrar {{day}}",
+      "showDayToday": "Mostrar {{day}}, hoy",
+      "today": "Hoy",
+      "range": "{{start}} – {{end}}"
+    },
     "agendaEmpty": "Nada programado en este período.",
     "anonymousFriend": "Usuario Anónimo",
     "layers": {

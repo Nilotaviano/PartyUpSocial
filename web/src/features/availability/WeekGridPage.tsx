@@ -58,6 +58,33 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const WAKING_START_HOUR = 8
 const END_HOUR = 24
 
+const DAYS_PER_WEEK = 7
+// CALENDAR_DESIGN.md §9 S5: below `sm` the grid shows three of the displayed
+// week's days at a time; the same `sm` boundary `CommitBlockDialog` switches
+// its popover/bottom-sheet skin on.
+const MOBILE_MEDIA_QUERY = '(max-width: 639px)'
+const MOBILE_DAY_WINDOW_LENGTH = 3
+
+function clamp(value: number, low: number, high: number) {
+  return Math.min(Math.max(value, low), high)
+}
+
+function useIsMobileViewport(): boolean {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof matchMedia === 'undefined' ? false : matchMedia(MOBILE_MEDIA_QUERY).matches,
+  )
+
+  useEffect(() => {
+    if (typeof matchMedia === 'undefined') return
+    const media = matchMedia(MOBILE_MEDIA_QUERY)
+    const listener = () => setIsMobile(media.matches)
+    media.addEventListener('change', listener)
+    return () => media.removeEventListener('change', listener)
+  }, [])
+
+  return isMobile
+}
+
 // The five new §8 problem codes (design §10.2): each renders its own
 // `availability.json` message. Every other code — including the two shared
 // `rate_limited`/`transient_conflict` — reads from the shipped flat
@@ -187,6 +214,10 @@ export function WeekGridPage() {
   const location = useLocation()
   const queryClient = useQueryClient()
   const [weekOffset, setWeekOffset] = useState(0)
+  // `null` means "no explicit paging yet" — the window is then derived from
+  // today (§9 S5's initial-window rule), which is also what the Today button
+  // and the week navigation restore.
+  const [dayWindowStart, setDayWindowStart] = useState<number | null>(null)
   const [editingTarget, setEditingTarget] = useState<EditingTarget | null>(null)
   const [pendingScope, setPendingScope] = useState<OccurrenceScope>('onlyThis')
   const [scopeDialogOpen, setScopeDialogOpen] = useState(false)
@@ -506,6 +537,57 @@ export function WeekGridPage() {
     }).format(date)
 
   const startHour = showEarlyHours ? 0 : WAKING_START_HOUR
+
+  // §9 S5's day window. `todayIndex` is a pure difference between the injected
+  // fake-local `now` and this week's own start — never the host clock — so it
+  // is `null` on every week that does not contain today.
+  const isMobile = useIsMobileViewport()
+  const dayWindowLength = isMobile ? MOBILE_DAY_WINDOW_LENGTH : DAYS_PER_WEEK
+  const maxDayWindowStart = DAYS_PER_WEEK - dayWindowLength
+  const todayIndex = useMemo(() => {
+    if (!now) return null
+    const index = Math.floor((now.getTime() - weekStart.getTime()) / DAY_MS)
+    return index >= 0 && index < DAYS_PER_WEEK ? index : null
+  }, [now, weekStart])
+  const defaultDayWindowStart =
+    todayIndex === null ? 0 : clamp(todayIndex, 0, maxDayWindowStart)
+  const dayWindowStartValue = clamp(
+    dayWindowStart ?? defaultDayWindowStart,
+    0,
+    maxDayWindowStart,
+  )
+  const dayWindowDays = Array.from(
+    { length: dayWindowLength },
+    (_, index) => dayWindowStartValue + index,
+  )
+
+  function goToWeek(delta: number) {
+    setWeekOffset((value) => value + delta)
+    setDayWindowStart(null)
+  }
+
+  // Prev/next step the window by a day and roll into the neighbouring week at
+  // the week's edges, landing the window at the far end so the step still
+  // reads as one day forward or back (§9 S5).
+  function stepDayWindow(delta: -1 | 1) {
+    const next = dayWindowStartValue + delta
+    if (next < 0) {
+      setWeekOffset((value) => value - 1)
+      setDayWindowStart(maxDayWindowStart)
+      return
+    }
+    if (next > maxDayWindowStart) {
+      setWeekOffset((value) => value + 1)
+      setDayWindowStart(0)
+      return
+    }
+    setDayWindowStart(next)
+  }
+
+  function goToToday() {
+    setWeekOffset(0)
+    setDayWindowStart(null)
+  }
 
   function toggleEarlyHours() {
     const next = !showEarlyHours
@@ -831,18 +913,10 @@ export function WeekGridPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="neutral"
-              onClick={() => setWeekOffset((value) => value - 1)}
-            >
+            <Button type="button" variant="neutral" onClick={() => goToWeek(-1)}>
               {t('calendar.previousWeek')}
             </Button>
-            <Button
-              type="button"
-              variant="neutral"
-              onClick={() => setWeekOffset((value) => value + 1)}
-            >
+            <Button type="button" variant="neutral" onClick={() => goToWeek(1)}>
               {t('calendar.nextWeek')}
             </Button>
           </div>
@@ -883,8 +957,79 @@ export function WeekGridPage() {
               >
                 {earlyHoursMessage}
               </p>
+              {/* §9 S5: the day pager exists only where the window applies —
+                  at `sm`+ the grid is the full week and there is nothing to
+                  page. The strip's seven buttons are the displayed week's
+                  days, so a jump never changes which week is shown. */}
+              {isMobile && (
+                <div className="space-y-1.5 sm:hidden" data-testid="day-pager">
+                  <div
+                    aria-label={t('calendar.dayPager.label')}
+                    className="grid grid-cols-7 gap-1"
+                    role="group"
+                  >
+                    {dayLabels.map((label, index) => {
+                      const inWindow = dayWindowDays.includes(index)
+                      return (
+                        <button
+                          key={label}
+                          aria-current={index === todayIndex ? 'date' : undefined}
+                          aria-label={t(
+                            index === todayIndex
+                              ? 'calendar.dayPager.showDayToday'
+                              : 'calendar.dayPager.showDay',
+                            { day: label },
+                          )}
+                          aria-pressed={inWindow}
+                          className={`min-h-11 rounded-xl border font-display text-[12px] font-bold ${
+                            inWindow
+                              ? 'border-primary bg-primary/20 text-ink'
+                              : 'border-ink/25 bg-card text-ink-soft'
+                          } ${index === todayIndex ? 'underline decoration-2 underline-offset-4' : ''}`}
+                          type="button"
+                          onClick={() => setDayWindowStart(clamp(index, 0, maxDayWindowStart))}
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      aria-label={t('calendar.dayPager.previousDay')}
+                      type="button"
+                      variant="neutral"
+                      onClick={() => stepDayWindow(-1)}
+                    >
+                      &lsaquo;
+                    </Button>
+                    <p className="min-w-0 flex-1 truncate text-center font-display text-[12px] font-bold text-ink-soft">
+                      {t('calendar.dayPager.range', {
+                        start: dayLabels[dayWindowDays[0]],
+                        end: dayLabels[dayWindowDays[dayWindowDays.length - 1]],
+                      })}
+                    </p>
+                    <Button type="button" variant="neutral" onClick={goToToday}>
+                      {t('calendar.dayPager.today')}
+                    </Button>
+                    <Button
+                      aria-label={t('calendar.dayPager.nextDay')}
+                      type="button"
+                      variant="neutral"
+                      onClick={() => stepDayWindow(1)}
+                    >
+                      &rsaquo;
+                    </Button>
+                  </div>
+                </div>
+              )}
               <WeekGrid
                 dayLabels={dayLabels}
+                dayWindow={
+                  isMobile
+                    ? { start: dayWindowStartValue, length: dayWindowLength }
+                    : undefined
+                }
                 endHour={END_HOUR}
                 friendRanges={friendRanges}
                 merged={merged}
@@ -897,6 +1042,7 @@ export function WeekGridPage() {
                 weekStart={weekStart}
                 onAdjustOccurrence={handleAdjustOccurrence}
                 onCreateBlock={handleCreateBlock}
+                onDayWindowStartChange={setDayWindowStart}
                 onEditOccurrence={handleEditOccurrence}
               />
             </div>

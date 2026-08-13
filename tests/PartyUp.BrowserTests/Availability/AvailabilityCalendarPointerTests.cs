@@ -20,6 +20,16 @@ namespace PartyUp.BrowserTests.Availability;
 /// under that ceiling (unlike the Chromium step, whose budget the sibling
 /// <see cref="AvailabilityCalendarFlowTests"/> class documents as already fully spent).
 /// </para>
+/// <para>
+/// The 390×844 context is below the `sm` breakpoint, so CALENDAR_DESIGN.md §9 S5's day window
+/// applies: the grid renders three columns per row, not seven. The window is derived, never
+/// seeded — the fixture registers a fresh account and loads `/calendar` at `weekOffset 0` on
+/// whatever the real current date is, and S5's initial-window rule puts the window start at
+/// `clamp(todayIndex, 0, 4)`. That clamp always keeps today inside the window, so which weekday
+/// each column holds is not fixed, but the window is always exactly three columns wide and
+/// always present. Every day index below is therefore a window-relative column (0..2) and
+/// <see cref="CellIndex"/> strides by three.
+/// </para>
 /// </summary>
 [Trait("Category", "Integration")]
 [Trait("Browser", "WebKit")]
@@ -87,8 +97,14 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             new { type, cellIndex, clientY });
     }
 
-    /// <summary>Row-major gridcell index for (day, slot) — 7 gridcells per row (see `WeekGrid.tsx`).</summary>
-    private static int CellIndex(int day, int slot) => (slot * 7) + day;
+    private const int DayWindowLength = 3;
+
+    /// <summary>
+    /// Row-major gridcell index for (column, slot), where <paramref name="column"/> is the
+    /// window-relative day column — <see cref="DayWindowLength"/> gridcells per row at this
+    /// viewport (see `WeekGrid.tsx`'s `dayWindow`).
+    /// </summary>
+    private static int CellIndex(int column, int slot) => (slot * DayWindowLength) + column;
 
     /// <summary>
     /// D-009/§7: a painted range is a proposal — the commit dialog's one-time/weekly choice is
@@ -115,7 +131,7 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             await page.GetByRole(AriaRole.Grid).WaitForAsync();
             ILocator grid = page.GetByRole(AriaRole.Grid);
 
-            int cellIndex = CellIndex(day: 0, slot: 0);
+            int cellIndex = CellIndex(column: 0, slot: 0);
             await DispatchTouchPointerEventAsync(page, "pointerdown", cellIndex);
 
             // Before the long-press threshold, the container has not opted out of native
@@ -159,9 +175,10 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             await page.GetByRole(AriaRole.Grid).WaitForAsync();
             ILocator grid = page.GetByRole(AriaRole.Grid);
 
-            // Day 1's column (never touched by the sibling long-press fact, which uses day 0) —
-            // starting near the top so there is real distance left to auto-scroll through.
-            int startCellIndex = CellIndex(day: 1, slot: 0);
+            // The window's second column (each fact runs in its own account and browser, so the
+            // columns only have to be readable, not disjoint) — starting near the top so there is
+            // real distance left to auto-scroll through.
+            int startCellIndex = CellIndex(column: 1, slot: 0);
             await DispatchTouchPointerEventAsync(page, "pointerdown", startCellIndex);
             await page.WaitForTimeoutAsync(LongPressSettleMs);
 
@@ -214,8 +231,8 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             await page.GetByRole(AriaRole.Grid).WaitForAsync();
             ILocator grid = page.GetByRole(AriaRole.Grid);
 
-            // Day 2's column — isolated from the other facts' cells.
-            int cellIndex = CellIndex(day: 2, slot: 0);
+            // The window's third column.
+            int cellIndex = CellIndex(column: 2, slot: 0);
             await DispatchTouchPointerEventAsync(page, "pointerdown", cellIndex);
 
             // Movement well past the cancel threshold (`MOVE_CANCEL_PX` in `WeekGrid.tsx`),
@@ -265,9 +282,9 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             await page.GetByRole(AriaRole.Grid).WaitForAsync();
 
-            // Day 3's column, slots 0..4 — a 1-hour (4 × 15-minute) drag.
-            int startCellIndex = CellIndex(day: 3, slot: 0);
-            int endCellIndex = CellIndex(day: 3, slot: 4);
+            // The window's first column, slots 0..4 — a 1-hour (4 × 15-minute) drag.
+            int startCellIndex = CellIndex(column: 0, slot: 0);
+            int endCellIndex = CellIndex(column: 0, slot: 4);
             await DispatchTouchPointerEventAsync(page, "pointerdown", startCellIndex);
             await page.WaitForTimeoutAsync(LongPressSettleMs);
             await DispatchTouchPointerEventAsync(page, "pointermove", endCellIndex);
@@ -280,11 +297,11 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             // sub-slot precision ever reaches the commit.
             for (int slot = 0; slot <= 4; slot++)
             {
-                await Assertions.Expect(page.GetByRole(AriaRole.Gridcell).Nth(CellIndex(3, slot)))
+                await Assertions.Expect(page.GetByRole(AriaRole.Gridcell).Nth(CellIndex(0, slot)))
                     .ToHaveAttributeAsync("data-state", "busy");
             }
 
-            await Assertions.Expect(page.GetByRole(AriaRole.Gridcell).Nth(CellIndex(3, 5)))
+            await Assertions.Expect(page.GetByRole(AriaRole.Gridcell).Nth(CellIndex(0, 5)))
                 .ToHaveAttributeAsync("data-state", "free");
         }
         finally
