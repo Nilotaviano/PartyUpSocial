@@ -132,4 +132,43 @@ describe('CalendarLayers', () => {
       expect(swatch.textContent).toBe('')
     }
   })
+
+  // CALENDAR_DESIGN.md §9 S4's verified S2 finding: the legend's swatches had
+  // drifted from what `WeekGrid.tsx` actually paints for the sessions/friend/
+  // poll-option layers — this pins each swatch to the grid's real fill/border
+  // so a future grid restyle without a matching legend update fails loudly.
+  it('paints every swatch with the fill/border the grid itself uses for that layer_S4', () => {
+    const onChange = vi.fn<(state: CalendarLayerState) => void>()
+    const { container } = render(
+      <CalendarLayers friends={[friend(0, 'Ana')]} onChange={onChange} />,
+    )
+    const swatches = Array.from(container.querySelectorAll('span[aria-hidden="true"].rounded-full'))
+    const classesFor = (index: number) => swatches[index]!.className
+
+    // My availability: the grid's free-cell fill, never `bg-free-ink`.
+    expect(classesFor(0)).toMatch(/\bbg-free\b/)
+    // Friends: a neutral busy-fill disc with an ink ring, never `bg-ink`.
+    expect(classesFor(1)).toMatch(/\bbg-busy\b/)
+    expect(classesFor(1)).not.toMatch(/\bbg-ink\b/)
+    // Sessions: an accent-filled pill with a 2px ink-tinted border, never
+    // `bg-free-ink`.
+    expect(classesFor(2)).toMatch(/\bbg-accent\b/)
+    expect(classesFor(2)).toMatch(/\bborder-2\b/)
+    expect(classesFor(2)).not.toMatch(/\bbg-free-ink\b/)
+    // Poll options: a dashed-border card-fill pill, never `bg-maybe`.
+    expect(classesFor(3)).toMatch(/\bbg-card\b/)
+    expect(classesFor(3)).toMatch(/\bborder-dashed\b/)
+    expect(classesFor(3)).not.toMatch(/\bbg-maybe\b/)
+  })
+
+  // CALENDAR_DESIGN.md §9 S4: the legend restyles as a card, fieldset/legend
+  // semantics unchanged.
+  it('restyles as a surfaced legend card without changing fieldset semantics_S4', () => {
+    const onChange = vi.fn<(state: CalendarLayerState) => void>()
+    const { container } = render(<CalendarLayers friends={[]} onChange={onChange} />)
+
+    const fieldset = container.querySelector('fieldset')
+    expect(fieldset).toHaveClass('surface')
+    expect(fieldset?.querySelector('legend')).toHaveTextContent('Layers')
+  })
 })

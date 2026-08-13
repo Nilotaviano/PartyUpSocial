@@ -28,6 +28,11 @@
   "summary": {
     "heading": "Sua disponibilidade",
     "empty": "Você ainda não publicou nenhuma disponibilidade.",
+    "weeklyHeading": "Repete toda semana",
+    "oneOffHeading": "Só esta semana",
+    "kindRecurring": "Repete toda semana",
+    "kindOneOff": "Uma vez",
+    "oneOffEmpty": "Nenhuma janela avulsa ainda.",
     "weeklyRule": "Toda semana, {{weekday}} · {{start}}–{{end}}",
     "oneOffRule": "{{date}} · {{start}}–{{end}}",
     "delete": "Excluir",
@@ -35,7 +40,11 @@
     "cancel": "Manter",
     "deleteSeriesTitle": "Excluir esta disponibilidade semanal?",
     "deleteSeriesBody": "Isto remove a janela semanal inteira, incluindo as ocorrências que você já alterou individualmente.",
-    "deleteSeriesConfirm": "Excluir série"
+    "deleteSeriesConfirm": "Excluir série",
+    "windowsCount_one": "{{count}} janela",
+    "windowsCount_other": "{{count}} janelas",
+    "expand": "Mostrar sua disponibilidade",
+    "collapse": "Ocultar sua disponibilidade"
   },
   "commit": {
     "range": "{{start}}–{{end}}",

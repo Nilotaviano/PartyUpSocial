@@ -28,6 +28,11 @@
   "summary": {
     "heading": "Your availability",
     "empty": "You have not published any availability yet.",
+    "weeklyHeading": "Repeats weekly",
+    "oneOffHeading": "This week only",
+    "kindRecurring": "Repeats weekly",
+    "kindOneOff": "One-time",
+    "oneOffEmpty": "No one-off windows yet.",
     "weeklyRule": "Every {{weekday}} · {{start}}–{{end}}",
     "oneOffRule": "{{date}} · {{start}}–{{end}}",
     "delete": "Delete",
@@ -35,7 +40,11 @@
     "cancel": "Keep it",
     "deleteSeriesTitle": "Delete this weekly availability?",
     "deleteSeriesBody": "This removes the whole weekly window, including occurrences you already changed on their own.",
-    "deleteSeriesConfirm": "Delete series"
+    "deleteSeriesConfirm": "Delete series",
+    "windowsCount_one": "{{count}} window",
+    "windowsCount_other": "{{count}} windows",
+    "expand": "Show your availability",
+    "collapse": "Hide your availability"
   },
   "commit": {
     "range": "{{start}}–{{end}}",

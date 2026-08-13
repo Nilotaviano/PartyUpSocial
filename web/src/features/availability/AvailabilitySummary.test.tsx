@@ -117,6 +117,83 @@ describe('AvailabilitySummary', () => {
     expect(onDeleteBlock).toHaveBeenCalledWith('block-1')
   })
 
+  // CALENDAR_DESIGN.md §9 S4: rules group under "Repeats weekly"/"This week
+  // only" headers, each row a card with a kind label as its secondary line.
+  it('groups rules under weekly and one-off headers with a kind label_S4', () => {
+    render(
+      <AvailabilitySummary
+        deletingId={null}
+        oneOffs={[
+          {
+            blockId: 'block-1',
+            startTime: '2026-08-11T23:00:00.000Z',
+            endTime: '2026-08-12T02:00:00.000Z',
+          },
+        ]}
+        series={series}
+        timeZone="America/Sao_Paulo"
+        onDeleteBlock={vi.fn()}
+        onDeleteSeries={vi.fn()}
+      />,
+    )
+
+    // The group heading and the recurring row's own kind label read
+    // identically ("Repeats weekly"), so both are asserted together here.
+    expect(screen.getAllByText('Repeats weekly').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText('This week only')).toBeInTheDocument()
+    // Every row's secondary line names its kind — never a colour/icon-only
+    // distinction (the icon chip itself stays `aria-hidden`).
+    expect(screen.getByText('One-time')).toBeInTheDocument()
+  })
+
+  it('shows an explicit empty state for the one-off group when only weekly rules exist_S4', () => {
+    render(
+      <AvailabilitySummary
+        deletingId={null}
+        oneOffs={[]}
+        series={series}
+        timeZone="America/Sao_Paulo"
+        onDeleteBlock={vi.fn()}
+        onDeleteSeries={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('This week only')).toBeInTheDocument()
+    expect(screen.getByText('No one-off windows yet.')).toBeInTheDocument()
+  })
+
+  it('lets two instances coexist via a caller-supplied titleId, never colliding on the default_S4', () => {
+    const { unmount } = render(
+      <AvailabilitySummary
+        deletingId={null}
+        oneOffs={[]}
+        series={series}
+        timeZone="America/Sao_Paulo"
+        titleId="availability-summary-heading-mobile"
+        onDeleteBlock={vi.fn()}
+        onDeleteSeries={vi.fn()}
+      />,
+    )
+    expect(document.getElementById('availability-summary-heading-mobile')).toHaveTextContent(
+      'Your availability',
+    )
+    unmount()
+
+    render(
+      <AvailabilitySummary
+        deletingId={null}
+        oneOffs={[]}
+        series={series}
+        timeZone="America/Sao_Paulo"
+        onDeleteBlock={vi.fn()}
+        onDeleteSeries={vi.fn()}
+      />,
+    )
+    expect(document.getElementById('availability-summary-heading')).toHaveTextContent(
+      'Your availability',
+    )
+  })
+
   it('tells the viewer when nothing is published yet_D025', () => {
     render(
       <AvailabilitySummary

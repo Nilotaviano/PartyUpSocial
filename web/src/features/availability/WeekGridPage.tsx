@@ -11,7 +11,6 @@ import {
 } from '../../components/ui/classes'
 import { PageHeader } from '../../components/ui/pageHeader'
 import { PageScaffold } from '../../components/ui/pageScaffold'
-import { Section } from '../../components/ui/section'
 import { StatusBanner } from '../../components/ui/statusBanner'
 import { Toast } from '../../components/ui/toast'
 import { getViewerProfile, viewerProfileKey } from '../sessions/sessionQueries'
@@ -202,6 +201,10 @@ export function WeekGridPage() {
   const [layers, setLayers] = useState<CalendarLayerState | null>(null)
   const [showEarlyHours, setShowEarlyHours] = useState(false)
   const [earlyHoursMessage, setEarlyHoursMessage] = useState('')
+  // CALENDAR_DESIGN.md §9 S4: below `lg` the summary starts collapsed behind
+  // a disclosure; at `lg`+ it is always visible in the sticky aside and this
+  // state has no effect (the aside ignores it).
+  const [summaryOpen, setSummaryOpen] = useState(false)
   const editTrigger = useRef<HTMLElement | null>(null)
 
   const isAgenda = location.pathname.endsWith('/agenda')
@@ -369,6 +372,10 @@ export function WeekGridPage() {
         ]
       : [],
   )
+  const availabilitySeries = calendar.data?.myAvailability.series ?? []
+  // The mobile disclosure's collapsed summary line (§9 S4) — every published
+  // rule, weekly or one-off, same as `AvailabilitySummary` itself lists.
+  const availabilityWindowCount = availabilitySeries.length + oneOffBlocks.length
 
   // Stabilized by reference (react-query keeps `data` referentially equal
   // across renders that don't refetch) so `CalendarLayers`' state-report
@@ -720,6 +727,76 @@ export function WeekGridPage() {
     }
   }
 
+  // CALENDAR_DESIGN.md §9 S4: one aside tree, reused by both the week-view
+  // and agenda branches below — the agenda route keeps layer control (per
+  // D-111/D-135) and now gains the summary alongside it, at parity with the
+  // week view rather than as a special case.
+  const aside = (
+    <aside className="flex flex-col gap-4 lg:sticky lg:top-4 lg:space-y-4">
+      {summaryOpen && (
+        <div className="lg:hidden">
+          <AvailabilitySummary
+            deletingId={deletingId}
+            oneOffs={oneOffBlocks}
+            series={availabilitySeries}
+            timeZone={timeZone}
+            titleId="availability-summary-heading-mobile"
+            onDeleteBlock={(blockId) => deleteBlock.mutate(blockId)}
+            onDeleteSeries={(seriesId) => deleteSeries.mutate(seriesId)}
+          />
+        </div>
+      )}
+      <button
+        aria-expanded={summaryOpen}
+        className="flex w-full items-center justify-between gap-2 rounded-card border border-ink/25 bg-card px-3 py-2 text-left lg:hidden"
+        type="button"
+        onClick={() => setSummaryOpen((open) => !open)}
+      >
+        <span className="min-w-0">
+          <span className="block font-display font-semibold text-ink">
+            {t('summary.heading')}
+          </span>
+          {!summaryOpen && (
+            <span className="block truncate text-meta text-ink-soft">
+              {t('summary.windowsCount', { count: availabilityWindowCount })}
+            </span>
+          )}
+        </span>
+        <svg
+          aria-hidden="true"
+          className={`size-5 shrink-0 transition-transform ${summaryOpen ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          viewBox="0 0 24 24"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      <div className="hidden lg:block">
+        <AvailabilitySummary
+          deletingId={deletingId}
+          oneOffs={oneOffBlocks}
+          series={availabilitySeries}
+          timeZone={timeZone}
+          titleId="availability-summary-heading-desktop"
+          onDeleteBlock={(blockId) => deleteBlock.mutate(blockId)}
+          onDeleteSeries={(seriesId) => deleteSeries.mutate(seriesId)}
+        />
+      </div>
+      <CalendarLayers
+        friends={friends}
+        pollItems={(calendar.data?.pollOptions ?? []).map((poll) => ({
+          pollId: poll.pollId,
+          title: poll.title,
+        }))}
+        onChange={setLayers}
+      />
+    </aside>
+  )
+
   return (
     <main data-testid="screen-calendar">
       <PageScaffold>
@@ -769,36 +846,25 @@ export function WeekGridPage() {
           </div>
         </div>
 
-        <Section>
-          <CalendarLayers
-            friends={friends}
-            pollItems={(calendar.data?.pollOptions ?? []).map((poll) => ({
-              pollId: poll.pollId,
-              title: poll.title,
-            }))}
-            onChange={setLayers}
-          />
-        </Section>
-
+        {/* CALENDAR_DESIGN.md §9 S4: the sticky aside hosts the summary then
+            the legend for BOTH view branches below (agenda keeps layer
+            control per D-111/D-135) — a `lg`+ two-column grid, single-column
+            with the summary behind a mobile disclosure below `lg`. */}
         {isAgenda ? (
-          <AgendaView
-            dateLabelFormatter={dateLabelFormatter}
-            entries={agendaEntries}
-            timeLabelFormatter={timeLabelFormatter}
-          />
-        ) : (
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-            <div className="lg:w-72 lg:shrink-0">
-              <AvailabilitySummary
-                deletingId={deletingId}
-                oneOffs={oneOffBlocks}
-                series={calendar.data?.myAvailability.series ?? []}
-                timeZone={timeZone}
-                onDeleteBlock={(blockId) => deleteBlock.mutate(blockId)}
-                onDeleteSeries={(seriesId) => deleteSeries.mutate(seriesId)}
+          <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
+            {aside}
+            <div className="min-w-0">
+              <AgendaView
+                dateLabelFormatter={dateLabelFormatter}
+                entries={agendaEntries}
+                timeLabelFormatter={timeLabelFormatter}
               />
             </div>
-            <div className="min-w-0 flex-1 space-y-2">
+          </div>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
+            {aside}
+            <div className="min-w-0 space-y-2">
               {/* Stays mounted in both states: unmounting the control on
                   activation would drop focus to document.body and leave the 32
                   revealed rows unannounced (WCAG 2.4.3). */}

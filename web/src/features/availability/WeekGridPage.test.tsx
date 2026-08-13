@@ -882,12 +882,12 @@ function profileResponse(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function renderPage() {
+function renderPage(initialEntries: string[] = ['/calendar']) {
   return render(
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <MemoryRouter initialEntries={['/calendar']}>
+      <MemoryRouter initialEntries={initialEntries}>
         <WeekGridPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -1652,5 +1652,102 @@ describe('WeekGridPage occurrence editing', () => {
       screen.queryByRole('gridcell', { name: /Raid night poll/ }),
     ).not.toBeInTheDocument()
     expect(screen.queryByText('Raid night poll')).not.toBeInTheDocument()
+  })
+})
+
+// CALENDAR_DESIGN.md §9 S4: side-panel (sticky aside) + main column at `lg`+,
+// summary behind a mobile disclosure below `lg` — for both view branches.
+describe('WeekGridPage §9 S4 aside layout', () => {
+  function mockCalendar(overrides: { series?: unknown[]; blockOccurrence?: boolean } = {}) {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve({ data: profileResponse() })
+      if (path === '/api/v1/calendar') {
+        return Promise.resolve({
+          data: {
+            myAvailability: {
+              occurrences: overrides.blockOccurrence
+                ? [
+                    {
+                      startTime: '2026-08-10T13:00:00.000Z',
+                      endTime: '2026-08-10T13:30:00.000Z',
+                      origin: { kind: 'block', blockId: 'block-1', seriesId: null, occurrenceDate: null },
+                    },
+                  ]
+                : [],
+              merged: [],
+              range: { start: '2026-08-10T00:00:00.000Z', end: '2026-08-17T00:00:00.000Z' },
+              series: overrides.series ?? [],
+            },
+            friendAvailability: [],
+            sessions: [],
+            pollOptions: [],
+          },
+        })
+      }
+      throw new Error(`Unexpected GET ${path}`)
+    })
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-08-10T12:00:00.000Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('starts the mobile summary disclosure collapsed, showing a windows-count line_S4', async () => {
+    mockCalendar({ blockOccurrence: true })
+    renderPage()
+
+    // The Delete affordance in the always-visible `lg`+ copy only appears
+    // once the calendar query resolves — waiting on it doubles as waiting
+    // for the collapsed count line below to reflect real data.
+    await screen.findByRole('button', { name: /Delete/ })
+
+    const toggle = screen.getByRole('button', { name: /Your availability/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(toggle).toHaveTextContent('1 window')
+    // One Delete affordance already exists (the always-visible `lg`+ copy)
+    // even while the mobile copy is collapsed — expanding adds a second one.
+    expect(screen.getAllByRole('button', { name: /Delete/ })).toHaveLength(1)
+  })
+
+  it('expands the disclosure to mount a second (mobile) copy of the summary and drops the count line_S4', async () => {
+    mockCalendar({ blockOccurrence: true })
+    renderPage()
+
+    await screen.findByRole('button', { name: /Delete/ })
+    const toggle = screen.getByRole('button', { name: /Your availability/ })
+    fireEvent.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(toggle).not.toHaveTextContent('window')
+    expect(screen.getAllByRole('button', { name: /Delete/ })).toHaveLength(2)
+  })
+
+  it('hosts both the summary and the legend in the aside on the agenda route too_S4', async () => {
+    mockCalendar({
+      series: [
+        {
+          seriesId: 'series-1',
+          dayOfWeek: 2,
+          startTime: '20:00',
+          durationMinutes: 60,
+          zoneId: 'UTC',
+          effectiveFrom: '2026-08-01',
+          effectiveUntil: null,
+        },
+      ],
+    })
+    renderPage(['/calendar/agenda'])
+
+    expect(await screen.findByRole('button', { name: /Your availability/ })).toBeInTheDocument()
+    // The legend (`CalendarLayers`) keeps its layer control on the agenda
+    // route (D-111/D-135) — it was never removed, only relocated into the
+    // aside alongside the summary.
+    expect(screen.getByText('Layers')).toBeInTheDocument()
+    expect(screen.getByLabelText('My availability')).toBeChecked()
   })
 })
