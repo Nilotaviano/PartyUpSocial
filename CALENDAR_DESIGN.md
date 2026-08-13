@@ -176,6 +176,8 @@ dependencies (A-013); `gen:api` untouched (no wire change).
 
 ## 9. Lovable Canvas port (owner-ratified 2026-08-13) — supersedes §2/§8 exclusions it names
 
+Status: S1–S6 SHIPPED 2026-08-13
+
 The owner approved the Lovable prototype "PartyUp Calendar Canvas" as the target design for
 this screen and ruled it wins over this document's earlier exclusions. Reference bundle with
 verbatim prototype sources and a distilled move list: the session scratchpad `lovable-proto/`
@@ -247,9 +249,10 @@ Slices (serialized S2→S5; write sets in `.foreman/ledger.md`):
   with the weekday carried by the columnheader and each cell's accessible name. Keyboard
   horizontal navigation at a window edge moves the window **only when the window is narrower
   than 7 days**, and focus lands on the newly revealed column after the window state settles.
-  S5 **owns rewriting the P5-TOUCH-01 pointer suite**: `AvailabilityCalendarPointerTests`
-  runs at 390×844 where the window applies — `CellIndex`'s 7-stride and its absolute day
-  indices rewrite to the window stride against the defined initial window.
+  S5 **owns rewriting the P5-TOUCH-01 pointer suite** (done — window-stride rewrite shipped
+  with S5): `AvailabilityCalendarPointerTests` runs at 390×844 where the window applies —
+  `CellIndex`'s 7-stride and its absolute day indices rewrite to the window stride against the
+  defined initial window.
 - **S6 — closing sweep**: i18n parity ×3 for all new strings; axe matrix green with the
   exclusion list untouched, **plus one 390 px-wide `/calendar` scan** covering the day strip,
   restored sticky header, and bottom sheet; TRACEABILITY rows for any test renames; this

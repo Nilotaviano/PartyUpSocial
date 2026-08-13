@@ -11,7 +11,8 @@ import { useId, type ReactNode } from 'react'
  * another bordered card, and a page carries at most three SectionCards.
  *
  * Repeated person/session rows are hairline rows (`border-t border-ink/25`)
- * inside one Section, never one card per row.
+ * inside one Section, never one card per row — the calendar summary panel's
+ * per-rule card rows are the ratified exception (CALENDAR_DESIGN.md §9 S4).
  */
 export interface SectionProps {
   children: ReactNode

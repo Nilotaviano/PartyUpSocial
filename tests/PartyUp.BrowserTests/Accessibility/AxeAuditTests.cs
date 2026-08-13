@@ -589,11 +589,17 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
         AuditedTheme theme,
         IBrowserContext browserContext,
         string path,
-        Func<IPage, Task> reachState)
+        Func<IPage, Task> reachState,
+        (int Width, int Height)? viewport = null)
     {
         IPage page = await browserContext.NewPageAsync();
         try
         {
+            if (viewport is not null)
+            {
+                await page.SetViewportSizeAsync(viewport.Value.Width, viewport.Value.Height);
+            }
+
             await SeedThemeBeforeFirstNavigationAsync(page, theme);
             await page.GotoAsync(PlaywrightFixture.WebBaseUrl + path);
             await AssertThemeAppliedAsync(page, theme);
@@ -762,6 +768,33 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
                     .ToBeVisibleAsync();
                 await Assertions.Expect(page.GetByRole(AriaRole.Dialog)).ToHaveCountAsync(0);
             });
+    }
+
+    /// <summary>
+    /// CALENDAR_DESIGN.md §9 S6: a 390×844 <c>/calendar</c> scan — the day strip, the sticky header
+    /// S5 restored below <c>sm</c>, and the now-line dot only render at this width, so the desktop
+    /// <c>calendar</c> route case in <see cref="Routes"/> never exercises them. Static page load
+    /// only: the S3 bottom sheet needs a real drag gesture to open, which this fact does not
+    /// perform. As of this writing that surface's own axe coverage is the
+    /// <c>availability-commit-dialog</c>/<c>availability-occurrence-scope-dialog</c>/
+    /// <c>availability-block-editor-dialog</c> facts above, which scan the same dialog's desktop
+    /// popover rendering (S3 keeps identical dialog semantics between the popover and bottom-sheet
+    /// arms; only the anchor position differs) — not the bottom sheet itself at this width.
+    /// </summary>
+    [Theory]
+    [InlineData(AuditedTheme.Light)]
+    [InlineData(AuditedTheme.Dark)]
+    public async Task Calendar390pxDayStrip_HasNoWcagViolation_D139(AuditedTheme theme)
+    {
+        AuditContext context = await GetContextAsync();
+
+        await AssertInteractionStateIsAxeCleanAsync(
+            "calendar-390-mobile",
+            theme,
+            context.Organizer.Page.Context,
+            "/calendar",
+            async page => await page.WaitForLoadStateAsync(LoadState.NetworkIdle),
+            viewport: (390, 844));
     }
 
     /// <summary>
