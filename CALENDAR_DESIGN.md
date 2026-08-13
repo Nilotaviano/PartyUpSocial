@@ -173,3 +173,89 @@ uses), resize-handle Space does not double-activate, band start/middle/end metad
 visible-range clamp (unit), label renders once per band and shifts when selected, friend glyph
 at span start only. Axe lane must stay green. All new strings (if any) in en/pt-BR/es; no new
 dependencies (A-013); `gen:api` untouched (no wire change).
+
+## 9. Lovable Canvas port (owner-ratified 2026-08-13) — supersedes §2/§8 exclusions it names
+
+The owner approved the Lovable prototype "PartyUp Calendar Canvas" as the target design for
+this screen and ruled it wins over this document's earlier exclusions. Reference bundle with
+verbatim prototype sources and a distilled move list: the session scratchpad `lovable-proto/`
+(prototype project 54690dbe @ 8f50d89c). §§1–8 remain the record of what shipped before it.
+
+**Now IN (previously excluded):** current-time line on today's column (presentation-only,
+`aria-hidden`, minute-interval tick); mobile 3-day paged view; commit popover anchored at the
+drag-release point on desktop; new visual tokens where the prototype needs them. FullCalendar
+stays out; month view stays out.
+
+**The engineering floor is not overridden** — every §9 item renders on top of it, never
+instead of it: the per-slot `role="gridcell"` DOM with roving tabindex and per-slot accessible
+names; keyboard create/edit paths and Space/Enter parity; the touch contract (finger drag
+scrolls, 380 ms-class long-press arms painting — constants stay `WeekGrid.tsx`'s
+`LONG_PRESS_MS`/`MOVE_CANCEL_PX`); `OccurrenceScopeDialog` routing on recurring occurrences;
+zero-exclusion axe; i18n en/pt-BR/es; D-076 masking; real calendar-view data only.
+
+**Explicitly NOT ported** (prototype fictions that would change domain or ratified systems):
+the free/maybe *painting* intent (domain has no maybe-availability — `maybe` tokens keep their
+existing consumers only); 5-hue initials chips (friend markers use the shipped `AvatarDisc`
+identity system, masked friends included); the prototype's overlay-only DOM (looks port onto
+the existing cell DOM); mock data of any kind; inline time-`select` editing in the summary
+panel (edit keeps routing to the shipped block editor — the panel restyles, its affordances
+keep their semantics).
+
+Slices (serialized S2→S5; write sets in `.foreman/ledger.md`):
+
+- **S1 — tokens & utilities** (`index.css`): `--color-grid-line`/`--color-grid-hour` (both
+  themes), `--shadow-card`/`--shadow-pop`, `surface` and `paper-grain` utilities, radius
+  additions the pills need. Existing palette hexes stay; new tokens harmonize with them.
+- **S2 — WeekGrid look**: the column-card read is **simulated on the unchanged row-major DOM**
+  (one `role="row"` per slot; §8's "no DOM restructuring" stands): column edge borders on each
+  column's first/last cell, top/bottom rounding on the first/last row, the inter-column gap via
+  cell margin. Today gets primary-tint edges + header chip; sticky header row gains card chips
+  (day name + date) on a translucent backdrop-blur strip; hour ruler right-aligned tabular
+  labels in a 56 px gutter; 15-min interior lines lighten toward `--color-grid-line`, hour
+  lines `--color-grid-hour`; band rounding/label per §8 unchanged in mechanism, restyled.
+  Session spans become pills at span start using **the ratified `accent`/`accent-ink` pair**
+  (poll spans: dashed border, same pair) — never `free-ink` on a new fill (zero-exclusion axe).
+  Friend glyphs **stay non-identifying** (`GridFriendRange` carries `ownerLabel` only, and a
+  per-friend avatar on masked entries would breach D-076): the glyph restyles as a small
+  neutral disc chip at friend-span start, existing N>1 collapse rendered as "+N"; a real
+  per-friend `AvatarDisc` needs an avatar on the wire contract and is **deferred to backlog**.
+  Now-line: red dot + hairline on today only, `aria-hidden` — **the page passes a fake-local
+  `now` prop** (re-derived on a minute tick via the shipped `instantToFakeLocal` boundary);
+  `WeekGrid` stays zone-free and only diffs it against `weekStart`/`startHour`/`endHour`.
+- **S3 — commit step**: `onCreateBlock` gains an **anchor `DOMRect`** — pointer paths pass the
+  release point, keyboard and touch paths pass the focused/last cell's
+  `getBoundingClientRect()` — and `CommitBlockDialog` renders as a small popover at that
+  anchor, viewport-clamped, on ≥sm, and as a bottom sheet with grab handle below sm; dialog
+  semantics keep (focus trap, Escape, labelled). One-time/weekly becomes a two-segment
+  control. Toast restyles to the prototype card look; Undo behavior unchanged.
+- **S4 — panel & page layout**: `AvailabilitySummary` groups rules under "Repeats weekly" /
+  "This week only" headers with kind icons and card rows (selected row ring-highlights and
+  scroll-syncs with grid selection where already wired); desktop `lg` layout becomes
+  side-panel (sticky aside) + main column, and **the aside hosts `CalendarLayers` for both
+  view branches** — the agenda route keeps layer control (D-111/D-135), below `lg` the
+  current above-content placement stays; the summary collapses above the grid behind a
+  disclosure below `lg`; `CalendarLayers` toggles restyle as the legend card (fieldset
+  semantics stay).
+- **S5 — mobile 3-day pager**: below `sm`, the grid shows a **3-day window defined as an index
+  into the displayed week** — initial window anchored on today clamped into the week
+  (`weekOffset 0`), otherwise the week's first three days; the day strip's 7 buttons are the
+  displayed week's days; prev/next step the window and **roll `weekOffset` at week edges**;
+  Today = `weekOffset 0` + window containing today. The horizontal-scroll fallback container
+  is removed, restoring the sticky header below `sm`; `WeekGrid` gains a visible-day-window
+  prop. ARIA: `aria-colcount` follows the window and **`aria-colindex` is window-relative**,
+  with the weekday carried by the columnheader and each cell's accessible name. Keyboard
+  horizontal navigation at a window edge moves the window **only when the window is narrower
+  than 7 days**, and focus lands on the newly revealed column after the window state settles.
+  S5 **owns rewriting the P5-TOUCH-01 pointer suite**: `AvailabilityCalendarPointerTests`
+  runs at 390×844 where the window applies — `CellIndex`'s 7-stride and its absolute day
+  indices rewrite to the window stride against the defined initial window.
+- **S6 — closing sweep**: i18n parity ×3 for all new strings; axe matrix green with the
+  exclusion list untouched, **plus one 390 px-wide `/calendar` scan** covering the day strip,
+  restored sticky header, and bottom sheet; TRACEABILITY rows for any test renames; this
+  section's status updated; full gates.
+
+Verification per slice: targeted Vitest; the §8 band/keyboard/touch suites stay green wherever
+mechanism is unchanged; S5 adds day-window unit tests (window math, edge navigation, strip
+selection) and re-runs the WebKit pointer arm locally. One adversarial design-review round ran
+before implementation (owner rule: no iterating reviews); findings applied are folded into the
+slice texts above.
