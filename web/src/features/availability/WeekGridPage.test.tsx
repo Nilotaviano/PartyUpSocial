@@ -1984,6 +1984,146 @@ describe('WeekGrid §9 S5 day window', () => {
     expect(onCreateBlock).not.toHaveBeenCalled()
     expect(screen.getByRole('status')).toHaveTextContent('Selection started at 9:00.')
   })
+
+  // Walking the window away and back within the *same* week must not
+  // resurrect the selection either — the eager clear fires the moment the
+  // day leaves the window, so walking back to include that day again finds
+  // no selection state left to revive.
+  it('does not resurrect a selection walked away and back within the same week_S5', () => {
+    const onCreateBlock = vi.fn<(range: GridRange, anchor: DOMRect) => void>()
+    const { rerender } = render(
+      <WeekGrid
+        {...windowedGridProps}
+        dayWindow={{ start: 0, length: 3 }}
+        onCreateBlock={onCreateBlock}
+        onEditOccurrence={vi.fn()}
+      />,
+    )
+
+    const start = screen.getByRole('gridcell', { name: 'Mon 9:00' })
+    start.focus()
+    fireEvent.keyDown(start, { key: 'Enter' })
+    expect(document.querySelectorAll('[data-selection-edge]').length).toBeGreaterThan(0)
+
+    rerender(
+      <WeekGrid
+        {...windowedGridProps}
+        dayWindow={{ start: 4, length: 3 }}
+        onCreateBlock={onCreateBlock}
+        onEditOccurrence={vi.fn()}
+      />,
+    )
+    expect(document.querySelectorAll('[data-selection-edge]')).toHaveLength(0)
+
+    rerender(
+      <WeekGrid
+        {...windowedGridProps}
+        dayWindow={{ start: 0, length: 3 }}
+        onCreateBlock={onCreateBlock}
+        onEditOccurrence={vi.fn()}
+      />,
+    )
+    expect(document.querySelectorAll('[data-selection-edge]')).toHaveLength(0)
+
+    const revealed = screen.getByRole('gridcell', { name: 'Mon 9:00' })
+    revealed.focus()
+    fireEvent.keyDown(revealed, { key: 'Enter' })
+
+    expect(onCreateBlock).not.toHaveBeenCalled()
+    expect(screen.getByRole('status')).toHaveTextContent('Selection started at 9:00.')
+  })
+
+  // The vanish is announced the same way an explicit Escape cancel is — a
+  // viewer relying on the live region must not be left wondering whether
+  // their paint is still pending.
+  it('announces the vanish as "Selection canceled." when the day leaves the window_S5', () => {
+    const { rerender } = render(
+      <WeekGrid
+        {...windowedGridProps}
+        dayWindow={{ start: 0, length: 3 }}
+        onCreateBlock={vi.fn()}
+        onEditOccurrence={vi.fn()}
+      />,
+    )
+
+    const start = screen.getByRole('gridcell', { name: 'Mon 9:00' })
+    start.focus()
+    fireEvent.keyDown(start, { key: 'Enter' })
+
+    rerender(
+      <WeekGrid
+        {...windowedGridProps}
+        dayWindow={{ start: 4, length: 3 }}
+        onCreateBlock={vi.fn()}
+        onEditOccurrence={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent('Selection canceled.')
+  })
+
+  // A day index (0-6) is only meaningful relative to one `weekStart` — the
+  // window walking back to include it again after a week roll must not
+  // resurrect a selection painted in the previous week, even though the
+  // rendered band would look identical (the same day-of-week column).
+  it('drops a selection across a week roll instead of committing it 7 days off_S5', () => {
+    const onCreateBlock = vi.fn<(range: GridRange, anchor: DOMRect) => void>()
+    const rolledWeekStart = new Date(windowedGridProps.weekStart.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const { rerender } = render(
+      <WeekGrid
+        {...windowedGridProps}
+        dayWindow={{ start: 0, length: 3 }}
+        onCreateBlock={onCreateBlock}
+        onEditOccurrence={vi.fn()}
+      />,
+    )
+
+    const start = screen.getByRole('gridcell', { name: 'Mon 9:00' })
+    start.focus()
+    fireEvent.keyDown(start, { key: 'Enter' })
+    expect(document.querySelectorAll('[data-selection-edge]').length).toBeGreaterThan(0)
+
+    // Roll to the next week (the mobile pager's own week-roll case).
+    rerender(
+      <WeekGrid
+        {...windowedGridProps}
+        dayWindow={{ start: 0, length: 3 }}
+        onCreateBlock={onCreateBlock}
+        onEditOccurrence={vi.fn()}
+        weekStart={rolledWeekStart}
+      />,
+    )
+    expect(document.querySelectorAll('[data-selection-edge]')).toHaveLength(0)
+
+    // Roll back to the original week — the same day index (0) is visible
+    // again, in the same window position.
+    rerender(
+      <WeekGrid
+        {...windowedGridProps}
+        dayWindow={{ start: 0, length: 3 }}
+        onCreateBlock={onCreateBlock}
+        onEditOccurrence={vi.fn()}
+      />,
+    )
+    expect(document.querySelectorAll('[data-selection-edge]')).toHaveLength(0)
+
+    // A single Enter on the reappeared cell must start a fresh selection,
+    // never commit the one painted before the roll — a commit here would be
+    // the 7-day-off block the fix prevents.
+    const revealed = screen.getByRole('gridcell', { name: 'Mon 9:00' })
+    revealed.focus()
+    fireEvent.keyDown(revealed, { key: 'Enter' })
+    expect(onCreateBlock).not.toHaveBeenCalled()
+    expect(screen.getByRole('status')).toHaveTextContent('Selection started at 9:00.')
+
+    // The normal two-step flow still commits, using the current week.
+    fireEvent.keyDown(revealed, { key: 'Enter' })
+    expect(onCreateBlock).toHaveBeenCalledTimes(1)
+    const [range] = onCreateBlock.mock.calls[0]
+    expect(range.start.getTime()).toBe(
+      windowedGridProps.weekStart.getTime() + 9 * 60 * 60 * 1000,
+    )
+  })
 })
 
 // CALENDAR_DESIGN.md §9 S5: the page owns the window state and the pager. The

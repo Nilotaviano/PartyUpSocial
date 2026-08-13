@@ -441,16 +441,50 @@ export function WeekGrid({
   // what the effect below keys on.
   const focusedDay = Math.min(Math.max(focused.day, windowStart), windowEnd)
 
-  // §9 S5: a selection whose day scrolled out of the window is abandoned — it
-  // stops rendering here, and `pendingSelection` below drops the commit-time ref
-  // with it, so an off-screen range can never be extended or committed.
-  const visibleSelection =
-    selection && selection.day >= windowStart && selection.day <= windowEnd ? selection : null
+  // §9 S5 + week rolls: a selection is bound to one weekStart/window context —
+  // a `day` index of 4 means a different date once `weekStart` rolls to the
+  // next week, so the pager walking the window back to include index 4 again
+  // must never resurrect the old selection. This is React's blessed
+  // "adjusting state during render" pattern (comparing the incoming context
+  // against the previous one, stored in state so the comparison — and any
+  // clear it triggers — only runs on an actual change, never on every
+  // render): it clears both `selection` and `selectionRef` synchronously with
+  // the prop change, never lazily at the next gesture, and announces the same
+  // way an explicit cancel does.
+  const selectionContext = { weekKey: weekStart.getTime(), windowStart, windowEnd }
+  const [prevSelectionContext, setPrevSelectionContext] = useState(selectionContext)
+  if (
+    prevSelectionContext.weekKey !== selectionContext.weekKey ||
+    prevSelectionContext.windowStart !== selectionContext.windowStart ||
+    prevSelectionContext.windowEnd !== selectionContext.windowEnd
+  ) {
+    setPrevSelectionContext(selectionContext)
+    if (
+      selection &&
+      (prevSelectionContext.weekKey !== selectionContext.weekKey ||
+        selection.day < windowStart ||
+        selection.day > windowEnd)
+    ) {
+      setSelection(null)
+      setLiveMessage(t('a11y.selectionCanceled'))
+    }
+  }
 
   useEffect(() => {
     if (!hasInteracted.current) return
     cellRefs.current.get(`${focused.day}:${focused.slot}`)?.focus()
   }, [focused])
+
+  // Keeps `selectionRef` — the commit-time source of truth (see its
+  // declaration above) — in lockstep with `selection` whenever the state
+  // goes to `null`, including the render-phase eager clear above: refs may
+  // not be written during render, so the ref side of that clear lands here,
+  // after commit and before the next event can read it.
+  useEffect(() => {
+    if (selection === null) {
+      selectionRef.current = null
+    }
+  }, [selection])
 
   useEffect(
     () => () => {
@@ -568,17 +602,12 @@ export function WeekGrid({
     )
   }
 
-  /** The committable selection: `null` once its day has left the visible
-   * window (§9 S5), which also drops the ref so the next gesture starts
-   * cleanly rather than extending something off-screen. */
+  /** The committable selection. A selection whose day left the window, or
+   * whose week rolled, is already cleared eagerly (both `selection` and this
+   * ref) by the render-phase adjustment above — this only ever reads a
+   * selection that's still valid for the current weekStart/window. */
   function pendingSelection(): Selection | null {
-    const pending = selectionRef.current
-    if (!pending) return null
-    if (pending.day < windowStart || pending.day > windowEnd) {
-      clearSelection()
-      return null
-    }
-    return pending
+    return selectionRef.current
   }
 
   function extendSelection(day: number, slot: number) {
@@ -1043,10 +1072,10 @@ export function WeekGrid({
               const cellSessions = sessionsAt(day, slot)
               const cellPollOptions = pollOptionsAt(day, slot)
               const inSelection =
-                visibleSelection &&
-                visibleSelection.day === day &&
-                slot >= Math.min(visibleSelection.anchorSlot, visibleSelection.endSlot) &&
-                slot <= Math.max(visibleSelection.anchorSlot, visibleSelection.endSlot)
+                selection &&
+                selection.day === day &&
+                slot >= Math.min(selection.anchorSlot, selection.endSlot) &&
+                slot <= Math.max(selection.anchorSlot, selection.endSlot)
               const isFocused = focusedDay === day && focused.slot === slot
               const key = `${day}:${slot}`
               const cellStart = cellTime(weekStart, day, slot, startHour)
@@ -1113,9 +1142,9 @@ export function WeekGrid({
               // every selected cell's own edges; only the top and bottom
               // band edges depend on position within the run.
               let selectionEdges = ''
-              if (inSelection && visibleSelection) {
-                const lo = Math.min(visibleSelection.anchorSlot, visibleSelection.endSlot)
-                const hi = Math.max(visibleSelection.anchorSlot, visibleSelection.endSlot)
+              if (inSelection && selection) {
+                const lo = Math.min(selection.anchorSlot, selection.endSlot)
+                const hi = Math.max(selection.anchorSlot, selection.endSlot)
                 const edges = ['left', 'right']
                 if (slot === lo) edges.push('top')
                 if (slot === hi) edges.push('bottom')
