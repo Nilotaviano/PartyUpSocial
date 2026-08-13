@@ -160,6 +160,8 @@ Phase 7 shipped end-to-end across seven slices (S1-S7), documented in `PHASE7_DE
 - Build and apply the app-wide palette, typography, spacing, motion, and component token system from the PartyUp thesis and owner-ratified Rallly/Luma/Sleeper references recorded in `PHASE3_DESIGN.md` §19.
 - Preserve the shipped Phase 3 constraints until migration: request cards remain username-only, accepted friends stay avatar-forward, QR/share remains the calm signature surface, masking looks ordinary, and WCAG 2.2 AA/reduced-motion/i18n remain the floor. D-188 keeps request cards username-only and confirms the constraint rather than overturning it.
 
+**Calendar follow-up executed 2026-08-13** (`CALENDAR_DESIGN.md` §9, "Lovable Canvas port", S1–S6): the owner ratified an externally prototyped redesign of the calendar view — column-card grid look, anchored commit popover/bottom sheet, side-panel summary + synced legend, now-line, and a mobile 3-day day-window pager — implemented on the unchanged ARIA grid DOM and touch contract. Same floors as above; per-slice blind verification recorded in `.foreman/ledger.md` (local); pushed as `8dc3656..c146d9f` with local gates owner-waived — CI is the binding verdict for that push.
+
 ---
 
 ## Phase 9 — Go live, private beta → public launch
