@@ -574,10 +574,12 @@ public sealed class Session : AggregateRoot
         ArgumentNullException.ThrowIfNull(clock);
         ApplyDueTransitions(clock);
 
+        // Identity guard first, matching Rsvp and DeclineInvitation: a non-member must land on
+        // NotFound before any state guard can leak the session's existence (A-055).
+        Participation row = RequireParticipation(participant);
+
         Instant now = clock.GetCurrentInstant();
         RequireRosterMutable(now, "leave");
-
-        Participation row = RequireParticipation(participant);
 
         if (row.Status is not (ParticipationStatus.Going or ParticipationStatus.Maybe))
         {

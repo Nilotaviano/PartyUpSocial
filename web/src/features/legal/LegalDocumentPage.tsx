@@ -23,7 +23,9 @@ export function LegalDocumentPage({
   const heading = useRef<HTMLHeadingElement>(null)
   const updatedAt = useMemo(
     () =>
-      new Intl.DateTimeFormat(i18n.language, { dateStyle: 'long' }).format(
+      // LEGAL_UPDATED_AT is a calendar date, not an instant: without an explicit UTC zone,
+      // formatting shifts it a day early for every viewer west of UTC.
+      new Intl.DateTimeFormat(i18n.language, { dateStyle: 'long', timeZone: 'UTC' }).format(
         new Date(LEGAL_UPDATED_AT),
       ),
     [i18n.language],

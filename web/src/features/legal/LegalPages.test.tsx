@@ -161,9 +161,12 @@ describe('draft banner', () => {
 
   it('renders the last-updated date formatted in the current locale_D060', async () => {
     await i18n.changeLanguage('pt-BR')
-    const expected = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' }).format(
+    // Pin the calendar date in UTC — an unzoned expectation would drift with the test
+    // runner's zone and could never catch the day-early rendering west of UTC.
+    const expected = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long', timeZone: 'UTC' }).format(
       new Date(LEGAL_UPDATED_AT),
     )
+    expect(expected).toContain('12')
 
     renderWithRouter(<PrivacyPolicyPage />)
 

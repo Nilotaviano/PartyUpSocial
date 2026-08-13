@@ -116,7 +116,7 @@
   "mute": {
     "on": "Silenciar",
     "off": "Dessilenciar",
-    "copy": "Silenciar suprime tudo sobre esta enquete, exceto seu lembrete enquanto seu voto for Disponível ou Talvez. Reativar não recupera nada — o que foi perdido enquanto estava silenciada não fica na fila para ser entregue depois.",
+    "copy": "Silenciar suprime tudo sobre esta enquete, exceto seu lembrete enquanto seu voto for Disponível ou Talvez. Dessilenciar não recupera nada — o que foi perdido enquanto estava silenciada não fica na fila para ser entregue depois.",
     "mutedAnnouncement": "Enquete silenciada.",
     "unmutedAnnouncement": "Enquete dessilenciada.",
     "disabledTerminal": "Silenciar não está disponível quando uma enquete é finalizada, expira ou é cancelada. Para uma enquete finalizada, silencie a sessão criada por ela."

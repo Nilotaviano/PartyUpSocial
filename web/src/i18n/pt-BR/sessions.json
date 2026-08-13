@@ -127,7 +127,7 @@
   "mute": {
     "on": "Silenciar",
     "off": "Dessilenciar",
-    "copy": "Silenciar suprime tudo sobre esta sessão, exceto seu lembrete enquanto você estiver Confirmado ou Talvez. Reativar não recupera nada — o que foi perdido enquanto estava silenciado não fica na fila para ser entregue depois.",
+    "copy": "Silenciar suprime tudo sobre esta sessão, exceto seu lembrete enquanto você estiver Confirmado ou Talvez. Dessilenciar não recupera nada — o que foi perdido enquanto estava silenciado não fica na fila para ser entregue depois.",
     "mutedAnnouncement": "Sessão silenciada.",
     "unmutedAnnouncement": "Sessão dessilenciada."
   },
