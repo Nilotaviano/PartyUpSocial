@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { components } from '../../api/schema'
+import { controlRowClasses } from '../../components/ui/classes'
 
 export type MaskedParticipant = components['schemas']['MaskedParticipant']
 
@@ -79,47 +80,52 @@ export function CalendarLayers({ friends, pollItems = [], onChange }: CalendarLa
   }
 
   return (
-    <fieldset className="space-y-3">
+    <fieldset className="flex flex-col gap-3">
       <legend className="font-display font-medium text-ink">{t('calendar.layers.heading')}</legend>
-      <label className="flex min-h-11 items-center gap-2">
-        <input
-          checked={myAvailability}
-          type="checkbox"
-          onChange={(event) => setMyAvailability(event.target.checked)}
-        />
-        <span aria-hidden="true" className="h-3 w-3 rounded-full border border-ink/40 bg-free" />
-        {t('calendar.layers.myAvailability')}
-      </label>
-      <label className="flex min-h-11 items-center gap-2">
-        <input
-          checked={friendAvailability}
-          type="checkbox"
-          onChange={(event) => setFriendAvailability(event.target.checked)}
-        />
-        <span aria-hidden="true" className="h-3 w-3 rounded-full border border-ink/40 bg-ink" />
-        {t('calendar.layers.friendAvailability')}
-      </label>
-      <label className="flex min-h-11 items-center gap-2">
-        <input
-          checked={sessions}
-          type="checkbox"
-          onChange={(event) => setSessions(event.target.checked)}
-        />
-        <span aria-hidden="true" className="h-3 w-3 rounded-full border border-ink/40 bg-free-ink" />
-        {t('calendar.layers.sessions')}
-      </label>
-      <label className="flex min-h-11 items-center gap-2">
-        <input
-          checked={pollOptions}
-          type="checkbox"
-          onChange={(event) => setPollOptions(event.target.checked)}
-        />
-        <span aria-hidden="true" className="h-3 w-3 rounded-full border border-ink/40 bg-maybe" />
-        {t('calendar.layers.pollOptions')}
-      </label>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <label className={controlRowClasses}>
+          <input
+            checked={myAvailability}
+            type="checkbox"
+            onChange={(event) => setMyAvailability(event.target.checked)}
+          />
+          <span aria-hidden="true" className="h-3 w-3 rounded-full border border-ink/40 bg-free" />
+          {t('calendar.layers.myAvailability')}
+        </label>
+        <label className={controlRowClasses}>
+          <input
+            checked={friendAvailability}
+            type="checkbox"
+            onChange={(event) => setFriendAvailability(event.target.checked)}
+          />
+          <span aria-hidden="true" className="h-3 w-3 rounded-full border border-ink/40 bg-ink" />
+          {t('calendar.layers.friendAvailability')}
+        </label>
+        <label className={controlRowClasses}>
+          <input
+            checked={sessions}
+            type="checkbox"
+            onChange={(event) => setSessions(event.target.checked)}
+          />
+          <span
+            aria-hidden="true"
+            className="h-3 w-3 rounded-full border border-ink/40 bg-free-ink"
+          />
+          {t('calendar.layers.sessions')}
+        </label>
+        <label className={controlRowClasses}>
+          <input
+            checked={pollOptions}
+            type="checkbox"
+            onChange={(event) => setPollOptions(event.target.checked)}
+          />
+          <span aria-hidden="true" className="h-3 w-3 rounded-full border border-ink/40 bg-maybe" />
+          {t('calendar.layers.pollOptions')}
+        </label>
+      </div>
 
       {pollOptions && pollItems.length > 0 && (
-        <ul className="ml-6 space-y-1 border-l border-ink/25 pl-4 text-sm text-ink-soft">
+        <ul className="border-l-2 border-ink/25 pl-4 text-meta text-ink-soft">
           {pollItems.map((poll) => (
             <li key={poll.pollId}>{poll.title}</li>
           ))}
@@ -127,20 +133,22 @@ export function CalendarLayers({ friends, pollItems = [], onChange }: CalendarLa
       )}
 
       {friendAvailability && friends.length > 0 && (
-        <fieldset className="ml-6 space-y-1 border-l border-ink/25 pl-4">
-          <legend className="text-sm font-medium text-ink-soft">
+        <fieldset className="flex flex-col gap-2 border-l-2 border-ink/25 pl-4">
+          <legend className="text-meta font-medium text-ink-soft">
             {t('calendar.layers.friendFilterHeading')}
           </legend>
-          {friends.map((friend) => (
-            <label key={friend.ordinal} className="flex min-h-11 items-center gap-2">
-              <input
-                checked={shownFriendOrdinals.has(Number(friend.ordinal))}
-                type="checkbox"
-                onChange={(event) => toggleFriend(Number(friend.ordinal), event.target.checked)}
-              />
-              {friend.displayName ?? t('calendar.anonymousFriend')}
-            </label>
-          ))}
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {friends.map((friend) => (
+              <label key={friend.ordinal} className={controlRowClasses}>
+                <input
+                  checked={shownFriendOrdinals.has(Number(friend.ordinal))}
+                  type="checkbox"
+                  onChange={(event) => toggleFriend(Number(friend.ordinal), event.target.checked)}
+                />
+                {friend.displayName ?? t('calendar.anonymousFriend')}
+              </label>
+            ))}
+          </div>
         </fieldset>
       )}
     </fieldset>

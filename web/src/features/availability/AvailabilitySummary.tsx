@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button'
 import { Dialog } from '../../components/ui/dialog'
+import { Section } from '../../components/ui/section'
 import type { AvailabilitySeriesView } from './availabilityQueries'
 
 export type AvailabilityOneOff = {
@@ -20,7 +21,7 @@ export type AvailabilitySummaryProps = {
 }
 
 const rowClasses =
-  'flex flex-wrap items-center justify-between gap-2 rounded-card border-2 border-ink bg-card p-3 shadow-offset-card'
+  'flex flex-wrap items-center justify-between gap-2 border-t border-ink/25 py-3 first:border-t-0'
 
 function endTime(startTime: string, durationMinutes: number): string {
   const [hours, minutes] = startTime.split(':').map(Number)
@@ -76,18 +77,11 @@ export function AvailabilitySummary({
   }
 
   return (
-    <section aria-labelledby="availability-summary-heading" className="space-y-3">
-      <h2
-        className="font-display text-h2 font-semibold text-ink"
-        id="availability-summary-heading"
-      >
-        {t('summary.heading')}
-      </h2>
-
+    <Section title={t('summary.heading')} titleId="availability-summary-heading">
       {series.length === 0 && oneOffs.length === 0 ? (
         <p className="text-ink-soft">{t('summary.empty')}</p>
       ) : (
-        <ul className="space-y-2">
+        <ul>
           {series.map((rule) => {
             const label = t('summary.weeklyRule', {
               weekday: weekdayName(Number(rule.dayOfWeek)),
@@ -176,6 +170,6 @@ export function AvailabilitySummary({
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </section>
+    </Section>
   )
 }

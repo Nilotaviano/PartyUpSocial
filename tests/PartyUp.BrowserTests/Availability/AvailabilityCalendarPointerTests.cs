@@ -53,7 +53,7 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
     /// <summary>
     /// Dispatches a real <c>PointerEvent</c> (<c>pointerType: "touch"</c>) at the given gridcell —
     /// or at an explicit viewport point when <paramref name="clientY"/> is supplied, which is what
-    /// the auto-scroll fact needs to reach a coordinate near the scroll container's own edge,
+    /// the auto-scroll fact needs to reach a coordinate near the viewport's own bottom edge,
     /// independent of any one cell's on-screen position.
     /// </summary>
     private static async Task DispatchTouchPointerEventAsync(
@@ -158,22 +158,22 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             await DispatchTouchPointerEventAsync(page, "pointerdown", startCellIndex);
             await page.WaitForTimeoutAsync(LongPressSettleMs);
 
-            double initialScrollTop = await grid.EvaluateAsync<double>("el => el.scrollTop");
+            double initialScrollY = await page.EvaluateAsync<double>("() => window.scrollY");
 
-            // A move whose clientY sits inside the container's own bottom-edge auto-scroll band
+            // A move whose clientY sits inside the viewport's own bottom-edge auto-scroll band
             // (`AUTO_SCROLL_EDGE_PX` in `WeekGrid.tsx`) — an off-screen row below the fold, which
             // is the entire point: the drag never has to (and in this headless viewport cannot)
-            // visually reach that row on its own.
-            double containerBottom = await grid.EvaluateAsync<double>(
-                "el => el.getBoundingClientRect().bottom");
+            // visually reach that row on its own. The grid has no scrollport of its own any more —
+            // it renders at natural height and the document scrolls — so the page is what moves.
+            double viewportBottom = await page.EvaluateAsync<double>("() => window.innerHeight");
             await DispatchTouchPointerEventAsync(
-                page, "pointermove", startCellIndex, clientY: containerBottom - 5);
+                page, "pointermove", startCellIndex, clientY: viewportBottom - 5);
 
             await page.WaitForTimeoutAsync(AutoScrollSettleMs);
-            double scrolledScrollTop = await grid.EvaluateAsync<double>("el => el.scrollTop");
+            double scrolledScrollY = await page.EvaluateAsync<double>("() => window.scrollY");
             Assert.True(
-                scrolledScrollTop > initialScrollTop,
-                $"Expected the grid to auto-scroll past {initialScrollTop}, stayed at {scrolledScrollTop}.");
+                scrolledScrollY > initialScrollY,
+                $"Expected the page to auto-scroll past {initialScrollY}, stayed at {scrolledScrollY}.");
 
             await DispatchTouchPointerEventAsync(page, "pointerup", startCellIndex);
 

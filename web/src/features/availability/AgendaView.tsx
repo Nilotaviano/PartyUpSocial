@@ -24,18 +24,23 @@ export function AgendaView({ entries, dateLabelFormatter, timeLabelFormatter }: 
   const sorted = [...entries].sort((a, b) => a.start.getTime() - b.start.getTime())
 
   if (sorted.length === 0) {
-    return <p>{t('calendar.agendaEmpty')}</p>
+    return <p className="text-meta text-ink-soft">{t('calendar.agendaEmpty')}</p>
   }
 
   return (
-    <ul aria-label={t('a11y.agendaLabel')} className="divide-y divide-ink/25">
+    <ul aria-label={t('a11y.agendaLabel')} className="flex flex-col">
       {sorted.map((entry) => (
-        <li key={entry.id} className="flex min-h-11 items-center gap-4 py-2">
-          <span className="w-28 text-sm text-ink-soft">{dateLabelFormatter(entry.start)}</span>
-          <span className="w-32 text-sm text-ink-soft">
-            {timeLabelFormatter(entry.start)}–{timeLabelFormatter(entry.end)}
+        <li
+          key={entry.id}
+          className="flex min-h-11 flex-col justify-center gap-1 border-t border-ink/25 py-2 first:border-t-0 sm:flex-row sm:items-center sm:gap-4"
+        >
+          <span className="flex flex-wrap items-baseline gap-x-3 text-meta text-ink-soft sm:w-56 sm:shrink-0">
+            <span>{dateLabelFormatter(entry.start)}</span>
+            <span>
+              {timeLabelFormatter(entry.start)}–{timeLabelFormatter(entry.end)}
+            </span>
           </span>
-          <span className="font-medium text-ink">{entry.title}</span>
+          <span className="min-w-0 break-words font-medium text-ink">{entry.title}</span>
         </li>
       ))}
     </ul>

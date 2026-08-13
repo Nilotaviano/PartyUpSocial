@@ -1,9 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
-import { raisedInteractiveClasses } from '../../components/ui/classes'
+import {
+  controlRowClasses,
+  fieldControlClasses,
+  raisedInteractiveClasses,
+} from '../../components/ui/classes'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section, SectionCard } from '../../components/ui/section'
+import { StatusBanner } from '../../components/ui/statusBanner'
 import { AvatarDisc } from '../friends/AvatarDisc'
 import { avatarImgUrl } from '../friends/avatarImage'
 import { friendKeys, getFriends } from '../friends/friendGraph'
@@ -76,17 +84,12 @@ function buildPollPrefillUrl(starts: string[]): string {
 
 export function FindATimePage() {
   const { t, i18n } = useTranslation(['availability', 'sessions', 'errors', 'common'])
-  const heading = useRef<HTMLHeadingElement>(null)
   const [selectedFriends, setSelectedFriends] = useState<string[]>([])
   const [rangeDays, setRangeDays] = useState(DEFAULT_RANGE_DAYS)
   const [durationMinutes, setDurationMinutes] = useState(String(DEFAULT_DURATION_MINUTES))
   // A-083 poll arm (design §5): windows the viewer has picked as poll option candidates,
   // keyed by `window.start` — accumulated across the results list, never a single-window pick.
   const [pollWindowStarts, setPollWindowStarts] = useState<string[]>([])
-
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
 
   const friends = useQuery({ queryKey: friendKeys.friends, queryFn: getFriends })
 
@@ -144,203 +147,202 @@ export function FindATimePage() {
   })
 
   return (
-    <main
-      className="mx-auto max-w-4xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-find-a-time"
-    >
-      <h1
-        ref={heading}
-        tabIndex={-1}
-        className="font-display text-3xl font-bold tracking-tight text-ink focus:outline-none"
-      >
-        {t('findATime.heading')}
-      </h1>
-      <p className="text-ink-soft">{t('findATime.subheading')}</p>
+    <main data-testid="screen-find-a-time">
+      <PageScaffold>
+        <PageHeader subtitle={t('findATime.subheading')} title={t('findATime.heading')} />
 
-      {anyError && <p role="alert">{errorMessage(anyError)}</p>}
+        {anyError && (
+          <StatusBanner role="alert" variant="danger">
+            {errorMessage(anyError)}
+          </StatusBanner>
+        )}
 
-      <section aria-labelledby="find-a-time-friends-heading">
-        <h2 id="find-a-time-friends-heading" className="font-display text-xl font-semibold text-ink">
-          {t('findATime.friendsLabel')}
-        </h2>
-        <p className="text-sm text-ink-soft">
-          {selectedFriends.length === 0
-            ? t('findATime.friendsAllDefault')
-            : t('findATime.friendsSelected', { count: selectedFriends.length })}
-        </p>
-
-        <ul className="mt-2 space-y-1">
-          {(friends.data ?? []).map((friend) => (
-            <li key={friend.friendshipId}>
-              <label className="inline-flex min-h-11 items-center gap-2">
-                <input
-                  checked={selectedFriends.includes(friend.userId)}
-                  type="checkbox"
-                  onChange={(event) => {
-                    const checked = event.target.checked
-                    setSelectedFriends((current) =>
-                      checked
-                        ? [...current, friend.userId]
-                        : current.filter((id) => id !== friend.userId),
-                    )
-                  }}
-                />
-                <AvatarDisc
-                  emoji={friend.avatar.emoji}
-                  imgUrl={avatarImgUrl(friend.avatar)}
-                  seed={friend.userId}
-                  size="xs"
-                />
-                {friend.displayName} (@{friend.username})
-              </label>
-            </li>
-          ))}
-        </ul>
-
-        {/*
-          A-078: the server never echoes a per-id resolution of an explicit
-          selection, so an "explicit" response has nothing new to add beyond
-          the checkboxes above. An omitted selection ("allFriends") is
-          resolved server-side, and `consideredFriends` is the only source of
-          "whose calendars produced these windows" — the client never derives
-          that set itself. An empty list (no accepted friends yet) renders
-          nothing at all rather than a heading over a blank list.
-        */}
-        {overlaps.data?.selectionSource === 'allFriends' &&
-          overlaps.data.consideredFriends &&
-          overlaps.data.consideredFriends.length > 0 && (
-            <div className="mt-3" data-testid="find-a-time-considered-friends">
-              <h3 className="text-sm font-medium text-ink-soft">
-                {t('findATime.consideredHeading')}
-              </h3>
-              <ul className="mt-1 space-y-1 text-sm text-ink-soft">
-                {overlaps.data.consideredFriends.map((friend) => (
-                  <li key={friend.ordinal}>
-                    {friend.displayName ?? t('detail.anonymous', { ns: 'sessions' })}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-      </section>
-
-      <section aria-labelledby="find-a-time-range-heading">
-        <h2 id="find-a-time-range-heading" className="font-display text-xl font-semibold text-ink">
-          {t('findATime.rangeLabel')}
-        </h2>
-        <label className="mt-2 block text-ink" htmlFor="find-a-time-range-days">
-          {t('findATime.rangeLabel')}
-        </label>
-        <input
-          className="mt-1 min-h-11 w-24 rounded-control border-2 border-ink bg-card px-3 py-2 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-          id="find-a-time-range-days"
-          max={92}
-          min={1}
-          type="number"
-          value={rangeDays}
-          onChange={(event) => setRangeDays(Number(event.target.value) || DEFAULT_RANGE_DAYS)}
-        />
-
-        <label className="mt-3 block text-ink" htmlFor="find-a-time-duration">
-          {t('create.duration', { ns: 'sessions' })}
-        </label>
-        <input
-          className="mt-1 min-h-11 w-24 rounded-control border-2 border-ink bg-card px-3 py-2 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-          id="find-a-time-duration"
-          min={15}
-          step={15}
-          type="number"
-          value={durationMinutes}
-          onChange={(event) => setDurationMinutes(event.target.value)}
-        />
-      </section>
-
-      {/* §12-44: context only — never fed into the overlap search. */}
-      <section aria-labelledby="find-a-time-mine-heading">
-        <h2 id="find-a-time-mine-heading" className="font-display text-xl font-semibold text-ink">
-          {t('calendar.layers.myAvailability', { ns: 'availability' })}
-        </h2>
-        {myMerged.length > 0 && (
-          <ul className="mt-2 space-y-1 text-sm text-ink-soft">
-            {myMerged.map((entry, index) => (
-              <li key={index}>
-                {timeFormat.format(new Date(entry.start))} –{' '}
-                {timeFormat.format(new Date(entry.end))}
+        <Section
+          description={
+            selectedFriends.length === 0
+              ? t('findATime.friendsAllDefault')
+              : t('findATime.friendsSelected', { count: selectedFriends.length })
+          }
+          title={t('findATime.friendsLabel')}
+          titleId="find-a-time-friends-heading"
+        >
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {(friends.data ?? []).map((friend) => (
+              <li key={friend.friendshipId}>
+                <label className={controlRowClasses}>
+                  <input
+                    checked={selectedFriends.includes(friend.userId)}
+                    type="checkbox"
+                    onChange={(event) => {
+                      const checked = event.target.checked
+                      setSelectedFriends((current) =>
+                        checked
+                          ? [...current, friend.userId]
+                          : current.filter((id) => id !== friend.userId),
+                      )
+                    }}
+                  />
+                  <AvatarDisc
+                    emoji={friend.avatar.emoji}
+                    imgUrl={avatarImgUrl(friend.avatar)}
+                    seed={friend.userId}
+                    size="xs"
+                  />
+                  {friend.displayName} (@{friend.username})
+                </label>
               </li>
             ))}
           </ul>
-        )}
-      </section>
 
-      <section aria-labelledby="find-a-time-results-heading">
-        <h2 id="find-a-time-results-heading" className="font-display text-xl font-semibold text-ink">
-          {t('findATime.resultsHeading')}
-        </h2>
-        {overlaps.isPending && (
-          <p role="status">{t('common.loading', { ns: 'common' })}</p>
-        )}
-        {!overlaps.isPending && windows.length === 0 && <p>{t('findATime.empty')}</p>}
-        {windows.length > 0 && (
-          <ul className="mt-2 space-y-3" data-testid="find-a-time-results">
-            {windows.map((window, index) => {
-              const finish = new Date(window.start).getTime() + plannedDuration * 60_000
-              const overMinutes = Math.max(
-                0,
-                Math.round((finish - new Date(window.end).getTime()) / 60_000),
-              )
-              return (
-                <li
-                  key={`${window.start}-${index}`}
-                  className="rounded-card border-2 border-ink bg-card p-4 shadow-offset-card"
-                >
-                  <p className="font-display font-semibold text-ink">
-                    {timeFormat.format(new Date(window.start))} –{' '}
-                    {timeFormat.format(new Date(window.end))}
-                  </p>
-                  <p className="text-sm text-ink-soft">
-                    {t('findATime.available', { count: window.available.length })}
-                    {' · '}
-                    {t('findATime.maybe', { count: window.maybe.length })}
-                  </p>
-                  {overMinutes > 0 && (
-                    <p role="status" className="mt-1 text-sm font-semibold text-danger">
-                      {t('findATime.overDurationWarning', { minutes: overMinutes })}
-                    </p>
-                  )}
-                  <Link
-                    className={`mt-3 inline-flex items-center px-4 py-2 text-primary-ink bg-primary ${raisedInteractiveClasses}`}
-                    to={buildPrefillUrl(window, plannedDuration)}
-                  >
-                    {t('findATime.scheduleCta')}
-                  </Link>
-                  <label className="mt-3 flex min-h-11 items-center gap-2 text-sm text-ink">
-                    <input
-                      checked={pollWindowStarts.includes(window.start)}
-                      type="checkbox"
-                      onChange={(event) => togglePollWindow(window.start, event.target.checked)}
-                    />
-                    {t('findATime.pollArm.addToPoll')}
-                  </label>
-                </li>
-              )
-            })}
-          </ul>
-        )}
+          {/*
+            A-078: the server never echoes a per-id resolution of an explicit
+            selection, so an "explicit" response has nothing new to add beyond
+            the checkboxes above. An omitted selection ("allFriends") is
+            resolved server-side, and `consideredFriends` is the only source of
+            "whose calendars produced these windows" — the client never derives
+            that set itself. An empty list (no accepted friends yet) renders
+            nothing at all rather than a heading over a blank list.
+          */}
+          {overlaps.data?.selectionSource === 'allFriends' &&
+            overlaps.data.consideredFriends &&
+            overlaps.data.consideredFriends.length > 0 && (
+              <div className="flex flex-col gap-1" data-testid="find-a-time-considered-friends">
+                <h3 className="font-display text-meta font-semibold text-ink-soft">
+                  {t('findATime.consideredHeading')}
+                </h3>
+                <ul className="text-meta text-ink-soft">
+                  {overlaps.data.consideredFriends.map((friend) => (
+                    <li key={friend.ordinal}>
+                      {friend.displayName ?? t('detail.anonymous', { ns: 'sessions' })}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+        </Section>
 
-        {pollWindowStarts.length > 0 && (
-          <div className="mt-3 rounded-card border-2 border-ink bg-card p-3 shadow-offset-card">
-            <p className="text-ink">
-              {t('findATime.pollArm.selectedCount', { count: pollWindowStarts.length })}
-            </p>
-            <Link
-              className={`mt-2 inline-flex items-center px-4 py-2 text-primary-ink bg-primary ${raisedInteractiveClasses}`}
-              to={buildPollPrefillUrl(pollWindowStarts)}
-            >
-              {t('findATime.pollArm.createPollCta')}
-            </Link>
+        <Section title={t('findATime.rangeLabel')} titleId="find-a-time-range-heading">
+          <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-ink" htmlFor="find-a-time-range-days">
+                {t('findATime.rangeLabel')}
+              </label>
+              <input
+                className={`${fieldControlClasses} w-28`}
+                id="find-a-time-range-days"
+                max={92}
+                min={1}
+                type="number"
+                value={rangeDays}
+                onChange={(event) => setRangeDays(Number(event.target.value) || DEFAULT_RANGE_DAYS)}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-ink" htmlFor="find-a-time-duration">
+                {t('create.duration', { ns: 'sessions' })}
+              </label>
+              <input
+                className={`${fieldControlClasses} w-28`}
+                id="find-a-time-duration"
+                min={15}
+                step={15}
+                type="number"
+                value={durationMinutes}
+                onChange={(event) => setDurationMinutes(event.target.value)}
+              />
+            </div>
           </div>
-        )}
-      </section>
+        </Section>
+
+        {/* §12-44: context only — never fed into the overlap search. */}
+        <Section
+          title={t('calendar.layers.myAvailability', { ns: 'availability' })}
+          titleId="find-a-time-mine-heading"
+        >
+          {myMerged.length > 0 && (
+            <ul className="text-meta text-ink-soft">
+              {myMerged.map((entry, index) => (
+                <li key={index} className="border-t border-ink/25 py-2 first:border-t-0">
+                  {timeFormat.format(new Date(entry.start))} –{' '}
+                  {timeFormat.format(new Date(entry.end))}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+
+        <Section title={t('findATime.resultsHeading')} titleId="find-a-time-results-heading">
+          {overlaps.isPending && (
+            <p className="motion-safe:animate-pulse text-ink-soft" role="status">
+              {t('common.loading', { ns: 'common' })}
+            </p>
+          )}
+          {!overlaps.isPending && windows.length === 0 && <p>{t('findATime.empty')}</p>}
+          {windows.length > 0 && (
+            <ul data-testid="find-a-time-results">
+              {windows.map((window, index) => {
+                const finish = new Date(window.start).getTime() + plannedDuration * 60_000
+                const overMinutes = Math.max(
+                  0,
+                  Math.round((finish - new Date(window.end).getTime()) / 60_000),
+                )
+                return (
+                  <li
+                    key={`${window.start}-${index}`}
+                    className="flex flex-col gap-2 border-t border-ink/25 py-4 first:border-t-0"
+                  >
+                    <p className="font-display font-semibold text-ink">
+                      {timeFormat.format(new Date(window.start))} –{' '}
+                      {timeFormat.format(new Date(window.end))}
+                    </p>
+                    <p className="text-meta text-ink-soft">
+                      {t('findATime.available', { count: window.available.length })}
+                      {' · '}
+                      {t('findATime.maybe', { count: window.maybe.length })}
+                    </p>
+                    {overMinutes > 0 && (
+                      <p className="text-meta font-semibold text-danger" role="status">
+                        {t('findATime.overDurationWarning', { minutes: overMinutes })}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Link
+                        className={`inline-flex items-center px-4 py-2 text-primary-ink bg-primary ${raisedInteractiveClasses}`}
+                        to={buildPrefillUrl(window, plannedDuration)}
+                      >
+                        {t('findATime.scheduleCta')}
+                      </Link>
+                      <label className={`${controlRowClasses} sm:w-auto`}>
+                        <input
+                          checked={pollWindowStarts.includes(window.start)}
+                          type="checkbox"
+                          onChange={(event) => togglePollWindow(window.start, event.target.checked)}
+                        />
+                        {t('findATime.pollArm.addToPoll')}
+                      </label>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+
+          {pollWindowStarts.length > 0 && (
+            <SectionCard>
+              <p className="text-ink">
+                {t('findATime.pollArm.selectedCount', { count: pollWindowStarts.length })}
+              </p>
+              <Link
+                className={`inline-flex w-fit items-center px-4 py-2 text-primary-ink bg-primary ${raisedInteractiveClasses}`}
+                to={buildPollPrefillUrl(pollWindowStarts)}
+              >
+                {t('findATime.pollArm.createPollCta')}
+              </Link>
+            </SectionCard>
+          )}
+        </Section>
+      </PageScaffold>
     </main>
   )
 }

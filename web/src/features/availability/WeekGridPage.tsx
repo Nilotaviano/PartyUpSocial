@@ -1,10 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
-import { raisedInteractiveClasses } from '../../components/ui/classes'
+import {
+  raisedInteractiveClasses,
+  segmentItemClasses,
+  segmentStripClasses,
+} from '../../components/ui/classes'
+import { PageHeader } from '../../components/ui/pageHeader'
+import { PageScaffold } from '../../components/ui/pageScaffold'
+import { Section } from '../../components/ui/section'
+import { StatusBanner } from '../../components/ui/statusBanner'
 import { Toast } from '../../components/ui/toast'
 import { getViewerProfile, viewerProfileKey } from '../sessions/sessionQueries'
 import { AgendaView, type AgendaEntry } from './AgendaView'
@@ -44,13 +52,12 @@ import {
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-// The grid renders one row per 15 minutes, so a full day is 96 rows. Clamping
-// the default viewport to waking hours costs 28 of them; the early hours stay
-// one control away rather than being unreachable.
-const WAKING_START_HOUR = 7
+// The grid renders one row per 15 minutes, so a full day is 96 rows. The
+// default window is 08:00–24:00 — 64 of them, rendered at natural height for
+// the page to scroll — and the 32 early rows stay one control away rather than
+// being unreachable.
+const WAKING_START_HOUR = 8
 const END_HOUR = 24
-// Where the grid lands when the viewer has nothing published this week.
-const FALLBACK_SCROLL_HOUR = 18
 
 // The five new §8 problem codes (design §10.2): each renders its own
 // `availability.json` message. Every other code — including the two shared
@@ -195,8 +202,6 @@ export function WeekGridPage() {
   const [showEarlyHours, setShowEarlyHours] = useState(false)
   const [earlyHoursMessage, setEarlyHoursMessage] = useState('')
   const editTrigger = useRef<HTMLElement | null>(null)
-  const gridScroller = useRef<HTMLDivElement>(null)
-  const didInitialScroll = useRef(false)
 
   const isAgenda = location.pathname.endsWith('/agenda')
 
@@ -483,32 +488,6 @@ export function WeekGridPage() {
 
   const startHour = showEarlyHours ? 0 : WAKING_START_HOUR
 
-  // Landing at `startHour` would still put the viewer's own evening windows
-  // below the fold, so the first paint after the calendar resolves scrolls the
-  // grid's own container (never the page) to the earliest hour that matters.
-  // Once only: a later scroll is the viewer's, and re-running would yank it back.
-  const calendarData = calendar.data
-  useEffect(() => {
-    if (didInitialScroll.current || !calendarData) return
-
-    const mine = calendarData.myAvailability.occurrences ?? []
-    const earliestHour = mine.length
-      ? Math.min(
-          ...mine.map((occurrence) =>
-            instantToFakeLocal(occurrence.startTime, timeZone).getUTCHours(),
-          ),
-        )
-      : FALLBACK_SCROLL_HOUR
-    const target = Math.max(earliestHour, startHour)
-
-    const scroller = gridScroller.current?.querySelector<HTMLElement>('[role="grid"]')
-    const row = scroller?.querySelector<HTMLElement>(`[data-hour="${target}"]`)
-    if (!scroller || !row) return
-
-    didInitialScroll.current = true
-    scroller.scrollTop = row.offsetTop
-  }, [calendarData, startHour, timeZone])
-
   function toggleEarlyHours() {
     const next = !showEarlyHours
     setShowEarlyHours(next)
@@ -728,114 +707,119 @@ export function WeekGridPage() {
   }
 
   return (
-    <main
-      className="mx-auto max-w-5xl space-y-6 p-4 sm:p-8"
-      data-testid="screen-calendar"
-    >
-      <h1 className="font-display text-3xl font-bold tracking-tight text-ink">
-        {t('calendar.heading')}
-      </h1>
+    <main data-testid="screen-calendar">
+      <PageScaffold>
+        <PageHeader title={t('calendar.heading')} />
 
-      {activeError && <p role="alert">{errorMessage(activeError)}</p>}
+        {activeError && (
+          <StatusBanner role="alert" variant="danger">
+            {errorMessage(activeError)}
+          </StatusBanner>
+        )}
 
-      <div role="tablist">
-        <Link
-          aria-selected={!isAgenda}
-          className={`mr-2 inline-flex items-center px-4 py-2 bg-card text-ink aria-selected:bg-accent aria-selected:text-accent-ink dark:aria-selected:border-accent-ink ${raisedInteractiveClasses}`}
-          role="tab"
-          to="/calendar"
-        >
-          {t('calendar.week')}
-        </Link>
-        <Link
-          aria-selected={isAgenda}
-          className={`inline-flex items-center px-4 py-2 bg-card text-ink aria-selected:bg-accent aria-selected:text-accent-ink dark:aria-selected:border-accent-ink ${raisedInteractiveClasses}`}
-          role="tab"
-          to="/calendar/agenda"
-        >
-          {t('calendar.agenda')}
-        </Link>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <button
-          className={`min-w-11 px-3 text-ink bg-card ${raisedInteractiveClasses}`}
-          type="button"
-          onClick={() => setWeekOffset((value) => value - 1)}
-        >
-          {t('calendar.previousWeek')}
-        </button>
-        <button
-          className={`min-w-11 px-3 text-ink bg-card ${raisedInteractiveClasses}`}
-          type="button"
-          onClick={() => setWeekOffset((value) => value + 1)}
-        >
-          {t('calendar.nextWeek')}
-        </button>
-      </div>
-
-      <CalendarLayers
-        friends={friends}
-        pollItems={(calendar.data?.pollOptions ?? []).map((poll) => ({
-          pollId: poll.pollId,
-          title: poll.title,
-        }))}
-        onChange={setLayers}
-      />
-
-      {isAgenda ? (
-        <AgendaView
-          dateLabelFormatter={dateLabelFormatter}
-          entries={agendaEntries}
-          timeLabelFormatter={timeLabelFormatter}
-        />
-      ) : (
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-          <div className="lg:w-72 lg:shrink-0">
-            <AvailabilitySummary
-              deletingId={deletingId}
-              oneOffs={oneOffBlocks}
-              series={calendar.data?.myAvailability.series ?? []}
-              timeZone={timeZone}
-              onDeleteBlock={(blockId) => deleteBlock.mutate(blockId)}
-              onDeleteSeries={(seriesId) => deleteSeries.mutate(seriesId)}
-            />
-          </div>
-          <div ref={gridScroller} className="min-w-0 flex-1 space-y-2">
-            {/* Stays mounted in both states: unmounting the control on
-                activation would drop focus to document.body and leave the 28
-                revealed rows unannounced (WCAG 2.4.3). */}
-            <Button type="button" variant="neutral" onClick={toggleEarlyHours}>
-              {showEarlyHours
-                ? t('viewport.hideEarlyHours')
-                : t('viewport.showEarlyHours')}
-            </Button>
-            <p
-              aria-live="polite"
-              className="sr-only"
-              data-testid="early-hours-status"
-              role="status"
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className={segmentStripClasses} role="tablist">
+            <Link
+              aria-selected={!isAgenda}
+              className={segmentItemClasses(!isAgenda)}
+              role="tab"
+              to="/calendar"
             >
-              {earlyHoursMessage}
-            </p>
-            <WeekGrid
-              dayLabels={dayLabels}
-              endHour={END_HOUR}
-              friendRanges={friendRanges}
-              merged={merged}
-              occurrences={occurrences}
-              pollOptionEntries={pollOptionEntries}
-              sessionEntries={sessionEntries}
-              startHour={startHour}
-              timeLabelFormatter={timeLabelFormatter}
-              weekStart={weekStart}
-              onAdjustOccurrence={handleAdjustOccurrence}
-              onCreateBlock={handleCreateBlock}
-              onEditOccurrence={handleEditOccurrence}
-            />
+              {t('calendar.week')}
+            </Link>
+            <Link
+              aria-selected={isAgenda}
+              className={segmentItemClasses(isAgenda)}
+              role="tab"
+              to="/calendar/agenda"
+            >
+              {t('calendar.agenda')}
+            </Link>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="neutral"
+              onClick={() => setWeekOffset((value) => value - 1)}
+            >
+              {t('calendar.previousWeek')}
+            </Button>
+            <Button
+              type="button"
+              variant="neutral"
+              onClick={() => setWeekOffset((value) => value + 1)}
+            >
+              {t('calendar.nextWeek')}
+            </Button>
           </div>
         </div>
-      )}
+
+        <Section>
+          <CalendarLayers
+            friends={friends}
+            pollItems={(calendar.data?.pollOptions ?? []).map((poll) => ({
+              pollId: poll.pollId,
+              title: poll.title,
+            }))}
+            onChange={setLayers}
+          />
+        </Section>
+
+        {isAgenda ? (
+          <AgendaView
+            dateLabelFormatter={dateLabelFormatter}
+            entries={agendaEntries}
+            timeLabelFormatter={timeLabelFormatter}
+          />
+        ) : (
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+            <div className="lg:w-72 lg:shrink-0">
+              <AvailabilitySummary
+                deletingId={deletingId}
+                oneOffs={oneOffBlocks}
+                series={calendar.data?.myAvailability.series ?? []}
+                timeZone={timeZone}
+                onDeleteBlock={(blockId) => deleteBlock.mutate(blockId)}
+                onDeleteSeries={(seriesId) => deleteSeries.mutate(seriesId)}
+              />
+            </div>
+            <div className="min-w-0 flex-1 space-y-2">
+              {/* Stays mounted in both states: unmounting the control on
+                  activation would drop focus to document.body and leave the 32
+                  revealed rows unannounced (WCAG 2.4.3). */}
+              <Button type="button" variant="neutral" onClick={toggleEarlyHours}>
+                {showEarlyHours
+                  ? t('viewport.hideEarlyHours')
+                  : t('viewport.showEarlyHours')}
+              </Button>
+              <p
+                aria-live="polite"
+                className="sr-only"
+                data-testid="early-hours-status"
+                role="status"
+              >
+                {earlyHoursMessage}
+              </p>
+              <WeekGrid
+                dayLabels={dayLabels}
+                endHour={END_HOUR}
+                friendRanges={friendRanges}
+                merged={merged}
+                occurrences={occurrences}
+                pollOptionEntries={pollOptionEntries}
+                sessionEntries={sessionEntries}
+                startHour={startHour}
+                timeLabelFormatter={timeLabelFormatter}
+                weekStart={weekStart}
+                onAdjustOccurrence={handleAdjustOccurrence}
+                onCreateBlock={handleCreateBlock}
+                onEditOccurrence={handleEditOccurrence}
+              />
+            </div>
+          </div>
+        )}
+      </PageScaffold>
 
       {pendingRange && (
         <CommitBlockDialog

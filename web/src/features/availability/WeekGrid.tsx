@@ -371,7 +371,6 @@ export function WeekGrid({
   const dragging = useRef(false)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const touchOrigin = useRef<{ x: number; y: number } | null>(null)
-  const gridRef = useRef<HTMLDivElement>(null)
   const autoScrollFrame = useRef<number | undefined>(undefined)
   const cellRefs = useRef(new Map<string, HTMLDivElement>())
   // Roving tabindex only steals DOM focus once the grid has already been
@@ -703,23 +702,24 @@ export function WeekGrid({
     }
   }
 
+  // The grid has no scrollport of its own — it renders at natural height and
+  // the document scrolls — so a drag that runs past the fold has to move the
+  // page. The trigger bands are therefore the viewport's own top and bottom
+  // edges, not any element rect.
   function maybeAutoScroll(clientY: number) {
-    const container = gridRef.current
-    if (!container) return
-    const rect = container.getBoundingClientRect()
-    const distanceFromTop = clientY - rect.top
-    const distanceFromBottom = rect.bottom - clientY
+    const distanceFromTop = clientY
+    const distanceFromBottom = window.innerHeight - clientY
 
     stopAutoScroll()
     if (distanceFromTop >= 0 && distanceFromTop < AUTO_SCROLL_EDGE_PX) {
       const step = () => {
-        container.scrollTop -= AUTO_SCROLL_STEP_PX
+        window.scrollBy(0, -AUTO_SCROLL_STEP_PX)
         autoScrollFrame.current = requestAnimationFrame(step)
       }
       autoScrollFrame.current = requestAnimationFrame(step)
     } else if (distanceFromBottom >= 0 && distanceFromBottom < AUTO_SCROLL_EDGE_PX) {
       const step = () => {
-        container.scrollTop += AUTO_SCROLL_STEP_PX
+        window.scrollBy(0, AUTO_SCROLL_STEP_PX)
         autoScrollFrame.current = requestAnimationFrame(step)
       }
       autoScrollFrame.current = requestAnimationFrame(step)
@@ -866,16 +866,17 @@ export function WeekGrid({
 
   return (
     <div>
-      {/* `relative` makes the scroll container the offset parent of every row,
-          so WeekGridPage's initial scroll can read an hour row's `offsetTop`
-          straight into `scrollTop`, and the sticky header/gutter resolve
-          against this box rather than the page. */}
+      {/* The grid has no scrollport of its own: it renders at natural height and
+          the document scrolls (nested vertical scrolling is what this replaces).
+          Horizontal scrolling survives only below `sm`, where seven 44px columns
+          plus the time gutter cannot fit a 360px viewport — that narrow case is
+          also the one where the day-header row cannot stick to the page, since a
+          scroll container captures its sticky descendants. */}
       <div
-        ref={gridRef}
         aria-colcount={8}
         aria-label={t('a11y.gridLabel')}
         aria-rowcount={slots + 1}
-        className={`relative max-h-[70vh] overflow-x-auto overflow-y-auto [-webkit-overflow-scrolling:touch] ${isTouchDragging ? 'touch-none' : ''}`}
+        className={`max-sm:overflow-x-auto max-sm:[-webkit-overflow-scrolling:touch] ${isTouchDragging ? 'touch-none' : ''}`}
         data-touch-dragging={isTouchDragging}
         role="grid"
         onMouseUp={handleMouseUp}
@@ -903,7 +904,6 @@ export function WeekGrid({
               aria-colindex={1}
               aria-rowindex={slot + 2}
               className="sticky left-0 z-10 min-h-11 w-16 shrink-0 bg-card pr-2 text-right text-xs text-ink-soft"
-              data-hour={slot % 4 === 0 ? startHour + slot / 4 : undefined}
               role="rowheader"
             >
               {slot % 4 === 0

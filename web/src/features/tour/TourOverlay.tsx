@@ -48,7 +48,8 @@ const SPOTLIGHT_CLASSES = [
  * `max-h-[min(280px,calc(100dvh-2rem))]` — the `calc(100dvh-2rem)` half is load-bearing, not
  * decorative: without it CSS could render the card taller than this constant on a short viewport,
  * which would silently invalidate the flip math's own height assumption (`overflow-y-auto` only
- * guards genuinely-long content, not this).
+ * guards genuinely-long content, not this). `transition-[top,left]` names the two properties
+ * `computeCardPosition` writes inline, so the card glides between anchors instead of jumping.
  */
 const CARD_WIDTH_PX = 320
 const CARD_MAX_HEIGHT_PX = 280
@@ -82,7 +83,14 @@ function computeCardPosition(anchorRect: DOMRect): CardPosition {
   const fitsBelow = belowTop + cardHeight <= window.innerHeight - CARD_MARGIN_PX
   const aboveTop = anchorRect.top - CARD_GAP_PX - cardHeight
   const canFlipAbove = !fitsBelow && aboveTop >= CARD_MARGIN_PX
-  const top = canFlipAbove ? aboveTop : Math.min(belowTop, window.innerHeight - CARD_MARGIN_PX)
+  // The below-anchor position is clamped at BOTH ends, not just the bottom: an anchor can sit
+  // above the viewport (the header scrolled out of view — the tour opens a modal, and its scroll
+  // lock makes the `scrollIntoView` below a no-op, so the anchor cannot be brought back), which
+  // puts `belowTop` at a negative offset and would pin the whole card off-screen. Clamping keeps
+  // the card reachable; when the anchor is on-screen the lower bound never binds.
+  const top = canFlipAbove
+    ? aboveTop
+    : Math.min(Math.max(belowTop, CARD_MARGIN_PX), window.innerHeight - CARD_MARGIN_PX)
 
   const arrowLeft = Math.min(
     Math.max(anchorCenter - left, ARROW_HALF_PX * 2),
@@ -265,7 +273,9 @@ export function TourOverlay() {
               common case, every shipped anchor lives in the header), bottom-right edges when
               `computeCardPosition` had to flip the card above it instead. Purely decorative
               (aria-hidden) — the ring on the anchor itself and Dialog.Title/Description carry the
-              real semantics. */}
+              real semantics. `-top-[9px]`/`-bottom-[9px]` is the offset that lands a 16px square
+              rotated 45° flush against the card's 2px border, and `rounded-[2px]` is a caret tip
+              softening — both smaller than any utility step. */}
           <div
             aria-hidden="true"
             className={

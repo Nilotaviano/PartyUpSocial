@@ -783,14 +783,27 @@ describe('WeekGridPage viewport', () => {
     vi.useRealTimers()
   })
 
-  // The grid's own default is startHour 0 — 96 rows the viewer has to scroll
-  // past. `timeLabelFormatter` renders through `Intl` in the active locale, so
-  // 07:00 reads "7:00 AM" and midnight "12:00 AM" under `en`.
-  it('renders the day from 07:00 by default instead of midnight', async () => {
+  // The grid's own default is startHour 0 — 96 rows. The page clamps the
+  // default window to 08:00–24:00. `timeLabelFormatter` renders through `Intl`
+  // in the active locale, so 08:00 reads "8:00 AM" and midnight "12:00 AM"
+  // under `en`.
+  it('renders the day from 08:00 by default instead of midnight', async () => {
     renderPage()
 
-    expect(await screen.findByText(/^7:00\s?AM$/)).toBeInTheDocument()
+    expect(await screen.findByText(/^8:00\s?AM$/)).toBeInTheDocument()
+    expect(screen.queryByText(/^7:00\s?AM$/)).not.toBeInTheDocument()
     expect(screen.queryByText(/^12:00\s?AM$/)).not.toBeInTheDocument()
+  })
+
+  // The grid is no longer an internally scrollable element: it renders at its
+  // natural height (64 rows by default) and the document scrolls. A height cap
+  // or a vertical overflow rule here would restore the nested scrollport.
+  it('renders the grid at natural height instead of its own scrollport', async () => {
+    renderPage()
+
+    const grid = await screen.findByRole('grid')
+    expect(grid.className).not.toMatch(/max-h-/)
+    expect(grid.className).not.toMatch(/overflow-y-(auto|scroll)/)
   })
 
   it('reveals the early hours on request', async () => {
@@ -862,7 +875,7 @@ describe('WeekGridPage commit step', () => {
   })
 
   // The same mouse drag the pointer suite paints with, driven against the
-  // page (startHour 7) rather than a bare grid — 9:00 AM is free in the
+  // page (startHour 8) rather than a bare grid — 9:00 AM is free in the
   // fixture, whose only occurrence sits at 13:00.
   async function paintRange() {
     await screen.findAllByRole('gridcell', { name: /Busy/ }, { timeout: 5000 })

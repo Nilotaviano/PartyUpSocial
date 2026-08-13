@@ -190,11 +190,11 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         ILocator busyCellsInDom = page.Locator("[role=gridcell][data-busy=true]");
         int baselineBusyInDom = await busyCellsInDom.CountAsync();
 
-        // Create: focus the grid's one tab stop (07:00 on the week's first day, the clamped
+        // Create: focus the grid's one tab stop (08:00 on the week's first day, the clamped
         // viewport's first row — always earlier than the sibling fact's fixed 10:00 series, so
         // it sorts first in DOM order below regardless of run order), then keyboard alone —
-        // Enter starts a selection, Shift+ArrowDown extends it by one 15-minute slot (a
-        // 07:00–07:30 range, two grid rows), Enter ends the paint (P5-CAL-01).
+        // Enter starts a selection, Shift+ArrowDown extends it by one 15-minute slot (an
+        // 08:00–08:30 range, two grid rows), Enter ends the paint (P5-CAL-01).
         ILocator firstCell = page.GetByRole(AriaRole.Gridcell).First;
         await firstCell.FocusAsync();
         await Assertions.Expect(firstCell).ToBeFocusedAsync();
@@ -226,8 +226,9 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         // Edit: Enter on the busy cell opens the editor directly (a one-time block carries no
         // series, so no scope choice applies — that half is the sibling fact below). Read the
         // dialog's own prefilled value back rather than independently recomputing the grid's
-        // displayed week, and shift two hours later on the same day so the edited block stays
-        // inside the still-visible week and still sorts before the sibling fact's 10:00 series.
+        // displayed week, and shift one hour later on the same day so the edited block stays
+        // inside the still-visible week and still sorts before — and never overlaps, which would
+        // merge the two bands and change the busy-cell count — the sibling fact's 10:00 series.
         await busyCells.First.FocusAsync();
         await page.Keyboard.PressAsync("Enter");
         ILocator editDialog = page.GetByRole(AriaRole.Dialog);
@@ -240,7 +241,7 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         ILocator endField = editDialog.GetByLabel("End time", new() { Exact = true });
         DateTime originalStart = DateTime.ParseExact(
             await startField.InputValueAsync(), "yyyy-MM-dd\\THH:mm", CultureInfo.InvariantCulture);
-        DateTime editedStart = originalStart.AddHours(2);
+        DateTime editedStart = originalStart.AddHours(1);
         DateTime editedEnd = editedStart.AddMinutes(30);
         await startField.FillAsync(editedStart.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture));
         await endField.FillAsync(editedEnd.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture));

@@ -41,12 +41,13 @@ month/day views and navigation chrome — are out of scope.
 `WeekGrid` renders `startHour = 0` to `endHour = 24` at `SLOT_MINUTES = 15` — **96 rows**, and
 `WeekGridPage` overrides neither.
 
-- Default range **07:00–24:00** (68 rows), with an "earlier hours" control expanding to the full 24.
-  Both props already exist; this is a default plus a toggle.
-- **Sticky day-header row** (vertical scroll) **and sticky time gutter** (horizontal scroll). The
-  gutter matters most on a phone, where scrolling sideways currently loses the hour labels.
-- Initial scroll lands on the earliest of (the viewer's earliest window that week, else **18:00**),
-  not midnight.
+- *Superseded 2026-08-13 (owner ruling, styling overhaul): the grid is no longer an internal
+  scrollport — it renders at natural height and the document scrolls.* Default range
+  **08:00–24:00** (64 rows), with the "earlier hours" control revealing 00:00–08:00.
+- **Sticky day-header row** against the page viewport at ≥`sm`; below `sm` the grid box is a
+  horizontal scroll container (372px minimum width vs the 360px floor), which captures sticky
+  descendants — the header does not stick there.
+- There is no initial scroll: the page loads at the top with the 08:00 window visible.
 - Sticky positioning must not disturb the grid's ARIA row/column semantics — the named regression
   risk of this section.
 
