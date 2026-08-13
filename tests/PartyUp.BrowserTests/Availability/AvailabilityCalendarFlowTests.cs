@@ -199,8 +199,10 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         // Create: focus the grid's one tab stop (08:00 on the week's first day, the clamped
         // viewport's first row — always earlier than the sibling fact's fixed 10:00 series, so
         // it sorts first in DOM order below regardless of run order), then keyboard alone —
-        // Enter starts a selection, Shift+ArrowDown extends it by one 15-minute slot (an
-        // 08:00–08:30 range, two grid rows), Enter ends the paint (P5-CAL-01).
+        // Enter starts a selection, Shift+ArrowDown extends it by one 15-minute slot (two
+        // grid rows), Enter ends the paint (P5-CAL-01). This first dialog is Escaped away
+        // to prove the trap and focus return; the block actually saved is the 08:15–08:45
+        // repaint below.
         ILocator firstCell = page.GetByRole(AriaRole.Gridcell).First;
         await firstCell.FocusAsync();
         await Assertions.Expect(firstCell).ToBeFocusedAsync();
@@ -212,8 +214,8 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         // dialog's one-time/weekly choice is confirmed. Keyboard-only, so the choice is left at
         // its "Just this time" default (a one-time block, which the edit half below depends on)
         // and Save is reached and activated without a pointer.
-        // The dialog is named by the painted range itself ("08:00 AM–08:30 AM"), so it is matched
-        // on the time-range shape rather than on a fixed title string.
+        // The dialog is named by the painted range itself, so it is matched on the
+        // time-range shape rather than on a fixed title string.
         ILocator commitDialog = page.GetByRole(AriaRole.Dialog, new() { NameRegex = CommitRangePattern });
         await commitDialog.WaitForAsync();
         await Assertions.Expect(busyCellsInDom).ToHaveCountAsync(baselineBusyInDom);
