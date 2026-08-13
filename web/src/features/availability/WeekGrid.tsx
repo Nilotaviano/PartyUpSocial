@@ -76,7 +76,12 @@ export type WeekGridProps = {
   /** The `pollOptions` layer (D-111/A-080) — instants only, painted into the one slot each
    * starts in; never a second gridcell or tab stop (§10.3's ARIA audit). */
   pollOptionEntries?: GridPollOptionEntry[]
-  onCreateBlock: (range: GridRange) => void
+  /** `anchor` is the release-point cell's rect for a pointer/mouse commit (or
+   * the pointer coordinates as a zero-size rect), and the focused/last-selected
+   * cell's `getBoundingClientRect()` for a keyboard or touch commit
+   * (CALENDAR_DESIGN.md §9 S3) — the caller positions `CommitBlockDialog`
+   * from it. Selection/commit behavior itself is unchanged. */
+  onCreateBlock: (range: GridRange, anchor: DOMRect) => void
   onEditOccurrence: (occurrenceId: string) => void
   /** Omitted when the caller has nothing to do with an adjustment — the edge
    * handles are then not rendered at all, rather than rendered inert. */
@@ -537,12 +542,23 @@ export function WeekGrid({
     if (selection) announceExtent(day, selection.anchorSlot, slot)
   }
 
-  function commitSelection(current: Selection) {
+  // Falls back to a zero-size rect at the origin only when the cell was
+  // never measured (e.g. a display:none ancestor) — the popover clamp math
+  // still produces an on-screen position from that.
+  function cellRect(day: number, slot: number): DOMRect {
+    return cellRefs.current.get(`${day}:${slot}`)?.getBoundingClientRect() ?? new DOMRect(0, 0, 0, 0)
+  }
+
+  function pointRect(clientX: number, clientY: number): DOMRect {
+    return new DOMRect(clientX, clientY, 0, 0)
+  }
+
+  function commitSelection(current: Selection, anchor: DOMRect) {
     const lo = Math.min(current.anchorSlot, current.endSlot)
     const hi = Math.max(current.anchorSlot, current.endSlot)
     const start = cellTime(weekStart, current.day, lo, startHour)
     const end = cellTime(weekStart, current.day, hi + 1, startHour)
-    onCreateBlock({ start, end })
+    onCreateBlock({ start, end }, anchor)
     setLiveMessage(
       t('a11y.selectionReady', {
         start: timeLabelFormatter(start),
@@ -702,7 +718,7 @@ export function WeekGrid({
       case ' ': {
         event.preventDefault()
         if (selection) {
-          commitSelection(selection)
+          commitSelection(selection, cellRect(day, slot))
           break
         }
         const occurrence = occurrenceAt(day, slot)
@@ -773,13 +789,20 @@ export function WeekGrid({
     extendSelection(day, slot)
   }
 
-  function handleMouseUp() {
+  // Commits by reading `selection` from this closure rather than through a
+  // `setSelection` functional updater: a `(current) => { onCreateBlock(...) }`
+  // callback runs during WeekGrid's own render pass (React invokes queued
+  // updaters there), and `onCreateBlock` sets state on the parent
+  // `WeekGridPage` — that combination is "update a component while
+  // rendering a different component", which React drops rather than applies.
+  // The plain event-handler closure is never stale here: a mouse/touch
+  // gesture's down/move/up are separate native events, and React commits the
+  // pending render from each before the next one is dispatched.
+  function handleMouseUp(event: React.MouseEvent) {
     if (!dragging.current) return
     dragging.current = false
-    setSelection((current) => {
-      if (current) commitSelection(current)
-      return null
-    })
+    if (selection) commitSelection(selection, pointRect(event.clientX, event.clientY))
+    setSelection(null)
   }
 
   // A native `click` only fires when the same element received both
@@ -858,10 +881,8 @@ export function WeekGrid({
     if (wasLongPress) {
       dragging.current = false
       setIsTouchDragging(false)
-      setSelection((current) => {
-        if (current) commitSelection(current)
-        return null
-      })
+      if (selection) commitSelection(selection, cellRect(day, slot))
+      setSelection(null)
       return
     }
     if (isTap) {

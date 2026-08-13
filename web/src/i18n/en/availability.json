@@ -38,12 +38,12 @@
     "deleteSeriesConfirm": "Delete series"
   },
   "commit": {
-    "title": "Add this availability?",
+    "range": "{{start}}–{{end}}",
     "recurrenceLegend": "How often",
     "once": "Just this time",
     "weekly": "Repeats weekly",
     "save": "Save",
-    "discard": "Discard",
+    "cancel": "Cancel",
     "savedOnce": "Availability added.",
     "savedWeekly": "Weekly availability added.",
     "undo": "Undo",

@@ -197,6 +197,7 @@ export function WeekGridPage() {
     end: '',
   })
   const [pendingRange, setPendingRange] = useState<GridRange | null>(null)
+  const [pendingAnchor, setPendingAnchor] = useState<DOMRect | null>(null)
   const [undoTarget, setUndoTarget] = useState<UndoTarget | null>(null)
   const [layers, setLayers] = useState<CalendarLayerState | null>(null)
   const [showEarlyHours, setShowEarlyHours] = useState(false)
@@ -509,14 +510,16 @@ export function WeekGridPage() {
 
   // D-009/§7: a painted range is a proposal — the commit step asks whether it
   // is one-time or weekly before anything reaches the API.
-  function handleCreateBlock(range: GridRange) {
+  function handleCreateBlock(range: GridRange, anchor: DOMRect) {
     setPendingRange(range)
+    setPendingAnchor(anchor)
   }
 
   function handleCommit(recurrence: CommitRecurrence) {
     const range = pendingRange
     if (!range) return
     setPendingRange(null)
+    setPendingAnchor(null)
 
     if (recurrence === 'once') {
       createBlock.mutate({
@@ -833,11 +836,15 @@ export function WeekGridPage() {
         )}
       </PageScaffold>
 
-      {pendingRange && (
+      {pendingRange && pendingAnchor && (
         <CommitBlockDialog
+          anchor={pendingAnchor}
           pending={createBlock.isPending || createSeries.isPending}
           range={pendingRange}
-          onCancel={() => setPendingRange(null)}
+          onCancel={() => {
+            setPendingRange(null)
+            setPendingAnchor(null)
+          }}
           onConfirm={handleCommit}
         />
       )}
@@ -846,6 +853,7 @@ export function WeekGridPage() {
         {/* The toast carries the only Undo affordance and is reached by the F8
             hotkey, so it must not expire on a timer (WCAG 2.2.1). */}
         <Toast.Root
+          className="!rounded-card !border !border-ink/25 !shadow-[var(--shadow-pop)]"
           duration={Infinity}
           open={undoTarget !== null}
           onOpenChange={(open) => {

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -17,6 +17,7 @@ vi.mock('../../api/client', () => ({
 }))
 
 import '../../i18n'
+import { clampPopoverPosition } from './CommitBlockDialog'
 import {
   WeekGrid,
   type GridAdjustment,
@@ -47,14 +48,14 @@ function renderGrid(props: {
   friendRanges?: GridFriendRange[]
   sessionEntries?: GridSessionEntry[]
   pollOptionEntries?: GridPollOptionEntry[]
-  onCreateBlock?: ReturnType<typeof vi.fn<(range: GridRange) => void>>
+  onCreateBlock?: ReturnType<typeof vi.fn<(range: GridRange, anchor: DOMRect) => void>>
   onEditOccurrence?: ReturnType<typeof vi.fn<(id: string) => void>>
   onAdjustOccurrence?: ReturnType<typeof vi.fn<(adjustment: GridAdjustment) => void>>
   startHour?: number
   endHour?: number
   now?: Date | null
 }) {
-  const onCreateBlock = props.onCreateBlock ?? vi.fn<(range: GridRange) => void>()
+  const onCreateBlock = props.onCreateBlock ?? vi.fn<(range: GridRange, anchor: DOMRect) => void>()
   const onEditOccurrence = props.onEditOccurrence ?? vi.fn<(id: string) => void>()
   render(
     <WeekGrid
@@ -364,6 +365,87 @@ describe('WeekGrid pointer flow', () => {
     block.focus()
     fireEvent.keyDown(block, { key: 'Enter' })
     expect(onEditOccurrence).toHaveBeenCalledWith('block-a')
+  })
+})
+
+// CALENDAR_DESIGN.md §9 S3: `onCreateBlock`'s second argument anchors
+// `CommitBlockDialog` at the commit point — a pointer/mouse release passes
+// the pointer coordinates, a keyboard or touch commit passes the
+// focused/last-selected cell's own measured rect.
+describe('WeekGrid commit anchor_S3', () => {
+  it('passes the pointer release coordinates as the anchor for a mouse commit', () => {
+    const { onCreateBlock } = renderGrid({})
+
+    const dragStart = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    fireEvent.mouseDown(dragStart, { button: 0 })
+    fireEvent.mouseUp(screen.getByRole('grid'), { clientX: 111, clientY: 222 })
+
+    expect(onCreateBlock).toHaveBeenCalledTimes(1)
+    const [, anchor] = onCreateBlock.mock.calls[0]
+    expect(anchor.left).toBe(111)
+    expect(anchor.top).toBe(222)
+    expect(anchor.width).toBe(0)
+  })
+
+  it('passes the focused cell rect as the anchor for a keyboard commit', () => {
+    const rect = {
+      x: 10,
+      y: 20,
+      width: 44,
+      height: 44,
+      top: 20,
+      left: 10,
+      right: 54,
+      bottom: 64,
+      toJSON: () => ({}),
+    } as DOMRect
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(rect)
+    const { onCreateBlock } = renderGrid({})
+
+    const cell = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    cell.focus()
+    fireEvent.keyDown(cell, { key: 'Enter' })
+    fireEvent.keyDown(cell, { key: 'Enter' })
+
+    expect(onCreateBlock).toHaveBeenCalledTimes(1)
+    const [, anchor] = onCreateBlock.mock.calls[0]
+    expect(anchor).toBe(rect)
+
+    spy.mockRestore()
+  })
+
+  it('passes the release cell rect as the anchor for a touch commit_P5TOUCH01', () => {
+    vi.useFakeTimers()
+    const rect = {
+      x: 5,
+      y: 5,
+      width: 44,
+      height: 44,
+      top: 5,
+      left: 5,
+      right: 49,
+      bottom: 49,
+      toJSON: () => ({}),
+    } as DOMRect
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(rect)
+    const { onCreateBlock } = renderGrid({})
+
+    const start = screen.getAllByRole('gridcell', { name: '9:00' })[0]
+    fireEvent.pointerDown(start, { pointerType: 'touch', clientX: 5, clientY: 5 })
+    // Flushes the long-press timer's state update to a committed render
+    // before the liftoff event — matching a real long-press, where the two
+    // native events are separated by a real setTimeout tick.
+    act(() => {
+      vi.advanceTimersByTime(500)
+    })
+    fireEvent.pointerUp(start, { pointerType: 'touch', clientX: 5, clientY: 5 })
+
+    expect(onCreateBlock).toHaveBeenCalledTimes(1)
+    const [, anchor] = onCreateBlock.mock.calls[0]
+    expect(anchor).toBe(rect)
+
+    spy.mockRestore()
+    vi.useRealTimers()
   })
 })
 
@@ -973,13 +1055,16 @@ describe('WeekGridPage commit step', () => {
     fireEvent.mouseUp(screen.getByRole('grid'))
   }
 
+  // §9 S3: the dialog is labelled by the range text itself (no generic
+  // "add this?" heading) — querying by accessible name proves Radix's
+  // aria-labelledby still resolves to it after the restyle.
   it('asks for a recurrence choice before saving a painted range_D009', async () => {
     renderPage()
     await paintRange()
 
-    expect(await screen.findByRole('dialog')).toHaveTextContent(
-      'Add this availability?',
-    )
+    expect(
+      await screen.findByRole('dialog', { name: /^09:00\s?AM.09:45\s?AM$/ }),
+    ).toBeInTheDocument()
     expect(api.post).not.toHaveBeenCalled()
   })
 
@@ -1018,7 +1103,7 @@ describe('WeekGridPage commit step', () => {
     renderPage()
     await paintRange()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Discard' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(api.post).not.toHaveBeenCalled()
@@ -1070,6 +1155,83 @@ describe('WeekGridPage commit step', () => {
 
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
   }, 20_000)
+
+  // §9 S3: Escape still closes the dialog and Radix still restores focus to
+  // whatever was focused before it opened — the mousedown that started the
+  // drag focuses `dragStart` (browsers focus a mousedown target by default),
+  // so that's the element the popover's own focus trap must hand back to.
+  // Radix's own Escape handling (`Dialog` in ui/dialog.tsx is untouched by
+  // this slice) — proof it still closes the popover/sheet without saving.
+  it('closes on Escape without saving_S3', async () => {
+    renderPage()
+    await paintRange()
+
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.keyDown(dialog, { key: 'Escape', code: 'Escape' })
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  // Radix's `FocusScope` traps Tab inside the dialog — proof that contract
+  // (untouched, from the shared `Dialog` primitive) still holds after the
+  // restyle: cycling Tab never lands outside the dialog's own controls.
+  it('traps Tab focus inside the dialog_S3', async () => {
+    renderPage()
+    await paintRange()
+
+    const dialog = await screen.findByRole('dialog')
+    for (let i = 0; i < 6; i += 1) {
+      fireEvent.keyDown(dialog, { key: 'Tab', code: 'Tab' })
+      expect(dialog.contains(document.activeElement)).toBe(true)
+    }
+  })
+
+  it('renders as a ≥sm popover clamped inside the viewport_S3', async () => {
+    renderPage()
+    await paintRange()
+
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog.className).toMatch(/\bfixed\b/)
+    expect(dialog.className).toMatch(/w-\[280px\]/)
+    const { top, left } = clampPopoverPosition(
+      { left: 0, top: 0, width: 0, height: 0 } as DOMRect,
+      { width: window.innerWidth, height: window.innerHeight },
+    )
+    expect(dialog.style.top).toBe(`${top}px`)
+    expect(dialog.style.left).toBe(`${left}px`)
+    expect(parseFloat(dialog.style.left)).toBeGreaterThanOrEqual(0)
+    expect(parseFloat(dialog.style.top)).toBeGreaterThanOrEqual(0)
+  })
+
+  // Below `sm` the same dialog is a bottom sheet — fixed to the bottom edge,
+  // rounded top corners, and a grab-handle bar instead of a floating card.
+  it('renders as a bottom sheet below sm_S3', async () => {
+    const originalMatchMedia = window.matchMedia
+    const media = {
+      matches: true,
+      media: '(max-width: 639px)',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockReturnValue(media),
+    })
+
+    renderPage()
+    await paintRange()
+
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog.className).toMatch(/bottom-0/)
+    expect(dialog.className).toMatch(/rounded-t-/)
+    expect(dialog.querySelector('[aria-hidden="true"]')).toBeInTheDocument()
+
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: originalMatchMedia,
+    })
+  })
 })
 
 describe('WeekGridPage occurrence editing', () => {

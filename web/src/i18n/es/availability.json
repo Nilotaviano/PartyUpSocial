@@ -38,12 +38,12 @@
     "deleteSeriesConfirm": "Eliminar serie"
   },
   "commit": {
-    "title": "¿Agregar esta disponibilidad?",
+    "range": "{{start}}–{{end}}",
     "recurrenceLegend": "Con qué frecuencia",
     "once": "Solo esta vez",
     "weekly": "Se repite cada semana",
     "save": "Guardar",
-    "discard": "Descartar",
+    "cancel": "Cancelar",
     "savedOnce": "Disponibilidad agregada.",
     "savedWeekly": "Disponibilidad semanal agregada.",
     "undo": "Deshacer",
