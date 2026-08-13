@@ -65,9 +65,11 @@ public static class VisibilityEngine
     }
 
     /// <summary>
-    /// The fail-closed gate the application layer puts in front of every read and write: an
-    /// invisible target raises <see cref="DomainError.NotFound"/>, indistinguishable from one that
-    /// was never created.
+    /// The throwing form of the fail-closed gate: an invisible target raises
+    /// <see cref="DomainError.NotFound"/>, indistinguishable from one that was never created.
+    /// Application gates are written as <c>Resolve(...).IsVisible</c> instead, mapping the miss to
+    /// their own not-found code, so the absence of a <c>Require</c> call at a read or write says
+    /// nothing about whether that path is gated — check for the <c>Resolve</c> form.
     /// </summary>
     public static VisibilityResult Require(VisibilityTarget target, Viewer viewer)
     {
