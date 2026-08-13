@@ -4,7 +4,9 @@ using Microsoft.Extensions.Logging;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Users;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Webp;
+using SixLabors.ImageSharp.Memory;
 using SixLabors.ImageSharp.Processing;
 
 // The fake-handler/fake-resolver test seam below is internal so production code cannot construct it
@@ -23,6 +25,17 @@ public sealed partial class AvatarCaptureService : IAvatarCaptureService, IDispo
 {
     private const int MaxBytes = 512 * 1024;
     private const int OutputSize = 128;
+
+    /// <summary>
+    /// The decoded-pixel ceiling (~4000x4000). The 512 KB transfer cap bounds only the compressed
+    /// bytes, so without this a highly compressible pixel bomb would still decode to hundreds of
+    /// megapixels; three orders of magnitude above the 128px output leaves every real avatar intact.
+    /// </summary>
+    private const long MaxPixels = 16_000_000;
+
+    private const int MaxIdentifiedFrames = 4;
+    private const int DecodeAllocationLimitMegabytes = 64;
+
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan TotalTimeout = TimeSpan.FromSeconds(5);
 
@@ -36,6 +49,13 @@ public sealed partial class AvatarCaptureService : IAvatarCaptureService, IDispo
             [AvatarSourceKind.SteamPlatform] = "steamstatic.com",
             [AvatarSourceKind.GoogleAccount] = "googleusercontent.com",
         };
+
+    /// <summary>
+    /// Decode runs against a private allocator with a hard limit rather than
+    /// <see cref="Configuration.Default"/>, so a decode that slips past the pixel pre-check trips an
+    /// <see cref="InvalidMemoryOperationException"/> instead of exhausting process memory.
+    /// </summary>
+    private static readonly Configuration CappedDecodeConfiguration = CreateCappedDecodeConfiguration();
 
     private readonly HttpClient _http;
     private readonly Func<string, CancellationToken, Task<IPAddress[]>> _resolveHost;
@@ -256,11 +276,37 @@ public sealed partial class AvatarCaptureService : IAvatarCaptureService, IDispo
         bytes[0] == (byte)'R' && bytes[1] == (byte)'I' && bytes[2] == (byte)'F' && bytes[3] == (byte)'F' &&
         bytes[8] == (byte)'W' && bytes[9] == (byte)'E' && bytes[10] == (byte)'B' && bytes[11] == (byte)'P';
 
+    private static Configuration CreateCappedDecodeConfiguration()
+    {
+        Configuration configuration = Configuration.Default.Clone();
+        configuration.MemoryAllocator = MemoryAllocator.Create(new MemoryAllocatorOptions
+        {
+            AllocationLimitMegabytes = DecodeAllocationLimitMegabytes,
+        });
+        return configuration;
+    }
+
     private AvatarCapture? ReEncode(byte[] bytes)
     {
         try
         {
-            using Image image = Image.Load(bytes);
+            DecoderOptions options = new()
+            {
+                Configuration = CappedDecodeConfiguration,
+                MaxFrames = 1,
+            };
+
+            // Read the header before allocating any pixel buffer: a bomb is rejected on its declared
+            // dimensions, never decoded.
+            ImageInfo info = Image.Identify(options, bytes);
+            if ((long)info.Width * info.Height > MaxPixels
+                || info.FrameMetadataCollection.Count > MaxIdentifiedFrames)
+            {
+                LogReEncodeRejected(_logger, info.Width, info.Height, info.FrameMetadataCollection.Count);
+                return null;
+            }
+
+            using Image image = Image.Load(options, bytes);
             image.Mutate(context => context.Resize(new ResizeOptions
             {
                 Size = new SixLabors.ImageSharp.Size(OutputSize, OutputSize),
@@ -271,7 +317,8 @@ public sealed partial class AvatarCaptureService : IAvatarCaptureService, IDispo
             image.Save(output, new WebpEncoder());
             return new AvatarCapture(output.ToArray(), AvatarSource.AllowedContentType);
         }
-        catch (Exception exception) when (exception is UnknownImageFormatException or InvalidImageContentException)
+        catch (Exception exception) when (
+            exception is ImageFormatException or InvalidMemoryOperationException)
         {
             LogReEncodeFailed(_logger, exception.GetType().Name);
             return null;
@@ -284,4 +331,9 @@ public sealed partial class AvatarCaptureService : IAvatarCaptureService, IDispo
         Level = LogLevel.Warning,
         Message = "Avatar re-encode failed after passing the magic-byte sniff ({ExceptionType})")]
     private static partial void LogReEncodeFailed(ILogger logger, string exceptionType);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Avatar decode rejected: {Width}x{Height}, {Frames} frame(s) exceeds the decode ceiling")]
+    private static partial void LogReEncodeRejected(ILogger logger, int width, int height, int frames);
 }

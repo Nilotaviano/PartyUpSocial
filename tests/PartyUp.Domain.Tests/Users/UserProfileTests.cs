@@ -236,6 +236,31 @@ public class UserProfileTests
         Assert.Equal(new byte[] { 2 }, user.AvatarSources[0].Bytes);
     }
 
+    /// <summary>
+    /// A-084 revocation: the capability token survives a re-capture on a still-linked account by
+    /// design (the refresh job must not churn it), but an unlink deletes the source row, so the
+    /// re-link that follows goes through the create branch and mints a fresh token. A token harvested
+    /// before an unlink is therefore dead after it.
+    /// </summary>
+    [Fact]
+    public void UnlinkThenRelink_MintsAFreshAvatarProxyToken_D190()
+    {
+        FakeClock clock = TestUsers.Clock();
+        User user = TestUsers.Active(clock);
+        PlatformLink link = user.LinkPlatform(Platform.Steam, GamingHandle.Create("player-one"));
+        AvatarSource before = user.CaptureAvatarSource(AvatarSourceKind.SteamPlatform, [1], "image/webp", clock);
+        string harvestedToken = before.Token;
+
+        user.UnlinkPlatform(link.Id);
+        Assert.Empty(user.AvatarSources);
+
+        user.LinkPlatform(Platform.Steam, GamingHandle.Create("player-one"));
+        AvatarSource after = user.CaptureAvatarSource(AvatarSourceKind.SteamPlatform, [2], "image/webp", clock);
+
+        Assert.NotEqual(harvestedToken, after.Token);
+        Assert.NotEqual(before.Id, after.Id);
+    }
+
     [Fact]
     public void RemoveAvatarSource_FallsTheAvatarBackToAnEmoji_D190()
     {

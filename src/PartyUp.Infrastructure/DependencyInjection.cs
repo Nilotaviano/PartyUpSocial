@@ -178,7 +178,21 @@ public static class DependencyInjection
             configuration["Deletion:JournalPath"] ?? "/data/deletion-journal"));
         services.AddSingleton(_ =>
         {
-            var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            // Redirects off: every Steam Web API URL carries the API key in its query string, so a
+            // followed 3xx would re-issue the request -- key included -- to the redirect target's host.
+            // The 32 MB buffer ceiling bounds a slow-drip or oversized response; the largest legitimate
+            // one is a 50k-app IStoreService/GetAppList page (SteamAppListClient.MaxResults), an order
+            // of magnitude below it.
+            var handler = new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                ConnectTimeout = TimeSpan.FromSeconds(5),
+            };
+            var httpClient = new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromSeconds(15),
+                MaxResponseContentBufferSize = 32 * 1024 * 1024,
+            };
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("PartyUp/1.0 (+https://partyup.social)");
             return httpClient;
         });
