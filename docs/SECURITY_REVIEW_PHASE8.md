@@ -21,6 +21,39 @@ listed here.
 | 11 | List/discover reads resolve visibility in SQL, not in the in-memory engine | Set-returning reads cannot round-trip every candidate through the engine | `ListDiscoverableSessionsUseCase.cs:6-11` (A-077(c) exclusion set + inheritedOnly fragment), `GetActionableInboxUseCase.cs:8-11`; the fragment annotates itself as the SQL projection of `VisibilityEngine.cs:32` (`PollVisibilitySql.cs:14`). Both carry list dimensions and `RequireOnboarded` |
 | 12 | Availability resolves through `AvailabilityVisibility`, not `VisibilityEngine` | Availability is friend-scoped, not session-scoped | `FindOverlapWindowsUseCase.cs:62` + `AvailabilityVisibility.cs:22,34-47`; `RequireRead` throws NotFound (`:50-54`); writes owner-scoped with a 404 miss (`AvailabilityBlockUseCases.cs:51-57`); A-078 no-echo intact (`FindOverlapWindowsUseCase.cs:81`) |
 
+## Headers (Q7)
+
+App-wide hardening headers shipped as middleware (`Program.cs`, registered beside the existing
+Referrer-Policy block): `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+`Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()`, and a
+`Content-Security-Policy` of `default-src 'self'; script-src 'self'[ 'sha256-<hash>' ...]; style-src
+'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri
+'self'; form-action 'self'`. `style-src 'unsafe-inline'` stays because Radix portal positioning and
+the tour arrow set inline `style` attributes, which hashes cannot cover.
+
+**Hash mechanism:** `CspInlineScriptHasher` (`src/PartyUp.Api/Security/CspInlineScriptHasher.cs`)
+SHA-256-hashes each inline `<script>` body (scripts with a `src` attribute are skipped) from the
+built `wwwroot/index.html`, read once at startup — never a hardcoded hash, which would rot on the
+next Vite build. `wwwroot` exists only in the container image; `dotnet run` and the integration test
+host have none, so the hash tokens are simply omitted there and the header still ships without them.
+
+**Route-local override:** the avatar proxy (`AvatarProxyEndpoints.cs:37-40`) keeps its own stricter
+`default-src 'none'; sandbox` CSP — the global middleware checks `ContainsKey("Content-Security-Policy")`
+in its `OnStarting` callback and does not overwrite an already-set header.
+
+**Tests:** `tests/PartyUp.Api.IntegrationTests/Security/SecurityHeadersTests.cs` —
+`ApiResponse_CarriesTheAppWideHardeningHeaders` (an API JSON response), `GuestExchangeRedirectLeg_CarriesTheAppWideHardeningHeaders`
+(`/g` redirect leg), `AvatarProxyMiss_StillCarriesTheAppWideHardeningHeaders` (`/a` 404 miss, and
+confirms no `sha256` token in the integration host's wwwroot-less CSP); the avatar proxy's route-local
+CSP itself stays pinned by the existing `AvatarProxyEndpointTests.ResponseHeadersMatchSpecExactly`.
+Unit coverage for the hash computation (known inline script → correct token; no `wwwroot` → no hash
+token) is `tests/PartyUp.Api.IntegrationTests/Security/CspInlineScriptHasherTests.cs`.
+
+**Open/deferred:** HSTS in Caddy stays the owner's duty (Q7). The SPA-document header assertion in the
+CI browser lane's *built* topology (Dockerfile-copied `wwwroot`, hash tokens present) is deferred to
+that lane per PHASE8_DESIGN.md §5 — out of this ticket's scope; the dev topology (Vite serving the
+SPA) is unaffected since the API's CSP does not apply to Vite's own responses.
+
 ## Non-exceptions confirmed complete
 
 - **CSRF: zero exemptions.** `ProblemAntiforgeryFilter` is attached to the whole `/api/v1` group before

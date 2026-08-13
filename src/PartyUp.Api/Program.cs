@@ -305,6 +305,31 @@ app.Use(async (context, next) =>
     });
     await next(context);
 });
+
+// PHASE8_DESIGN.md §3 S9 (Q7): app-wide hardening headers. The script-src hash is computed once at
+// startup from the built wwwroot/index.html (container image only -- dotnet run and the integration
+// host have none, so the hash tokens are simply omitted there). The avatar proxy (AvatarProxyEndpoints.cs)
+// sets its own stricter route-local CSP directly on the response before this middleware's
+// OnStarting callback runs, so the ContainsKey guard below lets the route-local value win.
+string wwwrootIndexPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot", "index.html");
+IReadOnlyList<string> inlineScriptShaTokens = new CspInlineScriptHasher().ComputeShaTokens(wwwrootIndexPath);
+string contentSecurityPolicy = SecurityHeaders.BuildContentSecurityPolicy(inlineScriptShaTokens);
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Headers["X-Content-Type-Options"] = SecurityHeaders.ContentTypeOptions;
+        context.Response.Headers["X-Frame-Options"] = SecurityHeaders.FrameOptions;
+        context.Response.Headers["Permissions-Policy"] = SecurityHeaders.PermissionsPolicy;
+        if (!context.Response.Headers.ContainsKey("Content-Security-Policy"))
+        {
+            context.Response.Headers["Content-Security-Policy"] = contentSecurityPolicy;
+        }
+
+        return Task.CompletedTask;
+    });
+    await next(context);
+});
 app.UseExceptionHandler();
 app.UseSerilogRequestLogging(options =>
 {
