@@ -25,10 +25,16 @@
   --color-qr: #fffdf5;
   --color-qr-ink: #1b2408;
   --color-scrim: rgb(0 0 0 / 0.4);
+  --color-grid-line: rgb(180 170 130 / 0.4);
+  --color-grid-hour: rgb(150 138 90 / 0.7);
 
   /* Radius */
   --radius-card: 1.125rem;
   --radius-control: 0.875rem;
+
+  /* Shadows — calendar overhaul, CALENDAR_DESIGN.md §9 */
+  --shadow-card: 0 1px 0 0 rgb(180 160 110 / 0.6), 0 12px 28px -18px rgb(32 48 28 / 0.55);
+  --shadow-pop: 0 20px 44px -18px rgb(32 48 28 / 0.45);
 
   /* Content widths — STYLING_OVERHAUL_DESIGN.md §3.0 (→ max-w-page / max-w-form) */
   --container-page: 72rem;
@@ -84,6 +90,10 @@
   --color-busy-ink: #b3afa3;
   --color-focus: #9db4f5;
   --color-shadow: rgba(237, 232, 212, 0.25);
+  --color-grid-line: rgb(90 100 70 / 0.45);
+  --color-grid-hour: rgb(120 130 90 / 0.7);
+  --shadow-card: 0 12px 30px -20px rgba(0, 0, 0, 0.8);
+  --shadow-pop: 0 22px 46px -18px rgba(0, 0, 0, 0.75);
 }
 
 @layer base {
@@ -188,6 +198,37 @@
   :focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
+  }
+}
+
+/*
+ * Card surface + paper-grain texture (CALENDAR_DESIGN.md §9). --shadow-card
+ * and --shadow-pop are plain box-shadow values (not the shadow-offset-*
+ * @utility group above), so surface consumes them directly.
+ */
+@utility surface {
+  background-color: var(--color-card);
+  border: 1px solid color-mix(in oklab, var(--color-ink) 25%, transparent);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+@utility paper-grain {
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      color-mix(in oklab, var(--color-ink) 7%, transparent) 1px,
+      transparent 0
+    );
+    background-size: 14px 14px;
+    opacity: 0.35;
   }
 }
 
