@@ -32,22 +32,28 @@ sudo apt-get install -y \
   ca-certificates curl git jq tmux unzip zip build-essential \
   apt-transport-https gnupg lsb-release
 
-echo "== .NET ${DOTNET_CHANNEL} SDK (apt) =="
-SDK_PKG="dotnet-sdk-${DOTNET_CHANNEL}"
-if ! sudo apt-get install -y "$SDK_PKG"; then
-  # Ubuntu's feed lags new majors sometimes — fall back to Microsoft's repo.
-  echo "-- ${SDK_PKG} not in Ubuntu's feed; adding packages.microsoft.com --"
-  curl -fsSL "https://packages.microsoft.com/config/ubuntu/$(. /etc/os-release && echo "$VERSION_ID")/packages-microsoft-prod.deb" \
-    -o /tmp/packages-microsoft-prod.deb
-  sudo dpkg -i /tmp/packages-microsoft-prod.deb
-  sudo apt-get update -y
-  sudo apt-get install -y "$SDK_PKG"
+echo "== .NET SDK (feature band pinned by the repo's global.json) =="
+# global.json pins 10.0.302 with rollForward=latestFeature: only the 3xx
+# feature band satisfies it, and the apt feeds (Ubuntu and Microsoft alike)
+# ship a single band — usually 1xx — so apt cannot be trusted to match.
+# The dot.net installer takes a band channel (e.g. 10.0.3xx) directly.
+SDK_PIN="$(curl -fsSL https://raw.githubusercontent.com/Nilotaviano/PartyUpSocial/main/global.json 2>/dev/null | jq -r '.sdk.version' || true)"
+if [ -d "$REPO_DIR/.git" ] && [ -f "$REPO_DIR/global.json" ]; then
+  SDK_PIN="$(jq -r '.sdk.version' "$REPO_DIR/global.json")"
 fi
-# dotnet global tools (pwsh below) install to ~/.dotnet/tools regardless of SDK origin.
-if ! grep -q '.dotnet/tools' "$HOME/.bashrc"; then
-  echo 'export PATH="$HOME/.dotnet/tools:$PATH"' >> "$HOME/.bashrc"
+SDK_PIN="${SDK_PIN:-10.0.302}"
+SDK_CHANNEL="$(echo "$SDK_PIN" | sed -E 's/^([0-9]+\.[0-9]+)\.([0-9])[0-9]{2}$/\1.\2xx/')"
+echo "-- global.json pins ${SDK_PIN} → channel ${SDK_CHANNEL} --"
+curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh
+bash /tmp/dotnet-install.sh --channel "${SDK_CHANNEL}" --install-dir "$HOME/.dotnet"
+if ! grep -q 'DOTNET_ROOT' "$HOME/.bashrc"; then
+  {
+    echo 'export DOTNET_ROOT="$HOME/.dotnet"'
+    echo 'export PATH="$HOME/.dotnet:$HOME/.dotnet/tools:$PATH"'
+  } >> "$HOME/.bashrc"
 fi
-export PATH="$HOME/.dotnet/tools:$PATH"
+export DOTNET_ROOT="$HOME/.dotnet"
+export PATH="$HOME/.dotnet:$HOME/.dotnet/tools:$PATH"
 dotnet --version
 
 echo "== Node ${NODE_MAJOR} (NodeSource) =="
