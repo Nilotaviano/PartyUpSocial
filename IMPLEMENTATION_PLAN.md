@@ -141,7 +141,7 @@ Phase 7 shipped end-to-end across seven slices (S1-S7), documented in `PHASE7_DE
 
 ## Phase 8 — Compliance, localization, hardening
 
-**Machine work complete 2026-08-12** (design: `PHASE8_DESIGN.md`, converged rev 6; security ledger: `docs/SECURITY_REVIEW_PHASE8.md`; WCAG dispositions: `docs/WCAG_AUDIT_PHASE8.md`; browser policy: `docs/BROWSER_SUPPORT.md`; load suite: `deploy/load/`). Open items live on the owner checklist at `PHASE8_DESIGN.md` §4: NVDA + real-device touch, real mobile Safari/Android Chrome + push-delivery spot checks, nine-document legal sign-off + privacy@partyup.social mailbox, k6 WSL rehearsal then optional VM run, HSTS in Caddy, backup age-out check (blocked on the Phase 9 offsite target).
+**Machine work complete 2026-08-12** (design: `PHASE8_DESIGN.md`, converged rev 6; security ledger: `docs/SECURITY_REVIEW_PHASE8.md`; WCAG dispositions: `docs/WCAG_AUDIT_PHASE8.md`; browser policy: `docs/BROWSER_SUPPORT.md`; load suite: `deploy/load/`). Open items live on the owner checklist at `PHASE8_DESIGN.md` §4: NVDA + real-device touch, real mobile Safari/Android Chrome + push-delivery spot checks, nine-document legal sign-off + privacy@mail.partyup.social mailbox, k6 WSL rehearsal then optional VM run, HSTS in Caddy, backup age-out check (blocked on the Phase 9 offsite target).
 
 - Translation pass: pt-BR + es for UI, **notifications, and emails**; locale formatting audit (D-060, D-146).
 - WCAG 2.2 AA audit across all screens; remediation (D-139). Calendar and poll grid get dedicated SR/keyboard sweeps — including the real-device touch + NVDA checkpoint on the shipped week grid, re-deferred here from Phase 5 by explicit owner decision (2026-08-07, `P5-TOUCH-01`; the automated WebKit pointer lane is the interim evidence).

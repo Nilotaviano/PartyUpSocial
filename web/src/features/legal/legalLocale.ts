@@ -21,6 +21,6 @@ export function resolveLegalLocale(language: string | undefined): LegalLocale {
   return 'en'
 }
 
-export const CONTACT_EMAIL = 'privacy@partyup.social'
+export const CONTACT_EMAIL = 'privacy@mail.partyup.social'
 
 export const LEGAL_UPDATED_AT = '2026-08-12'

@@ -51,7 +51,7 @@ describe('privacy policy', () => {
         }),
       ).toBeTruthy()
       expect(screen.getAllByRole('heading', { level: 2 }).length).toBeGreaterThan(4)
-      expect(document.body.textContent).toContain('privacy@partyup.social')
+      expect(document.body.textContent).toContain('privacy@mail.partyup.social')
     })
   }
 
@@ -134,7 +134,7 @@ describe('community standards', () => {
 
     const text = document.body.textContent ?? ''
     expect(text).toContain('In-app reporting is not built yet')
-    expect(text).toContain('privacy@partyup.social')
+    expect(text).toContain('privacy@mail.partyup.social')
     expect(text).not.toMatch(/report button/i)
     expect(text).toContain('profanity filter')
     expect(text).toContain('Warning')
@@ -208,7 +208,7 @@ describe('app footer', () => {
       '/terms',
       '/community-standards',
       '/account-deletion',
-      'mailto:privacy@partyup.social',
+      'mailto:privacy@mail.partyup.social',
     ])
   })
 

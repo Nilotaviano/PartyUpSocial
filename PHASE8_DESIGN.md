@@ -71,7 +71,7 @@ While Q1/Q2/Q6 answers are pending, the startable work is S4's e2e half and S10'
   drafts them): retention = **30-day backup retention** (matches the shipped nightly pg_dump rotation) and
   **shared session content persists until account deletion / D-092 effects** — closes PRODUCT_SPEC.md:464's
   TBD with a spec row in S5; LGPD controller = **the owner as natural person**, contact
-  **privacy@partyup.social** (owner creates the mailbox/alias before S5 drafts flip from draft status; the
+  **privacy@mail.partyup.social** (owner creates the mailbox/alias before S5 drafts flip from draft status; the
   footer contact link publishes it). LGPD
   controller identity and contact point for the pt-BR text (this is what the footer contact link publishes —
   §8.6's "published support/contact info" is a mobile-store-submission requirement and stays deferred with the
