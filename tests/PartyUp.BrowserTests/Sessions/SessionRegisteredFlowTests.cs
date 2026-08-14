@@ -36,11 +36,11 @@ public sealed class SessionRegisteredFlowTests(PlaywrightFixture fixture)
                 return _setup;
             }
 
-            RegisteredUser organizer = await fixture.RegisterAndOnboardAsync(
+            RegisteredUser organizer = await fixture.SeedRegisteredUserAsync(
                 await fixture.NewContextAsync(), "organizer", "Organizer One");
-            RegisteredUser friend = await fixture.RegisterAndOnboardAsync(
+            RegisteredUser friend = await fixture.SeedRegisteredUserAsync(
                 await fixture.NewContextAsync(), "friend", "Friend Two");
-            RegisteredUser stranger = await fixture.RegisterAndOnboardAsync(
+            RegisteredUser stranger = await fixture.SeedRegisteredUserAsync(
                 await fixture.NewContextAsync(), "stranger", "Stranger Three");
 
             await PlaywrightFixture.BefriendAsync(organizer, friend);

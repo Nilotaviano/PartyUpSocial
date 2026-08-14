@@ -7,9 +7,8 @@ namespace PartyUp.BrowserTests.Admin;
 /// 2026-08-12 — no navigation entry renders for anyone) and fails closed exactly the way D-177's
 /// server side does. Both legs run in one fact against one account, in order: the account first
 /// proves the no-leak posture without the role, then the fixture grants the role over its own
-/// connection and the same account reaches the real pages. Splitting them would need a second
-/// registration (each pays the fixture's 65-second shared-rate-window barrier) and would depend on
-/// xUnit fact ordering, which is not guaranteed.
+/// connection and the same account reaches the real pages. Splitting them would depend on xUnit
+/// fact ordering, which is not guaranteed.
 /// </summary>
 [Trait("Category", "Integration")]
 [Collection(PlaywrightSuite.Name)]
@@ -27,7 +26,7 @@ public sealed class AdminSurfaceFlowTests(PlaywrightFixture fixture)
     [Fact]
     public async Task AdminSurface_LeaksNoNavEntryAndFailsClosedUntilTheRoleIsGranted_D177_D178()
     {
-        RegisteredUser user = await fixture.RegisterAndOnboardAsync(
+        RegisteredUser user = await fixture.SeedRegisteredUserAsync(
             await fixture.NewContextAsync(),
             "adminflow",
             // Never a display name whose tokens include "admin": `all.txt` holds it as an exact

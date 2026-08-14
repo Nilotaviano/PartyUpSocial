@@ -26,7 +26,7 @@ public sealed class PollVotingFlowTests(PlaywrightFixture fixture)
         await SetupLock.WaitAsync();
         try
         {
-            _organizer ??= await fixture.RegisterAndOnboardAsync(
+            _organizer ??= await fixture.SeedRegisteredUserAsync(
                 await fixture.NewContextAsync(), "pollvoter", "Poll Voter Organizer");
             return _organizer;
         }

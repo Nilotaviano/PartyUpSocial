@@ -85,11 +85,13 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
     /// second party's; `{adminUserId}` resolves against the admin account's own id.
     /// </para>
     /// <para>
-    /// The lane overrides `register-ip` to 100 (`PlaywrightFixture.cs`'s
-    /// <c>RegisterPerIpPerHourOverride</c>), not production's 5 — the registrations this collection
-    /// ships (two here, plus each flow class's own) leave well over ninety remaining, and
-    /// <see cref="Tour.TourFlowTests"/>'s own registration fits comfortably inside it. Each one still
-    /// pays the fixture's 65-second shared-rate-window barrier.
+    /// The organizer is the one account in this class that must still be built by driving the real
+    /// registration UI — the <c>/onboarding*</c> routes are audited from inside that walk (see this
+    /// class's remarks above), so there is nothing to scan without it. It pays the fixture's
+    /// 65-second shared-rate-window barrier and one `register-ip` slot of the lane's overridden 100
+    /// (`PlaywrightFixture.cs`'s <c>RegisterPerIpPerHourOverride</c>, not production's 5). The admin
+    /// account asserts nothing about registration, so it is seeded in-process instead
+    /// (<see cref="PlaywrightFixture.SeedRegisteredUserAsync"/>) and pays neither.
     /// </para>
     /// </summary>
     private async Task<AuditContext> GetContextAsync()
@@ -198,7 +200,7 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
             // them on the organizer's context would audit a one-paragraph not-found page. The role
             // is granted over the fixture's own connection (see `GrantAdminRoleAsync`); the reload
             // below is what makes the already-open context's cached queries refetch under it.
-            RegisteredUser admin = await fixture.RegisterAndOnboardAsync(
+            RegisteredUser admin = await fixture.SeedRegisteredUserAsync(
                 await fixture.NewContextAsync(),
                 "axeadmin",
                 // Never a display name whose tokens include "admin": `all.txt` holds it as an
@@ -870,7 +872,7 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
     [InlineData(AuditedTheme.Dark)]
     public async Task PushPromptStatusBanner_HasNoWcagViolation_D139(AuditedTheme theme)
     {
-        RegisteredUser recipient = await fixture.RegisterAndOnboardAsync(
+        RegisteredUser recipient = await fixture.SeedRegisteredUserAsync(
             await fixture.NewContextAsync(), "pushbanneraudit", "Push Banner Audit");
 
         await recipient.Page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/sessions/new");
@@ -909,9 +911,9 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
     [InlineData(AuditedTheme.Dark)]
     public async Task FriendActionMenuOpen_HasNoWcagViolation_D139(AuditedTheme theme)
     {
-        RegisteredUser viewer = await fixture.RegisterAndOnboardAsync(
+        RegisteredUser viewer = await fixture.SeedRegisteredUserAsync(
             await fixture.NewContextAsync(), "friendmenuaudit", "Friend Menu Audit");
-        RegisteredUser peer = await fixture.RegisterAndOnboardAsync(
+        RegisteredUser peer = await fixture.SeedRegisteredUserAsync(
             await fixture.NewContextAsync(), "friendmenupeer", "Friend Menu Peer");
 
         // `viewer` accepts, so `peer` is the row on `viewer`'s own friends list.

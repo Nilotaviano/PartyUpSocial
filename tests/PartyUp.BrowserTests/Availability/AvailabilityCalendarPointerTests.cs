@@ -38,7 +38,7 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
 {
     // The constructor-injected `fixture` is the one real, already-`InitializeAsync`'d shared
     // instance [Collection] provides (its mail-drop path, API process etc. all live) — its
-    // `RegisterAndOnboardAsync` is browser-agnostic (takes an `IBrowserContext` parameter, never
+    // `SeedRegisteredUserAsync` is browser-agnostic (takes an `IBrowserContext` parameter, never
     // touches `fixture.Browser`), so it works unmodified against the WebKit context this class
     // creates for itself below.
     /// <summary>
@@ -62,7 +62,7 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             ViewportSize = new ViewportSize { Width = 390, Height = 844 },
         });
 
-        RegisteredUser user = await fixture.RegisterAndOnboardAsync(context, emailLocalPart, "Pointer Tester");
+        RegisteredUser user = await fixture.SeedRegisteredUserAsync(context, emailLocalPart, "Pointer Tester");
 
         return (playwright, browser, user.Page);
     }

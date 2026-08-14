@@ -48,11 +48,11 @@ public sealed class DiscoverFlowTests(PlaywrightFixture fixture)
                 return _setup;
             }
 
-            RegisteredUser organizer = await fixture.RegisterAndOnboardAsync(
+            RegisteredUser organizer = await fixture.SeedRegisteredUserAsync(
                 await fixture.NewContextAsync(), "discoverorganizer", "Discover Organizer");
-            RegisteredUser extender = await fixture.RegisterAndOnboardAsync(
+            RegisteredUser extender = await fixture.SeedRegisteredUserAsync(
                 await fixture.NewContextAsync(), "discoverextender", "Discover Extender");
-            RegisteredUser viewer = await fixture.RegisterAndOnboardAsync(
+            RegisteredUser viewer = await fixture.SeedRegisteredUserAsync(
                 await fixture.NewContextAsync(), "discoverviewer", "Discover Viewer");
 
             await PlaywrightFixture.BefriendAsync(organizer, extender);

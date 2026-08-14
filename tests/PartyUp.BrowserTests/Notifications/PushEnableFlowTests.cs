@@ -117,9 +117,9 @@ public sealed class PushEnableFlowTests(PlaywrightFixture fixture)
         // The qualifying action must land on the SAME account that then enables push — a
         // second-device/account read of `pushPromptEligible` is exactly ruling 4's account-fact
         // axis, so this account first creates its own (throwaway) session before anything else.
-        RegisteredUser recipient = await fixture.RegisterAndOnboardAsync(
+        RegisteredUser recipient = await fixture.SeedRegisteredUserAsync(
             await fixture.NewContextAsync(), "pushrecipient", "Push Recipient");
-        RegisteredUser sender = await fixture.RegisterAndOnboardAsync(
+        RegisteredUser sender = await fixture.SeedRegisteredUserAsync(
             await fixture.NewContextAsync(), "pushsender", "Push Sender");
         // `recipient.Page` is the one that clicks "Accept" inside `BefriendAsync` — reusing it
         // immediately afterward for a friends-list-dependent navigation would race the accept
@@ -233,7 +233,7 @@ public sealed class PushEnableFlowTests(PlaywrightFixture fixture)
     [Fact]
     public async Task EnableFlow_AbsentPushManagerShowsTheD175FallbackNotice_AndNeverPrompts_D175()
     {
-        RegisteredUser user = await fixture.RegisterAndOnboardAsync(
+        RegisteredUser user = await fixture.SeedRegisteredUserAsync(
             await fixture.NewContextAsync(), "pushfallback", "Push Fallback");
 
         // Qualifying action, same as the happy-path arm above.

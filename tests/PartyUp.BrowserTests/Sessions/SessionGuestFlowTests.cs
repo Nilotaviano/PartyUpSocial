@@ -28,7 +28,7 @@ public sealed class SessionGuestFlowTests(PlaywrightFixture fixture)
         await SetupLock.WaitAsync();
         try
         {
-            _organizer ??= await fixture.RegisterAndOnboardAsync(
+            _organizer ??= await fixture.SeedRegisteredUserAsync(
                 await fixture.NewContextAsync(), "guestorganizer", "Guest Organizer");
             return _organizer;
         }

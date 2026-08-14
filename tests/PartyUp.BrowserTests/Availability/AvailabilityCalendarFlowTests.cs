@@ -40,7 +40,7 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         await SetupLock.WaitAsync();
         try
         {
-            _organizer ??= await fixture.RegisterAndOnboardAsync(
+            _organizer ??= await fixture.SeedRegisteredUserAsync(
                 await fixture.NewContextAsync(), "calendarorganizer", "Calendar Organizer");
             return _organizer;
         }

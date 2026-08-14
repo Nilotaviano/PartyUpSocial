@@ -110,6 +110,43 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         Path.Combine(AppContext.BaseDirectory, "test-results");
 
     private static int _registrationCount;
+    private static int _seededPersonaCount;
+
+    /// <summary>
+    /// Every seeded persona presents itself to the API as its own client address.
+    /// <para>
+    /// The reason is <c>RateLimitPolicies.cs</c>'s <c>auth-ip</c> dimension: 20 sign-ins per 15
+    /// minutes per IP, covering <c>ConsumeMagicLink</c> — and unlike <c>register-ip</c> it has no
+    /// configuration override, so a lane that signs ~20 seeded personas in inside ten minutes would
+    /// sit right on the ceiling and 429 whichever ones lost the race. Pacing them apart is exactly
+    /// the wall-clock cost <see cref="SeedRegisteredUserAsync"/> exists to remove, and lowering the
+    /// ceiling is a production security control this lane must not touch. Distinct client addresses
+    /// give each persona its own partition instead, which is also what a real deployment sees:
+    /// twenty different people signing in are twenty different addresses, not one.
+    /// </para>
+    /// <para>
+    /// The spawned API is handed <c>Network:TrustedProxies</c> = loopback (both topologies) so
+    /// <c>UseForwardedHeaders</c> honours the header, and the address is set on the persona's whole
+    /// <see cref="IBrowserContext"/> rather than a single request — a per-request forgery is
+    /// impossible from page JavaScript (<c>X-Forwarded-For</c> is a forbidden fetch header) and a
+    /// persona whose sign-in and subsequent traffic disagreed about its own address would be a
+    /// stranger arrangement than either. The addresses come from RFC 5737's TEST-NET-1 documentation
+    /// range, which can never collide with a real client.
+    /// </para>
+    /// <para>
+    /// Accounts built by <see cref="RegisterAndOnboardAsync"/> deliberately do NOT get one: their
+    /// facts are about the registration surface, and <c>register-ip</c>'s shared budget plus
+    /// <see cref="SettleSharedRateLimitWindowBeforeRegistrationAsync"/>'s barrier are part of the
+    /// arrangement those tests already reason about.
+    /// </para>
+    /// </summary>
+    private static string NextSeededPersonaAddress()
+    {
+        int ordinal = Interlocked.Increment(ref _seededPersonaCount);
+        return string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"192.0.2.{ordinal % 254 + 1}");
+    }
 
     /// <summary>
     /// Round-1 fix, gate-driven (this ticket's own two-consecutive-clean-run requirement exposed
@@ -118,8 +155,10 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     /// shared across the whole collection — every class's traffic comes from the same loopback IP
     /// and counts against the same budget. Each registration (age gate → register → verify →
     /// onboarding) is by far the densest traffic a single test action produces here, and this
-    /// suite runs five of them (`AxeAuditTests` one, `SessionGuestFlowTests` one,
-    /// `SessionRegisteredFlowTests` three) close enough together — timed by nothing but how fast
+    /// suite still runs the ones whose facts are about registration itself (`AxeAuditTests`'s
+    /// organizer, `TourFlowTests`'s account — every other account is seeded in-process by
+    /// <see cref="SeedRegisteredUserAsync"/> and never reaches this path) close enough
+    /// together — timed by nothing but how fast
     /// Playwright can drive the UI, with no artificial pacing anywhere in the unmodified flow-test
     /// files — that two registrations' combined traffic can exceed 300 within whatever 60s window
     /// they land in. Confirmed by direct evidence: a captured 429 on `/api/v1/guest/{id}/session`,
@@ -156,6 +195,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     private string _pushVapidPublicKey = string.Empty;
     private string _pushVapidPrivateKey = string.Empty;
     private KillOnCloseJob? _job;
+    private SeededAccountFactory? _seededAccounts;
     private Process? _apiProcess;
     private Process? _webProcess;
     private PostgreSqlContainer? _postgresContainer;
@@ -207,7 +247,11 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
             InitializeLocalTopology();
         }
 
+        // After the topology has settled `_dbConnectionString`, and after the API's own startup
+        // migration has run (the readiness wait below is what proves that), so the seeding
+        // composition never races the schema.
         await WaitForHttpReadyAsync(ApiBaseUrl + "/health/live", TimeSpan.FromMinutes(3));
+        _seededAccounts = new SeededAccountFactory(_dbConnectionString, WebBaseUrl);
         if (!IsBuiltTopology)
         {
             await WaitForHttpReadyAsync(WebBaseUrl + "/", TimeSpan.FromMinutes(2));
@@ -283,6 +327,8 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
                 ["Database__MigrateOnStartup"] = "true",
                 ["Email__DropPath"] = _mailDropPath,
                 ["RateLimits__RegisterPerIpPerHour"] = RegisterPerIpPerHourOverride,
+                ["Network__TrustedProxies__0"] = "127.0.0.1",
+                ["Network__TrustedProxies__1"] = "::1",
                 ["ConnectionStrings__Db"] = _dbConnectionString,
                 ["Push__DispatchIntervalSeconds"] = PushDispatchIntervalSecondsOverride,
                 ["Push__Provider"] = "log",
@@ -354,6 +400,8 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
                 ["ConnectionStrings__Db"] = _dbConnectionString,
                 ["PublicBaseUrl"] = ApiBaseUrl,
                 ["RateLimits__RegisterPerIpPerHour"] = RegisterPerIpPerHourOverride,
+                ["Network__TrustedProxies__0"] = "127.0.0.1",
+                ["Network__TrustedProxies__1"] = "::1",
                 ["Push__DispatchIntervalSeconds"] = PushDispatchIntervalSecondsOverride,
                 ["Push__Provider"] = "log",
                 ["Push__DropPath"] = _pushDropPath,
@@ -636,6 +684,11 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         }
 
         _playwright?.Dispose();
+        if (_seededAccounts is not null)
+        {
+            await _seededAccounts.DisposeAsync();
+        }
+
         KillProcessTree(_webProcess);
         KillProcessTree(_apiProcess);
         if (_postgresContainer is not null)
@@ -681,6 +734,68 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     /// </summary>
     private const int NavigationTimeoutMs = 30000;
     private const int ActionTimeoutMs = 30000;
+
+    /// <summary>
+    /// The seeded counterpart of <see cref="RegisterAndOnboardAsync"/>, and the default for every
+    /// call site whose fact is not itself about registering: same signature, same
+    /// <see cref="RegisteredUser"/> (a page already at <c>/app</c>, authenticated, tour dismissed),
+    /// but the account is built in-process through the real Application-layer use cases
+    /// (<see cref="SeededAccountFactory"/>) instead of by driving the register/verify/onboard UI.
+    /// It therefore pays neither <see cref="SettleSharedRateLimitWindowBeforeRegistrationAsync"/>'s
+    /// 65-second barrier nor the multi-page wizard walk, and consumes no <c>register-ip</c> budget
+    /// at all.
+    /// <para>
+    /// The session itself is real: a <see cref="AuthTokenPurpose.MagicLink"/> token is minted for
+    /// the seeded user with <see cref="MintAuthTokenAsync"/> and redeemed by the shipped
+    /// <c>/auth/magic</c> screen in <paramref name="context"/>, so the browser ends up holding the
+    /// same <c>pu.auth</c>/<c>pu.csrf</c> cookies a real sign-in would have set — nothing about the
+    /// authenticated surface under test is faked. An onboarded account's redemption lands on
+    /// <c>/app</c> (`AuthScreens.tsx`'s `destination`), and its tour flag is already set, so no
+    /// first-login overlay leaks into the caller's first assertion.
+    /// </para>
+    /// <para>
+    /// The account's time zone is read from <paramref name="context"/> the same way the onboarding
+    /// wizard's time-zone step reads it (<c>Intl.DateTimeFormat().resolvedOptions().timeZone</c>),
+    /// so a seeded account renders times exactly as a UI-registered one on the same context would.
+    /// </para>
+    /// </summary>
+    public async Task<RegisteredUser> SeedRegisteredUserAsync(
+        IBrowserContext context,
+        string emailLocalPart,
+        string displayName)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        if (_seededAccounts is null)
+        {
+            throw new InvalidOperationException(
+                "The fixture has not been initialized; there is no database to seed into.");
+        }
+
+        // Same reason as RegisterAndOnboardAsync's: the dev Postgres this fixture points at is not
+        // reset between runs, so a fixed email/username would collide on a rerun.
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string email = $"{emailLocalPart}-{suffix}@partyup-browsertests.example";
+        string username = (emailLocalPart + suffix).ToLowerInvariant();
+
+        await context.SetExtraHTTPHeadersAsync(new Dictionary<string, string>
+        {
+            ["X-Forwarded-For"] = NextSeededPersonaAddress(),
+        });
+
+        IPage page = await context.NewPageAsync();
+        // `about:blank` already has a JS realm, and Playwright's timezone emulation applies to it —
+        // no navigation is needed just to ask the context what zone it is in.
+        string timeZoneId = await page.EvaluateAsync<string>(
+            "() => Intl.DateTimeFormat().resolvedOptions().timeZone");
+
+        Guid userId = await _seededAccounts.CreateAsync(email, username, displayName, timeZoneId);
+
+        string rawToken = await MintAuthTokenAsync(AuthTokenPurpose.MagicLink, userId);
+        await page.GotoAsync($"{WebBaseUrl}/auth/magic#token={rawToken}");
+        await page.WaitForURLAsync(url => url.EndsWith("/app", StringComparison.Ordinal));
+
+        return new RegisteredUser(page, username, displayName);
+    }
 
     /// <summary>
     /// Drives a brand-new registered account through the real magic-link-style flow the
