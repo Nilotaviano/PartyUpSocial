@@ -29,6 +29,15 @@ const AUTO_SCROLL_EDGE_PX = 48;
 const AUTO_SCROLL_STEP_PX = 16;
 const AUTO_SCROLL_TICK_MS = 60;
 
+const LONG_PRESS_MS = 380;
+
+/**
+ * A finger never holds perfectly still: only movement past this radius is a
+ * real scroll reclaiming the gesture from a pending long press. Cancelling on
+ * any movement at all would make the press impossible to hold on a touchscreen.
+ */
+const MOVE_CANCEL_PX = 10;
+
 export type Draft = {
   day: number;
   start: number;
@@ -100,7 +109,17 @@ export function WeekGrid({
   const [armed, setArmed] = useState(false); // long-press armed on touch
   const columnsRef = useRef<HTMLDivElement>(null);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchOrigin = useRef<{ x: number; y: number } | null>(null);
+  /**
+   * The committed range is read from here, never from `drag`: a pointermove's
+   * render can still be pending when the pointerup lands, so every mutation
+   * writes this ref in the same DOM event that queues the state update.
+   */
   const dragRef = useRef<Drag>(null);
+  const applyDrag = useCallback((next: Drag) => {
+    dragRef.current = next;
+    setDrag(next);
+  }, []);
 
   const totalMin = rangeEnd - rangeStart;
   const height = (totalMin / SLOT_MIN) * ROW_H;
@@ -130,7 +149,6 @@ export function WeekGrid({
   const onDraftCompleteRef = useRef(onDraftComplete);
   const onResizeRef = useRef(onResize);
   useEffect(() => {
-    dragRef.current = drag;
     onDraftCompleteRef.current = onDraftComplete;
     onResizeRef.current = onResize;
   });
@@ -148,14 +166,15 @@ export function WeekGrid({
         `[data-daycol="${dragRef.current && "day" in dragRef.current ? dragRef.current.day : ""}"]`,
       );
     const extendTo = (m: number) => {
-      setDrag((d) => {
-        if (!d) return d;
-        if (d.mode === "new") {
-          return { ...d, a: Math.min(d.anchor, m), b: Math.max(d.anchor, m) };
-        }
-        if (d.edge === "start") return { ...d, a: Math.min(m, d.b - SLOT_MIN) };
-        return { ...d, b: Math.max(m, d.a + SLOT_MIN) };
-      });
+      const d = dragRef.current;
+      if (!d) return;
+      if (d.mode === "new") {
+        applyDrag({ ...d, a: Math.min(d.anchor, m), b: Math.max(d.anchor, m) });
+      } else if (d.edge === "start") {
+        applyDrag({ ...d, a: Math.min(m, d.b - SLOT_MIN) });
+      } else {
+        applyDrag({ ...d, b: Math.max(m, d.a + SLOT_MIN) });
+      }
     };
     const move = (e: PointerEvent) => {
       const col = columnOf();
@@ -180,7 +199,7 @@ export function WeekGrid({
     }, AUTO_SCROLL_TICK_MS);
     const up = (e: PointerEvent) => {
       const d = dragRef.current;
-      setDrag(null);
+      applyDrag(null);
       setArmed(false);
       if (!d) return;
       if (d.mode === "new") {
@@ -199,12 +218,12 @@ export function WeekGrid({
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
     };
-  }, [dragging, yToMin]);
+  }, [applyDrag, dragging, yToMin]);
 
   const startPaint = (e: React.PointerEvent<HTMLDivElement>, day: number) => {
     const el = e.currentTarget;
     const m = yToMin(e.clientY, el);
-    setDrag({ mode: "new", day, anchor: m, a: m, b: m + SLOT_MIN });
+    applyDrag({ mode: "new", day, anchor: m, a: m, b: m + SLOT_MIN });
   };
 
   const onColumnPointerDown = (e: React.PointerEvent<HTMLDivElement>, day: number) => {
@@ -213,6 +232,7 @@ export function WeekGrid({
     const clientY = e.clientY;
     if (e.pointerType === "touch") {
       // finger drag must scroll the page — painting requires a long press
+      touchOrigin.current = { x: e.clientX, y: clientY };
       pressTimer.current = setTimeout(() => {
         setArmed(true);
         if (navigator.vibrate) navigator.vibrate(12);
@@ -222,8 +242,8 @@ export function WeekGrid({
           rangeEnd,
         );
         setLiveMessage(t("a11y.selectionStarted", { time: fmt(m) }));
-        setDrag({ mode: "new", day, anchor: m, a: m, b: m + 30 });
-      }, 380);
+        applyDrag({ mode: "new", day, anchor: m, a: m, b: m + 30 });
+      }, LONG_PRESS_MS);
       return;
     }
     onSelect(null);
@@ -233,6 +253,16 @@ export function WeekGrid({
   const cancelPress = () => {
     if (pressTimer.current) clearTimeout(pressTimer.current);
     pressTimer.current = null;
+    touchOrigin.current = null;
+  };
+
+  const onColumnPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const origin = touchOrigin.current;
+    if (!origin) {
+      cancelPress();
+      return;
+    }
+    if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > MOVE_CANCEL_PX) cancelPress();
   };
 
   const hours: number[] = [];
@@ -432,7 +462,7 @@ export function WeekGrid({
                 data-daycol={day}
                 onPointerDown={(e) => onColumnPointerDown(e, day)}
                 onPointerUp={cancelPress}
-                onPointerMove={cancelPress}
+                onPointerMove={onColumnPointerMove}
                 onContextMenu={(e) => e.preventDefault()}
                 className={cn(
                   "relative overflow-hidden rounded-2xl border bg-card select-none",
@@ -455,7 +485,7 @@ export function WeekGrid({
                     onSelect={() => onSelect(b.ruleId)}
                     onHandleDown={(edge, e) => {
                       e.stopPropagation();
-                      setDrag({
+                      applyDrag({
                         mode: "resize",
                         day,
                         ruleId: b.ruleId,
