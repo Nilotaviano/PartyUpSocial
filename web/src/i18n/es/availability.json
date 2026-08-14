@@ -169,7 +169,7 @@
     "deleteRuleTitle": "¿Eliminar esta regla semanal?",
     "deleteRuleBody": "{{rule}} se repite cada semana. Al eliminarla desaparece de todas las semanas futuras.",
     "deleteRule": "Eliminar regla",
-    "crew": "El grupo",
+    "crew": "Amigos",
     "bookedThisWeek": "Reservado esta semana",
     "openPoll": "Encuesta abierta · {{title}}",
     "legend": {

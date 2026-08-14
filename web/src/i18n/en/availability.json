@@ -169,7 +169,7 @@
     "deleteRuleTitle": "Delete this weekly rule?",
     "deleteRuleBody": "{{rule}} repeats every week. Deleting removes it from all future weeks.",
     "deleteRule": "Delete rule",
-    "crew": "The crew",
+    "crew": "Friends",
     "bookedThisWeek": "Booked this week",
     "openPoll": "Open poll · {{title}}",
     "legend": {

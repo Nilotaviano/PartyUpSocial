@@ -169,7 +169,7 @@
     "deleteRuleTitle": "Excluir esta regra semanal?",
     "deleteRuleBody": "{{rule}} se repete toda semana. Excluir remove a regra de todas as semanas futuras.",
     "deleteRule": "Excluir regra",
-    "crew": "A turma",
+    "crew": "Amigos",
     "bookedThisWeek": "Marcado esta semana",
     "openPoll": "Enquete aberta · {{title}}",
     "legend": {

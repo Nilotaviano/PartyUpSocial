@@ -134,9 +134,9 @@ function paintFromKeyboard(name: string) {
   fireEvent.keyDown(document.activeElement ?? cell, { key: 'Enter' })
 }
 
-/** The FriendsCard pill list: the crew heading's sibling <ul>, not UpNext's list. */
+/** The FriendsCard pill list: the Friends heading's sibling <ul>, not UpNext's list. */
 function crewList() {
-  const heading = screen.getAllByRole('heading', { name: /crew/i })[0]
+  const heading = screen.getAllByRole('heading', { name: /^friends$/i })[0]
   return heading.nextElementSibling as HTMLElement
 }
 
