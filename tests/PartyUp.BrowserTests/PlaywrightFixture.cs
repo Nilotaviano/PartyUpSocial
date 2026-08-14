@@ -127,11 +127,10 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     /// <para>
     /// The spawned API is handed <c>Network:TrustedProxies</c> = loopback (both topologies) so
     /// <c>UseForwardedHeaders</c> honours the header, and the address is set on the persona's whole
-    /// <see cref="IBrowserContext"/> rather than a single request — a per-request forgery is
-    /// impossible from page JavaScript (<c>X-Forwarded-For</c> is a forbidden fetch header) and a
-    /// persona whose sign-in and subsequent traffic disagreed about its own address would be a
-    /// stranger arrangement than either. The addresses come from RFC 5737's TEST-NET-1 documentation
-    /// range, which can never collide with a real client.
+    /// <see cref="IBrowserContext"/> rather than a single request, so the persona's sign-in and all
+    /// of its subsequent traffic agree about its address — one persona, one client IP, exactly as a
+    /// real user presents. The addresses come from RFC 5737's TEST-NET-1 documentation range, which
+    /// can never collide with a real client.
     /// </para>
     /// <para>
     /// Accounts built by <see cref="RegisterAndOnboardAsync"/> deliberately do NOT get one: their
