@@ -8,7 +8,7 @@ import { avatarImgUrl } from '../friends/avatarImage'
 import { getViewerProfile, viewerProfileKey } from '../sessions/sessionQueries'
 
 const itemClasses =
-  'flex min-h-11 cursor-pointer items-center rounded-md px-3 py-2 font-body text-body text-ink outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-ink data-[disabled]:pointer-events-none data-[disabled]:opacity-50'
+  'flex min-h-11 cursor-pointer items-center rounded-[0.375rem] px-3 py-2 font-body text-body text-ink outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-ink data-[disabled]:pointer-events-none data-[disabled]:opacity-50'
 
 /**
  * D-183: the app chrome's trailing account menu. The trigger doubles as the D-182 tour's eighth

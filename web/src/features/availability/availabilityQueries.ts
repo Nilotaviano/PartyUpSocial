@@ -21,7 +21,7 @@ export type OverlapWindowView = components['schemas']['OverlapWindowView']
 
 /**
  * Every availability query key lives here — S6-exclusive (design §10.1).
- * Layer toggles (CalendarLayers) are component state and never enter a key
+ * Layer visibility is component state and never enters a key
  * (D-135); ['calendar', from, to] carries every layer for one range so the
  * week grid and agenda never disagree mid-render (§5.1).
  */

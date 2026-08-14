@@ -4,6 +4,7 @@
   },
   "calendar": {
     "heading": "Calendario",
+    "viewSwitcher": "Vista del calendario",
     "week": "Semana",
     "agenda": "Agenda",
     "previousWeek": "Semana anterior",
@@ -148,6 +149,58 @@
       "invalid_range": "Ese rango de fechas no es válido.",
       "range_too_large": "Elige un rango de fechas más corto.",
       "occurrence_not_found": "No se encontró esa ocurrencia."
+    }
+  },
+  "lovable": {
+    "weekOf": "Semana del {{range}} · cuartel de la noche de juegos",
+    "myAvailability": "Mi disponibilidad",
+    "summaryLine": "{{windows}} ventanas · {{hours}} h esta semana",
+    "showEarly": "Mostrar 00:00–08:00",
+    "hideEarly": "Ocultar 00:00–08:00",
+    "paintHint": "Arrastra en la cuadrícula para pintar · mantén pulsado en táctil",
+    "dayPagerRange": "{{start}} – {{end}} · desliza la tira",
+    "earlierDays": "Días anteriores",
+    "laterDays": "Días posteriores",
+    "panelHint": "Arrastra en la cuadrícula para pintar una nueva ventana.",
+    "free": "Libre",
+    "maybe": "Quizás",
+    "editWindow": "Editar ventana",
+    "deleteWindow": "Eliminar ventana",
+    "deleteRuleTitle": "¿Eliminar esta regla semanal?",
+    "deleteRuleBody": "{{rule}} se repite cada semana. Al eliminarla desaparece de todas las semanas futuras.",
+    "deleteRule": "Eliminar regla",
+    "crew": "El grupo",
+    "bookedThisWeek": "Reservado esta semana",
+    "openPoll": "Encuesta abierta · {{title}}",
+    "legend": {
+      "heading": "Leyenda",
+      "free": "Libre (tú)",
+      "freeNote": "banda sólida",
+      "maybe": "Quizás (tú)",
+      "maybeNote": "banda discontinua",
+      "friend": "Amigo libre",
+      "friendNote": "ficha de avatar",
+      "session": "Sesión reservada",
+      "sessionNote": "píldora sólida 🎮",
+      "poll": "Opción de encuesta",
+      "pollNote": "píldora discontinua ?"
+    },
+    "grid": {
+      "weekly": "semanal",
+      "oneTime": "una vez",
+      "inCount_one": "{{count}} dentro",
+      "inCount_other": "{{count}} dentro",
+      "pollPill": "encuesta · {{vote}}"
+    },
+    "upNext": {
+      "yourVote": "tu voto: {{vote}}",
+      "noVote": "sin voto aún"
+    },
+    "toast": {
+      "savedOnce": "Disponibilidad única guardada · {{day}} {{range}}",
+      "savedWeekly": "Disponibilidad semanal guardada · {{day}} {{range}}",
+      "updated": "Ventana actualizada · {{range}}",
+      "deleted": "Eliminado · {{rule}}"
     }
   }
 }

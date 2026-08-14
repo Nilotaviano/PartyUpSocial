@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next'
  */
 
 const itemBaseClasses =
-  'group flex min-h-11 cursor-pointer select-none flex-col justify-center gap-0.5 rounded-md px-3 py-2 font-body text-body outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50'
+  'group flex min-h-11 cursor-pointer select-none flex-col justify-center gap-0.5 rounded-[0.375rem] px-3 py-2 font-body text-body outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50'
 
 const itemToneClasses = {
   standard: 'text-ink data-[highlighted]:bg-accent data-[highlighted]:text-accent-ink',

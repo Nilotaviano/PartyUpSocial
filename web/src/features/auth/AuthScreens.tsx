@@ -346,7 +346,7 @@ export function Welcome() {
             ].map((fill, index) => (
               <span
                 key={index}
-                className={`h-7 rounded-sm border border-ink/15 ${fill} ${
+                className={`h-7 rounded-[0.25rem] border border-ink/15 ${fill} ${
                   index === 6 || index === 11 ? 'ring-2 ring-ink ring-inset' : ''
                 }`}
               />

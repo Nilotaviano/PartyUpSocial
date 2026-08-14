@@ -24,7 +24,7 @@ import {
   Welcome,
 } from './features/auth/AuthScreens'
 import { FindATimePage } from './features/availability/FindATimePage'
-import { WeekGridPage } from './features/availability/WeekGridPage'
+import { CalendarShell } from './features/availability/lovable/CalendarShell'
 import { DiscoverPage } from './features/discover/DiscoverPage'
 import { AddFriendPage } from './features/friends/AddFriendPage'
 import { FriendsPage } from './features/friends/FriendsPage'
@@ -251,8 +251,8 @@ function App() {
         <Route element={<RequireOnboarded />}>
           <Route element={<AuthenticatedShell />}>
             <Route path="/app" element={<HomePage />} />
-            <Route path="/calendar" element={<WeekGridPage />} />
-            <Route path="/calendar/agenda" element={<WeekGridPage />} />
+            <Route path="/calendar" element={<CalendarShell />} />
+            <Route path="/calendar/agenda" element={<CalendarShell />} />
             <Route path="/find-a-time" element={<FindATimePage />} />
             <Route path="/discover" element={<DiscoverPage />} />
             <Route path="/friends" element={<FriendsPage />} />

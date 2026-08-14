@@ -20,6 +20,20 @@ export default defineConfig([
     },
   },
   {
+    // The two shadcn/ui primitives the calendar port carries keep their
+    // upstream shape: `use-mobile` reads the viewport in an effect (there is
+    // no render-safe source for it) and `button` exports its variant recipe
+    // beside the component.
+    files: [
+      'src/features/availability/lovable/use-mobile.tsx',
+      'src/features/availability/lovable/ui/button.tsx',
+    ],
+    rules: {
+      'react-hooks/set-state-in-effect': 'off',
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
     // Mirrors openapi-typescript's own output shape for a spec with no paths
     // yet, so `npm run gen:api` can overwrite this placeholder without the
     // file shape changing.

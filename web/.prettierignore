@@ -3,3 +3,7 @@ coverage
 
 # Regenerated verbatim by `npm run gen:api`; formatting it only creates churn.
 src/api/schema.d.ts
+
+# Ported from the Lovable design source and kept in its upstream formatting so
+# the two trees stay diffable against each other.
+src/features/availability/lovable

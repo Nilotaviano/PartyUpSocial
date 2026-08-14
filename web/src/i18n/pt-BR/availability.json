@@ -4,6 +4,7 @@
   },
   "calendar": {
     "heading": "Calendário",
+    "viewSwitcher": "Modo de exibição do calendário",
     "week": "Semana",
     "agenda": "Agenda",
     "previousWeek": "Semana anterior",
@@ -148,6 +149,58 @@
       "invalid_range": "Esse intervalo de datas não é válido.",
       "range_too_large": "Escolha um intervalo de datas mais curto.",
       "occurrence_not_found": "Essa ocorrência não foi encontrada."
+    }
+  },
+  "lovable": {
+    "weekOf": "Semana de {{range}} · QG da noite de jogos",
+    "myAvailability": "Minha disponibilidade",
+    "summaryLine": "{{windows}} janelas · {{hours}}h esta semana",
+    "showEarly": "Mostrar 00:00–08:00",
+    "hideEarly": "Ocultar 00:00–08:00",
+    "paintHint": "Arraste na grade para pintar · toque longo no celular",
+    "dayPagerRange": "{{start}} – {{end}} · deslize a faixa",
+    "earlierDays": "Dias anteriores",
+    "laterDays": "Dias seguintes",
+    "panelHint": "Arraste na grade para pintar uma nova janela.",
+    "free": "Livre",
+    "maybe": "Talvez",
+    "editWindow": "Editar janela",
+    "deleteWindow": "Excluir janela",
+    "deleteRuleTitle": "Excluir esta regra semanal?",
+    "deleteRuleBody": "{{rule}} se repete toda semana. Excluir remove a regra de todas as semanas futuras.",
+    "deleteRule": "Excluir regra",
+    "crew": "A turma",
+    "bookedThisWeek": "Marcado esta semana",
+    "openPoll": "Enquete aberta · {{title}}",
+    "legend": {
+      "heading": "Legenda",
+      "free": "Livre (você)",
+      "freeNote": "faixa sólida",
+      "maybe": "Talvez (você)",
+      "maybeNote": "faixa tracejada",
+      "friend": "Amigo livre",
+      "friendNote": "ficha de avatar",
+      "session": "Sessão marcada",
+      "sessionNote": "pílula sólida 🎮",
+      "poll": "Opção de enquete",
+      "pollNote": "pílula tracejada ?"
+    },
+    "grid": {
+      "weekly": "semanal",
+      "oneTime": "uma vez",
+      "inCount_one": "{{count}} dentro",
+      "inCount_other": "{{count}} dentro",
+      "pollPill": "enquete · {{vote}}"
+    },
+    "upNext": {
+      "yourVote": "seu voto: {{vote}}",
+      "noVote": "sem voto ainda"
+    },
+    "toast": {
+      "savedOnce": "Disponibilidade única salva · {{day}} {{range}}",
+      "savedWeekly": "Disponibilidade semanal salva · {{day}} {{range}}",
+      "updated": "Janela atualizada · {{range}}",
+      "deleted": "Excluído · {{rule}}"
     }
   }
 }

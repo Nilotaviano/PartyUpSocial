@@ -22,7 +22,7 @@ afterEach(() => {
 describe('AgendaView', () => {
   it('renders the chronological agenda over the same range as the week grid_D104', () => {
     // Deliberately out of chronological order and spanning the same range
-    // the week grid would show (WeekGridPage feeds both from one
+    // the week grid would show (CalendarShell feeds both from one
     // `GET /calendar` response, never a second fetch).
     const entries: AgendaEntry[] = [
       {

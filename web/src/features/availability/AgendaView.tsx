@@ -16,7 +16,7 @@ type AgendaViewProps = {
 
 /**
  * D-104: the chronological view of the identical range the week grid shows
- * — same `calendar.data`, sorted, not re-fetched (WeekGridPage feeds both
+ * — same `calendar.data`, sorted, not re-fetched (CalendarShell feeds both
  * from the one `GET /calendar` response).
  */
 export function AgendaView({ entries, dateLabelFormatter, timeLabelFormatter }: AgendaViewProps) {

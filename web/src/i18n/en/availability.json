@@ -4,6 +4,7 @@
   },
   "calendar": {
     "heading": "Calendar",
+    "viewSwitcher": "Calendar view",
     "week": "Week",
     "agenda": "Agenda",
     "previousWeek": "Previous week",
@@ -148,6 +149,58 @@
       "invalid_range": "That date range is not valid.",
       "range_too_large": "Choose a shorter date range.",
       "occurrence_not_found": "That occurrence could not be found."
+    }
+  },
+  "lovable": {
+    "weekOf": "Week of {{range}} · game night HQ",
+    "myAvailability": "My availability",
+    "summaryLine": "{{windows}} windows · {{hours}}h this week",
+    "showEarly": "Show 00:00–08:00",
+    "hideEarly": "Hide 00:00–08:00",
+    "paintHint": "Drag on the grid to paint · long-press on touch",
+    "dayPagerRange": "{{start}} – {{end}} · swipe the strip",
+    "earlierDays": "Earlier days",
+    "laterDays": "Later days",
+    "panelHint": "Drag on the grid to paint a new window.",
+    "free": "Free",
+    "maybe": "Maybe",
+    "editWindow": "Edit window",
+    "deleteWindow": "Delete window",
+    "deleteRuleTitle": "Delete this weekly rule?",
+    "deleteRuleBody": "{{rule}} repeats every week. Deleting removes it from all future weeks.",
+    "deleteRule": "Delete rule",
+    "crew": "The crew",
+    "bookedThisWeek": "Booked this week",
+    "openPoll": "Open poll · {{title}}",
+    "legend": {
+      "heading": "Legend",
+      "free": "Free (you)",
+      "freeNote": "solid band",
+      "maybe": "Maybe (you)",
+      "maybeNote": "dashed band",
+      "friend": "Friend free",
+      "friendNote": "avatar chip",
+      "session": "Booked session",
+      "sessionNote": "solid pill 🎮",
+      "poll": "Poll option",
+      "pollNote": "dashed pill ?"
+    },
+    "grid": {
+      "weekly": "weekly",
+      "oneTime": "one-time",
+      "inCount_one": "{{count}} in",
+      "inCount_other": "{{count}} in",
+      "pollPill": "poll · {{vote}}"
+    },
+    "upNext": {
+      "yourVote": "your vote: {{vote}}",
+      "noVote": "no vote yet"
+    },
+    "toast": {
+      "savedOnce": "One-time availability saved · {{day}} {{range}}",
+      "savedWeekly": "Weekly availability saved · {{day}} {{range}}",
+      "updated": "Window updated · {{range}}",
+      "deleted": "Deleted · {{rule}}"
     }
   }
 }
