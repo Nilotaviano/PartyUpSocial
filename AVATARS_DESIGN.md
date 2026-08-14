@@ -97,7 +97,13 @@ Guest poll rows carry **no avatar at all**. `PollRosterEntryResponse` is shared 
 `GuestPollContracts.cs:41,64`, and `GuestPollReadUseCases` builds every row unmasked by
 construction (D-150) — guests sit outside the visibility engine, and a guest link has no expiry.
 
-`MaskedParticipant` stays excluded and is unchanged; it was never the leak vector.
+`MaskedParticipant` carries an optional `avatar` on exactly one condition: the composing endpoint
+resolved the person from the viewer's own accepted-friend set, which is the calendar friend layer
+(`CalendarEndpoints`, `AvailabilityEndpoints`). `MaskedParticipantAssigner.For` is the single place
+the masking decision is taken, and it drops the avatar whenever the display name is null — the two
+identity channels stand or fall together, and the field is omitted from the JSON rather than written
+as null. Every other composer (session organizer, join-request requester, considered friends)
+supplies no avatar and keeps the ordinal-only shape.
 
 Each masked surface gains a `_D188`/`_D076` test asserting the avatar key is **absent**, not
 null. The shipped masking tests (`SessionRosterMaskingWireTests.cs:80-94`,
@@ -221,7 +227,7 @@ does not delay it; otherwise its own wave. Nothing else depends on it.
   `SteamUnmatchedFriendResponse` carve-out.
 - `_D192` — `BlockedUserResponse` carries no avatar property.
 - `_D188`/`_D076` — the avatar key is **absent** on every masked roster row, on every guest poll
-  row, and on `MaskedParticipant`.
+  row, and on every masked `MaskedParticipant`.
 - Capture rejects SVG, oversize bodies, off-allowlist hosts and redirects.
 - The proxy returns an identical 404 for unknown token, deleted source and missing bytes.
 - `FriendPathLogSanitizer` rewrites the proxy path.

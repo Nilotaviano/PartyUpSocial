@@ -66,9 +66,10 @@ public static class CalendarEndpoints
 
         IReadOnlyList<AcceptedFriendProjection> accepted =
             await friendships.ListAcceptedAsync(actorId.Value, cancellationToken);
-        Dictionary<UserId, DisplayName?> names = accepted.ToDictionary(
-            friend => friend.Counterpart.Id, friend => friend.Counterpart.DisplayName);
-        var ordinals = new MaskedParticipantAssigner(names);
+        Dictionary<UserId, KnownParticipant> known = accepted.ToDictionary(
+            friend => friend.Counterpart.Id,
+            friend => new KnownParticipant(friend.Counterpart.DisplayName, friend.Counterpart.Avatar));
+        var ordinals = new MaskedParticipantAssigner(known);
 
         // One shared assigner for the whole response — a friend-availability owner who is also a
         // visible session's organizer gets one ordinal, not two.

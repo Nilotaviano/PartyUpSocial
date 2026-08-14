@@ -15,7 +15,12 @@ namespace PartyUp.Api.IntegrationTests.Availability;
 [Trait("Category", "Integration")]
 public sealed class CalendarEndpointTests : IAsyncLifetime, IDisposable
 {
-    private static readonly string[] ExpectedOwnerProperties = ["displayName", "ordinal"];
+    /// <summary>
+    /// D-188: a readable friend-availability owner carries all three — the ordinal, the name, and the
+    /// avatar the calendar's crew list renders. A masked owner would carry the first two only
+    /// (<see cref="MaskedParticipantAvatarTests"/>).
+    /// </summary>
+    private static readonly string[] ExpectedOwnerProperties = ["avatar", "displayName", "ordinal"];
 
     private readonly PartyUpApiFactory _factory = new();
 
@@ -65,6 +70,46 @@ public sealed class CalendarEndpointTests : IAsyncLifetime, IDisposable
             string[] ownerProperties = [.. owner.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal)];
             Assert.Equal(ExpectedOwnerProperties, ownerProperties);
         }
+    }
+
+    /// <summary>
+    /// D-188 on the calendar's friend layer: the crew list renders a face, so a readable owner's avatar
+    /// arrives with the layer rather than costing a per-friend round trip. Seeded users carry
+    /// <c>Avatar.FromEmoji("🙂")</c> (PartyUpApiFactory.SeedUserAsync).
+    /// </summary>
+    [Fact]
+    public async Task FriendLayerOwnersCarryTheirAvatar_D188()
+    {
+        UserId viewerId = await _factory.SeedUserAsync(email: $"cal-av-viewer-{Guid.NewGuid():N}@example.test");
+        UserId friendId = await _factory.SeedUserAsync(email: $"cal-av-friend-{Guid.NewGuid():N}@example.test");
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, viewerId, friendId);
+
+        using SessionHttpSession friendSession = await SessionEndpointTestSupport.SignInAsync(_factory, friendId);
+        Instant blockStart = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await friendSession.SendUnsafeAsync(
+                HttpMethod.Post,
+                "/api/v1/me/availability/blocks",
+                JsonContent.Create(new
+                {
+                    startTime = Iso(blockStart),
+                    endTime = Iso(blockStart + Duration.FromHours(2)),
+                }))).StatusCode);
+
+        using SessionHttpSession viewerSession = await SessionEndpointTestSupport.SignInAsync(_factory, viewerId);
+        Instant from = _factory.Clock.GetCurrentInstant();
+        Instant to = from + Duration.FromDays(7);
+        using JsonDocument body = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await viewerSession.GetAsync(
+                $"/api/v1/calendar?from={Uri.EscapeDataString(Iso(from))}&to={Uri.EscapeDataString(Iso(to))}"));
+
+        JsonElement owner = body.RootElement.GetProperty("friendAvailability").EnumerateArray()
+            .Single().GetProperty("owner");
+        Assert.False(owner.GetProperty("displayName").ValueKind == JsonValueKind.Null);
+        JsonElement avatar = owner.GetProperty("avatar");
+        Assert.Equal("emoji", avatar.GetProperty("kind").GetString());
+        Assert.False(string.IsNullOrEmpty(avatar.GetProperty("emoji").GetString()));
     }
 
     /// <summary>

@@ -16,6 +16,7 @@ import { segmentItemClasses } from "../../../components/ui/classes";
 import { useToast } from "../../../components/ui/toastStore";
 import { AgendaView, type AgendaEntry } from "../AgendaView";
 import { OccurrenceScopeDialog, type OccurrenceScope } from "../OccurrenceScopeDialog";
+import { AvatarDisc } from "../../friends/AvatarDisc";
 import { getViewerProfile, viewerProfileKey } from "../../sessions/sessionQueries";
 import {
   availabilityKeys,
@@ -815,27 +816,27 @@ function Legend() {
     {
       label: t("lovable.legend.free"),
       cls: "bg-free border-free-foreground/30",
-      note: t("lovable.legend.freeNote"),
+      glyph: null,
     },
     {
       label: t("lovable.legend.maybe"),
       cls: "bg-maybe border-dashed border-maybe-foreground/50",
-      note: t("lovable.legend.maybeNote"),
+      glyph: null,
     },
     {
       label: t("lovable.legend.friend"),
       cls: "bg-chip-1 border-border rounded-full",
-      note: t("lovable.legend.friendNote"),
+      glyph: null,
     },
     {
       label: t("lovable.legend.session"),
       cls: "bg-accent border-foreground/70",
-      note: t("lovable.legend.sessionNote"),
+      glyph: "🎮",
     },
     {
       label: t("lovable.legend.poll"),
       cls: "bg-card border-dashed border-foreground/50",
-      note: t("lovable.legend.pollNote"),
+      glyph: "?",
     },
   ];
   return (
@@ -844,9 +845,16 @@ function Legend() {
       <ul className="mt-2 space-y-1.5">
         {items.map((i) => (
           <li key={i.label} className="flex items-center gap-2 text-[12px]">
-            <span className={cn("size-4 shrink-0 rounded-[5px] border-2", i.cls)} />
+            <span
+              aria-hidden="true"
+              className={cn(
+                "grid size-4 shrink-0 place-items-center rounded-[5px] border-2 text-[8px] leading-none font-bold",
+                i.cls,
+              )}
+            >
+              {i.glyph}
+            </span>
             <span className="min-w-0 truncate font-semibold">{i.label}</span>
-            <span className="ml-auto shrink-0 text-muted-foreground">{i.note}</span>
           </li>
         ))}
       </ul>
@@ -875,14 +883,15 @@ function FriendsCard({
         {friends.map((f) => (
           <li
             key={f.id}
-            className="flex items-center gap-1.5 rounded-full border border-border bg-background py-1 pr-2.5 pl-1"
+            className="flex items-center gap-1.5 rounded-full border border-border bg-background py-0.5 pr-2.5 pl-0.5"
           >
-            <span
-              className="grid size-6 place-items-center rounded-full text-[10px] font-bold text-background"
-              style={{ background: `var(--chip-${f.chip})` }}
-            >
-              {f.initials}
-            </span>
+            <AvatarDisc
+              seed={f.id}
+              emoji={f.emoji}
+              imgUrl={f.imgUrl}
+              masked={f.masked}
+              size="xs"
+            />
             <span className="text-[12px] font-semibold">{f.name.split(" ")[0]}</span>
           </li>
         ))}

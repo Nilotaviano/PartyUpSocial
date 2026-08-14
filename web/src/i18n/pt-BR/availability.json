@@ -175,15 +175,10 @@
     "legend": {
       "heading": "Legenda",
       "free": "Livre (você)",
-      "freeNote": "faixa sólida",
       "maybe": "Talvez (você)",
-      "maybeNote": "faixa tracejada",
       "friend": "Amigo livre",
-      "friendNote": "ficha de avatar",
       "session": "Sessão marcada",
-      "sessionNote": "pílula sólida 🎮",
-      "poll": "Opção de enquete",
-      "pollNote": "pílula tracejada ?"
+      "poll": "Opção de enquete"
     },
     "grid": {
       "weekly": "semanal",

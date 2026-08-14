@@ -38,6 +38,16 @@ export type Friend = {
   name: string;
   initials: string;
   chip: 1 | 2 | 3 | 4 | 5;
+  /** D-188 avatar glyph; null for a picture avatar and for a masked owner. */
+  emoji: string | null;
+  /** D-191 proxy URL, never an upstream one; null unless the avatar is external. */
+  imgUrl: string | null;
+  /**
+   * D-076: the owner arrived without a readable display name, so the disc renders
+   * the neutral masked treatment. The server already withholds the avatar here —
+   * this flag keeps the client from inventing one from the anonymous label.
+   */
+  masked: boolean;
   windows: { day: number; start: number; end: number; intent: "free" | "maybe" }[];
 };
 

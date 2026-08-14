@@ -175,15 +175,10 @@
     "legend": {
       "heading": "Legend",
       "free": "Free (you)",
-      "freeNote": "solid band",
       "maybe": "Maybe (you)",
-      "maybeNote": "dashed band",
       "friend": "Friend free",
-      "friendNote": "avatar chip",
       "session": "Booked session",
-      "sessionNote": "solid pill 🎮",
-      "poll": "Poll option",
-      "pollNote": "dashed pill ?"
+      "poll": "Poll option"
     },
     "grid": {
       "weekly": "weekly",

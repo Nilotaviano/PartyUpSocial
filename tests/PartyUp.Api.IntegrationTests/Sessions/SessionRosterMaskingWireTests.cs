@@ -142,10 +142,11 @@ public sealed class SessionRosterMaskingWireTests : IAsyncLifetime, IDisposable
     }
 
     /// <summary>
-    /// AVATARS_DESIGN.md §2.4/§5 (D-188/D-076): MaskedParticipant stays excluded from the fan-out. It
-    /// is the ordinal-plus-optional-name shape a viewer gets for someone they may not see, and a face
-    /// there would defeat the ordinal that exists in its place. This pins the omission on the
-    /// session-list organizer so a later wave cannot quietly add one.
+    /// AVATARS_DESIGN.md §2.4/§5 (D-188/D-076): a <c>MaskedParticipant</c> carries an avatar only where
+    /// its composer resolved one from the viewer's own friend set — the calendar's friend layer. The
+    /// session-list organizer is composed through the caller-resolved overload, which offers no avatar:
+    /// an unattached organizer is a stranger to the viewer, and a face there would defeat the ordinal
+    /// that exists in its place. This pins the omission so a later wave cannot quietly add one.
     /// </summary>
     [Fact]
     public async Task TheSessionListOrganizerMaskedParticipantCarriesNoAvatar_D188_D076()

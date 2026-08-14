@@ -63,9 +63,14 @@ function calendarResponse() {
     },
     friendAvailability: [
       {
-        owner: { ordinal: 1, displayName: 'Mika Ortega' },
+        owner: {
+          ordinal: 1,
+          displayName: 'Mika Ortega',
+          avatar: { kind: 'emoji', emoji: '🦊', avatarSourceId: null, imgUrl: null },
+        },
         ranges: [{ start: '2026-08-11T20:00:00Z', end: '2026-08-11T23:00:00Z' }],
       },
+      // D-076: the server withholds the avatar wherever it withholds the name.
       { owner: { ordinal: 2, displayName: null }, ranges: [] },
     ],
     sessions: [
@@ -127,6 +132,12 @@ function paintFromKeyboard(name: string) {
   fireEvent.keyDown(cell, { key: 'Enter' })
   fireEvent.keyDown(cell, { key: 'ArrowDown', shiftKey: true })
   fireEvent.keyDown(document.activeElement ?? cell, { key: 'Enter' })
+}
+
+/** The FriendsCard pill list: the crew heading's sibling <ul>, not UpNext's list. */
+function crewList() {
+  const heading = screen.getAllByRole('heading', { name: /crew/i })[0]
+  return heading.nextElementSibling as HTMLElement
 }
 
 async function waitForCalendar() {
@@ -414,6 +425,34 @@ describe('CalendarShell', () => {
 
     // One fetch carried all of it.
     expect(api.get.mock.calls.filter((c) => c[0] === '/api/v1/calendar')).toHaveLength(1)
+  })
+
+  it('renders an avatar disc per crew member, decoration only_D188', async () => {
+    renderShell()
+    await waitForCalendar()
+
+    const crew = crewList()
+    const named = within(crew).getByText('Mika').closest('li')!
+    // The disc is aria-hidden decoration beside the name, never the pill's label.
+    expect(named).toHaveTextContent('🦊')
+    expect(named.querySelector('[aria-hidden="true"]')).toHaveTextContent('🦊')
+    expect(within(crew).queryByRole('img')).toBeNull()
+  })
+
+  it('renders the masked crew member as a neutral disc that leaks no emoji_D188_D076', async () => {
+    renderShell()
+    await waitForCalendar()
+
+    const crew = crewList()
+    const masked = within(crew).getByText('Anonymous').closest('li')!
+    // The server sends no avatar for a masked owner, and the client invents none:
+    // the neutral '●' placeholder, never the named friend's glyph.
+    expect(masked).toHaveTextContent('●')
+    expect(masked).not.toHaveTextContent('🦊')
+    expect(masked.querySelector('img')).toBeNull()
+    // The busy fill is reachable only through AvatarDisc's `masked` arm, so this
+    // pins the masking decision rather than an incidentally empty avatar.
+    expect(masked.querySelector('[aria-hidden="true"]')).toHaveClass('bg-busy')
   })
 
   it('renders the agenda over the same range as the week grid, from the same fetch_D104', async () => {

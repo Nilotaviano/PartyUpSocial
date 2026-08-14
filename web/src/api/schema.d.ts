@@ -2476,6 +2476,7 @@ export interface components {
             /** Format: int32 */
             ordinal: number | string;
             displayName: null | string;
+            avatar?: null | components["schemas"]["AvatarResponse"];
         };
         MyAvailabilityLayerResponse: {
             occurrences: components["schemas"]["MyAvailabilityOccurrenceView"][];

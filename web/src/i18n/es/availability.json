@@ -175,15 +175,10 @@
     "legend": {
       "heading": "Leyenda",
       "free": "Libre (tú)",
-      "freeNote": "banda sólida",
       "maybe": "Quizás (tú)",
-      "maybeNote": "banda discontinua",
       "friend": "Amigo libre",
-      "friendNote": "ficha de avatar",
       "session": "Sesión reservada",
-      "sessionNote": "píldora sólida 🎮",
-      "poll": "Opción de encuesta",
-      "pollNote": "píldora discontinua ?"
+      "poll": "Opción de encuesta"
     },
     "grid": {
       "weekly": "semanal",

@@ -136,9 +136,10 @@ public static class AvailabilityEndpoints
     {
         IReadOnlyList<AcceptedFriendProjection> accepted =
             await friendships.ListAcceptedAsync(viewerId, cancellationToken);
-        Dictionary<UserId, DisplayName?> names = accepted.ToDictionary(
-            friend => friend.Counterpart.Id, friend => friend.Counterpart.DisplayName);
-        return new MaskedParticipantAssigner(names);
+        Dictionary<UserId, KnownParticipant> known = accepted.ToDictionary(
+            friend => friend.Counterpart.Id,
+            friend => new KnownParticipant(friend.Counterpart.DisplayName, friend.Counterpart.Avatar));
+        return new MaskedParticipantAssigner(known);
     }
 
     private static async Task<UserId?> ActorIdAsync(

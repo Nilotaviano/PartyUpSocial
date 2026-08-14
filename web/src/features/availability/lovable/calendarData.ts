@@ -149,11 +149,17 @@ export function mapCalendar(
   const friends: Friend[] = (view?.friendAvailability ?? []).map((entry) => {
     const ordinal = Number(entry.owner.ordinal)
     const name = entry.owner.displayName ?? labels.anonymousFriend
+    // D-076: a null display name is the wire's masking signal. The server already
+    // withholds the avatar on that same row, so this only mirrors the decision.
+    const masked = entry.owner.displayName == null
     return {
       id: `friend-${ordinal}`,
       name,
       initials: initialsOf(entry.owner.displayName),
       chip: chipOf(ordinal),
+      emoji: masked ? null : (entry.owner.avatar?.emoji ?? null),
+      imgUrl: masked ? null : (entry.owner.avatar?.imgUrl ?? null),
+      masked,
       windows: entry.ranges.flatMap((range) =>
         segmentsInWeek(
           instantToFakeLocal(range.start, timeZone),

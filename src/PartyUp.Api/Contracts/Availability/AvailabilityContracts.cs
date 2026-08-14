@@ -1,9 +1,11 @@
 using System.Text.Json.Serialization;
 using NodaTime;
 using NodaTime.Text;
+using PartyUp.Api.Endpoints;
 using PartyUp.Application.Availability;
 using PartyUp.Domain.Availability;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Users;
 
 namespace PartyUp.Api.Contracts.Availability;
 
@@ -76,9 +78,26 @@ public static class AvailabilityWireFormat
 /// PHASE5_DESIGN.md §8.1: the wire shape of every person Phase 5 renders. <see cref="Ordinal"/> is
 /// 0-based, assigned within one response, and per-person-stable inside that response only — meaningless
 /// across responses. Carries no user id, ever.
+/// <para>
+/// AVATARS_DESIGN.md §2.4/§5 (D-188/D-076): <see cref="Avatar"/> travels on exactly the same terms as
+/// <see cref="DisplayName"/> — a caller that cannot resolve a readable name supplies no avatar either,
+/// and <see cref="MaskedParticipantAssigner.For(UserId, DisplayName?, Avatar?)"/> drops it structurally
+/// when the name is null. It is omitted from the JSON rather than written as null, so a masked person
+/// is byte-indistinguishable from one whose caller never had an avatar to offer.
+/// </para>
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record MaskedParticipant(int Ordinal, string? DisplayName);
+public sealed record MaskedParticipant(
+    int Ordinal,
+    string? DisplayName,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AvatarResponse? Avatar = null);
+
+/// <summary>
+/// What a <see cref="MaskedParticipantAssigner"/> can resolve for itself about one person in the
+/// viewer's friend set. Both members are optional and travel together: a caller with no readable
+/// <see cref="DisplayName"/> also has no <see cref="Avatar"/> to offer (AVATARS_DESIGN.md §2.4).
+/// </summary>
+public readonly record struct KnownParticipant(DisplayName? DisplayName, Avatar? Avatar);
 
 /// <summary>
 /// Assigns 0-based ordinals to distinct people within one response, stable for the lifetime of this
@@ -90,22 +109,24 @@ public sealed record MaskedParticipant(int Ordinal, string? DisplayName);
 /// inherited row's absent <c>organizerId</c> against a friend-layer owner must never conclude they
 /// were the same person).
 /// </summary>
-public sealed class MaskedParticipantAssigner(IReadOnlyDictionary<UserId, DisplayName?>? knownDisplayNames = null)
+public sealed class MaskedParticipantAssigner(IReadOnlyDictionary<UserId, KnownParticipant>? knownParticipants = null)
 {
-    private readonly IReadOnlyDictionary<UserId, DisplayName?> _knownDisplayNames =
-        knownDisplayNames ?? new Dictionary<UserId, DisplayName?>();
+    private readonly IReadOnlyDictionary<UserId, KnownParticipant> _knownParticipants =
+        knownParticipants ?? new Dictionary<UserId, KnownParticipant>();
     private readonly Dictionary<UserId, int> _ordinalsByUserId = [];
     private int _nextOrdinal;
 
-    /// <summary>Looks the display name up in the dictionary this assigner was built with (the friend-set
+    /// <summary>Looks the identity up in the dictionary this assigner was built with (the friend-set
     /// contexts: overlap windows, considered friends, calendar friend-availability owners).</summary>
     public MaskedParticipant For(UserId id) =>
-        For(id, _knownDisplayNames.TryGetValue(id, out DisplayName? name) ? name : null);
+        _knownParticipants.TryGetValue(id, out KnownParticipant known)
+            ? For(id, known.DisplayName, known.Avatar)
+            : For(id, null);
 
     /// <summary>A caller-resolved display name (session organizer, join-request requester) that is not
     /// necessarily in the friend-set dictionary — an unattached Discover/calendar organizer is a
     /// stranger to the viewer, never a friend, and would resolve to nothing from that dictionary.</summary>
-    public MaskedParticipant For(UserId id, DisplayName? displayName)
+    public MaskedParticipant For(UserId id, DisplayName? displayName, Avatar? avatar = null)
     {
         if (!_ordinalsByUserId.TryGetValue(id, out int ordinal))
         {
@@ -113,7 +134,13 @@ public sealed class MaskedParticipantAssigner(IReadOnlyDictionary<UserId, Displa
             _ordinalsByUserId[id] = ordinal;
         }
 
-        return new MaskedParticipant(ordinal, displayName?.Value);
+        // D-076/D-188: the two identity channels stand or fall together. A null display name is the
+        // wire signal for "this viewer may not read this person", and an avatar is the stronger of the
+        // two channels, so it is dropped here — the one place masking is decided — rather than at each
+        // call site that could forget.
+        return displayName is { } name
+            ? new MaskedParticipant(ordinal, name.Value, avatar is { } value ? AvatarResponse.From(value) : null)
+            : new MaskedParticipant(ordinal, null);
     }
 
     public IReadOnlyList<MaskedParticipant> For(IEnumerable<UserId> ids) => [.. ids.Select(id => For(id))];
