@@ -2656,6 +2656,9 @@ export interface components {
             /** Format: int32 */
             unavailableCount: number | string;
             viewerVote: null | string;
+            availableVoters: components["schemas"]["PollRosterEntryResponse"][];
+            maybeVoters: components["schemas"]["PollRosterEntryResponse"][];
+            unavailableVoters: components["schemas"]["PollRosterEntryResponse"][];
         };
         PollRosterEntryResponse: {
             /** Format: uuid */

@@ -13,6 +13,9 @@ function options() {
       availableCount: 0,
       maybeCount: 0,
       unavailableCount: 0,
+      availableVoters: [],
+      maybeVoters: [],
+      unavailableVoters: [],
       viewerVote: null,
     },
   ]

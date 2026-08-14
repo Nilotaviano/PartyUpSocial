@@ -42,6 +42,7 @@ public sealed class GuestPollReadUseCases(IPollRepository polls, IPollReadReposi
             await reads.FindNameplatesAsync(registeredIds, cancellationToken);
 
         List<PollRosterEntry> roster = [];
+        Dictionary<ParticipantRef, PollRosterEntry> rosterByParticipant = [];
         foreach (PollParticipant participant in poll.Participants)
         {
             DisplayName? displayName = participant.UserId is { } userId
@@ -54,7 +55,9 @@ public sealed class GuestPollReadUseCases(IPollRepository polls, IPollReadReposi
             // only), so MaskedForViewer stays false throughout — every row renders exactly as the
             // registered voter-grid view would for an unblocked viewer. Avatar is left unset: a guest
             // read is outside the visibility engine (D-150), so the shared response carries no face.
-            roster.Add(new PollRosterEntry(participant.Id, participant.Participant, displayName, participant.IsActive));
+            var rosterEntry = new PollRosterEntry(participant.Id, participant.Participant, displayName, participant.IsActive);
+            roster.Add(rosterEntry);
+            rosterByParticipant[participant.Participant] = rosterEntry;
         }
 
         GuestLink? link = poll.GuestLinks.FirstOrDefault(l => l.Id == guestLinkId);
@@ -100,9 +103,13 @@ public sealed class GuestPollReadUseCases(IPollRepository polls, IPollReadReposi
                 }
             }
 
+            var (availableVoters, maybeVoters, unavailableVoters) =
+                PollVoterListBuilder.Build(option.Id, poll.Votes, rosterByParticipant);
+
             options.Add(new PollOptionGridEntry(
                 option.Id, option.StartTime, option.SuggestedBy, false,
-                available, maybe, unavailable, ownVote));
+                available, maybe, unavailable, ownVote,
+                availableVoters, maybeVoters, unavailableVoters));
         }
 
         var detail = new PollDetail(

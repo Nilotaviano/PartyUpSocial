@@ -130,7 +130,14 @@ public sealed record PollOptionResponse(
     int AvailableCount,
     int MaybeCount,
     int UnavailableCount,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ViewerVote)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ViewerVote,
+    // Per-category voter lists, ordered by first-submitted-response ascending (D-119's allocation
+    // vocabulary). Each entry is the SAME PollRosterEntryResponse.From conversion the roster uses,
+    // so a masked voter's ParticipationId/DisplayName/Avatar agree exactly between the roster and
+    // every option list -- there is no second masking pass here (D-076).
+    IReadOnlyList<PollRosterEntryResponse> AvailableVoters,
+    IReadOnlyList<PollRosterEntryResponse> MaybeVoters,
+    IReadOnlyList<PollRosterEntryResponse> UnavailableVoters)
 {
     public static PollOptionResponse From(PollOptionGridEntry entry) =>
         new(
@@ -143,7 +150,10 @@ public sealed record PollOptionResponse(
             entry.AvailableCount,
             entry.MaybeCount,
             entry.UnavailableCount,
-            entry.ViewerVote is { } choice ? PollWireFormat.VoteChoice(choice) : null);
+            entry.ViewerVote is { } choice ? PollWireFormat.VoteChoice(choice) : null,
+            entry.AvailableVoters.Select(PollRosterEntryResponse.From).ToArray(),
+            entry.MaybeVoters.Select(PollRosterEntryResponse.From).ToArray(),
+            entry.UnavailableVoters.Select(PollRosterEntryResponse.From).ToArray());
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

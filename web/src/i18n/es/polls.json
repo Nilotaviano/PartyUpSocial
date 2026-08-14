@@ -7,9 +7,7 @@
     "title": "Título",
     "options": "Horarios candidatos",
     "optionsHelp": "Agrega al menos dos horarios candidatos. Agregar el mismo horario dos veces lo fusiona en una sola opción.",
-    "addOption": "Agregar horario",
     "removeOption": "Quitar",
-    "optionMerged": "Ese horario ya se había agregado.",
     "deadline": "Plazo de votación",
     "deadlineChoice": {
       "hours6": "6 horas",
@@ -39,6 +37,16 @@
       "loading": "Buscando...",
       "noResults": "Sin resultados. El nombre escrito se usará igualmente.",
       "listboxLabel": "Resultados del catálogo de Steam"
+    },
+    "privacyPrivate": "Privada",
+    "privacyPublic": "Pública",
+    "grid": {
+      "heading": "Horarios candidatos",
+      "hint": "Toca un horario para agregarlo como candidato.",
+      "showDaytime": "Mostrar horario diurno",
+      "eveningsOnly": "Solo por la noche",
+      "weekOf": "Semana del {{range}}",
+      "count": "{{count}}/{{max}} opciones"
     }
   },
   "validation": {
@@ -56,6 +64,8 @@
   },
   "list": {
     "heading": "Encuestas",
+    "description": "Vota los horarios candidatos y finaliza el ganador en una sesión.",
+    "bandTabsLabel": "Grupos de encuestas",
     "involved": "Tus encuestas",
     "discoverable": "Descubrir",
     "emptyInvolved": "No tienes encuestas activas.",
@@ -66,6 +76,7 @@
     "optionCount_other": "{{count}} opciones"
   },
   "status": {
+    "polling": "En votación",
     "pollingUntil": "En votación · cierra {{deadline}}",
     "awaitingSelection": "Cerrada · en espera de selección",
     "expiredPending": "Cerrada · ventana de selección vencida",
@@ -78,14 +89,9 @@
     "options": "Opciones",
     "roster": "Votantes",
     "anonymous": "Usuario Anónimo",
+    "hiddenSuffix": "(oculto)",
     "removed": "Eliminado",
-    "deadline": "La votación cierra {{deadline}}.",
-    "awaitingSelectionNotice": "La votación cerró. El organizador está eligiendo un horario.",
-    "expiredPendingNotice": "La ventana de selección de esta encuesta ha vencido.",
-    "finalizedNotice": "Esta encuesta fue finalizada.",
     "viewSession": "Ver la sesión",
-    "expiredNotice": "Esta encuesta venció sin una selección.",
-    "canceledNotice": "Esta encuesta fue cancelada.",
     "tallyAvailable_one": "{{count}} disponible",
     "tallyAvailable_other": "{{count}} disponibles",
     "tallyMaybe_one": "{{count}} tal vez",
@@ -128,15 +134,9 @@
     "help": "Al salir, se retiran tus votos. No quedas vetado: pueden invitarte de nuevo o puedes pedir unirte."
   },
   "finalize": {
-    "heading": "Elegir un horario",
-    "earlyHeading": "Finalizar antes del plazo",
     "earlyNotice": "Hay suficiente gente disponible para al menos un horario. Finalizar ahora cierra la votación de inmediato y crea la sesión.",
     "previewGuarantee": "Esta vista previa y la finalización usan la misma regla: las mismas entradas siempre producen el mismo resultado. Si algo cambia mientras tanto (se elimina una opción o cambia el acceso de alguien), el resultado puede diferir de lo mostrado aquí.",
-    "chooseOption": "Elige el horario para finalizar",
     "belowMinimum": "Por debajo de la asistencia mínima",
-    "going": "Confirmados: {{names}}",
-    "waitlisted": "En lista de espera: {{names}}",
-    "action": "Finalizar",
     "confirmTitle": "¿Finalizar esta encuesta?",
     "confirmTitleEarly": "¿Cerrar la votación y finalizar?",
     "confirmBody": "Esto crea una sesión a las {{time}} y no se puede deshacer.",
@@ -207,12 +207,67 @@
   "a11y": {
     "validationSummary": "Hubo problemas con tu envío",
     "dialogLabel": "Cuadro de confirmación",
-    "copyLink": "Copiar enlace de invitación"
+    "copyLink": "Copiar enlace de invitación",
+    "candidateFreeCount_one": "{{day}} {{time}} — {{count}} amigo libre",
+    "candidateFreeCount_other": "{{day}} {{time}} — {{count}} amigos libres"
   },
   "emptyState": {
     "polls": {
       "body": "Todavía no hay encuestas. Crea una y deja que todos elijan un horario que funcione.",
       "cta": "Crear encuesta"
     }
+  },
+  "detailLovable": {
+    "meta": {
+      "duration": "Duración",
+      "privacy": "Privacidad",
+      "minimum": "Mínimo",
+      "capacity": "Capacidad",
+      "unlimited": "Ilimitada"
+    },
+    "privacyPrivate": "Privada",
+    "privacyPublic": "Pública",
+    "countdown": {
+      "votingClosesIn": "La votación cierra en {{time}}",
+      "pickWindow": "El organizador tiene {{time}} de la ventana de 48h para elegir",
+      "lockedIn": "Definido · {{time}}",
+      "expiredBanner": "Vencida — la ventana de 48h para elegir pasó sin una selección.",
+      "canceledBanner": "Cancelada por el organizador. Los votos se conservan como referencia."
+    },
+    "invited": "Invitados · {{count}}",
+    "organizerNote": "Organizador",
+    "legendHeading": "Leyenda",
+    "legendHint": "ícono + etiqueta, no color",
+    "pastOptionLegend": "Opción pasada",
+    "pastOptionHint": "aún se puede elegir",
+    "rank": "Posición {{rank}}",
+    "currentLeader": "Líder actual",
+    "winningTime": "Horario ganador",
+    "alreadyPassed": "Ya pasó",
+    "repliedCount": "{{responded}}/{{total}} respondieron",
+    "previewSeats": "Vista previa de cupos",
+    "deleteOption": "Eliminar opción",
+    "deleteOptionTitle": "¿Eliminar esta opción?",
+    "deleteOptionBody": "Se eliminan todos los votos de este horario. Las demás opciones no se ven afectadas.",
+    "keepIt": "Conservar",
+    "yourVoteHeading": "Tu voto",
+    "seated": "Cupos confirmados",
+    "waitlist": "Lista de espera",
+    "nobodyCanMake": "Nadie puede en este horario.",
+    "everyoneFits": "Todos entran.",
+    "belowMinimumNotice": "Por debajo del mínimo de {{min}} jugadores — aún puedes finalizar.",
+    "notYet": "Todavía no",
+    "lockInTime": "Definir este horario",
+    "previewAndFinalize": "Vista previa y finalizar",
+    "suggestDialogTitle": "Sugerir otro horario",
+    "suggestDialogHelp": "Se vuelve una opción de inmediato — sin necesidad de aprobación.",
+    "nudgeNotice": "Todos reciben un aviso para votar la nueva opción.",
+    "cancel": "Cancelar",
+    "candidateHeading": "Horarios candidatos",
+    "candidateHint": "Ordenados por Disponible, luego Tal vez. Vota en todas las opciones.",
+    "voterChipsLabel": "Votantes de {{category}}: {{names}}",
+    "voterChipsOverflow": "+{{count}} más",
+    "voterChipsOverflow_one": "+{{count}} más",
+    "voterChipsOverflow_other": "+{{count}} más"
   }
 }

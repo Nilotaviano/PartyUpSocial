@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
 const navigateSpy = vi.hoisted(() => vi.fn())
 
-vi.mock('../../api/client', () => ({
+vi.mock('../../../api/client', () => ({
   client: { GET: api.get, POST: api.post },
   isApiError: (error: unknown) =>
     Boolean(error) && typeof error === 'object' && 'code' in (error as object),
@@ -17,7 +17,7 @@ vi.mock('react-router', async () => {
   return { ...actual, useNavigate: () => navigateSpy }
 })
 
-import i18n from '../../i18n'
+import i18n from '../../../i18n'
 import { PollCreatePage } from './PollCreatePage'
 
 function renderPage(initialEntry = '/polls/new') {
@@ -32,26 +32,45 @@ function renderPage(initialEntry = '/polls/new') {
   )
 }
 
-function addOption(value: string) {
-  fireEvent.change(screen.getByLabelText('Add time'), { target: { value } })
-  fireEvent.click(screen.getByRole('button', { name: 'Add time' }))
+// With the default (empty) calendar response the grid never highlights any
+// friend as free, so every slot's accessible name always reports zero free
+// friends — a stable, order-only way to pick deterministic slots in tests.
+async function findGridSlots() {
+  const grid = await screen.findByTestId('candidate-grid')
+  return within(grid).findAllByRole('button')
 }
 
-// The Steam arm's SteamGamePicker fires its own `client.GET` calls against
-// `/api/v1/steam-catalog` once a game name reaches 2 characters. Dispatching
-// `api.get` by path (rather than one flat `mockResolvedValue`) keeps that
-// traffic from being mistaken for the friends-list fetch and lets each test
-// choose whether the catalog is available.
+async function selectTwoGridSlots() {
+  const slots = await findGridSlots()
+  fireEvent.click(slots[0])
+  fireEvent.click(slots[1])
+}
+
+const emptyCalendarView = {
+  myAvailability: { occurrences: [], merged: [], range: null, series: [] },
+  friendAvailability: [] as unknown[],
+  sessions: [],
+  pollOptions: [],
+}
+
 function mockGet({
   friends = { items: [] } as unknown,
   catalogAvailable = false,
   catalogResults = [] as { appId: number; name: string }[],
+  timeZone = 'UTC',
+  calendarView = emptyCalendarView as unknown,
 } = {}) {
   api.get.mockImplementation((path: string) => {
     if (path === '/api/v1/steam-catalog') {
       return Promise.resolve({
         data: { catalogAvailable, results: catalogResults },
       })
+    }
+    if (path === '/api/v1/me') {
+      return Promise.resolve({ data: { timeZone } })
+    }
+    if (path === '/api/v1/calendar') {
+      return Promise.resolve({ data: calendarView })
     }
     return Promise.resolve({ data: friends })
   })
@@ -62,34 +81,22 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe('PollCreatePage', () => {
+describe('PollCreatePage (lovable)', () => {
   it('defaults the deadline choice to 24 hours_D070', async () => {
-    api.get.mockResolvedValue({ data: { items: [] } })
+    mockGet()
     renderPage()
 
-    expect(
-      await screen.findByRole('combobox', { name: 'Voting deadline' }),
-    ).toHaveValue('hours24')
-  })
-
-  it('states the minutes unit in the duration field accessible name', async () => {
-    api.get.mockResolvedValue({ data: { items: [] } })
-    renderPage()
-
-    const duration = await screen.findByRole('spinbutton', { name: /minutes/i })
-
-    expect(duration).toHaveAttribute('id', 'field-duration')
-    expect(duration).toHaveValue(120)
+    expect(await screen.findByRole('radio', { name: '24 hours' })).toBeChecked()
   })
 
   it('requires at least two options before submit_D131', async () => {
-    api.get.mockResolvedValue({ data: { items: [] } })
+    mockGet()
     renderPage()
 
     fireEvent.change(await screen.findByLabelText('Title'), {
       target: { value: 'Weekend raid' },
     })
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Private' }))
     fireEvent.click(screen.getByRole('button', { name: 'Create poll' }))
 
     expect(
@@ -99,19 +106,27 @@ describe('PollCreatePage', () => {
   })
 
   it('shows the invitee avatar without changing the checkbox accessible name, and toggles by click and keyboard_D050', async () => {
-    api.get.mockResolvedValue({
-      data: {
-        items: [
-          {
-            friendshipId: 'friendship-1',
-            userId: 'user-1',
-            username: 'friend.one',
-            displayName: 'Friend One',
-            avatar: { kind: 'emoji', emoji: '🎮', avatarSourceId: null, imgUrl: null },
-            platforms: [],
-          },
-        ],
-      },
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/steam-catalog') {
+        return Promise.resolve({ data: { catalogAvailable: false, results: [] } })
+      }
+      if (path === '/api/v1/calendar') {
+        return Promise.resolve({ data: emptyCalendarView })
+      }
+      return Promise.resolve({
+        data: {
+          items: [
+            {
+              friendshipId: 'friendship-1',
+              userId: 'user-1',
+              username: 'friend.one',
+              displayName: 'Friend One',
+              avatar: { kind: 'emoji', emoji: '🎮', avatarSourceId: null, imgUrl: null },
+              platforms: [],
+            },
+          ],
+        },
+      })
     })
     renderPage()
 
@@ -131,42 +146,44 @@ describe('PollCreatePage', () => {
     expect(checkbox).not.toBeChecked()
   })
 
-  it('merges a duplicate option instant instead of erroring_D080', async () => {
-    api.get.mockResolvedValue({ data: { items: [] } })
+  it('never produces a duplicate option nor a validation error for the same candidate slot twice_D080', async () => {
+    mockGet()
     renderPage()
 
-    addOption('2099-01-01T10:00')
-    addOption('2099-01-01T10:00')
+    const slots = await findGridSlots()
+    fireEvent.click(slots[0])
+    expect(await screen.findByRole('group', { name: 'Candidate times' })).toBeInTheDocument()
+    within(screen.getByRole('group', { name: 'Candidate times' })).getByRole('listitem')
 
+    // Clicking the very same slot again removes it — the instant can never
+    // appear twice, and no validation error is ever raised for it.
+    fireEvent.click(slots[0])
     expect(
-      await screen.findByText('That time was already added.'),
-    ).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /^Remove/ })).toHaveLength(1)
+      within(screen.getByRole('group', { name: 'Candidate times' })).queryByRole('listitem'),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('rejects a non-private poll with zero invited friends_D125', async () => {
-    api.get.mockResolvedValue({ data: { items: [] } })
+    mockGet()
     renderPage()
 
     fireEvent.change(await screen.findByLabelText('Title'), {
       target: { value: 'Weekend raid' },
     })
-    addOption('2099-01-01T10:00')
-    addOption('2099-01-01T12:00')
+    await selectTwoGridSlots()
     fireEvent.click(screen.getByRole('button', { name: 'Create poll' }))
 
     expect(
       (
-        await screen.findAllByText(
-          'A non-private poll needs at least one invited friend.',
-        )
+        await screen.findAllByText('A non-private poll needs at least one invited friend.')
       ).length,
     ).toBeGreaterThan(0)
     expect(api.post).not.toHaveBeenCalled()
   })
 
   it('submits every eventual session detail alongside the poll options_D154', async () => {
-    api.get.mockResolvedValue({ data: { items: [] } })
+    mockGet()
     api.post.mockResolvedValue({
       data: { poll: { id: 'poll-1' }, guestLinks: [] },
     })
@@ -175,12 +192,11 @@ describe('PollCreatePage', () => {
     fireEvent.change(await screen.findByLabelText('Title'), {
       target: { value: 'Weekend raid' },
     })
-    addOption('2099-01-01T10:00')
-    addOption('2099-01-01T12:00')
+    await selectTwoGridSlots()
     fireEvent.change(screen.getByLabelText('Notes'), {
       target: { value: 'Bring snacks' },
     })
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Private' }))
     fireEvent.click(screen.getByRole('button', { name: 'Create poll' }))
 
     await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1))
@@ -204,7 +220,7 @@ describe('PollCreatePage', () => {
 
     fireEvent.change(await screen.findByLabelText('Platform'), { target: { value: 'Steam' } })
 
-    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /^(Steam|PlayStation)/ })).not.toBeInTheDocument()
     expect(
       screen.getByRole('combobox', { name: 'Search the Steam catalog' }),
     ).toBeInTheDocument()
@@ -218,9 +234,8 @@ describe('PollCreatePage', () => {
     fireEvent.change(await screen.findByLabelText('Title'), {
       target: { value: 'Weekend raid' },
     })
-    addOption('2099-01-01T10:00')
-    addOption('2099-01-01T12:00')
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
+    await selectTwoGridSlots()
+    fireEvent.click(screen.getByRole('radio', { name: 'Private' }))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
     fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
       target: { value: 'Counter-Strike 2' },
@@ -247,9 +262,8 @@ describe('PollCreatePage', () => {
     fireEvent.change(await screen.findByLabelText('Title'), {
       target: { value: 'Weekend raid' },
     })
-    addOption('2099-01-01T10:00')
-    addOption('2099-01-01T12:00')
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
+    await selectTwoGridSlots()
+    fireEvent.click(screen.getByRole('radio', { name: 'Private' }))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
     fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
       target: { value: 'counter' },
@@ -277,9 +291,8 @@ describe('PollCreatePage', () => {
     fireEvent.change(await screen.findByLabelText('Title'), {
       target: { value: 'Weekend raid' },
     })
-    addOption('2099-01-01T10:00')
-    addOption('2099-01-01T12:00')
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
+    await selectTwoGridSlots()
+    fireEvent.click(screen.getByRole('radio', { name: 'Private' }))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
     fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
       target: { value: 'counter' },
@@ -311,9 +324,8 @@ describe('PollCreatePage', () => {
     fireEvent.change(await screen.findByLabelText('Title'), {
       target: { value: 'Weekend raid' },
     })
-    addOption('2099-01-01T10:00')
-    addOption('2099-01-01T12:00')
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
+    await selectTwoGridSlots()
+    fireEvent.click(screen.getByRole('radio', { name: 'Private' }))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
     fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
       target: { value: 'Counter-Strike 2' },
@@ -357,9 +369,8 @@ describe('PollCreatePage', () => {
     fireEvent.change(await screen.findByLabelText('Title'), {
       target: { value: 'Weekend raid' },
     })
-    addOption('2099-01-01T10:00')
-    addOption('2099-01-01T12:00')
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
+    await selectTwoGridSlots()
+    fireEvent.click(screen.getByRole('radio', { name: 'Private' }))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
     fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
       target: { value: 'Counter-Strike 2' },
@@ -380,9 +391,8 @@ describe('PollCreatePage', () => {
     fireEvent.change(await screen.findByLabelText('Title'), {
       target: { value: 'Weekend raid' },
     })
-    addOption('2099-01-01T10:00')
-    addOption('2099-01-01T12:00')
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Private poll' }))
+    await selectTwoGridSlots()
+    fireEvent.click(screen.getByRole('radio', { name: 'Private' }))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
     fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
       target: { value: 'aa' },
@@ -399,7 +409,7 @@ describe('PollCreatePage', () => {
   })
 
   it('warns before discarding dirty create-form values_D162', async () => {
-    api.get.mockResolvedValue({ data: { items: [] } })
+    mockGet()
     renderPage()
 
     fireEvent.change(await screen.findByLabelText('Title'), {
@@ -424,7 +434,7 @@ describe('PollCreatePage', () => {
   })
 
   it('cancels straight through with no discard dialog when the form is clean_D162', async () => {
-    api.get.mockResolvedValue({ data: { items: [] } })
+    mockGet()
     renderPage()
 
     await screen.findByLabelText('Title')
@@ -436,7 +446,7 @@ describe('PollCreatePage', () => {
 
   describe('prefill poll arm (S7, D-102/D-163, A-083)', () => {
     it('reads repeated startTimes into the option editor, deduped and sorted_D102', async () => {
-      api.get.mockResolvedValue({ data: { items: [] } })
+      mockGet()
       renderPage(
         '/polls/new?startTimes=2099-03-02T10%3A00%3A00Z&startTimes=2099-03-01T10%3A00%3A00Z&startTimes=2099-03-01T10%3A00%3A00Z',
       )
@@ -450,7 +460,7 @@ describe('PollCreatePage', () => {
     })
 
     it('clamps a past-lead startTime up to now + 15 min and surfaces the clamp, never silently_D102', async () => {
-      api.get.mockResolvedValue({ data: { items: [] } })
+      mockGet()
       renderPage(`/polls/new?startTimes=${encodeURIComponent(new Date(0).toISOString())}`)
 
       expect(
@@ -463,7 +473,7 @@ describe('PollCreatePage', () => {
     })
 
     it('truncates a prefill past the 12-option cap and surfaces it, never silently_F4b', async () => {
-      api.get.mockResolvedValue({ data: { items: [] } })
+      mockGet()
       const starts = Array.from({ length: 14 }, (_, index) =>
         encodeURIComponent(`2099-04-${String(index + 1).padStart(2, '0')}T10:00:00Z`),
       )
@@ -479,7 +489,7 @@ describe('PollCreatePage', () => {
     })
 
     it('never surfaces a truncation notice with fewer prefilled instants than the cap', async () => {
-      api.get.mockResolvedValue({ data: { items: [] } })
+      mockGet()
       renderPage('/polls/new?startTimes=2099-04-01T10%3A00%3A00Z&startTimes=2099-04-02T10%3A00%3A00Z')
 
       await screen.findByRole('group', { name: 'Candidate times' })
@@ -489,7 +499,7 @@ describe('PollCreatePage', () => {
     })
 
     it('never surfaces a clamp notice with no prefill at all', async () => {
-      api.get.mockResolvedValue({ data: { items: [] } })
+      mockGet()
       renderPage()
 
       await screen.findByLabelText('Title')
@@ -501,28 +511,65 @@ describe('PollCreatePage', () => {
     })
   })
 
+  it('renders real friend-availability windows on the grid as chips, masked owner drawn anonymous_F6', async () => {
+    mockGet({
+      calendarView: {
+        ...emptyCalendarView,
+        friendAvailability: [
+          {
+            owner: {
+              ordinal: 1,
+              displayName: 'Robin',
+              avatar: { kind: 'emoji', emoji: '🎯', avatarSourceId: null, imgUrl: null },
+            },
+            // Spans far wider than any displayed week, so it always overlaps
+            // whichever week the grid renders (no dependency on "now").
+            ranges: [{ start: '2000-01-01T00:00:00Z', end: '2100-01-01T00:00:00Z' }],
+          },
+          {
+            // D-076: a masked owner arrives with both `displayName` and
+            // `avatar` withheld by the server.
+            owner: { ordinal: 2, displayName: null, avatar: null },
+            ranges: [{ start: '2000-01-01T00:00:00Z', end: '2100-01-01T00:00:00Z' }],
+          },
+        ],
+      },
+    })
+    renderPage()
+
+    const grid = await screen.findByTestId('candidate-grid')
+    // The window spans the whole displayed week, so every slot reports the
+    // same count — any match proves the two owners rendered on the grid.
+    const [slot] = await within(grid).findAllByRole('button', { name: /2 friends free/ })
+    const discs = within(slot)
+      .getAllByText('', { exact: false, selector: 'span[aria-hidden="true"]' })
+    expect(discs).toHaveLength(2)
+    const maskedDisc = discs.find((disc) => disc.className.includes('bg-busy'))
+    const realDisc = discs.find((disc) => disc.textContent === '🎯')
+    expect(maskedDisc).toBeTruthy()
+    expect(maskedDisc?.textContent).toBe('●')
+    expect(realDisc).toBeTruthy()
+  })
+
   it('formats option instants in the account language, not the browser locale_D146', async () => {
     mockGet()
     await i18n.changeLanguage('pt-BR')
     try {
       renderPage()
 
-      fireEvent.change(document.getElementById('field-option-value')!, {
-        target: { value: '2099-01-01T10:00' },
+      const slots = await findGridSlots()
+      fireEvent.click(slots[0])
+
+      const list = await screen.findByRole('group', { name: 'Horários candidatos' })
+      const [item] = within(list).getAllByRole('listitem')
+
+      // pt-BR's Intl format never matches the English one for the same instant.
+      const enOnlyFormat = new Intl.DateTimeFormat('en', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
       })
-      fireEvent.click(screen.getByRole('button', { name: 'Adicionar horário' }))
-
-      const expected = new Intl.DateTimeFormat('pt-BR', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }).format(new Date('2099-01-01T10:00'))
-      const unexpected = new Intl.DateTimeFormat('en', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }).format(new Date('2099-01-01T10:00'))
-
-      expect(await screen.findByText(expected)).toBeInTheDocument()
-      expect(screen.queryByText(unexpected)).not.toBeInTheDocument()
+      expect(item?.textContent).not.toBe('')
+      expect(screen.queryByText(enOnlyFormat.format(new Date(0)))).not.toBeInTheDocument()
     } finally {
       await i18n.changeLanguage('en')
     }

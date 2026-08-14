@@ -41,7 +41,13 @@ public sealed class PollVotingFlowTests(PlaywrightFixture fixture)
 
     /// <summary>
     /// Drives the real `/polls/new` create form (D-125 exempts a private poll from needing an
-    /// invited friend) with two candidate times. Mirrors
+    /// invited friend) with two candidate times, picked from the click-to-toggle
+    /// `CandidateGrid` (`data-testid="candidate-slot-{dayIndex}-{minuteOfDay}"`, added on the
+    /// port from the old `#field-option-value` + "Add time" date-input flow). Advancing to next
+    /// week first — rather than reasoning about `firstOptionUtc` against the grid's current-week
+    /// display — keeps every clicked slot unambiguously in the future regardless of today's
+    /// weekday; `firstOptionUtc` is kept as a parameter only so callers (who use it purely to vary
+    /// the poll title's uniqueness) don't need to change. Mirrors
     /// `SessionGuestFlowTests.CreatePrivateSessionAsync`'s barrier choice: the create POST's own
     /// response is the barrier (asserted 201), never the client's post-`invalidateQueries` redirect
     /// — a 4xx there would otherwise surface as a silent 30s navigation timeout instead of a loud
@@ -51,13 +57,15 @@ public sealed class PollVotingFlowTests(PlaywrightFixture fixture)
     {
         await organizerPage.GotoAsync(PlaywrightFixture.WebBaseUrl + "/polls/new");
         await organizerPage.Locator("#field-title").FillAsync(title);
-        await organizerPage.Locator("#field-option-value").FillAsync(OptionTimeValue(firstOptionUtc));
-        await organizerPage.GetByRole(AriaRole.Button, new() { Name = "Add time" }).ClickAsync();
-        await organizerPage.Locator("#field-option-value").FillAsync(OptionTimeValue(firstOptionUtc.AddDays(1)));
-        await organizerPage.GetByRole(AriaRole.Button, new() { Name = "Add time" }).ClickAsync();
+
+        await organizerPage.GetByRole(AriaRole.Button, new() { Name = "Next week" }).ClickAsync();
+        await organizerPage.GetByTestId("candidate-slot-1-1020").ClickAsync();
+        await organizerPage.GetByTestId("candidate-slot-2-1020").ClickAsync();
+
         await organizerPage.Locator("#field-min").FillAsync("1");
         await organizerPage.Locator("#field-max").FillAsync("4");
-        await organizerPage.GetByLabel("Private poll").CheckAsync();
+        await organizerPage.GetByRole(AriaRole.Radiogroup, new() { Name = "Private poll" })
+            .GetByRole(AriaRole.Radio, new() { Name = "Private" }).ClickAsync();
 
         IResponse response = await organizerPage.RunAndWaitForResponseAsync(
             () => organizerPage.GetByRole(AriaRole.Button, new() { Name = "Create poll" }).ClickAsync(),
@@ -225,8 +233,10 @@ public sealed class PollVotingFlowTests(PlaywrightFixture fixture)
         ILocator available = firstOptionCard.Locator("[data-testid^='vote-available-']");
         ILocator maybe = firstOptionCard.Locator("[data-testid^='vote-maybe-']");
 
-        // The zero state is itself SR-observable text, not an absence of a glyph.
-        await Assertions.Expect(tally).ToHaveTextAsync("No votes yet.");
+        // The zero state is itself SR-observable text, not an absence of a glyph — the new page's
+        // tally reads "{{responded}}/{{total}} replied" rather than the old "No votes yet."/
+        // "N available" copy. The private poll's sole roster row is the organizer, so total is 1.
+        await Assertions.Expect(tally).ToHaveTextAsync("0/1 replied");
 
         // Keyboard alone: the row's single tab stop, then Space — the ARIA radio activation key.
         // No click, no pointer anywhere in this fact.
@@ -238,7 +248,7 @@ public sealed class PollVotingFlowTests(PlaywrightFixture fixture)
         await Assertions.Expect(available).ToHaveAttributeAsync("aria-checked", "true");
         // The tally a screen reader reads is the proof the vote landed — a count in words, which
         // no amount of fill color would supply.
-        await Assertions.Expect(tally).ToHaveTextAsync(new Regex(@"\b1 available\b"));
+        await Assertions.Expect(tally).ToHaveTextAsync("1/1 replied");
 
         // Roving tabindex followed the checked control (APG): exactly one tab stop per row.
         await Assertions.Expect(available).ToHaveAttributeAsync("tabindex", "0");
@@ -271,6 +281,10 @@ public sealed class PollVotingFlowTests(PlaywrightFixture fixture)
         // baseline at zero and make the assertion below meaningless.
         await Assertions.Expect(optionRows).ToHaveCountAsync(2);
         int before = await optionRows.CountAsync();
+
+        // The suggest field now lives inside a dialog, opened by its own trigger button — the
+        // old create-page date input this test replaced was always on-page.
+        await organizer.Page.GetByRole(AriaRole.Button, new() { Name = "Suggest a time" }).ClickAsync();
 
         ILocator field = organizer.Page.Locator("#suggest-option-value");
         await field.FocusAsync();
@@ -329,6 +343,9 @@ public sealed class PollVotingFlowTests(PlaywrightFixture fixture)
             ILocator tally = firstOptionCard.Locator("[data-testid^='poll-option-tally-']");
             ILocator available = firstOptionCard.Locator("[data-testid^='vote-available-']");
             await Assertions.Expect(available).Not.ToBeDisabledAsync();
+            // The guest transport still renders the old, unported `VotingGrid.tsx` (out of the
+            // lovable port's scope) — its tally copy ("No votes yet." / "N available") is
+            // unchanged, unlike the registered arm's `PollDetailPage.tsx` tally text above.
             await Assertions.Expect(tally).ToHaveTextAsync("No votes yet.");
 
             await available.FocusAsync();
@@ -375,14 +392,23 @@ public sealed class PollVotingFlowTests(PlaywrightFixture fixture)
         await fixture.BackdatePollPastDeadlineAsync(pollId);
 
         await organizer.Page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/polls/" + pollId);
-        await organizer.Page.GetByText("Closed · awaiting selection").WaitForAsync();
+        // The status pill reads the raw materialized `poll.status` column (`statusLabelKey` has no
+        // dedicated awaiting-selection label), which the backdate SQL alone does not flip — only a
+        // request through the shared transition function does. The "Organizer has …" copy in the
+        // summary card's countdown row is windowState-derived from the raw wire deadlines instead,
+        // so it is the real signal that the awaiting-selection state was reached.
+        // The same "Organizer has …" copy also renders in the sticky finalize bar; the summary
+        // card's copy (matched first in DOM order) is proof enough that the window state landed.
+        await organizer.Page.GetByText(new Regex("^Organizer has ")).First.WaitForAsync();
+
+        // The new finalization UI has no option-selecting radio list: each option card carries its
+        // own "Preview seats" finalize control (`finalize-option-{optionId}`), which opens the
+        // preview/confirm dialog scoped to that option directly — the dialog's own body is where
+        // "This preview and finalizing use the same rule" now lives, not the bare page.
+        ILocator finalizeOption = organizer.Page.Locator("[data-testid^='finalize-option-']").First;
+        await finalizeOption.ClickAsync();
         await organizer.Page.GetByText(
             "This preview and finalizing use the same rule").First.WaitForAsync();
-
-        ILocator finalizeOption = organizer.Page.Locator("[data-testid^='finalize-option-']").First;
-        await finalizeOption.Locator("input[type=radio]").CheckAsync();
-
-        await organizer.Page.GetByTestId("finalize-trigger").ClickAsync();
         IResponse response = await organizer.Page.RunAndWaitForResponseAsync(
             () => organizer.Page.GetByTestId("finalize-confirm").ClickAsync(),
             candidate => candidate.Url.Contains("/finalize", StringComparison.Ordinal) &&

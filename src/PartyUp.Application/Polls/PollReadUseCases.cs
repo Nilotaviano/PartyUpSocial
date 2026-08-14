@@ -51,6 +51,7 @@ public sealed class PollReadUseCases(
             await reads.FindNameplatesAsync(registeredIds, cancellationToken);
 
         List<PollRosterEntry> roster = [];
+        Dictionary<ParticipantRef, PollRosterEntry> rosterByParticipant = [];
         HashSet<UserId> maskedUserIds = [];
         foreach (PollParticipant participant in poll.Participants)
         {
@@ -73,13 +74,15 @@ public sealed class PollReadUseCases(
                 maskedUserIds.Add(maskedUserId);
             }
 
-            roster.Add(new PollRosterEntry(
+            var rosterEntry = new PollRosterEntry(
                 participant.Id,
                 participant.Participant,
                 masked ? null : displayName,
                 participant.IsActive,
                 masked,
-                masked ? null : avatar));
+                masked ? null : avatar);
+            roster.Add(rosterEntry);
+            rosterByParticipant[participant.Participant] = rosterEntry;
         }
 
         ParticipantRef viewerParticipant = ParticipantRef.ForUser(viewerId);
@@ -119,9 +122,13 @@ public sealed class PollReadUseCases(
 
             bool suggesterMasked = option.SuggestedBy.UserId is { } suggesterId && maskedUserIds.Contains(suggesterId);
 
+            var (availableVoters, maybeVoters, unavailableVoters) =
+                PollVoterListBuilder.Build(option.Id, poll.Votes, rosterByParticipant);
+
             options.Add(new PollOptionGridEntry(
                 option.Id, option.StartTime, option.SuggestedBy, suggesterMasked,
-                available, maybe, unavailable, ownVote));
+                available, maybe, unavailable, ownVote,
+                availableVoters, maybeVoters, unavailableVoters));
         }
 
         bool muted = poll.Status == PollStatus.Finalized && poll.CreatedSessionId is { } createdSessionId

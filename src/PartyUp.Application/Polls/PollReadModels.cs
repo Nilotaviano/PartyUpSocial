@@ -44,6 +44,12 @@ public sealed record PollRosterEntry(
 /// <see cref="PollReadUseCases"/> when the suggester is the roster's masked-for-viewer row -- the
 /// wire contract omits the suggester's user id when it is set, matching the roster's own D-076
 /// omission rather than leaking the real id through a second, unmasked channel.
+/// Per-category voter lists reuse the same <see cref="PollRosterEntry"/> rows the roster itself
+/// carries (looked up by the vote's <see cref="ParticipantRef"/>) rather than recomputing masking:
+/// a voter's <see cref="PollRosterEntry.MaskedForViewer"/> and <see cref="PollRosterEntry.ParticipationId"/>
+/// are therefore identical whether they are read off the roster or off an option's voter list.
+/// Ordered by <see cref="PollVote.SubmittedAt"/> ascending (first submitted response first) — the
+/// vote's own write-once submission instant, cheaply available since votes are already loaded.
 /// </summary>
 public sealed record PollOptionGridEntry(
     PollOptionId Id,
@@ -53,7 +59,62 @@ public sealed record PollOptionGridEntry(
     int AvailableCount,
     int MaybeCount,
     int UnavailableCount,
-    VoteChoice? ViewerVote);
+    VoteChoice? ViewerVote,
+    IReadOnlyList<PollRosterEntry> AvailableVoters,
+    IReadOnlyList<PollRosterEntry> MaybeVoters,
+    IReadOnlyList<PollRosterEntry> UnavailableVoters);
+
+/// <summary>
+/// Shared by <see cref="PollReadUseCases"/> and <see cref="GuestPollReadUseCases"/> so both option
+/// grids build their per-category voter lists off the identical roster rows — never a second masking
+/// pass — and the identical response-time ordering.
+/// </summary>
+internal static class PollVoterListBuilder
+{
+    public static (
+        IReadOnlyList<PollRosterEntry> Available,
+        IReadOnlyList<PollRosterEntry> Maybe,
+        IReadOnlyList<PollRosterEntry> Unavailable) Build(
+        PollOptionId optionId,
+        IEnumerable<PollVote> votes,
+        IReadOnlyDictionary<ParticipantRef, PollRosterEntry> rosterByParticipant)
+    {
+        List<(PollVote Vote, PollRosterEntry Entry)> available = [];
+        List<(PollVote Vote, PollRosterEntry Entry)> maybe = [];
+        List<(PollVote Vote, PollRosterEntry Entry)> unavailable = [];
+
+        foreach (PollVote vote in votes)
+        {
+            if (vote.OptionId != optionId)
+            {
+                continue;
+            }
+
+            if (!rosterByParticipant.TryGetValue(vote.Participant, out PollRosterEntry? entry))
+            {
+                continue;
+            }
+
+            switch (vote.Choice)
+            {
+                case VoteChoice.Available:
+                    available.Add((vote, entry));
+                    break;
+                case VoteChoice.Maybe:
+                    maybe.Add((vote, entry));
+                    break;
+                case VoteChoice.Unavailable:
+                    unavailable.Add((vote, entry));
+                    break;
+            }
+        }
+
+        return (Order(available), Order(maybe), Order(unavailable));
+    }
+
+    private static PollRosterEntry[] Order(List<(PollVote Vote, PollRosterEntry Entry)> votes) =>
+        votes.OrderBy(v => v.Vote.SubmittedAt).Select(v => v.Entry).ToArray();
+}
 
 /// <summary>The full voter-grid read (PHASE6_DESIGN.md §4).</summary>
 public sealed record PollDetail(

@@ -10,9 +10,6 @@ export type CreatePollResponse = components['schemas']['CreatePollResponse']
 export type PollBand = 'involved' | 'discoverable'
 export type GuestLinkInvitation = components['schemas']['GuestLinkInvitationResponse']
 export type VoteChoiceWire = 'available' | 'maybe' | 'unavailable'
-export type FinalizationPreview = components['schemas']['PollFinalizationPreviewResponse']
-export type FinalizationPreviewOption =
-  components['schemas']['PollFinalizationPreviewOptionResponse']
 export type FinalizePollResponse = components['schemas']['FinalizePollResponse']
 
 export const pollKeys = {
@@ -83,6 +80,14 @@ export async function suggestPollOption(pollId: string, startTime: string) {
   })
   if (!data) throw new Error('Suggest option response was empty.')
   return data
+}
+
+// Organizer-only, valid only while the poll is still Polling — the server is the sole
+// enforcer of that gate (`poll_invalid_transition` otherwise).
+export async function deletePollOption(pollId: string, optionId: string) {
+  await client.DELETE('/api/v1/polls/{pollId}/options/{optionId}', {
+    params: { header: csrf, path: { pollId, optionId } },
+  })
 }
 
 export async function createPollGuestLinks(pollId: string, count: number) {

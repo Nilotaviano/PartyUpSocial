@@ -7,9 +7,7 @@
     "title": "Title",
     "options": "Candidate times",
     "optionsHelp": "Add at least two candidate times. Adding the same time twice merges it into one option.",
-    "addOption": "Add time",
     "removeOption": "Remove",
-    "optionMerged": "That time was already added.",
     "deadline": "Voting deadline",
     "deadlineChoice": {
       "hours6": "6 hours",
@@ -39,6 +37,16 @@
       "loading": "Searching...",
       "noResults": "No matches. Your typed name will still be used.",
       "listboxLabel": "Steam catalog matches"
+    },
+    "privacyPrivate": "Private",
+    "privacyPublic": "Public",
+    "grid": {
+      "heading": "Candidate start times",
+      "hint": "Tap a slot to add it as a candidate time.",
+      "showDaytime": "Show daytime",
+      "eveningsOnly": "Evenings only",
+      "weekOf": "Week of {{range}}",
+      "count": "{{count}}/{{max}} options"
     }
   },
   "validation": {
@@ -56,6 +64,8 @@
   },
   "list": {
     "heading": "Polls",
+    "description": "Vote on candidate times, then finalize the winner into a session.",
+    "bandTabsLabel": "Poll bands",
     "involved": "Your polls",
     "discoverable": "Discover",
     "emptyInvolved": "You have no active polls.",
@@ -66,6 +76,7 @@
     "optionCount_other": "{{count}} options"
   },
   "status": {
+    "polling": "Polling",
     "pollingUntil": "Polling · closes {{deadline}}",
     "awaitingSelection": "Closed · awaiting selection",
     "expiredPending": "Closed · selection window ended",
@@ -78,14 +89,9 @@
     "options": "Options",
     "roster": "Voters",
     "anonymous": "Anonymous User",
+    "hiddenSuffix": "(hidden)",
     "removed": "Removed",
-    "deadline": "Voting closes {{deadline}}.",
-    "awaitingSelectionNotice": "Voting has closed. The organizer is choosing a time.",
-    "expiredPendingNotice": "This poll's selection window has closed.",
-    "finalizedNotice": "This poll was finalized.",
     "viewSession": "View the session",
-    "expiredNotice": "This poll expired without a selection.",
-    "canceledNotice": "This poll was canceled.",
     "tallyAvailable_one": "{{count}} available",
     "tallyAvailable_other": "{{count}} available",
     "tallyMaybe_one": "{{count}} maybe",
@@ -128,15 +134,9 @@
     "help": "Leaving withdraws your votes. You are not banned — you can be invited again or ask to join."
   },
   "finalize": {
-    "heading": "Choose a time",
-    "earlyHeading": "Finalize early",
     "earlyNotice": "Enough people are available for at least one time. Finalizing now ends voting immediately and creates the session.",
     "previewGuarantee": "This preview and finalizing use the same rule — the same inputs always produce the same result. If something changes in between (an option is removed, or someone's access changes), the outcome may differ from what's shown here.",
-    "chooseOption": "Choose the time to finalize",
     "belowMinimum": "Below minimum attendance",
-    "going": "Going: {{names}}",
-    "waitlisted": "Waitlisted: {{names}}",
-    "action": "Finalize",
     "confirmTitle": "Finalize this poll?",
     "confirmTitleEarly": "End voting and finalize?",
     "confirmBody": "This creates a session at {{time}} and cannot be undone.",
@@ -207,12 +207,67 @@
   "a11y": {
     "validationSummary": "There were problems with your submission",
     "dialogLabel": "Confirmation dialog",
-    "copyLink": "Copy invitation link"
+    "copyLink": "Copy invitation link",
+    "candidateFreeCount_one": "{{day}} {{time}} — {{count}} friend free",
+    "candidateFreeCount_other": "{{day}} {{time}} — {{count}} friends free"
   },
   "emptyState": {
     "polls": {
       "body": "No polls yet. Start one and let everyone pick a time that works.",
       "cta": "Create a poll"
     }
+  },
+  "detailLovable": {
+    "meta": {
+      "duration": "Duration",
+      "privacy": "Privacy",
+      "minimum": "Minimum",
+      "capacity": "Capacity",
+      "unlimited": "Unlimited"
+    },
+    "privacyPrivate": "Private",
+    "privacyPublic": "Public",
+    "countdown": {
+      "votingClosesIn": "Voting closes in {{time}}",
+      "pickWindow": "Organizer has {{time}} of the 48h window left to pick",
+      "lockedIn": "Locked in · {{time}}",
+      "expiredBanner": "Expired — the 48h picking window passed without a choice.",
+      "canceledBanner": "Cancelled by the organizer. Votes are kept for reference."
+    },
+    "invited": "Invited · {{count}}",
+    "organizerNote": "Organizer",
+    "legendHeading": "Legend",
+    "legendHint": "icon + label, not colour",
+    "pastOptionLegend": "Past option",
+    "pastOptionHint": "still selectable",
+    "rank": "Rank {{rank}}",
+    "currentLeader": "Current leader",
+    "winningTime": "Winning time",
+    "alreadyPassed": "Already passed",
+    "repliedCount": "{{responded}}/{{total}} replied",
+    "previewSeats": "Preview seats",
+    "deleteOption": "Delete option",
+    "deleteOptionTitle": "Delete this option?",
+    "deleteOptionBody": "Everyone's votes on this time are removed. Other options are untouched.",
+    "keepIt": "Keep it",
+    "yourVoteHeading": "Your vote",
+    "seated": "Seated",
+    "waitlist": "Waitlist",
+    "nobodyCanMake": "Nobody can make this time.",
+    "everyoneFits": "Everyone fits.",
+    "belowMinimumNotice": "Below the minimum of {{min}} players — you can still finalize.",
+    "notYet": "Not yet",
+    "lockInTime": "Lock in this time",
+    "previewAndFinalize": "Preview & finalize",
+    "suggestDialogTitle": "Suggest another time",
+    "suggestDialogHelp": "It becomes an option straight away — no approval needed.",
+    "nudgeNotice": "Everyone gets a nudge to vote on the new option.",
+    "cancel": "Cancel",
+    "candidateHeading": "Candidate times",
+    "candidateHint": "Ranked by Available, then Maybe. Vote on every option.",
+    "voterChipsLabel": "{{category}} voters: {{names}}",
+    "voterChipsOverflow": "+{{count}} more",
+    "voterChipsOverflow_one": "+{{count}} more",
+    "voterChipsOverflow_other": "+{{count}} more"
   }
 }

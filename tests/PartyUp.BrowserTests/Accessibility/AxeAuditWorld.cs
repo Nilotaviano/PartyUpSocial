@@ -282,16 +282,18 @@ internal static class AxeAuditWorld
         await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/polls/new");
         await page.Locator("#field-title").FillAsync(title);
 
-        string optionOne = DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
-        string optionTwo = DateTime.UtcNow.AddDays(2).ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
-        await page.Locator("#field-option-value").FillAsync(optionOne);
-        await page.GetByRole(AriaRole.Button, new() { Name = "Add time" }).ClickAsync();
-        await page.Locator("#field-option-value").FillAsync(optionTwo);
-        await page.GetByRole(AriaRole.Button, new() { Name = "Add time" }).ClickAsync();
+        // Two candidate times off the click-to-toggle `CandidateGrid`
+        // (`data-testid="candidate-slot-{dayIndex}-{minuteOfDay}"`), replacing the old
+        // `#field-option-value` + "Add time" date-input flow. "Next week" keeps both slots
+        // unambiguously in the future.
+        await page.GetByRole(AriaRole.Button, new() { Name = "Next week" }).ClickAsync();
+        await page.GetByTestId("candidate-slot-1-1020").ClickAsync();
+        await page.GetByTestId("candidate-slot-2-1020").ClickAsync();
 
         await page.Locator("#field-min").FillAsync("1");
         await page.Locator("#field-max").FillAsync("4");
-        await page.GetByLabel("Private poll").CheckAsync();
+        await page.GetByRole(AriaRole.Radiogroup, new() { Name = "Private poll" })
+            .GetByRole(AriaRole.Radio, new() { Name = "Private" }).ClickAsync();
         await page.Locator("#field-guest-links").FillAsync("1");
         await page.GetByRole(AriaRole.Button, new() { Name = "Create poll" }).ClickAsync();
         await page.WaitForURLAsync(url => Regex.IsMatch(url, @"/polls/[0-9a-fA-F-]{36}$"));

@@ -7,9 +7,7 @@
     "title": "Título",
     "options": "Horários candidatos",
     "optionsHelp": "Adicione pelo menos dois horários candidatos. Adicionar o mesmo horário duas vezes o mescla em uma única opção.",
-    "addOption": "Adicionar horário",
     "removeOption": "Remover",
-    "optionMerged": "Esse horário já havia sido adicionado.",
     "deadline": "Prazo de votação",
     "deadlineChoice": {
       "hours6": "6 horas",
@@ -39,6 +37,16 @@
       "loading": "Buscando...",
       "noResults": "Nenhum resultado. O nome digitado ainda será usado.",
       "listboxLabel": "Resultados do catálogo da Steam"
+    },
+    "privacyPrivate": "Privada",
+    "privacyPublic": "Pública",
+    "grid": {
+      "heading": "Horários candidatos",
+      "hint": "Toque em um horário para adicioná-lo como candidato.",
+      "showDaytime": "Mostrar horário diurno",
+      "eveningsOnly": "Somente à noite",
+      "weekOf": "Semana de {{range}}",
+      "count": "{{count}}/{{max}} opções"
     }
   },
   "validation": {
@@ -56,6 +64,8 @@
   },
   "list": {
     "heading": "Enquetes",
+    "description": "Vote nos horários candidatos e finalize o horário vencedor em uma sessão.",
+    "bandTabsLabel": "Grupos de enquetes",
     "involved": "Suas enquetes",
     "discoverable": "Descobrir",
     "emptyInvolved": "Você não tem enquetes ativas.",
@@ -66,6 +76,7 @@
     "optionCount_other": "{{count}} opções"
   },
   "status": {
+    "polling": "Votação",
     "pollingUntil": "Votação · encerra {{deadline}}",
     "awaitingSelection": "Encerrada · aguardando seleção",
     "expiredPending": "Encerrada · janela de seleção vencida",
@@ -78,14 +89,9 @@
     "options": "Opções",
     "roster": "Votantes",
     "anonymous": "Usuário Anônimo",
+    "hiddenSuffix": "(oculto)",
     "removed": "Removido",
-    "deadline": "A votação encerra {{deadline}}.",
-    "awaitingSelectionNotice": "A votação encerrou. O organizador está escolhendo um horário.",
-    "expiredPendingNotice": "A janela de seleção desta enquete já encerrou.",
-    "finalizedNotice": "Esta enquete foi finalizada.",
     "viewSession": "Ver a sessão",
-    "expiredNotice": "Esta enquete expirou sem uma seleção.",
-    "canceledNotice": "Esta enquete foi cancelada.",
     "tallyAvailable_one": "{{count}} disponível",
     "tallyAvailable_other": "{{count}} disponíveis",
     "tallyMaybe_one": "{{count}} talvez",
@@ -128,15 +134,9 @@
     "help": "Ao sair, seus votos são retirados. Você não fica banido — pode ser convidado de novo ou pedir para entrar."
   },
   "finalize": {
-    "heading": "Escolha um horário",
-    "earlyHeading": "Finalizar antes do prazo",
     "earlyNotice": "Há gente disponível suficiente para pelo menos um horário. Finalizar agora encerra a votação imediatamente e cria a sessão.",
     "previewGuarantee": "Esta prévia e a finalização usam a mesma regra — as mesmas entradas sempre produzem o mesmo resultado. Se algo mudar nesse meio-tempo (uma opção for removida, ou o acesso de alguém mudar), o resultado pode ser diferente do que é mostrado aqui.",
-    "chooseOption": "Escolha o horário para finalizar",
     "belowMinimum": "Abaixo da presença mínima",
-    "going": "Confirmados: {{names}}",
-    "waitlisted": "Na lista de espera: {{names}}",
-    "action": "Finalizar",
     "confirmTitle": "Finalizar esta enquete?",
     "confirmTitleEarly": "Encerrar a votação e finalizar?",
     "confirmBody": "Isso cria uma sessão em {{time}} e não pode ser desfeito.",
@@ -207,12 +207,67 @@
   "a11y": {
     "validationSummary": "Houve problemas com seu envio",
     "dialogLabel": "Caixa de confirmação",
-    "copyLink": "Copiar link de convite"
+    "copyLink": "Copiar link de convite",
+    "candidateFreeCount_one": "{{day}} {{time}} — {{count}} amigo livre",
+    "candidateFreeCount_other": "{{day}} {{time}} — {{count}} amigos livres"
   },
   "emptyState": {
     "polls": {
       "body": "Nenhuma enquete ainda. Crie uma e deixe todos escolherem um horário que funcione.",
       "cta": "Criar enquete"
     }
+  },
+  "detailLovable": {
+    "meta": {
+      "duration": "Duração",
+      "privacy": "Privacidade",
+      "minimum": "Mínimo",
+      "capacity": "Capacidade",
+      "unlimited": "Ilimitada"
+    },
+    "privacyPrivate": "Privada",
+    "privacyPublic": "Pública",
+    "countdown": {
+      "votingClosesIn": "A votação encerra em {{time}}",
+      "pickWindow": "O organizador tem {{time}} da janela de 48h para escolher",
+      "lockedIn": "Definido · {{time}}",
+      "expiredBanner": "Expirada — a janela de 48h para escolher passou sem uma seleção.",
+      "canceledBanner": "Cancelada pelo organizador. Os votos são mantidos como referência."
+    },
+    "invited": "Convidados · {{count}}",
+    "organizerNote": "Organizador",
+    "legendHeading": "Legenda",
+    "legendHint": "ícone + rótulo, não cor",
+    "pastOptionLegend": "Opção passada",
+    "pastOptionHint": "ainda selecionável",
+    "rank": "Posição {{rank}}",
+    "currentLeader": "Líder atual",
+    "winningTime": "Horário vencedor",
+    "alreadyPassed": "Já passou",
+    "repliedCount": "{{responded}}/{{total}} responderam",
+    "previewSeats": "Pré-visualizar vagas",
+    "deleteOption": "Excluir opção",
+    "deleteOptionTitle": "Excluir esta opção?",
+    "deleteOptionBody": "Todos os votos neste horário são removidos. As outras opções não são afetadas.",
+    "keepIt": "Manter",
+    "yourVoteHeading": "Seu voto",
+    "seated": "Vagas confirmadas",
+    "waitlist": "Lista de espera",
+    "nobodyCanMake": "Ninguém pode neste horário.",
+    "everyoneFits": "Todos cabem.",
+    "belowMinimumNotice": "Abaixo do mínimo de {{min}} jogadores — você ainda pode finalizar.",
+    "notYet": "Ainda não",
+    "lockInTime": "Definir este horário",
+    "previewAndFinalize": "Pré-visualizar e finalizar",
+    "suggestDialogTitle": "Sugerir outro horário",
+    "suggestDialogHelp": "Vira uma opção imediatamente — sem aprovação necessária.",
+    "nudgeNotice": "Todos recebem um aviso para votar na nova opção.",
+    "cancel": "Cancelar",
+    "candidateHeading": "Horários candidatos",
+    "candidateHint": "Ordenados por Disponível, depois Talvez. Vote em todas as opções.",
+    "voterChipsLabel": "Votantes de {{category}}: {{names}}",
+    "voterChipsOverflow": "+{{count}} a mais",
+    "voterChipsOverflow_one": "+{{count}} a mais",
+    "voterChipsOverflow_other": "+{{count}} a mais"
   }
 }

@@ -5,12 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({ get: vi.fn() }))
 
-vi.mock('../../api/client', () => ({
+vi.mock('../../../api/client', () => ({
   client: { GET: api.get },
   isApiError: () => false,
 }))
 
-import '../../i18n'
+import '../../../i18n'
 import { PollListPage } from './PollListPage'
 
 function poll(overrides: Partial<Record<string, unknown>> = {}) {
@@ -46,7 +46,7 @@ afterEach(() => {
 })
 
 describe('PollListPage', () => {
-  it('renders both the involved and discoverable bands from GET /polls', async () => {
+  it('renders the involved band by default from GET /polls', async () => {
     api.get.mockImplementation(
       (_path: string, options?: { params: { query: { band?: string } } }) => {
         const band = options?.params.query.band
@@ -63,12 +63,48 @@ describe('PollListPage', () => {
     renderPage()
 
     expect(await screen.findByText('Raid night poll')).toBeInTheDocument()
-    expect(await screen.findByText('Open lobby')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Your polls' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Discover' })).toBeInTheDocument()
+    expect(screen.queryByText('Open lobby')).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Your polls' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    expect(screen.getByRole('tab', { name: 'Discover' })).toHaveAttribute(
+      'aria-selected',
+      'false',
+    )
   })
 
-  it('shows a status chip with the deadline as text while polling', async () => {
+  it('switches the query family when the discoverable tab is activated', async () => {
+    api.get.mockImplementation(
+      (_path: string, options?: { params: { query: { band?: string } } }) => {
+        const band = options?.params.query.band
+        if (band === 'discoverable') {
+          return Promise.resolve({
+            data: { items: [poll({ id: 'poll-2', title: 'Open lobby' })], nextCursor: null },
+          })
+        }
+        return Promise.resolve({
+          data: { items: [poll({ title: 'Raid night poll' })], nextCursor: null },
+        })
+      },
+    )
+    renderPage()
+
+    expect(await screen.findByText('Raid night poll')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Discover' }))
+
+    expect(await screen.findByText('Open lobby')).toBeInTheDocument()
+    expect(screen.queryByText('Raid night poll')).not.toBeInTheDocument()
+    expect(
+      api.get.mock.calls.some(
+        (call) => (call[1] as { params: { query: { band?: string } } }).params.query.band ===
+          'discoverable',
+      ),
+    ).toBe(true)
+  })
+
+  it('shows a status pill with the deadline as text while polling', async () => {
     const deadline = '2099-06-15T23:00:00Z'
     api.get.mockResolvedValue({ data: { items: [poll({ deadline })], nextCursor: null } })
     renderPage()
@@ -92,17 +128,29 @@ describe('PollListPage', () => {
     expect(await screen.findByText('Closed · awaiting selection')).toBeInTheDocument()
   })
 
-  it('shows both bands empty states', async () => {
+  it('shows the involved empty state with a create-poll way out', async () => {
     api.get.mockResolvedValue({ data: { items: [], nextCursor: null } })
     renderPage()
 
     expect(await screen.findByText('You have no active polls.')).toBeInTheDocument()
     expect(
-      screen.getByText('No open polls to discover right now.'),
-    ).toBeInTheDocument()
+      screen.getByRole('link', { name: 'Create a poll' }),
+    ).toHaveAttribute('href', '/polls/new')
   })
 
-  it('loads the next cursor page per band independently', async () => {
+  it('shows the discoverable empty state with no CTA', async () => {
+    api.get.mockResolvedValue({ data: { items: [], nextCursor: null } })
+    renderPage()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Discover' }))
+
+    expect(
+      await screen.findByText('No open polls to discover right now.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Create a poll' })).not.toBeInTheDocument()
+  })
+
+  it('loads the next cursor page for the active band', async () => {
     api.get.mockImplementation(
       (
         _path: string,
@@ -132,6 +180,43 @@ describe('PollListPage', () => {
     expect(screen.getByText('First')).toBeInTheDocument()
   })
 
+  it('resets pagination when switching bands', async () => {
+    api.get.mockImplementation(
+      (
+        _path: string,
+        options?: { params: { query: { band?: string; cursor?: string } } },
+      ) => {
+        const band = options?.params.query.band
+        const cursor = options?.params.query.cursor
+        if (band === 'discoverable') {
+          return Promise.resolve({
+            data: { items: [poll({ id: 'poll-3', title: 'Discoverable one' })], nextCursor: null },
+          })
+        }
+        if (!cursor) {
+          return Promise.resolve({
+            data: { items: [poll({ id: 'poll-1', title: 'First' })], nextCursor: 'page-2' },
+          })
+        }
+        return Promise.resolve({
+          data: { items: [poll({ id: 'poll-2', title: 'Second' })], nextCursor: null },
+        })
+      },
+    )
+    renderPage()
+
+    expect(await screen.findByText('First')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    await waitFor(() => expect(screen.getByText('Second')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Discover' }))
+    expect(await screen.findByText('Discoverable one')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Your polls' }))
+    expect(await screen.findByText('First')).toBeInTheDocument()
+    expect(screen.queryByText('Second')).not.toBeInTheDocument()
+  })
+
   it('links to /polls/new to create a poll', async () => {
     api.get.mockResolvedValue({ data: { items: [], nextCursor: null } })
     renderPage()
@@ -139,5 +224,12 @@ describe('PollListPage', () => {
     expect(
       await screen.findByRole('link', { name: 'New poll' }),
     ).toHaveAttribute('href', '/polls/new')
+  })
+
+  it('shows option count as a text-coded chip, not just the status colour', async () => {
+    api.get.mockResolvedValue({ data: { items: [poll({ optionCount: 4 })], nextCursor: null } })
+    renderPage()
+
+    expect(await screen.findByText('4 options')).toBeInTheDocument()
   })
 })
