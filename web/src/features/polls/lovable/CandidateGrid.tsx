@@ -149,7 +149,9 @@ function SlotRow({
       <div
         className={cn(
           'flex h-11 items-center justify-end pr-1 text-[11px] tabular-nums',
-          onHour ? 'font-bold text-muted-foreground' : 'text-muted-foreground/60',
+          // Full-opacity ink on both branches: the prototype's /60 half-hour
+          // labels sat at 2.54:1, under the 4.5:1 floor (WCAG 1.4.3 / D-139).
+          onHour ? 'font-bold text-muted-foreground' : 'text-muted-foreground',
         )}
       >
         {fmt(m)}
