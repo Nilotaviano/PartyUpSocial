@@ -19,7 +19,6 @@ using PartyUp.Infrastructure.Deletion;
 using PartyUp.Infrastructure.Identity;
 using PartyUp.Infrastructure.Persistence;
 using PartyUp.Infrastructure.Persistence.Repositories;
-using Testcontainers.PostgreSql;
 using System.Threading.Channels;
 
 namespace PartyUp.Api.IntegrationTests;
@@ -29,8 +28,7 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
     private readonly bool _googleEnabled;
     private readonly bool? _steamEnabled;
     private readonly string? _deletionJournalPath;
-    private readonly PostgreSqlContainer _postgres =
-        new PostgreSqlBuilder("postgres:17-alpine").Build();
+    private string? _connectionString;
     private readonly CapturingEmailSender _emailSender = new();
     private readonly CountingPasswordHasher _passwordHasher = new();
     private readonly PostAuthenticationGateProbe _postAuthenticationGateProbe = new();
@@ -66,9 +64,21 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
         _deletionJournalPath = deletionJournalPath;
     }
 
-    internal Task StartAsync() => _postgres.StartAsync();
+    /// <summary>
+    /// Provisions this factory's own database on the process-wide container (see
+    /// <see cref="SharedPostgres"/>) and must run before the host is built.
+    /// </summary>
+    internal async Task StartAsync() =>
+        _connectionString = await SharedPostgres.CreateDatabaseAsync();
 
-    internal Task StopAsync() => _postgres.DisposeAsync().AsTask();
+    internal async Task StopAsync()
+    {
+        if (_connectionString is { } connectionString)
+        {
+            _connectionString = null;
+            await SharedPostgres.DropDatabaseAsync(connectionString);
+        }
+    }
 
     internal async Task<UserId> SeedUserAsync(
         bool completeProfile = true,
@@ -161,7 +171,8 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
         {
             var settings = new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Db"] = _postgres.GetConnectionString(),
+                ["ConnectionStrings:Db"] = _connectionString ?? throw new InvalidOperationException(
+                    $"{nameof(StartAsync)} must complete before the host is built."),
                 ["Database:MigrateOnStartup"] = "true",
                 ["Deletion:SweepEnabled"] = "false",
                 ["Email:Provider"] = "log",
