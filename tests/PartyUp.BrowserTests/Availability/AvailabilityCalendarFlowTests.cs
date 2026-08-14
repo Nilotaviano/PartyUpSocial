@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
@@ -22,8 +21,8 @@ namespace PartyUp.BrowserTests.Availability;
 public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
 {
     /// <summary>
-    /// The commit dialog's accessible name is the painted range (`commit.range`), formatted in the
-    /// viewer's locale — matched on the "time separator time" shape so it survives any range value.
+    /// The commit dialog's accessible name is the painted range, formatted in the viewer's locale
+    /// — matched on the "time separator time" shape so it survives any range value.
     /// </summary>
     private static readonly Regex CommitRangePattern = new(@"\d{1,2}:\d{2}.*\d{1,2}:\d{2}");
 
@@ -132,10 +131,14 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
 
     /// <summary>
     /// Phase 5.1 S1 geometry gate (PHASE5_1_DESIGN.md §3 "Grid geometry gate"): the row-ordering
-    /// fact above passes at any height, so it is not a tripwire against the Gabarito/Nunito Sans
-    /// font swap moving row metrics. This fact pins the durable floor instead — every row's cells
-    /// are at least 44px tall (WCAG 2.2 target-size) and every row is the same height as the first
-    /// (no pixel-pinned baseline, since fonts legitimately move metrics slightly).
+    /// fact above passes at any height, so it is not a tripwire against a font or layout change
+    /// collapsing the calendar's real touch targets. WCAG 2.5.8 sizes *pointer* targets, and the
+    /// 15-minute cell layer is not one — it is a transparent <c>pointer-events:none</c> overlay
+    /// that exists for the keyboard and the accessibility tree only (`lovable/WeekGrid.tsx`). So
+    /// this pins the two things that are real: the painted day columns a finger actually drags on
+    /// stay full-height and wide enough to hit, and every control on the calendar screen clears
+    /// the 24px target-size floor. Row uniformity is checked without a pixel-pinned baseline,
+    /// since fonts legitimately move metrics slightly.
     /// </summary>
     [Fact]
     public async Task GridCellsMeetGeometryFloor_D132()
@@ -146,8 +149,7 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/calendar");
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-        ILocator grid = page.GetByRole(AriaRole.Grid);
-        ILocator rows = grid.Locator("[role=row]");
+        ILocator rows = page.GetByRole(AriaRole.Grid).Locator("[role=row]");
         int rowCount = await rows.CountAsync();
         Assert.True(rowCount >= 3, "expected several time-slot rows in the visible week");
 
@@ -158,19 +160,47 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
             int cellCount = await cells.CountAsync();
             Assert.True(cellCount >= 1, $"row {rowIndex} has no gridcells");
 
-            for (int cellIndex = 0; cellIndex < cellCount; cellIndex++)
-            {
-                LocatorBoundingBoxResult? box = await cells.Nth(cellIndex).BoundingBoxAsync();
-                Assert.NotNull(box);
-                Assert.True(
-                    box!.Height >= 44,
-                    $"row {rowIndex} cell {cellIndex} is {box.Height}px tall, expected >= 44px");
+            LocatorBoundingBoxResult? box = await cells.First.BoundingBoxAsync();
+            Assert.NotNull(box);
+            Assert.True(box!.Height > 0, $"row {rowIndex} has zero-height cells");
 
-                firstRowHeight ??= box.Height;
-                Assert.True(
-                    Math.Abs(box.Height - firstRowHeight.Value) < 1,
-                    $"row {rowIndex} cell {cellIndex} height {box.Height} differs from row 1's {firstRowHeight}");
+            firstRowHeight ??= box.Height;
+            Assert.True(
+                Math.Abs(box.Height - firstRowHeight.Value) < 1,
+                $"row {rowIndex} height {box.Height} differs from row 1's {firstRowHeight}");
+        }
+
+        // The paint surface itself: one column per shown day, each tall enough to hold every row
+        // and wide enough to hit with a finger.
+        ILocator columns = page.Locator("[data-daycol]");
+        int columnCount = await columns.CountAsync();
+        Assert.True(columnCount >= 1, "expected at least one painted day column");
+        double gridHeight = firstRowHeight!.Value * (rowCount - 1);
+        for (int columnIndex = 0; columnIndex < columnCount; columnIndex++)
+        {
+            LocatorBoundingBoxResult? box = await columns.Nth(columnIndex).BoundingBoxAsync();
+            Assert.NotNull(box);
+            Assert.True(box!.Width >= 44, $"day column {columnIndex} is {box.Width}px wide, expected >= 44px");
+            Assert.True(
+                box.Height >= gridHeight - 1,
+                $"day column {columnIndex} is {box.Height}px tall, expected to span the {gridHeight}px grid");
+        }
+
+        // WCAG 2.2 AA 2.5.8: every control on the calendar clears 24×24 CSS px.
+        ILocator controls = page.Locator("[data-testid=screen-calendar] button:visible");
+        int controlCount = await controls.CountAsync();
+        Assert.True(controlCount >= 1, "expected the calendar screen to carry controls");
+        for (int controlIndex = 0; controlIndex < controlCount; controlIndex++)
+        {
+            LocatorBoundingBoxResult? box = await controls.Nth(controlIndex).BoundingBoxAsync();
+            if (box is null)
+            {
+                continue;
             }
+
+            Assert.True(
+                box.Width >= 24 && box.Height >= 24,
+                $"control {controlIndex} is {box.Width}×{box.Height}px, below the 24×24 target-size floor");
         }
     }
 
@@ -186,23 +216,16 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         // Counted relative to a baseline, not an absolute 0/1: the sibling fact in this class
         // shares this account and seeds a recurring series that can legitimately show its own
         // busy cell in the same visible week (xunit does not order facts across a class).
-        ILocator busyCells = page.GetByRole(AriaRole.Gridcell, new() { NameRegex = new Regex("Busy") });
+        // Busy state is the server's own merge, read straight off the cell layer (A-076).
+        ILocator busyCells = page.Locator("[role=gridcell][data-state=busy]");
         int baselineBusyCount = await busyCells.CountAsync();
-
-        // The same cells addressed structurally. While the modal commit dialog is open Radix
-        // marks the rest of the page `aria-hidden`, which removes it from the accessibility tree
-        // and therefore from every role-based locator — so the "nothing is created yet" check
-        // below, the only one that runs with the dialog up, has to read the DOM instead.
-        ILocator busyCellsInDom = page.Locator("[role=gridcell][data-busy=true]");
-        int baselineBusyInDom = await busyCellsInDom.CountAsync();
 
         // Create: focus the grid's one tab stop (08:00 on the week's first day, the clamped
         // viewport's first row — always earlier than the sibling fact's fixed 10:00 series, so
         // it sorts first in DOM order below regardless of run order), then keyboard alone —
-        // Enter starts a selection, Shift+ArrowDown extends it by one 15-minute slot (two
-        // grid rows), Enter ends the paint (P5-CAL-01). This first dialog is Escaped away
-        // to prove the trap and focus return; the block actually saved is the 08:15–08:45
-        // repaint below.
+        // Enter starts a selection, Shift+ArrowDown extends it by one 15-minute slot, Enter ends
+        // the paint (P5-CAL-01). This first dialog is Escaped away to prove the trap and focus
+        // return; the block actually saved is the repaint below.
         ILocator firstCell = page.GetByRole(AriaRole.Gridcell).First;
         await firstCell.FocusAsync();
         await Assertions.Expect(firstCell).ToBeFocusedAsync();
@@ -212,19 +235,19 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
 
         // D-009/§7: the painted range is only a proposal — nothing is created until the commit
         // dialog's one-time/weekly choice is confirmed. Keyboard-only, so the choice is left at
-        // its "Just this time" default (a one-time block, which the edit half below depends on)
-        // and Save is reached and activated without a pointer.
-        // The dialog is named by the painted range itself, so it is matched on the
-        // time-range shape rather than on a fixed title string.
+        // its "One-time" default (a one-time block, which the edit half below depends on) and
+        // Save is reached and activated without a pointer. The dialog is named by the painted
+        // range itself, so it is matched on the time-range shape rather than a fixed title.
         ILocator commitDialog = page.GetByRole(AriaRole.Dialog, new() { NameRegex = CommitRangePattern });
         await commitDialog.WaitForAsync();
-        await Assertions.Expect(busyCellsInDom).ToHaveCountAsync(baselineBusyInDom);
+        await Assertions.Expect(busyCells).ToHaveCountAsync(baselineBusyCount);
         await Assertions
-            .Expect(commitDialog.GetByRole(AriaRole.Radio, new() { Name = "Just this time" }))
-            .ToBeCheckedAsync();
+            .Expect(commitDialog.GetByRole(AriaRole.Button, new() { Name = "One-time", Exact = true }))
+            .ToHaveAttributeAsync("aria-pressed", "true");
 
-        // WCAG 2.4.3/2.1.2: the popover is modal, so Tab has to cycle within it — six presses is
-        // more than one full cycle of its controls (two recurrence radios, Cancel, Save).
+        // WCAG 2.4.3/2.1.2: the popover declares `aria-modal`, so Tab has to cycle within it —
+        // six presses is more than one full cycle of its controls (two recurrence toggles,
+        // Cancel, Save).
         for (int tab = 0; tab < 6; tab++)
         {
             await page.Keyboard.PressAsync("Tab");
@@ -238,7 +261,7 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         await page.Keyboard.PressAsync("Escape");
         await Assertions.Expect(commitDialog).Not.ToBeVisibleAsync();
         await Assertions.Expect(page.Locator("[role=grid] [role=gridcell]:focus")).ToHaveCountAsync(1);
-        await Assertions.Expect(busyCellsInDom).ToHaveCountAsync(baselineBusyInDom);
+        await Assertions.Expect(busyCells).ToHaveCountAsync(baselineBusyCount);
 
         // Paint again from the restored focus position and take the same commit dialog through to
         // Save this time — the create half of this fact continues from here.
@@ -254,50 +277,29 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         await Assertions.Expect(commitDialog).Not.ToBeVisibleAsync();
 
         // Two busy gridcells for one 30-minute block — each 15-minute row it spans paints
-        // separately (`mergedAt` in `WeekGrid.tsx`), never a single merged DOM cell.
+        // separately, never a single merged DOM cell.
         await Assertions.Expect(busyCells).ToHaveCountAsync(baselineBusyCount + 2);
 
-        // Edit: Enter on the busy cell opens the editor directly (a one-time block carries no
-        // series, so no scope choice applies — that half is the sibling fact below). Read the
-        // dialog's own prefilled value back rather than independently recomputing the grid's
-        // displayed week, and shift one hour later on the same day so the edited block stays
-        // inside the still-visible week and still sorts before — and never overlaps, which would
-        // merge the two bands and change the busy-cell count — the sibling fact's 10:00 series.
-        await busyCells.First.FocusAsync();
+        // Edit: the availability panel lists every published window, one-off rules last, and each
+        // row's own controls are the edit surface (the grid's drag handles are the pointer half of
+        // the same operation). Reached and operated by keyboard alone.
+        ILocator editWindow = page.GetByRole(AriaRole.Button, new() { Name = "Edit window" }).Last;
+        await editWindow.FocusAsync();
         await page.Keyboard.PressAsync("Enter");
-        ILocator editDialog = page.GetByRole(AriaRole.Dialog);
-        await editDialog.GetByText("Edit availability").WaitForAsync();
 
-        // Dialog-scoped and label-exact: the grid's own edge-resize handles are labelled
-        // "Change start time"/"Change end time", which a page-wide substring label match also
-        // resolves (strict-mode violation), and `aria-hidden` does not filter label locators.
-        ILocator startField = editDialog.GetByLabel("Start time", new() { Exact = true });
-        ILocator endField = editDialog.GetByLabel("End time", new() { Exact = true });
-        DateTime originalStart = DateTime.ParseExact(
-            await startField.InputValueAsync(), "yyyy-MM-dd\\THH:mm", CultureInfo.InvariantCulture);
-        DateTime editedStart = originalStart.AddHours(1);
-        DateTime editedEnd = editedStart.AddMinutes(30);
-        await startField.FillAsync(editedStart.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture));
-        await endField.FillAsync(editedEnd.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture));
+        // Stretch the block's end to 09:00 — still inside the visible week, and still ending
+        // before the sibling fact's 10:00 series so the two never overlap and merge.
+        ILocator endTime = page.GetByLabel("End time", new() { Exact = true });
+        await endTime.SelectOptionAsync(new SelectOptionValue { Value = "540" });
 
-        ILocator saveButton = page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true });
-        await saveButton.FocusAsync();
-        await page.Keyboard.PressAsync("Enter");
-        await Assertions.Expect(editDialog).Not.ToBeVisibleAsync();
+        // The block moved rather than duplicating: one rule row still, now four slots long.
+        await Assertions.Expect(busyCells).ToHaveCountAsync(baselineBusyCount + 4);
+        await Assertions.Expect(page.GetByText(new Regex("08:00.09:00")).First).ToBeVisibleAsync();
 
-        // Still the same count — the edit moved the block, it did not duplicate it.
-        await Assertions.Expect(busyCells).ToHaveCountAsync(baselineBusyCount + 2);
-
-        // Delete: focus the (moved) busy cell, open it, reach Delete with the keyboard alone.
-        await busyCells.First.FocusAsync();
-        await page.Keyboard.PressAsync("Enter");
-        ILocator deleteDialog = page.GetByRole(AriaRole.Dialog);
-        await deleteDialog.GetByText("Edit availability").WaitForAsync();
-        // Scoped to the editor and name-exact: the availability summary panel renders a per-row
-        // delete button whose accessible name is "Delete <rule>", which a page-wide, non-exact
-        // "Delete" match would also resolve (strict-mode violation).
-        ILocator deleteButton = deleteDialog.GetByRole(AriaRole.Button, new() { Name = "Delete", Exact = true });
-        await deleteButton.FocusAsync();
+        // Delete: a one-time window carries no series, so it goes without a scope question — the
+        // weekly confirm is the sibling fact below.
+        ILocator deleteWindow = page.GetByRole(AriaRole.Button, new() { Name = "Delete window" }).Last;
+        await deleteWindow.FocusAsync();
         await page.Keyboard.PressAsync("Enter");
 
         await Assertions.Expect(busyCells).ToHaveCountAsync(baselineBusyCount);
@@ -322,7 +324,8 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
 
         // The grid's own status region, not the page's other live regions (the early-hours notice
         // and the app chrome's notification counter both carry one).
-        ILocator gridStatus = page.Locator("[role=grid]").Locator("xpath=..").GetByRole(AriaRole.Status);
+        ILocator gridStatus = page.Locator(
+            "[data-testid=screen-calendar] [role=status]:not([data-testid=early-hours-status])");
 
         await page.GetByRole(AriaRole.Gridcell).First.FocusAsync();
         await page.Keyboard.PressAsync("Enter");
@@ -363,6 +366,11 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/calendar/agenda");
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
+        // Both views stay reachable from the calendar itself, not by URL alone.
+        await Assertions
+            .Expect(page.GetByRole(AriaRole.Tab, new() { Name = "Agenda" }))
+            .ToHaveAttributeAsync("aria-selected", "true");
+
         ILocator agenda = page.GetByRole(AriaRole.List, new() { Name = "Agenda" });
         await agenda.WaitForAsync();
 
@@ -379,6 +387,10 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         Assert.False(
             string.IsNullOrWhiteSpace(firstRow),
             "an agenda row must not depend on anything but its own text");
+
+        // The spatial view is one keyboard activation away, over the same range.
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Week" }).ClickAsync();
+        await page.GetByRole(AriaRole.Grid).WaitForAsync();
     }
 
     [Fact]
@@ -393,10 +405,13 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/calendar");
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-        ILocator busyCell = page.GetByRole(AriaRole.Gridcell, new() { NameRegex = new Regex("Busy") }).First;
-        await busyCell.WaitForAsync();
-        await busyCell.FocusAsync();
+        // The panel lists weekly rules first, so the first row is a series occurrence — the one
+        // case whose edit has to ask about scope. Opened by keyboard alone.
+        ILocator editWindow = page.GetByRole(AriaRole.Button, new() { Name = "Edit window" }).First;
+        await editWindow.FocusAsync();
         await page.Keyboard.PressAsync("Enter");
+        await page.GetByLabel("Start time", new() { Exact = true }).SelectOptionAsync(
+            new SelectOptionValue { Value = "555" });
 
         ILocator scopeDialog = page.GetByRole(AriaRole.Dialog);
         await scopeDialog.GetByRole(AriaRole.Heading, new() { Name = "Which occurrences?" }).WaitForAsync();
@@ -416,14 +431,11 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         await confirmButton.FocusAsync();
         await page.Keyboard.PressAsync("Enter");
 
-        // The scope choice reaches the editor it gates — the flow that follows is D-143's
-        // `thisAndFuture` save path, proven end to end at the unit layer
-        // (`WeekGridPage.test.tsx`'s `saves the thisAndFuture scope end to end...` test); this
-        // fact's job is the dialog's own pointer-free reachability, so it stops once that editor
-        // opens and leaves without saving.
-        ILocator editDialog = page.GetByRole(AriaRole.Dialog);
-        await editDialog.GetByText("Edit availability").WaitForAsync();
-        await page.Keyboard.PressAsync("Escape");
-        await Assertions.Expect(editDialog).Not.ToBeVisibleAsync();
+        // The scope choice reaches the write it gates — the `thisAndFuture` body shape itself is
+        // proven at the unit layer (`lovable/CalendarShell.test.tsx`'s
+        // `saves the thisAndFuture scope as the series shape...` test); this fact's job is the
+        // dialog's own pointer-free reachability, so it stops once the edit has landed.
+        await Assertions.Expect(scopeDialog).Not.ToBeVisibleAsync();
+        await page.GetByText("Window updated").WaitForAsync();
     }
 }

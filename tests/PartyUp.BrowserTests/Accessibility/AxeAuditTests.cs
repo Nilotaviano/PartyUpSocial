@@ -672,9 +672,9 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
 
     /// <summary>
     /// The three availability modals, reached the way a keyboard viewer reaches them and audited in
-    /// one walk: paint a range to raise the commit dialog, cancel it, then open the seeded weekly
-    /// series' busy cell — which raises the D-134/D-143 scope dialog, whose Confirm raises the block
-    /// editor. Nothing is saved, so the organizer's calendar is unchanged for the route cases.
+    /// one walk: paint a range to raise the commit dialog, cancel it, then edit the seeded weekly
+    /// series' edit — which raises the D-134/D-143 scope dialog — and finally its delete confirm.
+    /// Nothing is saved, so the organizer's calendar is unchanged for the route cases.
     /// </summary>
     [Theory]
     [InlineData(AuditedTheme.Light)]
@@ -711,38 +711,36 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
             async page =>
             {
                 await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-                ILocator busyCell = page
-                    .GetByRole(AriaRole.Gridcell, new() { NameRegex = new Regex("Busy") }).First;
-                await busyCell.WaitForAsync();
-                await busyCell.FocusAsync();
-                await page.Keyboard.PressAsync("Enter");
+                // The panel lists weekly rules first, so its first row is the seeded series
+                // occurrence — the one case whose edit has to ask about scope.
+                await page.GetByRole(AriaRole.Button, new() { Name = "Edit window" }).First.ClickAsync();
+                await page.GetByLabel("Start time", new() { Exact = true })
+                    .SelectOptionAsync(new SelectOptionValue { Value = "555" });
                 await page.GetByRole(AriaRole.Dialog)
                     .GetByRole(AriaRole.Heading, new() { Name = "Which occurrences?" })
                     .WaitForAsync();
             });
 
         await AssertInteractionStateIsAxeCleanAsync(
-            "availability-block-editor-dialog",
+            "availability-delete-series-confirm",
             theme,
             context.Organizer.Page.Context,
             "/calendar",
             async page =>
             {
                 await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-                ILocator busyCell = page
-                    .GetByRole(AriaRole.Gridcell, new() { NameRegex = new Regex("Busy") }).First;
-                await busyCell.WaitForAsync();
-                await busyCell.FocusAsync();
-                await page.Keyboard.PressAsync("Enter");
-                await page.GetByRole(AriaRole.Button, new() { Name = "Confirm" }).ClickAsync();
-                await page.GetByRole(AriaRole.Dialog)
-                    .GetByText("Edit availability").WaitForAsync();
+                // Deleting a weekly rule is the surface's other modal: an alertdialog that says
+                // the removal reaches every future week before anything is written.
+                await page.GetByRole(AriaRole.Button, new() { Name = "Delete window" }).First.ClickAsync();
+                await page.GetByRole(AriaRole.Alertdialog)
+                    .GetByRole(AriaRole.Heading, new() { Name = "Delete this weekly rule?" })
+                    .WaitForAsync();
             });
     }
 
     /// <summary>
     /// A live keyboard selection on the week grid — the state between the first `Enter` and the one
-    /// that commits, where the grid carries `data-selection-edge` band borders and a `role=status`
+    /// that commits, where the grid carries `aria-selected` cells, a band preview and a `role=status`
     /// extent announcement that no initial-render scan has ever seen.
     /// </summary>
     [Theory]
@@ -764,10 +762,11 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
                 await page.Keyboard.PressAsync("Enter");
                 await page.Keyboard.PressAsync("Shift+ArrowDown");
                 await page.Keyboard.PressAsync("Shift+ArrowDown");
-                // The selection is live and uncommitted: banded cells, no dialog.
+                // The selection is live and uncommitted: the cells it covers report
+                // `aria-selected`, and no dialog has opened.
                 await Assertions
-                    .Expect(page.Locator("[role=gridcell][data-selection-edge]").First)
-                    .ToBeVisibleAsync();
+                    .Expect(page.Locator("[role=gridcell][aria-selected=true]"))
+                    .Not.ToHaveCountAsync(0);
                 await Assertions.Expect(page.GetByRole(AriaRole.Dialog)).ToHaveCountAsync(0);
             });
     }
@@ -779,7 +778,7 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
     /// only: the S3 bottom sheet needs a real drag gesture to open, which this fact does not
     /// perform. As of this writing that surface's own axe coverage is the
     /// <c>availability-commit-dialog</c>/<c>availability-occurrence-scope-dialog</c>/
-    /// <c>availability-block-editor-dialog</c> facts above, which scan the same dialog's desktop
+    /// <c>availability-delete-series-confirm</c> facts above, which scan the same dialog's desktop
     /// popover rendering (S3 keeps identical dialog semantics between the popover and bottom-sheet
     /// arms; only the anchor position differs) — not the bottom sheet itself at this width.
     /// </summary>

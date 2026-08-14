@@ -28,7 +28,8 @@ namespace PartyUp.BrowserTests.Availability;
 /// `clamp(todayIndex, 0, 4)`. That clamp always keeps today inside the window, so which weekday
 /// each column holds is not fixed, but the window is always exactly three columns wide and
 /// always present. Every day index below is therefore a window-relative column (0..2) and
-/// <see cref="CellIndex"/> strides by three.
+/// <see cref="CellIndex"/> strides by three — the row's leading time label is a
+/// <c>role=rowheader</c>, not a gridcell, so it never enters that stride.
 /// </para>
 /// </summary>
 [Trait("Category", "Integration")]
@@ -72,19 +73,37 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
     /// or at an explicit viewport point when <paramref name="clientY"/> is supplied, which is what
     /// the auto-scroll fact needs to reach a coordinate near the viewport's own bottom edge,
     /// independent of any one cell's on-screen position.
+    /// <para>
+    /// The cell layer is a transparent, <c>pointer-events:none</c> ARIA overlay — keyboard and AT
+    /// only — so the element that actually paints is the day column underneath it. The cell still
+    /// supplies the geometry (which is the point: this fact is about where in the 15-minute
+    /// lattice the gesture lands), and the column it belongs to is resolved by its position in its
+    /// own row rather than by hit-testing, which would not work for a row below the fold.
+    /// </para>
+    /// <para>
+    /// <paramref name="atBottom"/> aims at the cell's bottom edge instead of its top. A drag is
+    /// quantised from raw pixels, so a gesture that must *include* its release slot has to reach
+    /// that slot's far edge — aiming at a cell's middle would snap to whichever boundary happens
+    /// to be nearer and make the painted extent depend on row height.
+    /// </para>
     /// </summary>
     private static async Task DispatchTouchPointerEventAsync(
-        IPage page, string type, int cellIndex, double? clientY = null)
+        IPage page, string type, int cellIndex, double? clientY = null, bool atBottom = false)
     {
         await page.EvaluateAsync(
             """
-            ({ type, cellIndex, clientY }) => {
+            ({ type, cellIndex, clientY, atBottom }) => {
                 const cells = document.querySelectorAll('[role="gridcell"]');
                 const el = cells[cellIndex];
                 const rect = el.getBoundingClientRect();
                 const x = rect.left + rect.width / 2;
-                const y = clientY ?? (rect.top + rect.height / 2);
-                el.dispatchEvent(new PointerEvent(type, {
+                const y = clientY ?? (atBottom ? rect.bottom - 1 : rect.top + 1);
+
+                const rowCells = el.closest('[role="row"]').querySelectorAll('[role="gridcell"]');
+                const column = Array.prototype.indexOf.call(rowCells, el);
+                const target = document.querySelectorAll('[data-daycol]')[column];
+
+                target.dispatchEvent(new PointerEvent(type, {
                     bubbles: true,
                     cancelable: true,
                     pointerId: 1,
@@ -94,7 +113,7 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
                 }));
             }
             """,
-            new { type, cellIndex, clientY });
+            new { type, cellIndex, clientY, atBottom });
     }
 
     private const int DayWindowLength = 3;
@@ -102,14 +121,14 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
     /// <summary>
     /// Row-major gridcell index for (column, slot), where <paramref name="column"/> is the
     /// window-relative day column — <see cref="DayWindowLength"/> gridcells per row at this
-    /// viewport (see `WeekGrid.tsx`'s `dayWindow`).
+    /// viewport (see `CalendarShell.tsx`'s `days` window).
     /// </summary>
     private static int CellIndex(int column, int slot) => (slot * DayWindowLength) + column;
 
     /// <summary>
     /// D-009/§7: a painted range is a proposal — the commit dialog's one-time/weekly choice is
     /// what actually creates anything. The touch facts below care about the geometry the drag
-    /// produced, not about recurrence, so each confirms at the dialog's "Just this time" default.
+    /// produced, not about recurrence, so each confirms at the dialog's "One-time" default.
     /// </summary>
     private static async Task ConfirmCommitDialogAsync(IPage page)
     {
@@ -129,7 +148,9 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/calendar");
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             await page.GetByRole(AriaRole.Grid).WaitForAsync();
-            ILocator grid = page.GetByRole(AriaRole.Grid);
+            // `data-touch-dragging` is reported by the grid's root wrapper, which owns the
+            // painted day columns; the `role=grid` element itself is the ARIA cell overlay.
+            ILocator grid = page.Locator("[data-grid-root]");
 
             int cellIndex = CellIndex(column: 0, slot: 0);
             await DispatchTouchPointerEventAsync(page, "pointerdown", cellIndex);
@@ -145,7 +166,9 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             // gate exists to prove is resolved: scroll is never blocked before a hold is real).
             await page.WaitForTimeoutAsync(LongPressSettleMs - ShortPressMs);
             await Assertions.Expect(grid).ToHaveAttributeAsync("data-touch-dragging", "true");
-            await page.GetByRole(AriaRole.Status).GetByText("Selection started").WaitForAsync();
+            await page.Locator(
+                    "[data-testid='screen-calendar'] [role='status']:not([data-testid='early-hours-status'])")
+                .GetByText("Selection started").WaitForAsync();
 
             await DispatchTouchPointerEventAsync(page, "pointerup", cellIndex);
 
@@ -173,7 +196,9 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/calendar");
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             await page.GetByRole(AriaRole.Grid).WaitForAsync();
-            ILocator grid = page.GetByRole(AriaRole.Grid);
+            // `data-touch-dragging` is reported by the grid's root wrapper, which owns the
+            // painted day columns; the `role=grid` element itself is the ARIA cell overlay.
+            ILocator grid = page.Locator("[data-grid-root]");
 
             // The window's second column (each fact runs in its own account and browser, so the
             // columns only have to be readable, not disjoint) — starting near the top so there is
@@ -185,7 +210,7 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             double initialScrollY = await page.EvaluateAsync<double>("() => window.scrollY");
 
             // A move whose clientY sits inside the viewport's own bottom-edge auto-scroll band
-            // (`AUTO_SCROLL_EDGE_PX` in `WeekGrid.tsx`) — an off-screen row below the fold, which
+            // (`AUTO_SCROLL_EDGE_PX` in `lovable/WeekGrid.tsx`) — an off-screen row below the fold, which
             // is the entire point: the drag never has to (and in this headless viewport cannot)
             // visually reach that row on its own. The grid has no scrollport of its own any more —
             // it renders at natural height and the document scrolls — so the page is what moves.
@@ -229,15 +254,16 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/calendar");
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             await page.GetByRole(AriaRole.Grid).WaitForAsync();
-            ILocator grid = page.GetByRole(AriaRole.Grid);
+            // `data-touch-dragging` is reported by the grid's root wrapper, which owns the
+            // painted day columns; the `role=grid` element itself is the ARIA cell overlay.
+            ILocator grid = page.Locator("[data-grid-root]");
 
             // The window's third column.
             int cellIndex = CellIndex(column: 2, slot: 0);
             await DispatchTouchPointerEventAsync(page, "pointerdown", cellIndex);
 
-            // Movement well past the cancel threshold (`MOVE_CANCEL_PX` in `WeekGrid.tsx`),
-            // dispatched before the long-press timer would fire — a real scroll gesture
-            // overtaking a still-pending press.
+            // Any movement before the long-press timer fires reclaims the gesture for the page
+            // (`cancelPress` in `lovable/WeekGrid.tsx`) — a real scroll overtaking a pending press.
             await page.WaitForTimeoutAsync(ShortPressMs);
             await DispatchTouchPointerEventAsync(page, "pointermove", cellIndex, clientY: 0);
 
@@ -287,13 +313,13 @@ public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
             int endCellIndex = CellIndex(column: 0, slot: 4);
             await DispatchTouchPointerEventAsync(page, "pointerdown", startCellIndex);
             await page.WaitForTimeoutAsync(LongPressSettleMs);
-            await DispatchTouchPointerEventAsync(page, "pointermove", endCellIndex);
-            await DispatchTouchPointerEventAsync(page, "pointerup", endCellIndex);
+            await DispatchTouchPointerEventAsync(page, "pointermove", endCellIndex, atBottom: true);
+            await DispatchTouchPointerEventAsync(page, "pointerup", endCellIndex, atBottom: true);
             await ConfirmCommitDialogAsync(page);
 
             // Exactly the five slots the drag spanned are now busy — a touch drag lands on the
             // same 15-minute grid the keyboard path is quantized to by construction
-            // (`WeekGridPage.test.tsx`'s keyboard-entry snapping row proves that half); no
+            // (`lovable/WeekGrid.test.tsx`'s keyboard-entry snapping row proves that half); no
             // sub-slot precision ever reaches the commit.
             for (int slot = 0; slot <= 4; slot++)
             {
