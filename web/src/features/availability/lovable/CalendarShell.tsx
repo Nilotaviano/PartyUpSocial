@@ -356,8 +356,10 @@ export function CalendarShell() {
         return;
       }
       if (scope === "thisAndFuture") {
-        // A this-and-future edit rewrites the series' own shape, so it
-        // carries the new weekday and duration rather than two instants.
+        // A this-and-future edit rewrites the series' own shape, so it carries
+        // the new weekday, its local "HH:mm" start and a duration — not the
+        // two instants the one-off arm sends (`EditOccurrenceRequest`'s two
+        // arms never share a body shape, and `endTime` must stay absent here).
         const startLocal = instantToFakeLocal(body.startTime, timeZone);
         const endLocal = instantToFakeLocal(body.endTime, timeZone);
         await editOccurrence.mutateAsync({
@@ -365,7 +367,7 @@ export function CalendarShell() {
           occurrenceDate: target.occurrenceDate,
           body: {
             scope,
-            startTime: null,
+            startTime: hhmmOf(startLocal),
             endTime: null,
             dayOfWeek: isoDayOfWeek(startLocal),
             durationMinutes: Math.round((endLocal.getTime() - startLocal.getTime()) / 60_000),

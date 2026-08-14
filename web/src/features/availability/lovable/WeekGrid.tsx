@@ -694,7 +694,7 @@ function BandBlock({
         {fmtRange(start, end)}
       </span>
       {h > 44 && (
-        <span className="block text-[10px] leading-tight font-semibold opacity-75">
+        <span className="block text-[10px] leading-tight font-semibold opacity-90">
           {band.kind === "recurring" ? t("lovable.grid.weekly") : t("lovable.grid.oneTime")}
         </span>
       )}

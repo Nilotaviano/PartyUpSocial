@@ -326,7 +326,9 @@ describe('CalendarShell', () => {
     await waitFor(() => expect(api.patch).toHaveBeenCalled())
     expect(api.patch.mock.calls.at(-1)![1].body).toEqual({
       scope: 'thisAndFuture',
-      startTime: null,
+      // A local "HH:mm" wall time, not the instant the onlyThis arm sends, and no endTime at
+      // all — the endpoint rejects a thisAndFuture body carrying either shape.
+      startTime: '19:00',
       endTime: null,
       dayOfWeek: 4,
       durationMinutes: 180,

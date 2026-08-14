@@ -292,9 +292,12 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         ILocator endTime = page.GetByLabel("End time", new() { Exact = true });
         await endTime.SelectOptionAsync(new SelectOptionValue { Value = "540" });
 
-        // The block moved rather than duplicating: one rule row still, now four slots long.
-        await Assertions.Expect(busyCells).ToHaveCountAsync(baselineBusyCount + 4);
-        await Assertions.Expect(page.GetByText(new Regex("08:00.09:00")).First).ToBeVisibleAsync();
+        // The block moved rather than duplicating: one rule row still, now three slots long. The
+        // repaint above started from the row the first paint's Shift+ArrowDown left focus on —
+        // Escape cancels the selection, not the caret — so the saved block is 08:15–08:45 and
+        // stretching its end to 09:00 covers 08:15, 08:30 and 08:45.
+        await Assertions.Expect(busyCells).ToHaveCountAsync(baselineBusyCount + 3);
+        await Assertions.Expect(page.GetByText(new Regex("08:15.09:00")).First).ToBeVisibleAsync();
 
         // Delete: a one-time window carries no series, so it goes without a scope question — the
         // weekly confirm is the sibling fact below.
@@ -436,6 +439,8 @@ public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
         // `saves the thisAndFuture scope as the series shape...` test); this fact's job is the
         // dialog's own pointer-free reachability, so it stops once the edit has landed.
         await Assertions.Expect(scopeDialog).Not.ToBeVisibleAsync();
-        await page.GetByText("Window updated").WaitForAsync();
+        // `.First` because the toast queue renders the message twice by design — once visibly and
+        // once inside Radix's own assertive mirror region.
+        await page.GetByText("Window updated").First.WaitForAsync();
     }
 }

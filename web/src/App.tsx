@@ -80,7 +80,13 @@ function AuthenticatedShell() {
           {/* The four bracketed utilities are raw CSS properties Tailwind has no
               utility for: momentum scrolling, the two scrollbar-hiding halves
               (Firefox + WebKit), and the §3.7 edge-fade mask. */}
-          <div className="flex min-w-0 snap-x snap-proximity items-center gap-2 overflow-x-auto [-webkit-overflow-scrolling:touch] [scrollbar-width:none] max-sm:[mask-image:linear-gradient(to_right,transparent,black_0.75rem,black_calc(100%-0.75rem),transparent)] [&::-webkit-scrollbar]:hidden">
+          {/* `pe-0.5` is scroll slack, not spacing: these items are laid out at fractional widths,
+              but `scrollWidth`/`scrollLeft` are whole pixels, so at maximum scroll the last item
+              can still hang a sub-pixel sliver past this container's own clip and never be fully
+              revealed. Two pixels of trailing room is always more than that remainder, which is
+              what lets the tour spotlight (`TourOverlay.tsx` scrolls its anchor into view here)
+              actually bring the last control entirely on screen. */}
+          <div className="flex min-w-0 snap-x snap-proximity items-center gap-2 overflow-x-auto pe-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] max-sm:[mask-image:linear-gradient(to_right,transparent,black_0.75rem,black_calc(100%-0.75rem),transparent)] [&::-webkit-scrollbar]:hidden">
             <NavLink
               className={({ isActive }) =>
                 `inline-flex min-h-11 flex-none snap-start items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${

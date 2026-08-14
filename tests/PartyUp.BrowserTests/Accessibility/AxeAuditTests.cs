@@ -331,8 +331,35 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
     private static async Task<AxeResultItem[]> RunAxeAsync(IPage page)
     {
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await WaitForAnimationsToSettleAsync(page);
         AxeResult result = await page.RunAxe(new AxeRunOptions { RunOnly = RunOnlyOptions.Tags(WcagTags) });
         return result.Violations;
+    }
+
+    /// <summary>
+    /// Contrast is a property of the settled surface. Dialogs enter behind a short fade, and axe
+    /// composites an element's colours through every ancestor opacity — so a scan that lands
+    /// mid-fade measures a partially transparent blend nobody ever reads, and reports a ratio the
+    /// finished UI does not have. Endlessly repeating animations (the now-line pulse) never reach
+    /// a finished state, so they are excluded rather than waited on; a settle that does not arrive
+    /// inside the budget leaves the scan exactly where it would have been without this wait.
+    /// </summary>
+    private static async Task WaitForAnimationsToSettleAsync(IPage page)
+    {
+        try
+        {
+            await page.WaitForFunctionAsync(
+                """
+                () => document.getAnimations().every(animation =>
+                    animation.playState !== 'running'
+                    || animation.effect?.getComputedTiming?.().iterations === Infinity)
+                """,
+                null,
+                new PageWaitForFunctionOptions { Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
+        }
     }
 
     private const string ThemeStorageKey = "partyup:theme";
