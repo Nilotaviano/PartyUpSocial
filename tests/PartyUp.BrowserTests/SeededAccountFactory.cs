@@ -15,11 +15,11 @@ namespace PartyUp.BrowserTests;
 /// Creates fully-registered, onboarded, tour-completed accounts for the browser lane WITHOUT
 /// driving the registration UI.
 /// <para>
-/// Every UI registration costs <see cref="PlaywrightFixture"/>'s 65-second shared-rate-window
-/// barrier plus a multi-page mailbox round trip, and the overwhelming majority of the lane's
+/// Every UI registration costs a multi-page mailbox round trip through the age gate, the register
+/// form, the verification link and six onboarding steps, and the overwhelming majority of the lane's
 /// accounts are only ever *props* — an organizer to create a session, a friend to invite, a viewer
 /// to read a Discover row. None of those facts assert anything about registration or onboarding, so
-/// paying the barrier for them bought nothing but wall-clock. The register/verify/onboard UI itself
+/// paying that walk for them bought nothing but wall-clock. The register/verify/onboard UI itself
 /// stays covered by the call sites that genuinely audit it
 /// (<see cref="Tour.TourFlowTests"/>, <see cref="Accessibility.AxeAuditTests"/>'s onboarding-step
 /// capture), which still go through <see cref="PlaywrightFixture.RegisterAndOnboardAsync"/>.

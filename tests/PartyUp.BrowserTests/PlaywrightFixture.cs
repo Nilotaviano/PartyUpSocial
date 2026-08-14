@@ -109,74 +109,41 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     private static string ArtifactsDirectory =>
         Path.Combine(AppContext.BaseDirectory, "test-results");
 
-    private static int _registrationCount;
-    private static int _seededPersonaCount;
+    private static int _personaCount;
 
     /// <summary>
-    /// Every seeded persona presents itself to the API as its own client address.
+    /// Every account this fixture builds — seeded (<see cref="SeedRegisteredUserAsync"/>) or walked
+    /// through the real registration UI (<see cref="RegisterAndOnboardAsync"/>) — presents itself to
+    /// the API as its own client address.
     /// <para>
-    /// The reason is <c>RateLimitPolicies.cs</c>'s <c>auth-ip</c> dimension: 20 sign-ins per 15
-    /// minutes per IP, covering <c>ConsumeMagicLink</c> — and unlike <c>register-ip</c> it has no
-    /// configuration override, so a lane that signs ~20 seeded personas in inside ten minutes would
-    /// sit right on the ceiling and 429 whichever ones lost the race. Pacing them apart is exactly
-    /// the wall-clock cost <see cref="SeedRegisteredUserAsync"/> exists to remove, and lowering the
-    /// ceiling is a production security control this lane must not touch. Distinct client addresses
-    /// give each persona its own partition instead, which is also what a real deployment sees:
-    /// twenty different people signing in are twenty different addresses, not one.
+    /// The reason is <c>RateLimitPolicies.cs</c>'s per-IP dimensions. <c>auth-ip</c> allows 20
+    /// sign-ins per 15 minutes per IP, covering <c>ConsumeMagicLink</c> — and unlike
+    /// <c>register-ip</c> it has no configuration override, so a lane that signs ~20 seeded personas
+    /// in inside ten minutes would sit right on the ceiling and 429 whichever ones lost the race.
+    /// The "default" dimension (300/IP/minute, a fixed window covering every operation) is denser
+    /// still for a registration walk — age gate → register → verify → onboarding is by far the
+    /// heaviest burst a single account costs — so two walks sharing one address could exceed it
+    /// inside whatever 60s window they landed in. Pacing accounts apart in wall-clock time is
+    /// exactly the cost this lane exists to avoid, and lowering the ceilings is a production
+    /// security control it must not touch. Distinct client addresses give each account its own
+    /// partition instead, which is also what a real deployment sees: N different people registering
+    /// or signing in are N different addresses, not one.
     /// </para>
     /// <para>
     /// The spawned API is handed <c>Network:TrustedProxies</c> = loopback (both topologies) so
-    /// <c>UseForwardedHeaders</c> honours the header, and the address is set on the persona's whole
-    /// <see cref="IBrowserContext"/> rather than a single request, so the persona's sign-in and all
-    /// of its subsequent traffic agree about its address — one persona, one client IP, exactly as a
-    /// real user presents. The addresses come from RFC 5737's TEST-NET-1 documentation range, which
-    /// can never collide with a real client.
-    /// </para>
-    /// <para>
-    /// Accounts built by <see cref="RegisterAndOnboardAsync"/> deliberately do NOT get one: their
-    /// facts are about the registration surface, and <c>register-ip</c>'s shared budget plus
-    /// <see cref="SettleSharedRateLimitWindowBeforeRegistrationAsync"/>'s barrier are part of the
-    /// arrangement those tests already reason about.
+    /// <c>UseForwardedHeaders</c> honours the header, and the address is set on the account's whole
+    /// <see cref="IBrowserContext"/> rather than a single request, so its sign-in and all of its
+    /// subsequent traffic agree about its address — one account, one client IP, exactly as a real
+    /// user presents. The addresses come from RFC 5737's TEST-NET-1 documentation range, which can
+    /// never collide with a real client.
     /// </para>
     /// </summary>
-    private static string NextSeededPersonaAddress()
+    private static string NextClientAddress()
     {
-        int ordinal = Interlocked.Increment(ref _seededPersonaCount);
+        int ordinal = Interlocked.Increment(ref _personaCount);
         return string.Create(
             System.Globalization.CultureInfo.InvariantCulture,
             $"192.0.2.{ordinal % 254 + 1}");
-    }
-
-    /// <summary>
-    /// Round-1 fix, gate-driven (this ticket's own two-consecutive-clean-run requirement exposed
-    /// it; no F-numbered finding named it): <c>RateLimitPolicies.cs</c>'s "default" dimension
-    /// (300/IP/minute, a FIXED window covering every operation, `AutoReplenishment = true`) is
-    /// shared across the whole collection — every class's traffic comes from the same loopback IP
-    /// and counts against the same budget. Each registration (age gate → register → verify →
-    /// onboarding) is by far the densest traffic a single test action produces here, and this
-    /// suite still runs the ones whose facts are about registration itself (`AxeAuditTests`'s
-    /// organizer, `TourFlowTests`'s account — every other account is seeded in-process by
-    /// <see cref="SeedRegisteredUserAsync"/> and never reaches this path) close enough
-    /// together — timed by nothing but how fast
-    /// Playwright can drive the UI, with no artificial pacing anywhere in the unmodified flow-test
-    /// files — that two registrations' combined traffic can exceed 300 within whatever 60s window
-    /// they land in. Confirmed by direct evidence: a captured 429 on `/api/v1/guest/{id}/session`,
-    /// itself `retry:false` client-side, stranding an unmodified Phase 4 guest-flow test showing
-    /// neither its expected text nor a visible error. A per-navigation delay only changes *when*
-    /// one class's own requests happen, not how many a *different*, unmodified class fires once it
-    /// starts, so the fix lives at the one call site every registration in the whole suite already
-    /// shares: before the second and every later registration, wait out a full window with zero
-    /// requests. `FixedWindowRateLimiter`'s replenishment does not depend on a request landing
-    /// exactly on the boundary, so a quiet period at least as long as the window guarantees
-    /// whichever window is open has fully reset before the next registration's burst begins — a
-    /// barrier on the shared resource's state, not a wait tied to any one assertion.
-    /// </summary>
-    private static async Task SettleSharedRateLimitWindowBeforeRegistrationAsync()
-    {
-        if (Interlocked.Increment(ref _registrationCount) > 1)
-        {
-            await Task.Delay(65_000);
-        }
     }
 
     /// <summary>
@@ -542,10 +509,9 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     /// CSPRNG bytes, base64url-encoded for the URL fragment, and <c>auth_tokens.token_hash</c> holds
     /// their SHA-256 — exactly <c>SecurityTokenService.IssueAsync</c>/<c>TryHashRawToken</c>'s shape,
     /// so the running server redeems it through its ordinary path with nothing mocked. Driving the
-    /// issuing endpoints instead was ruled out by Q4: each extra registration costs
-    /// <see cref="SettleSharedRateLimitWindowBeforeRegistrationAsync"/>'s 65-second barrier, and the
-    /// consumption legs sit in the IP-partitioned <c>auth-ip</c> dimension a fresh account does
-    /// nothing for.
+    /// issuing endpoints instead was ruled out by Q4: each extra registration costs a full
+    /// multi-page mailbox round trip through the UI, and the consumption legs sit in the
+    /// IP-partitioned <c>auth-ip</c> dimension a fresh account does nothing for.
     /// <para>
     /// The returned raw token is single-use and some purposes mutate the account, so every caller
     /// navigates it in a throwaway context and mints its own.
@@ -708,6 +674,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         IBrowserContext context = await Browser.NewContextAsync(new() { TimezoneId = timezoneId });
         context.SetDefaultNavigationTimeout(NavigationTimeoutMs);
         context.SetDefaultTimeout(ActionTimeoutMs);
+        await context.AddInitScriptAsync(ReadinessInstrumentationScript);
 
         if (IsBuiltTopology)
         {
@@ -721,6 +688,91 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         }
 
         return context;
+    }
+
+    /// <summary>
+    /// Installed on every context before its first document (<see cref="NewContextAsync"/>), so that
+    /// <see cref="WaitForRequestQuiescenceAsync"/> can ask the page directly whether it is still
+    /// waiting on data instead of inferring it from socket silence. It counts in-flight
+    /// <c>fetch</c>/<c>XMLHttpRequest</c> calls — the two transports the generated API client and
+    /// TanStack Query use — and latches <c>document.fonts.ready</c>, which is the one late-arriving
+    /// subresource the <c>load</c> event does not cover and that changes what the page renders.
+    /// </summary>
+    private const string ReadinessInstrumentationScript =
+        """
+        (() => {
+          const state = { pending: 0, quietTicks: 0, fontsReady: false };
+          window.__partyupReadiness = state;
+
+          const fetchImpl = window.fetch;
+          if (typeof fetchImpl === 'function') {
+            window.fetch = function (...args) {
+              state.pending += 1;
+              return fetchImpl.apply(this, args).finally(() => { state.pending -= 1; });
+            };
+          }
+
+          const send = XMLHttpRequest.prototype.send;
+          XMLHttpRequest.prototype.send = function (...args) {
+            state.pending += 1;
+            let settled = false;
+            const done = () => { if (!settled) { settled = true; state.pending -= 1; } };
+            this.addEventListener('loadend', done);
+            try {
+              return send.apply(this, args);
+            } catch (error) {
+              done();
+              throw error;
+            }
+          };
+
+          if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => { state.fontsReady = true; });
+          } else {
+            state.fontsReady = true;
+          }
+        })();
+        """;
+
+    /// <summary>
+    /// "The page has finished arriving at what it is going to show": the document is complete, its
+    /// webfonts have loaded, and no request the app itself issued is still in flight — held across
+    /// two consecutive polls, so a scan cannot slip into the gap between one query resolving and the
+    /// dependent query it kicks off. This is what a <c>NetworkIdle</c> wait was standing in for, but
+    /// stated as the page's own state rather than as half a second of socket silence, so an already
+    /// settled page answers immediately instead of paying that half second again on every scan.
+    /// <para>
+    /// Fails loudly (a timeout) rather than silently scanning early if
+    /// <see cref="ReadinessInstrumentationScript"/> never ran on the page.
+    /// </para>
+    /// </summary>
+    public static async Task WaitForRequestQuiescenceAsync(IPage page, int timeoutMs = 15000)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+        await page.WaitForLoadStateAsync(LoadState.Load);
+        // A second scan of the same document (a theme flip) inherits the previous scan's tick
+        // count, which would let the very first poll answer "settled" without ever observing two.
+        await page.EvaluateAsync(
+            "() => { if (window.__partyupReadiness) { window.__partyupReadiness.quietTicks = 0; } }");
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+              const state = window.__partyupReadiness;
+              if (!state || document.readyState !== 'complete' || !state.fontsReady) {
+                return false;
+              }
+
+              if (state.pending > 0) {
+                state.quietTicks = 0;
+                return false;
+              }
+
+              state.quietTicks += 1;
+              return state.quietTicks >= 2;
+            }
+            """,
+            null,
+            new PageWaitForFunctionOptions { PollingInterval = 20, Timeout = timeoutMs });
     }
 
     /// <summary>
@@ -740,9 +792,8 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     /// <see cref="RegisteredUser"/> (a page already at <c>/app</c>, authenticated, tour dismissed),
     /// but the account is built in-process through the real Application-layer use cases
     /// (<see cref="SeededAccountFactory"/>) instead of by driving the register/verify/onboard UI.
-    /// It therefore pays neither <see cref="SettleSharedRateLimitWindowBeforeRegistrationAsync"/>'s
-    /// 65-second barrier nor the multi-page wizard walk, and consumes no <c>register-ip</c> budget
-    /// at all.
+    /// It therefore pays neither the multi-page mailbox round trip nor the wizard walk, and consumes
+    /// no <c>register-ip</c> budget at all.
     /// <para>
     /// The session itself is real: a <see cref="AuthTokenPurpose.MagicLink"/> token is minted for
     /// the seeded user with <see cref="MintAuthTokenAsync"/> and redeemed by the shipped
@@ -778,7 +829,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
 
         await context.SetExtraHTTPHeadersAsync(new Dictionary<string, string>
         {
-            ["X-Forwarded-For"] = NextSeededPersonaAddress(),
+            ["X-Forwarded-For"] = NextClientAddress(),
         });
 
         IPage page = await context.NewPageAsync();
@@ -819,7 +870,11 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         string displayName,
         Func<string, IPage, Task>? onOnboardingStep = null)
     {
-        await SettleSharedRateLimitWindowBeforeRegistrationAsync();
+        ArgumentNullException.ThrowIfNull(context);
+        await context.SetExtraHTTPHeadersAsync(new Dictionary<string, string>
+        {
+            ["X-Forwarded-For"] = NextClientAddress(),
+        });
 
         // A random suffix on both the email and the username: the dev Postgres this fixture
         // points at is not reset between runs, so a fixed email would hit RegisterWithPasswordUseCase's

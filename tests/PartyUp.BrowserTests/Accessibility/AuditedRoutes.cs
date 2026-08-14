@@ -162,7 +162,7 @@ public static class AuditedRoutes
         // the token only on submit, so a minted token renders inertly: the audit sees the real
         // token-bearing DOM and the backing account is never mutated. That is why one organizer
         // account backs all of these rather than a dedicated registration (Q4's registration
-        // budget: every extra one costs the fixture's 65-second shared-rate-window barrier).
+        // budget: every extra one costs a full multi-page walk through the registration UI).
         new AuditedRoute(
             "auth-reset",
             "/auth/reset",

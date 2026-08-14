@@ -10,8 +10,9 @@ namespace PartyUp.BrowserTests.Accessibility;
 
 /// <summary>
 /// The theme dimension every <see cref="AuditedRoutes"/> entry is now scanned under (PHASE5_1_DESIGN.md
-/// §4 slice 8) — <c>Light</c> and <c>Dark</c> are both seeded explicitly (never left to the browser's
-/// own default color scheme) so neither audit run's result depends on an unstated ambient preference.
+/// §4 slice 8) — both are reached by an explicit act (a pre-navigation seed, or the shipped theme
+/// switch on an already-loaded page), never left to the browser's own default color scheme, so
+/// neither audit run's result depends on an unstated ambient preference.
 /// </summary>
 public enum AuditedTheme
 {
@@ -87,8 +88,8 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
     /// <para>
     /// The organizer is the one account in this class that must still be built by driving the real
     /// registration UI — the <c>/onboarding*</c> routes are audited from inside that walk (see this
-    /// class's remarks above), so there is nothing to scan without it. It pays the fixture's
-    /// 65-second shared-rate-window barrier and one `register-ip` slot of the lane's overridden 100
+    /// class's remarks above), so there is nothing to scan without it. It pays the multi-page
+    /// mailbox walk and one `register-ip` slot of the lane's overridden 100
     /// (`PlaywrightFixture.cs`'s <c>RegisterPerIpPerHourOverride</c>, not production's 5). The admin
     /// account asserts nothing about registration, so it is seeded in-process instead
     /// (<see cref="PlaywrightFixture.SeedRegisteredUserAsync"/>) and pays neither.
@@ -330,7 +331,7 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
 
     private static async Task<AxeResultItem[]> RunAxeAsync(IPage page)
     {
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await PlaywrightFixture.WaitForRequestQuiescenceAsync(page);
         await WaitForAnimationsToSettleAsync(page);
         AxeResult result = await page.RunAxe(new AxeRunOptions { RunOnly = RunOnlyOptions.Tags(WcagTags) });
         return result.Violations;
@@ -427,94 +428,11 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
         AuditedRoute route = AuditedRoutes.ByName(routeName);
         AuditContext context = await GetContextAsync();
 
-        AxeResultItem[] violations;
-        if (route.OnboardingStepKey is not null)
-        {
+        AxeResultItem[] violations = route.OnboardingStepKey is not null
             // Captured live during GetContextAsync's registration walk — see this class's own
             // remarks and PlaywrightFixture.RegisterAndOnboardAsync's onOnboardingStep parameter.
-            violations = context.OnboardingFindings[(route.OnboardingStepKey, theme)];
-        }
-        else
-        {
-            IBrowserContext? guestContext = null;
-            IPage page;
-            if (route.RequiresGuestLink)
-            {
-                // Own short-lived context per guest-route audit (never the organizer's persistent
-                // one) — closed below regardless of outcome so the route loop doesn't accumulate
-                // open browser contexts across the run.
-                guestContext = await fixture.NewContextAsync();
-                page = await guestContext.NewPageAsync();
-                await SeedThemeBeforeFirstNavigationAsync(page, theme);
-                string guestLinkUrl = route.GuestLinkKind == GuestLinkKind.Poll
-                    ? context.PollGuestLinkUrl
-                    : context.GuestLinkUrl;
-                await page.GotoAsync(guestLinkUrl);
-            }
-            else if (route.SignedOut)
-            {
-                // Phase 8 S7 / Q4: a mailed link opens in whatever browser the recipient has, signed
-                // out — so these are audited in their own throwaway context, which also keeps a
-                // single-use token from ever being reused across the light/dark pair (each case
-                // mints its own below). Closed in the finally, like the guest contexts above.
-                guestContext = await fixture.NewContextAsync();
-                page = await guestContext.NewPageAsync();
-                await SeedThemeBeforeFirstNavigationAsync(page, theme);
-
-                string url = PlaywrightFixture.WebBaseUrl + route.PathTemplate;
-                if (route.TokenPurpose is AuthTokenPurpose purpose)
-                {
-                    string rawToken = await fixture.MintAuthTokenAsync(
-                        purpose,
-                        context.TokenSubjectId,
-                        context.TokenSubjectEmail);
-                    url += "#token=" + rawToken;
-                }
-
-                await page.GotoAsync(url);
-            }
-            else
-            {
-                string path = route.PathTemplate
-                    .Replace("{sessionId}", context.SessionId, StringComparison.Ordinal)
-                    .Replace("{username}", context.Organizer.Username, StringComparison.Ordinal)
-                    .Replace("{code}", context.OwnFriendCode, StringComparison.Ordinal)
-                    .Replace("{pollId}", context.PollId, StringComparison.Ordinal)
-                    .Replace(
-                        "{pollAwaitingSelectionId}",
-                        context.PollAwaitingSelectionId,
-                        StringComparison.Ordinal)
-                    .Replace("{adminUserId}", context.AdminUserId, StringComparison.Ordinal);
-                // A fresh tab on the account's own authenticated context — the admin audit account
-                // for a `RequiresAdmin` route, the organizer otherwise (never either account's
-                // persistent page) — shares its cookies so the route still renders signed-in, but
-                // never navigated before, so the theme seed below is guaranteed to land before this
-                // page's first paint. Closed in the finally below so per-theme runs don't accumulate
-                // open tabs on that context across the route loop.
-                page = route.RequiresAdmin
-                    ? await context.Admin.Page.Context.NewPageAsync()
-                    : await context.Organizer.Page.Context.NewPageAsync();
-                await SeedThemeBeforeFirstNavigationAsync(page, theme);
-                await page.GotoAsync(PlaywrightFixture.WebBaseUrl + path);
-            }
-
-            try
-            {
-                await AssertThemeAppliedAsync(page, theme);
-                violations = await RunAxeAsync(page);
-            }
-            finally
-            {
-                if (guestContext is not null)
-                {
-                    await guestContext.CloseAsync();
-                }
-                else
-                {
-                    await page.CloseAsync();
-                }
-            }
-        }
+            ? context.OnboardingFindings[(route.OnboardingStepKey, theme)]
+            : (await GetRouteFindingsAsync(route, context))[theme];
 
         HashSet<string> excludedRuleIds = AxeExclusions.Entries
             .Where(entry => entry.RouteName == route.Name)
@@ -538,6 +456,183 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
             "violation(s): " + string.Join(", ", unexpected.Select(v => $"{v.Id} ({v.Impact})")) +
             $". Details in {AxeArtifactsDirectory}.");
     }
+
+    /// <summary>
+    /// One navigation per route, both themes scanned off it — the light/dark pair are two
+    /// <em>readings</em> of one rendered page, not two page loads, so a route costs one navigation
+    /// instead of two. Each theory row still asserts only its own theme's findings, keeps its own
+    /// dump file and names the theme in its failure message, so which cell failed is unchanged.
+    /// <para>
+    /// The cache holds the in-flight <see cref="Task{TResult}"/> (the
+    /// <see cref="GetContextAsync"/> idiom): whichever of a route's two rows runs first performs the
+    /// scan, the other awaits the same attempt and observes the same exception if it threw.
+    /// </para>
+    /// </summary>
+    private static readonly SemaphoreSlim RouteFindingsLock = new(1, 1);
+
+    private static readonly Dictionary<string, Task<IReadOnlyDictionary<AuditedTheme, AxeResultItem[]>>>
+        RouteFindings = new(StringComparer.Ordinal);
+
+    private async Task<IReadOnlyDictionary<AuditedTheme, AxeResultItem[]>> GetRouteFindingsAsync(
+        AuditedRoute route,
+        AuditContext context)
+    {
+        Task<IReadOnlyDictionary<AuditedTheme, AxeResultItem[]>>? scan;
+        await RouteFindingsLock.WaitAsync();
+        try
+        {
+            if (!RouteFindings.TryGetValue(route.Name, out scan))
+            {
+                scan = ScanBothThemesAsync(route, context);
+                RouteFindings[route.Name] = scan;
+            }
+        }
+        finally
+        {
+            RouteFindingsLock.Release();
+        }
+
+        return await scan;
+    }
+
+    private async Task<IReadOnlyDictionary<AuditedTheme, AxeResultItem[]>> ScanBothThemesAsync(
+        AuditedRoute route,
+        AuditContext context)
+    {
+        IBrowserContext? guestContext = null;
+        IPage page;
+        if (route.RequiresGuestLink)
+        {
+            // Own short-lived context per guest-route audit (never the organizer's persistent
+            // one) — closed below regardless of outcome so the route loop doesn't accumulate
+            // open browser contexts across the run.
+            guestContext = await fixture.NewContextAsync();
+            page = await guestContext.NewPageAsync();
+            await SeedThemeBeforeFirstNavigationAsync(page, AuditedTheme.Light);
+            string guestLinkUrl = route.GuestLinkKind == GuestLinkKind.Poll
+                ? context.PollGuestLinkUrl
+                : context.GuestLinkUrl;
+            await page.GotoAsync(guestLinkUrl);
+        }
+        else if (route.SignedOut)
+        {
+            // Phase 8 S7 / Q4: a mailed link opens in whatever browser the recipient has, signed
+            // out — so these are audited in their own throwaway context. One minted token covers
+            // both themes because they share this one navigation; the token is never redeemed a
+            // second time. Closed in the finally, like the guest contexts above.
+            guestContext = await fixture.NewContextAsync();
+            page = await guestContext.NewPageAsync();
+            await SeedThemeBeforeFirstNavigationAsync(page, AuditedTheme.Light);
+
+            string url = PlaywrightFixture.WebBaseUrl + route.PathTemplate;
+            if (route.TokenPurpose is AuthTokenPurpose purpose)
+            {
+                string rawToken = await fixture.MintAuthTokenAsync(
+                    purpose,
+                    context.TokenSubjectId,
+                    context.TokenSubjectEmail);
+                url += "#token=" + rawToken;
+            }
+
+            await page.GotoAsync(url);
+        }
+        else
+        {
+            string path = route.PathTemplate
+                .Replace("{sessionId}", context.SessionId, StringComparison.Ordinal)
+                .Replace("{username}", context.Organizer.Username, StringComparison.Ordinal)
+                .Replace("{code}", context.OwnFriendCode, StringComparison.Ordinal)
+                .Replace("{pollId}", context.PollId, StringComparison.Ordinal)
+                .Replace(
+                    "{pollAwaitingSelectionId}",
+                    context.PollAwaitingSelectionId,
+                    StringComparison.Ordinal)
+                .Replace("{adminUserId}", context.AdminUserId, StringComparison.Ordinal);
+            // A fresh tab on the account's own authenticated context — the admin audit account
+            // for a `RequiresAdmin` route, the organizer otherwise (never either account's
+            // persistent page) — shares its cookies so the route still renders signed-in, but
+            // never navigated before, so the theme seed below is guaranteed to land before this
+            // page's first paint. Closed in the finally below so the route loop doesn't accumulate
+            // open tabs on that context.
+            page = route.RequiresAdmin
+                ? await context.Admin.Page.Context.NewPageAsync()
+                : await context.Organizer.Page.Context.NewPageAsync();
+            await SeedThemeBeforeFirstNavigationAsync(page, AuditedTheme.Light);
+            await page.GotoAsync(PlaywrightFixture.WebBaseUrl + path);
+        }
+
+        try
+        {
+            await AssertThemeAppliedAsync(page, AuditedTheme.Light);
+            AxeResultItem[] light = await RunAxeAsync(page);
+
+            await SwitchThemeAsync(page, AuditedTheme.Dark);
+            AxeResultItem[] dark = await RunAxeAsync(page);
+
+            return new Dictionary<AuditedTheme, AxeResultItem[]>
+            {
+                [AuditedTheme.Light] = light,
+                [AuditedTheme.Dark] = dark,
+            };
+        }
+        finally
+        {
+            if (guestContext is not null)
+            {
+                await guestContext.CloseAsync();
+            }
+            else
+            {
+                await page.CloseAsync();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Repaints an already-loaded page in the other theme, exactly the way the shipped app does it:
+    /// through <c>ThemeToggle</c>'s own control where the route renders one (so that control's own
+    /// checked state stays consistent with what is on screen — auditing a "Light" chip marked
+    /// current over a dark page would be a rendering the app never produces), and through
+    /// <c>theme.ts</c>'s <c>setThemePreference</c> effect — the stored preference plus the
+    /// <c>data-theme</c> attribute — on every other route, which is the same pair of writes that
+    /// control performs.
+    /// <para>
+    /// The palette is CSS-token driven off <c>data-theme</c> (`index.css`), so a repaint is what a
+    /// reload would produce; that the repaint actually happened is proved rather than assumed, by
+    /// asserting <c>--background</c> resolves to a different value afterwards. A flip that silently
+    /// did nothing would otherwise scan the light page twice and report it as the dark result.
+    /// </para>
+    /// </summary>
+    private static async Task SwitchThemeAsync(IPage page, AuditedTheme theme)
+    {
+        string before = await ResolvedBackgroundTokenAsync(page);
+
+        ILocator themeControl = page
+            .GetByRole(AriaRole.Radiogroup, new() { Name = "Theme preference" })
+            .GetByRole(AriaRole.Radio, new() { Name = theme == AuditedTheme.Dark ? "Dark" : "Light", Exact = true });
+        if (await themeControl.CountAsync() > 0)
+        {
+            await themeControl.ClickAsync();
+        }
+        else
+        {
+            await page.EvaluateAsync(
+                """
+                value => {
+                    try { localStorage.setItem('partyup:theme', value); } catch (e) {}
+                    document.documentElement.setAttribute('data-theme', value);
+                }
+                """,
+                ThemeValue(theme));
+        }
+
+        await AssertThemeAppliedAsync(page, theme);
+        Assert.NotEqual(before, await ResolvedBackgroundTokenAsync(page));
+    }
+
+    private static async Task<string> ResolvedBackgroundTokenAsync(IPage page) =>
+        await page.EvaluateAsync<string>(
+            "() => getComputedStyle(document.documentElement).getPropertyValue('--background').trim()");
 
     /// <summary>
     /// TOUR_DESIGN.md §6: the tour's own axe coverage reaches the overlay through Replay — the
@@ -717,7 +812,7 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
             "/calendar",
             async page =>
             {
-                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                await PlaywrightFixture.WaitForRequestQuiescenceAsync(page);
                 await page.GetByRole(AriaRole.Gridcell).First.FocusAsync();
                 await page.Keyboard.PressAsync("Enter");
                 await page.Keyboard.PressAsync("Shift+ArrowDown");
@@ -737,7 +832,7 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
             "/calendar",
             async page =>
             {
-                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                await PlaywrightFixture.WaitForRequestQuiescenceAsync(page);
                 // The panel lists weekly rules first, so its first row is the seeded series
                 // occurrence — the one case whose edit has to ask about scope.
                 await page.GetByRole(AriaRole.Button, new() { Name = "Edit window" }).First.ClickAsync();
@@ -755,7 +850,7 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
             "/calendar",
             async page =>
             {
-                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                await PlaywrightFixture.WaitForRequestQuiescenceAsync(page);
                 // Deleting a weekly rule is the surface's other modal: an alertdialog that says
                 // the removal reaches every future week before anything is written.
                 await page.GetByRole(AriaRole.Button, new() { Name = "Delete window" }).First.ClickAsync();
@@ -784,7 +879,7 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
             "/calendar",
             async page =>
             {
-                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                await PlaywrightFixture.WaitForRequestQuiescenceAsync(page);
                 await page.GetByRole(AriaRole.Gridcell).First.FocusAsync();
                 await page.Keyboard.PressAsync("Enter");
                 await page.Keyboard.PressAsync("Shift+ArrowDown");
@@ -821,7 +916,7 @@ public sealed class AxeAuditTests(PlaywrightFixture fixture)
             theme,
             context.Organizer.Page.Context,
             "/calendar",
-            async page => await page.WaitForLoadStateAsync(LoadState.NetworkIdle),
+            async page => await PlaywrightFixture.WaitForRequestQuiescenceAsync(page),
             viewport: (390, 844));
     }
 
