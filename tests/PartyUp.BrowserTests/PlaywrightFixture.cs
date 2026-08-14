@@ -35,6 +35,13 @@ namespace PartyUp.BrowserTests;
 /// <c>Database:MigrateOnStartup</c> is forced on in both topologies so the schema is current without
 /// a manual EF step.
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1822:Mark members as static",
+    Justification = "The stack behind this fixture is process-wide (one API, one database, one " +
+        "browser, refcounted across the lane's collections), but the fixture instance is the handle " +
+        "xunit injects into every test class — the surface stays instance-shaped so call sites read " +
+        "`fixture.X(...)` rather than reaching for the type.")]
 public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
 {
     private const string ApiBaseUrl = "http://localhost:5000";
@@ -153,19 +160,33 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     /// </summary>
     private const string PushDispatchIntervalSecondsOverride = "2";
 
-    private readonly string _repoRoot = FindRepoRoot();
-    private readonly List<IBrowserContext> _tracedContexts = [];
-    private readonly Lock _tracedContextsLock = new();
-    private string _mailDropPath = string.Empty;
-    private string _pushDropPath = string.Empty;
-    private string _pushVapidPublicKey = string.Empty;
-    private string _pushVapidPrivateKey = string.Empty;
-    private KillOnCloseJob? _job;
-    private SeededAccountFactory? _seededAccounts;
-    private Process? _apiProcess;
-    private Process? _webProcess;
-    private PostgreSqlContainer? _postgresContainer;
-    private IPlaywright? _playwright;
+    private static readonly string _repoRoot = FindRepoRoot();
+    private static readonly List<IBrowserContext> _tracedContexts = [];
+    private static readonly Lock _tracedContextsLock = new();
+    private static string _mailDropPath = string.Empty;
+    private static string _pushDropPath = string.Empty;
+    private static string _pushVapidPublicKey = string.Empty;
+    private static string _pushVapidPrivateKey = string.Empty;
+    private static KillOnCloseJob? _job;
+    private static SeededAccountFactory? _seededAccounts;
+    private static Process? _apiProcess;
+    private static Process? _webProcess;
+    private static PostgreSqlContainer? _postgresContainer;
+    private static IPlaywright? _playwright;
+
+    /// <summary>
+    /// The lane runs several <see cref="PlaywrightSuite"/> collections concurrently
+    /// (<c>xunit.runner.json</c>), and xunit builds one collection-fixture instance per collection —
+    /// but a second API process would bind the same port and a second browser would double the
+    /// memory for no coverage. The stack below is therefore process-wide: the first instance to
+    /// initialize builds it, every later instance joins the same attempt (the in-flight
+    /// <see cref="Task"/> is cached, so a failed boot surfaces the real exception to every
+    /// collection instead of a cascade of unrelated port collisions), and only the last instance to
+    /// dispose tears it down.
+    /// </summary>
+    private static readonly SemaphoreSlim StackLifetimeLock = new(1, 1);
+    private static Task? _stackTask;
+    private static int _liveCollections;
 
     /// <summary>
     /// The exact `ConnectionStrings:Db` value the spawned API process reads, in whichever
@@ -174,11 +195,29 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     /// test (F1 fix: no more topology-specific guessing at credentials or a `docker` CLI
     /// dependency the Windows dev host doesn't have, ARCHITECTURE.md:238).
     /// </summary>
-    private string _dbConnectionString = string.Empty;
+    private static string _dbConnectionString = string.Empty;
 
-    public IBrowser Browser { get; private set; } = null!;
+    private static IBrowser _browser = null!;
+
+    public IBrowser Browser => _browser;
 
     public async Task InitializeAsync()
+    {
+        await StackLifetimeLock.WaitAsync();
+        try
+        {
+            _liveCollections++;
+            _stackTask ??= StartStackAsync();
+        }
+        finally
+        {
+            StackLifetimeLock.Release();
+        }
+
+        await _stackTask;
+    }
+
+    private static async Task StartStackAsync()
     {
         _mailDropPath = Path.Combine(_repoRoot, "tests", "PartyUp.BrowserTests", ".mail-drop");
         Directory.CreateDirectory(_mailDropPath);
@@ -230,7 +269,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
             "webkit" => _playwright.Webkit,
             _ => _playwright.Chromium,
         };
-        Browser = await engine.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+        _browser = await engine.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
 
         if (!IsBuiltTopology)
         {
@@ -254,9 +293,9 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     /// cost paid before any test starts, not a per-test interaction; it would defeat the purpose
     /// for the warm-up itself to time out at the same ceiling it exists to protect tests from.
     /// </summary>
-    private async Task WarmDevServerAsync()
+    private static async Task WarmDevServerAsync()
     {
-        IPage page = await Browser.NewPageAsync();
+        IPage page = await _browser.NewPageAsync();
         try
         {
             string[] routes = [WebBaseUrl + "/welcome", WebBaseUrl + "/login", WebBaseUrl + "/register", WebBaseUrl + "/app"];
@@ -272,7 +311,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         }
     }
 
-    private void InitializeLocalTopology()
+    private static void InitializeLocalTopology()
     {
         // Explicitly computed and handed to the API rather than left to its own
         // `appsettings.json` default — the exact string this fixture then also opens for
@@ -328,7 +367,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     /// gates <c>UseStaticFiles</c>/<c>MapFallbackToFile</c> — resolves against that content root.
     /// This path runs only where Docker exists (CI; the Windows dev host has none).
     /// </summary>
-    private async Task InitializeBuiltTopologyAsync()
+    private static async Task InitializeBuiltTopologyAsync()
     {
         _postgresContainer = new PostgreSqlBuilder("postgres:17-alpine").Build();
         await _postgresContainer.StartAsync();
@@ -380,7 +419,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     }
 
     /// <summary>The directory the CI <c>browser</c> job's own <c>dotnet build</c> writes to.</summary>
-    private string BuiltApiOutputDirectory =>
+    private static string BuiltApiOutputDirectory =>
         Path.Combine(_repoRoot, "src", "PartyUp.Api", "bin", "Debug", "net10.0");
 
     /// <summary>
@@ -614,6 +653,22 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
 
     public async Task DisposeAsync()
     {
+        await StackLifetimeLock.WaitAsync();
+        bool lastCollection;
+        try
+        {
+            lastCollection = --_liveCollections == 0;
+        }
+        finally
+        {
+            StackLifetimeLock.Release();
+        }
+
+        if (!lastCollection)
+        {
+            return;
+        }
+
         // F3: export every still-live traced context's trace BEFORE closing the browser (closing
         // kills the contexts, and a context AxeAuditTests' own `finally` already closed cannot
         // export — best-effort per context so one already-closed context doesn't drop the rest).
@@ -643,9 +698,9 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
             }
         }
 
-        if (Browser is not null)
+        if (_browser is not null)
         {
-            await Browser.CloseAsync();
+            await _browser.CloseAsync();
         }
 
         _playwright?.Dispose();
@@ -661,13 +716,21 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
             await _postgresContainer.DisposeAsync();
         }
 
-        Dispose();
+        _job?.Dispose();
     }
 
     // Closing the job handle is what actually kills any surviving descendants
     // (KILL_ON_JOB_CLOSE); SafeHandle disposal is idempotent, so running after
-    // DisposeAsync as well is harmless.
-    public void Dispose() => _job?.Dispose();
+    // DisposeAsync as well is harmless. The count check is what makes it safe for xunit to
+    // dispose one collection's fixture instance while other collections are still running against
+    // the shared stack: only the last one closes the job.
+    public void Dispose()
+    {
+        if (Volatile.Read(ref _liveCollections) == 0)
+        {
+            _job?.Dispose();
+        }
+    }
 
     public async Task<IBrowserContext> NewContextAsync(string? timezoneId = null)
     {
@@ -848,6 +911,50 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     }
 
     /// <summary>
+    /// A second, independent browser context signed in as an account that already exists, through
+    /// the same minted-magic-link redemption <see cref="SeedRegisteredUserAsync"/> uses — so the
+    /// context holds real <c>pu.auth</c>/<c>pu.csrf</c> cookies rather than a copied session.
+    /// <para>
+    /// Contexts are the unit of <c>localStorage</c> isolation, and two collections running
+    /// concurrently against one account would otherwise share (and overwrite) each other's
+    /// <c>partyup:theme</c> seed. Each context therefore also takes its own client address, the
+    /// rate-limit partitioning <see cref="NextClientAddress"/> documents.
+    /// </para>
+    /// </summary>
+    public async Task<IBrowserContext> SignInNewContextAsync(string username)
+    {
+        (Guid userId, _) = await GetAuthIdentityAsync(username);
+        IBrowserContext context = await NewContextAsync();
+        await context.SetExtraHTTPHeadersAsync(new Dictionary<string, string>
+        {
+            ["X-Forwarded-For"] = NextClientAddress(),
+        });
+
+        // Two collections signing the SAME account in at the same instant is a shape no real user
+        // produces, and the server answers it honestly: `ConsumeMagicLinkUseCase` confirms the
+        // email inside its transaction, so the loser of the race gets Identity's optimistic
+        // concurrency failure (a 500) and its page never leaves `/auth/magic`. Redemptions are
+        // therefore taken one at a time — there are only a handful per run, each about a second.
+        await SignInGate.WaitAsync();
+        try
+        {
+            string rawToken = await MintAuthTokenAsync(AuthTokenPurpose.MagicLink, userId);
+            IPage page = await context.NewPageAsync();
+            await page.GotoAsync($"{WebBaseUrl}/auth/magic#token={rawToken}");
+            await page.WaitForURLAsync(url => url.EndsWith("/app", StringComparison.Ordinal));
+            await page.CloseAsync();
+        }
+        finally
+        {
+            SignInGate.Release();
+        }
+
+        return context;
+    }
+
+    private static readonly SemaphoreSlim SignInGate = new(1, 1);
+
+    /// <summary>
     /// Drives a brand-new registered account through the real magic-link-style flow the
     /// web app exposes (age gate → email-only register → mailbox link → password → onboarding
     /// wizard) so the browser tests exercise the same path a real user takes rather than a
@@ -938,7 +1045,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
 
         await page.GetByText("Check your inbox.").WaitForAsync();
 
-        string verifyLink = await HarvestLinkAsync("/auth/verify-email#token=", since);
+        string verifyLink = await HarvestLinkAsync("/auth/verify-email#token=", since, email);
         await page.GotoAsync(verifyLink);
         await page.GetByLabel("Password").FillAsync("correct horse battery staple 42");
         await page.GetByRole(AriaRole.Button, new() { Name = "Continue" }).ClickAsync();
@@ -1077,9 +1184,20 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     /// <summary>
     /// §9.1/A-064's mailbox harvesting for local e2e: `LoggingEmailSender` (Development-only) drops
     /// each outbound email as a `.eml` file. This polls for the newest file created after
-    /// <paramref name="since"/> and extracts the first link containing <paramref name="pathContains"/>.
+    /// <paramref name="since"/> that is addressed to <paramref name="recipient"/> and extracts the
+    /// first link containing <paramref name="pathContains"/>.
+    /// <para>
+    /// The drop directory is one shared mailbox for every account the run creates, and the lane's
+    /// collections register accounts concurrently, so the recipient — matched against
+    /// `LoggingEmailSender`'s own <c>To:</c> header — is what makes a harvest belong to its caller.
+    /// A time window alone would let one registration redeem another's verification token.
+    /// </para>
     /// </summary>
-    public async Task<string> HarvestLinkAsync(string pathContains, DateTime since, TimeSpan? timeout = null)
+    public async Task<string> HarvestLinkAsync(
+        string pathContains,
+        DateTime since,
+        string recipient,
+        TimeSpan? timeout = null)
     {
         DateTime sinceWithSkewGuard = since - TimeSpan.FromSeconds(2);
         DateTime deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(45));
@@ -1091,7 +1209,23 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
 
             foreach (string file in candidates)
             {
-                string content = await File.ReadAllTextAsync(file);
+                string content;
+                try
+                {
+                    content = await File.ReadAllTextAsync(file);
+                }
+                catch (IOException)
+                {
+                    // The API writes the drop file while this poll enumerates the directory; a
+                    // half-written file is simply not this poll's answer yet.
+                    continue;
+                }
+
+                if (!IsAddressedTo(content, recipient))
+                {
+                    continue;
+                }
+
                 Match match = Regex.Match(content, @"https?://\S*" + Regex.Escape(pathContains) + @"\S*");
                 if (match.Success)
                 {
@@ -1102,7 +1236,16 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
             await Task.Delay(250);
         }
 
-        throw new TimeoutException($"No dropped email contained a link with '{pathContains}' within the timeout.");
+        throw new TimeoutException(
+            $"No dropped email to '{recipient}' contained a link with '{pathContains}' within the timeout.");
+    }
+
+    private static bool IsAddressedTo(string emlContent, string recipient)
+    {
+        int end = emlContent.IndexOf('\n');
+        string firstLine = end < 0 ? emlContent : emlContent[..end];
+        return firstLine.StartsWith("To:", StringComparison.Ordinal)
+            && firstLine.Contains(recipient, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -1254,7 +1397,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
         throw new TimeoutException($"'{url}' did not become ready within {timeout}.", last);
     }
 
-    private void AssignToJob(Process process)
+    private static void AssignToJob(Process process)
     {
         if (OperatingSystem.IsWindows())
         {
@@ -1308,10 +1451,45 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     }
 }
 
+/// <summary>
+/// The lane's four parallel collections. xunit runs the tests inside one collection serially and
+/// different collections concurrently (<c>xunit.runner.json</c>), so this partition — not any
+/// per-test attribute — is what makes the lane overlap its own waits: nearly every second of it is
+/// spent waiting on a navigation, an axe scan or a UI transition, and a browser context is cheap.
+/// <para>
+/// Every collection shares one <see cref="PlaywrightFixture"/> stack (one API process, one database,
+/// one browser — see that class's own remarks on how the collection-fixture instances refcount it),
+/// and each collection's accounts are its own: no seeded persona is shared across two of them, and
+/// every account already carries its own client address for rate-limit partitioning. The sizes
+/// below balance the measured serial run: the route audit is the whale (~57s), the interaction
+/// audits (~34s) are the second, and the flow suites (~37s together) split into the remaining two.
+/// </para>
+/// </summary>
+[CollectionDefinition(Name)]
+public sealed class AxeRouteSuite : ICollectionFixture<PlaywrightFixture>
+{
+    public const string Name = "Playwright axe route audit";
+}
+
+/// <inheritdoc cref="AxeRouteSuite"/>
+[CollectionDefinition(Name)]
+public sealed class AxeInteractionSuite : ICollectionFixture<PlaywrightFixture>
+{
+    public const string Name = "Playwright axe interaction audit";
+}
+
+/// <inheritdoc cref="AxeRouteSuite"/>
 [CollectionDefinition(Name)]
 public sealed class PlaywrightSuite : ICollectionFixture<PlaywrightFixture>
 {
     public const string Name = "Playwright browser suite";
+}
+
+/// <inheritdoc cref="AxeRouteSuite"/>
+[CollectionDefinition(Name)]
+public sealed class PlaywrightCalendarSuite : ICollectionFixture<PlaywrightFixture>
+{
+    public const string Name = "Playwright calendar and polls suite";
 }
 
 public sealed record RegisteredUser(IPage Page, string Username, string DisplayName);

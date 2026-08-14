@@ -17,6 +17,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The runner reads this from the test assembly's own output directory, so it has to be
+         copied there: the four collections in PlaywrightFixture.cs only overlap because it turns
+         collection parallelism on. -->
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Test-only: the browser lane's own real-clock backdoor (PlaywrightFixture.BackdatePollPastDeadlineAsync)
          needs a Postgres client to write the same DB the running API reads. This never wires any
          Infrastructure DI, EF DbContext, or app service — it only reuses the `Npgsql` assembly this

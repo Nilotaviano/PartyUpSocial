@@ -34,7 +34,7 @@ namespace PartyUp.BrowserTests.Availability;
 /// </summary>
 [Trait("Category", "Integration")]
 [Trait("Browser", "WebKit")]
-[Collection(PlaywrightSuite.Name)]
+[Collection(PlaywrightCalendarSuite.Name)]
 public sealed class AvailabilityCalendarPointerTests(PlaywrightFixture fixture)
 {
     // The constructor-injected `fixture` is the one real, already-`InitializeAsync`'d shared

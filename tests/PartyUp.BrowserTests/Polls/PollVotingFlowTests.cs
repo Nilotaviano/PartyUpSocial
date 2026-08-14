@@ -10,7 +10,7 @@ namespace PartyUp.BrowserTests.Polls;
 /// shape of a vote row, and the guest claim-then-vote flow over the poll-typed guest link.
 /// </summary>
 [Trait("Category", "Integration")]
-[Collection(PlaywrightSuite.Name)]
+[Collection(PlaywrightCalendarSuite.Name)]
 public sealed class PollVotingFlowTests(PlaywrightFixture fixture)
 {
     private static readonly SemaphoreSlim SetupLock = new(1, 1);

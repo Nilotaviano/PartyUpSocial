@@ -9,7 +9,7 @@ namespace PartyUp.BrowserTests.Tour;
 /// then walks: register → `/settings/account` → Replay → overlay.
 /// </summary>
 [Trait("Category", "Integration")]
-[Collection(PlaywrightSuite.Name)]
+[Collection(PlaywrightCalendarSuite.Name)]
 public sealed class TourFlowTests(PlaywrightFixture fixture)
 {
     private static readonly SemaphoreSlim SetupLock = new(1, 1);

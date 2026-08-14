@@ -14,7 +14,7 @@ namespace PartyUp.BrowserTests.Notifications;
 /// the real stack.
 /// </summary>
 [Trait("Category", "Integration")]
-[Collection(PlaywrightSuite.Name)]
+[Collection(PlaywrightCalendarSuite.Name)]
 public sealed class PushEnableFlowTests(PlaywrightFixture fixture)
 {
     /// <summary>

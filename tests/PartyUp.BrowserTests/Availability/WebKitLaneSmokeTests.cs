@@ -15,7 +15,7 @@ namespace PartyUp.BrowserTests.Availability;
 /// </summary>
 [Trait("Category", "Integration")]
 [Trait("Browser", "WebKit")]
-[Collection(PlaywrightSuite.Name)]
+[Collection(PlaywrightCalendarSuite.Name)]
 public sealed class WebKitLaneSmokeTests
 {
     // No PlaywrightFixture constructor parameter: this class drives its own WebKit instance and

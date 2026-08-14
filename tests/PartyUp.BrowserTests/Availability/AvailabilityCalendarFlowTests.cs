@@ -17,7 +17,7 @@ namespace PartyUp.BrowserTests.Availability;
 /// </para>
 /// </summary>
 [Trait("Category", "Integration")]
-[Collection(PlaywrightSuite.Name)]
+[Collection(PlaywrightCalendarSuite.Name)]
 public sealed class AvailabilityCalendarFlowTests(PlaywrightFixture fixture)
 {
     /// <summary>
