@@ -26,6 +26,7 @@ const FILL_CLASSES: Record<FillVariant, string> = {
 }
 
 const SIZE_CLASSES = {
+  xxs: 'h-[19px] w-[19px] text-[11px]',
   xs: 'h-9 w-9 text-lg',
   sm: 'h-12 w-12 text-xl',
   md: 'h-14 w-14 text-2xl',

@@ -324,9 +324,7 @@ describe('WeekGrid layers', () => {
         {
           id: 'friend-1',
           name: 'Ana Silva',
-          initials: 'AS',
-          chip: 1,
-          emoji: null,
+          emoji: '🐙',
           imgUrl: null,
           masked: false,
           windows: [{ day: 1, start: 540, end: 570, intent: 'free' }],
@@ -351,7 +349,9 @@ describe('WeekGrid layers', () => {
     expect(screen.getByText(/Raid night/)).toBeInTheDocument()
     expect(screen.getByText(/Deep Rock co-op/)).toBeInTheDocument()
     expect(screen.getByText(/your vote: available/)).toBeInTheDocument()
-    expect(screen.getByTitle(/Ana Silva/)).toBeInTheDocument()
+    const chip = screen.getByTitle(/Ana Silva/)
+    expect(chip).toBeInTheDocument()
+    expect(chip).toHaveTextContent('🐙')
 
     // The layers are painted over the same slots — they never become cells of
     // their own, so the cell layer's shape is untouched.
@@ -359,6 +359,44 @@ describe('WeekGrid layers', () => {
     expect(
       screen.getAllByRole('gridcell').filter((c) => c.getAttribute('tabindex') === '0'),
     ).toHaveLength(1)
+  })
+
+  it('exposes the friend chip tooltip text to screen readers, not just the title attribute', () => {
+    renderGrid({
+      friends: [
+        {
+          id: 'friend-1',
+          name: 'Ana Silva',
+          emoji: '🐙',
+          imgUrl: null,
+          masked: false,
+          windows: [{ day: 1, start: 540, end: 570, intent: 'free' }],
+        },
+      ],
+    })
+
+    // The disc is aria-hidden and `title` is mouse-only, so the same text the
+    // tooltip carries must also land in an sr-only span a screen reader reads.
+    expect(screen.getByText('Ana Silva · 09:00–09:30')).toBeInTheDocument()
+  })
+
+  it('renders a friend chip as an AvatarDisc, masking the emoji for a masked friend_D188', () => {
+    renderGrid({
+      friends: [
+        {
+          id: 'friend-2',
+          name: 'Ren Okafor',
+          emoji: '🐙',
+          imgUrl: null,
+          masked: true,
+          windows: [{ day: 1, start: 540, end: 570, intent: 'free' }],
+        },
+      ],
+    })
+
+    const chip = screen.getByTitle(/Ren Okafor/)
+    expect(chip).toHaveTextContent('●')
+    expect(chip).not.toHaveTextContent('🐙')
   })
 
   it('marks the now-line on today only, and only inside the visible hours_S6', () => {

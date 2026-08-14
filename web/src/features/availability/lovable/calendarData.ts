@@ -67,19 +67,6 @@ export function baseRuleId(ruleId: string): string {
   return ruleId.split('#')[0]
 }
 
-function initialsOf(displayName: string | null): string {
-  if (!displayName) return '?'
-  const parts = displayName.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return '?'
-  const letters = parts.slice(0, 2).map((part) => [...part][0] ?? '')
-  return letters.join('').toLocaleUpperCase()
-}
-
-function chipOf(ordinal: number): Friend['chip'] {
-  const index = (((ordinal - 1) % 5) + 5) % 5
-  return (index + 1) as Friend['chip']
-}
-
 export function mapCalendar(
   view: CalendarView | undefined,
   weekStart: Date,
@@ -155,8 +142,6 @@ export function mapCalendar(
     return {
       id: `friend-${ordinal}`,
       name,
-      initials: initialsOf(entry.owner.displayName),
-      chip: chipOf(ordinal),
       emoji: masked ? null : (entry.owner.avatar?.emoji ?? null),
       imgUrl: masked ? null : (entry.owner.avatar?.imgUrl ?? null),
       masked,

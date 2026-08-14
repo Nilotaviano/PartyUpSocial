@@ -234,11 +234,14 @@ Slices (serialized S2→S5; write sets in `.foreman/ledger.md`):
 - **S4 — panel & page layout**: `AvailabilitySummary` groups rules under "Repeats weekly" /
   "This week only" headers with kind icons and card rows (selected row ring-highlights and
   scroll-syncs with grid selection where already wired); desktop `lg` layout becomes
-  side-panel (sticky aside) + main column, and **the aside hosts `CalendarLayers` for both
-  view branches** — the agenda route keeps layer control (D-111/D-135), below `lg` the
-  current above-content placement stays; the summary collapses above the grid behind a
-  disclosure below `lg`; `CalendarLayers` toggles restyle as the legend card (fieldset
-  semantics stay).
+  side-panel (sticky aside) + main column, and **the aside hosts the Friends card for both
+  view branches** from one mount — a toggle made on the agenda route applies to the week
+  grid, since agenda itself paints no friend layer (D-111/D-135) — below `lg` the current
+  above-content placement stays; the summary collapses above the grid behind a disclosure
+  below `lg`. The Friends card's legend pills are the shipped D-117 filter surface: an
+  `aria-pressed` toggle per friend, defaulting to shown, that excludes a friend's chips
+  from the grid without removing their pill; the card itself is a plain `div`/`h2`/`ul`/`li`
+  with `button` pills, not a `fieldset`.
 - **S5 — mobile 3-day pager**: below `sm`, the grid shows a **3-day window defined as an index
   into the displayed week** — initial window anchored on today clamped into the week
   (`weekOffset 0`), otherwise the week's first three days; the day strip's 7 buttons are the

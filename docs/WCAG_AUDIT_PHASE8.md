@@ -63,7 +63,7 @@ would pretend to.
 Not strictly a manual-only criterion, but axe does not decide it, so it is checked by named tests
 instead: the voting grid pairs every fill with a glyph and a value in the accessible name; the week
 grid's layer legend carries text labels with `aria-hidden` swatches
-(`CalendarLayers.test.tsx`'s `codes every calendar layer by text, never by its colour swatch
+(`lovable/CalendarShell.test.tsx`'s `codes every calendar layer by text, never by its colour swatch
 alone_D139`); the session roster and poll status use text, not colour alone.
 
 ## Findings this slice found and fixed

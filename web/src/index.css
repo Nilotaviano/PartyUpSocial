@@ -106,12 +106,6 @@
   --color-busy: var(--busy);
   --color-busy-foreground: var(--busy-ink);
 
-  --color-chip-1: var(--chip-1);
-  --color-chip-2: var(--chip-2);
-  --color-chip-3: var(--chip-3);
-  --color-chip-4: var(--chip-4);
-  --color-chip-5: var(--chip-5);
-
   --color-grid-line: var(--grid-line);
   --color-grid-hour: var(--grid-hour);
 }
@@ -141,12 +135,6 @@
   --maybe-ink: oklch(0.462 0.094 88.9);
   --busy: oklch(0.942 0.016 95.2);
   --busy-ink: oklch(0.443 0.014 84.6);
-
-  --chip-1: oklch(0.62 0.16 25);
-  --chip-2: oklch(0.6 0.13 250);
-  --chip-3: oklch(0.58 0.14 320);
-  --chip-4: oklch(0.6 0.13 195);
-  --chip-5: oklch(0.6 0.14 60);
 
   --grid-line: oklch(0.885 0.018 95 / 60%);
   --grid-hour: oklch(0.82 0.026 95 / 90%);
@@ -187,12 +175,6 @@
   --maybe-ink: oklch(0.899 0.102 95.8);
   --busy: oklch(0.294 0.018 125.3);
   --busy-ink: oklch(0.754 0.017 91.6);
-
-  --chip-1: oklch(0.68 0.16 25);
-  --chip-2: oklch(0.68 0.13 250);
-  --chip-3: oklch(0.66 0.14 320);
-  --chip-4: oklch(0.68 0.12 195);
-  --chip-5: oklch(0.72 0.14 60);
 
   --grid-line: oklch(0.42 0.02 130 / 45%);
   --grid-hour: oklch(0.5 0.025 130 / 70%);

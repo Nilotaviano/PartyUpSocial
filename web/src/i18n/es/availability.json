@@ -170,6 +170,7 @@
     "deleteRuleBody": "{{rule}} se repite cada semana. Al eliminarla desaparece de todas las semanas futuras.",
     "deleteRule": "Eliminar regla",
     "crew": "Amigos",
+    "friendToggle": "Alternar disponibilidad de {{name}}",
     "bookedThisWeek": "Reservado esta semana",
     "openPoll": "Encuesta abierta · {{title}}",
     "legend": {

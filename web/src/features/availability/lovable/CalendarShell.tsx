@@ -85,6 +85,19 @@ export function CalendarShell() {
   const [pageStart, setPageStart] = useState<number | null>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
+  // D-117/D-135: an exclusion set, not an inclusion list — an empty set means
+  // every friend is shown, so the "all friends by default" behavior holds the
+  // instant the async calendar response arrives. Plain component state only:
+  // no `localStorage`, no URL, no query key, so a remount resets it for free.
+  const [excludedFriendIds, setExcludedFriendIds] = useState<Set<string>>(new Set());
+  const toggleFriend = useCallback((id: string) => {
+    setExcludedFriendIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const profile = useQuery({
     queryKey: viewerProfileKey,
@@ -121,6 +134,21 @@ export function CalendarShell() {
 
   const from = fakeLocalToInstant(weekStart, timeZone);
   const to = fakeLocalToInstant(new Date(weekStart.getTime() + 7 * DAY_MS), timeZone);
+
+  // `Friend.id` (`friend-${ordinal}`) is only stable within one `GET /calendar`
+  // response: the ordinal is the owner's encounter order in that response, not
+  // a durable identity, so a paged-in response can hand the same id to a
+  // different person. The exclusion set can't outlive the fetched range it was
+  // built against, so it is cleared here — one mechanism for every cause of a
+  // range change, week paging and the minute-tick midnight rollover alike —
+  // rather than at each action that might change `from`. This resets state
+  // during render on a prop/derived-value change (React's documented pattern),
+  // not in a `useEffect`, so it never cascades an extra render.
+  const [rangeAtLastClear, setRangeAtLastClear] = useState(from);
+  if (rangeAtLastClear !== from) {
+    setRangeAtLastClear(from);
+    setExcludedFriendIds(new Set());
+  }
 
   const calendar = useQuery({
     queryKey: availabilityKeys.calendar(from, to),
@@ -629,6 +657,8 @@ export function CalendarShell() {
               <Legend />
               <FriendsCard
                 friends={mapped.friends}
+                excludedFriendIds={excludedFriendIds}
+                onToggleFriend={toggleFriend}
                 sessions={mapped.sessions}
                 labels={labels}
                 pollGroups={mapped.pollGroups}
@@ -669,6 +699,8 @@ export function CalendarShell() {
                     <Legend />
                     <FriendsCard
                       friends={mapped.friends}
+                      excludedFriendIds={excludedFriendIds}
+                      onToggleFriend={toggleFriend}
                       sessions={mapped.sessions}
                       labels={labels}
                       pollGroups={mapped.pollGroups}
@@ -760,7 +792,7 @@ export function CalendarShell() {
                 <WeekGrid
                   rules={rules}
                   merged={mapped.merged}
-                  friends={mapped.friends}
+                  friends={mapped.friends.filter((f) => !excludedFriendIds.has(f.id))}
                   sessions={mapped.sessions}
                   polls={mapped.polls}
                   labels={labels}
@@ -825,8 +857,8 @@ function Legend() {
     },
     {
       label: t("lovable.legend.friend"),
-      cls: "bg-chip-1 border-border rounded-full",
-      glyph: null,
+      cls: "bg-card border-border rounded-full",
+      glyph: "●",
     },
     {
       label: t("lovable.legend.session"),
@@ -864,11 +896,15 @@ function Legend() {
 
 function FriendsCard({
   friends,
+  excludedFriendIds,
+  onToggleFriend,
   sessions,
   pollGroups,
   labels,
 }: {
   friends: Friend[];
+  excludedFriendIds: Set<string>;
+  onToggleFriend: (id: string) => void;
   sessions: GameSession[];
   pollGroups: PollGroup[];
   labels: WeekLabels;
@@ -880,21 +916,36 @@ function FriendsCard({
         <Users className="size-4" /> {t("lovable.crew")}
       </h2>
       <ul className="mt-2 flex flex-wrap gap-1.5">
-        {friends.map((f) => (
-          <li
-            key={f.id}
-            className="flex items-center gap-1.5 rounded-full border border-border bg-background py-0.5 pr-2.5 pl-0.5"
-          >
-            <AvatarDisc
-              seed={f.id}
-              emoji={f.emoji}
-              imgUrl={f.imgUrl}
-              masked={f.masked}
-              size="xs"
-            />
-            <span className="text-[12px] font-semibold">{f.name.split(" ")[0]}</span>
-          </li>
-        ))}
+        {friends.map((f) => {
+          const shown = !excludedFriendIds.has(f.id);
+          return (
+            <li key={f.id}>
+              <button
+                type="button"
+                aria-pressed={shown}
+                aria-label={t("lovable.friendToggle", { name: f.name })}
+                onClick={() => onToggleFriend(f.id)}
+                className={cn(
+                  "flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-background py-0.5 pr-2.5 pl-0.5",
+                  // WCAG 1.4.3: an aria-pressed="false" button is still operable, so
+                  // the off state can't drop the label below 4.5:1 via opacity — the
+                  // off signal is the dashed border plus a dimmed (aria-hidden) disc.
+                  !shown && "border-dashed text-muted-foreground",
+                )}
+              >
+                <AvatarDisc
+                  seed={f.id}
+                  emoji={f.emoji}
+                  imgUrl={f.imgUrl}
+                  masked={f.masked}
+                  size="xs"
+                  className={!shown ? "opacity-40" : undefined}
+                />
+                <span className="text-[12px] font-semibold">{f.name.split(" ")[0]}</span>
+              </button>
+            </li>
+          );
+        })}
       </ul>
       <UpNext compact sessions={sessions} pollGroups={pollGroups} labels={labels} />
     </div>

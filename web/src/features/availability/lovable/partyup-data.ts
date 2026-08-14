@@ -36,8 +36,6 @@ export type MergedSpan = { day: number; start: number; end: number };
 export type Friend = {
   id: string;
   name: string;
-  initials: string;
-  chip: 1 | 2 | 3 | 4 | 5;
   /** D-188 avatar glyph; null for a picture avatar and for a masked owner. */
   emoji: string | null;
   /** D-191 proxy URL, never an upstream one; null unless the avatar is external. */

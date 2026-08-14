@@ -61,6 +61,15 @@ describe('AvatarDisc', () => {
     expect(container.querySelector('span[aria-hidden="true"]')).toHaveTextContent('●')
   })
 
+  it('renders the xxs size for the week-grid friend chips', () => {
+    const { container } = render(<AvatarDisc emoji="🐙" seed="friend-1" size="xxs" />)
+
+    const disc = container.querySelector('span[aria-hidden="true"]')
+    expect(disc).toHaveClass('h-[19px]')
+    expect(disc).toHaveClass('w-[19px]')
+    expect(disc).toHaveClass('text-[11px]')
+  })
+
   it('retries a new imgUrl after a previous one failed, instead of staying on the glyph', () => {
     const { container, rerender } = render(
       <AvatarDisc emoji="🎲" imgUrl="/a/broken-token" seed="user-1" />,

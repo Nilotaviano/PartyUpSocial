@@ -170,6 +170,7 @@
     "deleteRuleBody": "{{rule}} repeats every week. Deleting removes it from all future weeks.",
     "deleteRule": "Delete rule",
     "crew": "Friends",
+    "friendToggle": "Toggle availability for {{name}}",
     "bookedThisWeek": "Booked this week",
     "openPoll": "Open poll · {{title}}",
     "legend": {

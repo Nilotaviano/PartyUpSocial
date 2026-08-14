@@ -526,4 +526,123 @@ describe('CalendarShell', () => {
       ).toBe(true),
     )
   })
+
+  it('shows every friend chip by default and toggling a pill off removes it from the grid_D117', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') {
+        return Promise.resolve({ data: { timeZone: 'UTC', locale: 'en' } })
+      }
+      if (path === '/api/v1/calendar') {
+        const body = calendarResponse()
+        // Gives the masked friend a window too, so both fixture friends paint a
+        // grid chip and a toggle on one can be proven to leave the other alone.
+        body.friendAvailability[1]!.ranges = [
+          { start: '2026-08-11T14:00:00Z', end: '2026-08-11T15:00:00Z' },
+        ]
+        return Promise.resolve({ data: body })
+      }
+      return Promise.resolve({ data: undefined })
+    })
+    renderShell()
+    await waitForCalendar()
+
+    const crew = crewList()
+    expect(screen.getByTitle(/Mika Ortega/)).toBeInTheDocument()
+    expect(screen.getByTitle(/Anonymous/)).toBeInTheDocument()
+    const toggle = within(crew).getByRole('button', {
+      name: 'Toggle availability for Mika Ortega',
+    })
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByTitle(/Mika Ortega/)).not.toBeInTheDocument()
+    // The other friend's chip is untouched by this toggle.
+    expect(screen.getByTitle(/Anonymous/)).toBeInTheDocument()
+    // The legend pill stays visible (dimmed), never removed — it is the truthful filter control.
+    expect(within(crew).getByText('Mika')).toBeInTheDocument()
+
+    fireEvent.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTitle(/Mika Ortega/)).toBeInTheDocument()
+  })
+
+  it('resets the friend filter on week navigation, since a friend id is only stable within one response', async () => {
+    renderShell()
+    await waitForCalendar()
+
+    const toggle = () =>
+      within(crewList()).getByRole('button', { name: 'Toggle availability for Mika Ortega' })
+    fireEvent.click(toggle())
+    expect(toggle()).toHaveAttribute('aria-pressed', 'false')
+
+    // Every step below actually moves the fetched `from` — the single reset
+    // mechanism (a render-phase reset keyed on `from`) fires on each, never on
+    // a same-week no-op, so the sequence never revisits an unchanged range.
+    fireEvent.click(screen.getByRole('button', { name: 'Next week' }))
+    await waitFor(() => expect(toggle()).toHaveAttribute('aria-pressed', 'true'))
+
+    fireEvent.click(toggle())
+    expect(toggle()).toHaveAttribute('aria-pressed', 'false')
+
+    // offset 1 -> 0: still a genuine range change.
+    fireEvent.click(screen.getByRole('button', { name: 'Today' }))
+    await waitFor(() => expect(toggle()).toHaveAttribute('aria-pressed', 'true'))
+
+    fireEvent.click(toggle())
+    expect(toggle()).toHaveAttribute('aria-pressed', 'false')
+
+    // offset 0 -> -1: also a genuine range change.
+    fireEvent.click(screen.getByRole('button', { name: 'Previous week' }))
+    await waitFor(() => expect(toggle()).toHaveAttribute('aria-pressed', 'true'))
+  })
+
+  it('codes every calendar layer by text, never by its colour swatch alone_D139', async () => {
+    renderShell()
+    await waitForCalendar()
+
+    // Every legend row names its layer in words; the coloured swatch beside it
+    // is `aria-hidden` decoration, never the sole cue (WCAG 1.4.1).
+    for (const label of [
+      'Free (you)',
+      'Maybe (you)',
+      'Friend free',
+      'Booked session',
+      'Poll option',
+    ]) {
+      const item = screen.getByText(label).closest('li')!
+      expect(item.querySelector('[aria-hidden="true"]')).toBeInTheDocument()
+    }
+
+    // Each crew pill carries the friend's own name as text, not colour or a glyph alone.
+    const crew = crewList()
+    expect(within(crew).getByText('Mika')).toBeInTheDocument()
+    expect(within(crew).getByText('Anonymous')).toBeInTheDocument()
+  })
+
+  it('resets the friend filter to all-shown on remount, with no persisted write_D135', async () => {
+    const localStorageSpy = vi.spyOn(Storage.prototype, 'setItem')
+    const historySpy = vi.spyOn(window.history, 'pushState')
+
+    const first = renderShell()
+    await waitForCalendar()
+
+    const toggle = () =>
+      within(crewList()).getByRole('button', { name: 'Toggle availability for Mika Ortega' })
+    fireEvent.click(toggle())
+    expect(toggle()).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByTitle(/Mika Ortega/)).not.toBeInTheDocument()
+
+    first.unmount()
+
+    renderShell()
+    await waitForCalendar()
+
+    expect(toggle()).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTitle(/Mika Ortega/)).toBeInTheDocument()
+    expect(localStorageSpy).not.toHaveBeenCalled()
+    expect(historySpy).not.toHaveBeenCalled()
+  })
 })

@@ -66,6 +66,41 @@ public sealed class AvailabilityReadRepositoryStatementCountTests : IAsyncLifeti
         Assert.Equal(4, counter.StatementCount);
     }
 
+    [Fact]
+    public async Task ReadOwnersWindowReturnsOwnersOrderedByOwnerIdRegardlessOfInsertOrRequestOrder()
+    {
+        await using AppDbContext seedContext = CreateContext(null);
+        await seedContext.Database.MigrateAsync();
+
+        List<UserId> ownerIds = [];
+        for (int i = 0; i < 5; i++)
+        {
+            ownerIds.Add(await SeedUserAsync(seedContext));
+        }
+
+        await seedContext.SaveChangesAsync();
+
+        // Request order is the reverse of insertion order — if the read ever fell back to a
+        // storage-order or request-order shape, this would catch it; only an explicit ORDER BY on
+        // the owner id survives both permutations.
+        List<UserId> requestOrder = [.. ownerIds.AsEnumerable().Reverse()];
+        List<Guid> expectedOrder = [.. ownerIds.Select(id => id.Value).OrderBy(value => value)];
+
+        await using AppDbContext readContext = CreateContext(null);
+        var repository = new AvailabilityReadRepository(readContext);
+
+        TimeRange window = new(
+            Instant.FromUtc(2026, 9, 1, 0, 0), Instant.FromUtc(2026, 9, 30, 0, 0));
+
+        IReadOnlyList<AvailabilityOwnerData> firstRead =
+            await repository.ReadOwnersWindowAsync(requestOrder, window, default);
+        IReadOnlyList<AvailabilityOwnerData> secondRead =
+            await repository.ReadOwnersWindowAsync(requestOrder, window, default);
+
+        Assert.Equal(expectedOrder, [.. firstRead.Select(o => o.OwnerId.Value)]);
+        Assert.Equal(expectedOrder, [.. secondRead.Select(o => o.OwnerId.Value)]);
+    }
+
     private static async Task<UserId> SeedUserAsync(AppDbContext context)
     {
         User user = User.BeginOnboarding(

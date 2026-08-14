@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { GripHorizontal } from "lucide-react";
+import { AvatarDisc } from "../../friends/AvatarDisc";
 import { cn } from "./utils";
 import {
   ROW_H,
@@ -526,12 +527,23 @@ export function WeekGrid({
                           key={w.friend.id}
                           title={`${w.friend.name} · ${fmtRange(w.start, w.end)}`}
                           className={cn(
-                            "grid size-[19px] place-items-center rounded-full border border-card text-[9px] font-bold text-background shadow-sm",
+                            "grid place-items-center rounded-full",
                             w.intent === "maybe" && "opacity-70 ring-1 ring-dashed",
                           )}
-                          style={{ background: `var(--chip-${w.friend.chip})` }}
                         >
-                          {w.friend.initials}
+                          <AvatarDisc
+                            seed={w.friend.id}
+                            emoji={w.friend.emoji}
+                            imgUrl={w.friend.imgUrl}
+                            masked={w.friend.masked}
+                            size="xxs"
+                          />
+                          {/* The disc is aria-hidden decoration and `title` is
+                              mouse-only, so a screen reader viewer otherwise gets
+                              nothing for this chip. */}
+                          <span className="sr-only">
+                            {`${w.friend.name} · ${fmtRange(w.start, w.end)}`}
+                          </span>
                         </span>
                       ))}
                       {rest > 0 && (

@@ -28,10 +28,12 @@ public sealed class AvailabilityReadRepository(AppDbContext context) : IAvailabi
         Instant from = window.Start;
         Instant to = window.End;
 
-        // Statement 1: the owners' current TimeZone from users.
+        // Statement 1: the owners' current TimeZone from users. Ordered by owner id so the caller's
+        // result list — and any ordinal derived from its position — is stable across identical calls.
         List<OwnerZoneRow> zones = await context.DomainUsers
             .AsNoTracking()
             .Where(user => ownerIdList.Contains(user.Id) && user.TimeZone != null)
+            .OrderBy(user => user.Id)
             .Select(user => new OwnerZoneRow(user.Id, user.TimeZone!))
             .ToListAsync(cancellationToken);
 
