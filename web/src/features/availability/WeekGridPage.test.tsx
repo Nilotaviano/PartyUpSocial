@@ -1182,6 +1182,54 @@ describe('WeekGridPage commit step', () => {
     expect(api.post).not.toHaveBeenCalled()
   })
 
+  // `CommitBlockDialog` conditional-mounts per open, so it has no stable
+  // trigger for Radix's own focus restore to return to. Without the page's
+  // own restore, closing the dialog drops keyboard focus to `document.body`
+  // (CI's `KeyboardOnlyCreateEditDelete_D132`, WCAG 2.4.3) — these prove the
+  // roving-tabindex cell regains focus across all three close paths.
+  function expectFocusBackOnTheRovingCell() {
+    expect(document.activeElement?.getAttribute('role')).toBe('gridcell')
+    expect(document.activeElement?.getAttribute('tabindex')).toBe('0')
+    const focusedGridcells = screen
+      .getAllByRole('gridcell')
+      .filter((cell) => cell === document.activeElement)
+    expect(focusedGridcells).toHaveLength(1)
+  }
+
+  it('returns focus to the grid after Escape closes the commit dialog_D132', async () => {
+    renderPage()
+    await paintRange()
+
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.keyDown(dialog, { key: 'Escape', code: 'Escape' })
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(expectFocusBackOnTheRovingCell)
+  })
+
+  it('returns focus to the grid after Cancel closes the commit dialog_D132', async () => {
+    renderPage()
+    await paintRange()
+    await screen.findByRole('dialog')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(expectFocusBackOnTheRovingCell)
+  })
+
+  it('returns focus to the grid after Save closes the commit dialog_D132', async () => {
+    renderPage()
+    await paintRange()
+    await screen.findByRole('dialog')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(expectFocusBackOnTheRovingCell)
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1))
+  })
+
   it('renders as a ≥sm popover clamped inside the viewport_S3', async () => {
     renderPage()
     await paintRange()

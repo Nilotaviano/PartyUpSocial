@@ -237,6 +237,26 @@ export function WeekGridPage() {
   // state has no effect (the aside ignores it).
   const [summaryOpen, setSummaryOpen] = useState(false)
   const editTrigger = useRef<HTMLElement | null>(null)
+  // `CommitBlockDialog` conditional-mounts per open (`{pendingRange && ...}`),
+  // so Radix has no stable trigger element to restore focus to when it
+  // unmounts — unlike the always-mounted edit dialogs below, which hand Radix
+  // `editTrigger` via `onCloseAutoFocus`. This ref/effect pair is the
+  // equivalent restore for the commit dialog: the roving-tabindex cell in the
+  // grid, re-focused once the dialog's own unmount has finished painting.
+  const gridContainerRef = useRef<HTMLDivElement>(null)
+  const wasCommitDialogOpen = useRef(false)
+  useEffect(() => {
+    const isOpen = pendingRange !== null && pendingAnchor !== null
+    const closedJustNow = wasCommitDialogOpen.current && !isOpen
+    wasCommitDialogOpen.current = isOpen
+    if (!closedJustNow) return
+    const raf = requestAnimationFrame(() => {
+      gridContainerRef.current
+        ?.querySelector<HTMLElement>('[role="gridcell"][tabindex="0"]')
+        ?.focus()
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [pendingRange, pendingAnchor])
 
   const isAgenda = location.pathname.endsWith('/agenda')
 
@@ -940,7 +960,7 @@ export function WeekGridPage() {
         ) : (
           <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
             {aside}
-            <div className="min-w-0 space-y-2">
+            <div ref={gridContainerRef} className="min-w-0 space-y-2">
               {/* Stays mounted in both states: unmounting the control on
                   activation would drop focus to document.body and leave the 32
                   revealed rows unannounced (WCAG 2.4.3). */}
