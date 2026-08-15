@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { Mail } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
@@ -17,7 +18,6 @@ import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold } from '../../components/ui/pageScaffold'
-import { Section } from '../../components/ui/section'
 import { StatusBanner } from '../../components/ui/statusBanner'
 import { startExternalProviderWithRetry } from '../../auth/externalIntent'
 import {
@@ -172,6 +172,22 @@ function AuthScreen({
 
 const linkButtonBase = `inline-flex items-center justify-center gap-2 px-4 py-2 ${raisedInteractiveClasses}`
 
+// The sign-in-methods panel/card grammar (owner-approved Lovable design):
+// full-width h-12 rounded-xl rows on the app's `surface` card, matching the
+// row skin `AccountMenu.tsx`'s `rowClasses` already ships and the
+// primary/outline button recipes `HomePage.tsx` ships — reused here rather
+// than the older `ink`-token `Button`/`Input` primitives so the auth screens
+// read as one system with the rest of the uplifted app.
+const authRowOutlineClasses =
+  'flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-center font-display text-[14px] font-bold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
+const authRowPrimaryClasses =
+  'flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 font-display text-[14px] font-bold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
+const authFieldClasses =
+  'h-12 w-full rounded-xl border border-border bg-background px-3 font-body text-[14px] text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-50'
+const authFieldLabelClasses = 'font-display text-[13px] font-bold text-foreground'
+const quietAuthLinkClasses =
+  'inline-flex min-h-11 w-fit cursor-pointer items-center justify-center font-display text-[13px] font-bold text-muted-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
+
 /**
  * Decoration for the welcome "how it works" band (§3.6): the hero's own
  * vocabulary — outlined time blocks — reduced to a step-sized figure. Purely
@@ -291,28 +307,41 @@ export function Welcome() {
             {t('app.tagline')}
           </h1>
           {showLoginOptions ? (
-            <div className="flex flex-wrap gap-3">
+            <div className="surface flex flex-col gap-3 p-4" id="welcome-signin-panel">
+              <p className="font-body text-[13px] text-muted-foreground">
+                {t('welcome.signIn.intro', { ns: 'auth' })}
+              </p>
               {session?.providers.includes('google') && (
-                <Button variant="neutral" onClick={() => void external('google')}>
+                <button
+                  className={authRowOutlineClasses}
+                  type="button"
+                  onClick={() => void external('google')}
+                >
                   {t('providers.google', { ns: 'auth' })}
-                </Button>
+                </button>
               )}
               {session?.providers.includes('steam') && (
-                <Button variant="neutral" onClick={() => void external('steam')}>
+                <button
+                  className={authRowOutlineClasses}
+                  type="button"
+                  onClick={() => void external('steam')}
+                >
                   {t('providers.steam', { ns: 'auth' })}
-                </Button>
+                </button>
               )}
-              <Link className={`${linkButtonBase} bg-primary text-primary-ink`} to="/login">
+              <Link className={authRowOutlineClasses} to="/login">
+                <Mail aria-hidden className="size-4" />
                 {t('providers.email', { ns: 'auth' })}
               </Link>
-              <Link className={`${linkButtonBase} bg-card text-ink`} to="/register">
+              <Link className={authRowPrimaryClasses} to="/register">
                 {t('pages.register', { ns: 'auth' })}
               </Link>
             </div>
           ) : (
             <div className="flex flex-wrap gap-3">
               <Button
-                aria-expanded={false}
+                aria-controls="welcome-signin-panel"
+                aria-expanded={showLoginOptions}
                 variant="primary"
                 onClick={() => setShowLoginOptions(true)}
               >
@@ -504,65 +533,80 @@ export function Login() {
 
   return (
     <AuthScreen testId="screen-login" title={t('pages.login')}>
-      <FormShell
-        onSubmit={submit}
-        submit={
-          <Button type="submit" variant="primary">
+      <div className="surface flex flex-col gap-4 p-5">
+        <form className="flex flex-col gap-4" noValidate onSubmit={submit}>
+          <div className="flex flex-col gap-1.5">
+            <label className={authFieldLabelClasses} htmlFor="login-email">
+              {t('fields.email')}
+            </label>
+            <input
+              className={authFieldClasses}
+              id="login-email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              aria-invalid={emailError ? true : undefined}
+              aria-describedby={emailError ? 'login-email-error' : undefined}
+              required
+            />
+            <div className="min-h-[1.125rem]">
+              {emailError && (
+                <p className="font-body text-[12px] text-danger" id="login-email-error" role="alert">
+                  {t(emailError === 'required' ? 'fields.emailRequired' : 'fields.emailInvalid')}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className={authFieldLabelClasses} htmlFor="login-password">
+              {t('fields.password')}
+            </label>
+            <input
+              className={authFieldClasses}
+              id="login-password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              aria-invalid={passwordMissing || undefined}
+              aria-describedby={passwordMissing ? 'login-password-error' : undefined}
+              required
+            />
+            <div className="min-h-[1.125rem]">
+              {passwordMissing && (
+                <p className="font-body text-[12px] text-danger" id="login-password-error" role="alert">
+                  {t('fields.passwordRequired')}
+                </p>
+              )}
+            </div>
+          </div>
+          <button className={authRowPrimaryClasses} type="submit">
             {t('actions.signIn')}
-          </Button>
-        }
-      >
-        <FormField htmlFor="login-email" label={t('fields.email')}>
-          <Input
-            id="login-email"
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            aria-invalid={emailError ? true : undefined}
-            aria-describedby={emailError ? 'login-email-error' : undefined}
-            required
-          />
-          {emailError && (
-            <p id="login-email-error" role="alert">
-              {t(emailError === 'required' ? 'fields.emailRequired' : 'fields.emailInvalid')}
-            </p>
-          )}
-        </FormField>
-        <FormField htmlFor="login-password" label={t('fields.password')}>
-          <Input
-            id="login-password"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            aria-invalid={passwordMissing || undefined}
-            aria-describedby={passwordMissing ? 'login-password-error' : undefined}
-            required
-          />
-          {passwordMissing && <p id="login-password-error" role="alert">{t('fields.passwordRequired')}</p>}
-        </FormField>
-      </FormShell>
-      <Section className="gap-3">
-        <div className="flex flex-wrap gap-3">
-          <Button variant="neutral" onClick={() => void magic()}>
-            {t('actions.emailLink')}
-          </Button>
-          {session?.providers.includes('google') && (
-            <Button variant="neutral" onClick={() => void external('google')}>
-              {t('providers.google')}
-            </Button>
-          )}
-          {session?.providers.includes('steam') && (
-            <Button variant="neutral" onClick={() => void external('steam')}>
-              {t('providers.steam')}
-            </Button>
-          )}
-        </div>
+          </button>
+        </form>
+      </div>
+      <div className="flex flex-col gap-3">
+        <button className={authRowOutlineClasses} type="button" onClick={() => void magic()}>
+          {t('actions.emailLink')}
+        </button>
+        {session?.providers.includes('google') && (
+          <button className={authRowOutlineClasses} type="button" onClick={() => void external('google')}>
+            {t('providers.google')}
+          </button>
+        )}
+        {session?.providers.includes('steam') && (
+          <button className={authRowOutlineClasses} type="button" onClick={() => void external('steam')}>
+            {t('providers.steam')}
+          </button>
+        )}
         {sent && (
           <StatusBanner role="status" variant="success">
             {t('messages.checkInbox')}
           </StatusBanner>
         )}
-      </Section>
+        <Link className={quietAuthLinkClasses} to="/register">
+          {t('pages.register')}
+        </Link>
+      </div>
       <ErrorAlert error={error} />
     </AuthScreen>
   )
@@ -644,31 +688,43 @@ export function Register() {
           {t('messages.checkInbox')}
         </StatusBanner>
       ) : (
-        <FormShell
-          onSubmit={submit}
-          submit={
-            <Button type="submit" variant="primary">
+        <div className="surface flex flex-col gap-4 p-5">
+          <form className="flex flex-col gap-4" noValidate onSubmit={submit}>
+            <div className="flex flex-col gap-1.5">
+              <label className={authFieldLabelClasses} htmlFor="register-email">
+                {t('fields.email')}
+              </label>
+              <input
+                className={authFieldClasses}
+                id="register-email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                aria-invalid={emailError ? true : undefined}
+                aria-describedby={emailError ? 'register-email-error' : undefined}
+                required
+              />
+              <div className="min-h-[1.125rem]">
+                {emailError && (
+                  <p className="font-body text-[12px] text-danger" id="register-email-error" role="alert">
+                    {t(emailError === 'required' ? 'fields.emailRequired' : 'fields.emailInvalid')}
+                  </p>
+                )}
+              </div>
+            </div>
+            <p className="font-body text-[13px] text-muted-foreground">
+              {t('register.explainer')}
+            </p>
+            <button className={authRowPrimaryClasses} type="submit">
               {t('actions.createAccount')}
-            </Button>
-          }
-        >
-          <FormField htmlFor="register-email" label={t('fields.email')}>
-            <Input
-              id="register-email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              aria-invalid={emailError ? true : undefined}
-              aria-describedby={emailError ? 'register-email-error' : undefined}
-              required
-            />
-            {emailError && (
-              <p id="register-email-error" role="alert">
-                {t(emailError === 'required' ? 'fields.emailRequired' : 'fields.emailInvalid')}
-              </p>
-            )}
-          </FormField>
-        </FormShell>
+            </button>
+          </form>
+        </div>
+      )}
+      {!sent && (
+        <Link className={quietAuthLinkClasses} to="/login">
+          {t('pages.login')}
+        </Link>
       )}
       <ErrorAlert error={error} />
     </AuthScreen>
