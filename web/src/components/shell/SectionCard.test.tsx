@@ -31,7 +31,7 @@ describe('EmptyState', () => {
       />,
     )
 
-    expect(screen.getByText('No polls')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: 'No polls' })).toBeInTheDocument()
     expect(screen.getByText('Nothing here yet.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create a poll' })).toBeInTheDocument()
   })

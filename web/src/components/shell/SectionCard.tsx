@@ -45,7 +45,9 @@ export function EmptyState({
       <span className="mx-auto grid size-12 place-items-center rounded-full bg-card ring-1 ring-border">
         <Icon className="size-5 text-muted-foreground" />
       </span>
-      <p className="mt-3 font-display text-[15px] font-extrabold">{title}</p>
+      {/* h3, not the prototype's <p>: the pre-shell primitive exposed empty
+          states to heading navigation and the owner ruled that semantics stays. */}
+      <h3 className="mt-3 font-display text-[15px] font-extrabold">{title}</h3>
       {description && (
         <p className="mx-auto mt-1 max-w-[36ch] text-[12.5px] text-muted-foreground">{description}</p>
       )}
