@@ -832,16 +832,15 @@ describe('SessionDetailPage (lovable)', () => {
       await screen.findByText('Raid night')
       await screen.findByText('Requester One')
 
-      function orderOf(text: string | RegExp) {
-        return screen.getByText(text).closest('section')?.className.match(/\border-(\d+)\b/)?.[1]
-      }
       function headingOrderOf(name: string | RegExp) {
         return screen
           .getByRole('heading', { name })
           .closest('section')?.className.match(/\border-(\d+)\b/)?.[1]
       }
 
-      const summaryOrder = orderOf('Raid night')
+      const summaryOrder = screen
+        .getByTestId('session-summary-card')
+        .className.match(/\border-(\d+)\b/)?.[1]
       const rosterHeadingOrder = screen
         .getByRole('heading', { name: /Roster/ })
         .closest('section')?.className.match(/\border-(\d+)\b/)?.[1]

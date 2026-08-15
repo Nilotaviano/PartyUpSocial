@@ -6,6 +6,7 @@ import { CalendarClock, Gamepad2, Users } from 'lucide-react'
 import { isApiError } from '../../../api/client'
 import { Button } from '../../../components/ui/button'
 import { raisedInteractiveClasses } from '../../../components/ui/classes'
+import { PageHeader } from '../../../components/shell/PageHeader'
 import { StatusBanner } from '../../../components/ui/statusBanner'
 import { useDirtyGuard } from '../../../components/useDirtyGuard'
 import { friendKeys, getFriends } from '../../friends/friendGraph'
@@ -125,7 +126,6 @@ export function SessionCreatePage() {
   const queryClient = useQueryClient()
   const summaryRef = useRef<HTMLDivElement>(null)
   const cancelTrigger = useRef<HTMLButtonElement>(null)
-  const heading = useRef<HTMLHeadingElement>(null)
   const [searchParams] = useSearchParams()
   const [prefill] = useState(() => readPrefill(searchParams))
   const [form, setForm] = useState(() =>
@@ -167,11 +167,6 @@ export function SessionCreatePage() {
       summaryRef.current.focus()
     }
   }, [submit.error])
-
-  // D-139: the page heading takes programmatic focus on mount.
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((current) => ({ ...current, [key]: value }))
@@ -261,15 +256,10 @@ export function SessionCreatePage() {
 
   return (
     <main className="min-h-screen bg-background pb-32" data-testid="screen-session-create">
-      <div className="mx-auto max-w-[880px] px-3 pt-5 sm:px-6">
-        <h1
-          ref={heading}
-          className="font-display text-xl font-extrabold text-ink focus:outline-none sm:text-2xl"
-          tabIndex={-1}
-        >
-          {t('create.heading')}
-        </h1>
-      </div>
+      <PageHeader
+        back={{ label: t('nav.backToList'), to: '/sessions/upcoming' }}
+        title={t('create.heading')}
+      />
 
       {prefill?.startWasClamped && (
         <p aria-live="polite" className="mx-auto max-w-[880px] px-3 sm:px-6" role="status">

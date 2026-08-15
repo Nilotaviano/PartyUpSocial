@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { isApiError } from "../../../api/client";
+import { PageHeader } from "../../../components/shell/PageHeader";
 import { segmentItemClasses } from "../../../components/ui/classes";
 import { useToast } from "../../../components/ui/toastStore";
 import { AgendaView, type AgendaEntry } from "../AgendaView";
@@ -609,68 +610,67 @@ export function CalendarShell() {
   return (
     <>
       <div className="min-h-screen bg-background pb-24" data-testid="screen-calendar">
-        <header className="mx-auto flex max-w-[1400px] flex-col gap-3 px-3 pt-5 pb-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-6">
-          <div className="min-w-0">
-            <h1 className="truncate font-display text-xl font-extrabold sm:text-2xl">
-              {t("lovable.weekOf", { range: weekRangeLabel })}
-            </h1>
-          </div>
-          <div className="flex shrink-0 items-center gap-2 self-stretch sm:self-auto">
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label={t("calendar.previousWeek")}
-              className="size-11 rounded-xl"
-              onClick={() => goToWeek(-1)}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <Button
-              variant="outline"
-              className="h-11 rounded-xl font-display font-bold"
-              onClick={goToToday}
-            >
-              {t("calendar.dayPager.today")}
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label={t("calendar.nextWeek")}
-              className="size-11 rounded-xl"
-              onClick={() => goToWeek(1)}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-            {/* App chrome inside the ported header: the view switcher belongs
-                to this app's navigation, so it wears the SegmentStrip skin
-                but sits with the week controls, kept horizontal at all sizes. */}
-            <nav aria-label={t("calendar.viewSwitcher")} className="ml-auto sm:ml-2">
-              <div
-                className="flex flex-row [&>*]:rounded-none [&>*+*]:border-l-0 [&>*:first-child]:rounded-l-control [&>*:last-child]:rounded-r-control"
-                role="tablist"
+        <PageHeader
+          actions={
+            <div className="flex shrink-0 items-center gap-2 self-stretch sm:self-auto">
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label={t("calendar.previousWeek")}
+                className="size-11 rounded-xl"
+                onClick={() => goToWeek(-1)}
               >
-                {[
-                  { to: "/calendar", label: t("calendar.week"), on: !agendaMode },
-                  {
-                    to: "/calendar/agenda",
-                    label: t("calendar.agenda"),
-                    on: agendaMode,
-                  },
-                ].map((tab) => (
-                  <Link
-                    key={tab.to}
-                    aria-selected={tab.on}
-                    className={segmentItemClasses(tab.on, "flex-none")}
-                    role="tab"
-                    to={tab.to}
-                  >
-                    {tab.label}
-                  </Link>
-                ))}
-              </div>
-            </nav>
-          </div>
-        </header>
+                <ChevronLeft className="size-4" />
+              </Button>
+              <Button
+                variant="outline"
+                className="h-11 rounded-xl font-display font-bold"
+                onClick={goToToday}
+              >
+                {t("calendar.dayPager.today")}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label={t("calendar.nextWeek")}
+                className="size-11 rounded-xl"
+                onClick={() => goToWeek(1)}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+              {/* App chrome inside the ported header: the view switcher belongs
+                  to this app's navigation, so it wears the SegmentStrip skin
+                  but sits with the week controls, kept horizontal at all sizes. */}
+              <nav aria-label={t("calendar.viewSwitcher")} className="ml-auto sm:ml-2">
+                <div
+                  className="flex flex-row [&>*]:rounded-none [&>*+*]:border-l-0 [&>*:first-child]:rounded-l-control [&>*:last-child]:rounded-r-control"
+                  role="tablist"
+                >
+                  {[
+                    { to: "/calendar", label: t("calendar.week"), on: !agendaMode },
+                    {
+                      to: "/calendar/agenda",
+                      label: t("calendar.agenda"),
+                      on: agendaMode,
+                    },
+                  ].map((tab) => (
+                    <Link
+                      key={tab.to}
+                      aria-selected={tab.on}
+                      className={segmentItemClasses(tab.on, "flex-none")}
+                      role="tab"
+                      to={tab.to}
+                    >
+                      {tab.label}
+                    </Link>
+                  ))}
+                </div>
+              </nav>
+            </div>
+          }
+          live
+          title={t("lovable.weekOf", { range: weekRangeLabel })}
+        />
 
         <main className="mx-auto grid max-w-[1400px] gap-4 px-3 sm:px-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           {/* side panel — desktop */}

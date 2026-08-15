@@ -11,6 +11,7 @@ import {
   segmentStripClasses,
 } from '../../../components/ui/classes'
 import { EmptyState } from '../../../components/ui/emptyState'
+import { PageHeader } from '../../../components/shell/PageHeader'
 import { useToast } from '../../../components/ui/toastStore'
 import { cn } from '../../availability/lovable/utils'
 import { getPollList, pollKeys, pollWindowState, type PollBand, type PollSummary } from '../pollQueries'
@@ -178,12 +179,8 @@ export function PollListPage() {
 
   return (
     <main className="min-h-screen bg-background pb-24" data-testid="screen-polls">
-      <div className="mx-auto max-w-[1000px] px-3 py-6 sm:px-6">
-        <div className="surface paper-grain flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="font-display text-lg font-extrabold text-ink">{t('list.heading')}</h1>
-            <p className="text-[12px] text-ink-soft">{t('list.description')}</p>
-          </div>
+      <PageHeader
+        actions={
           <Link
             className={`inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
             to="/polls/new"
@@ -191,9 +188,12 @@ export function PollListPage() {
             <Plus aria-hidden="true" className="size-4" />
             {t('create.heading')}
           </Link>
-        </div>
-
-        <div aria-label={t('list.bandTabsLabel')} className={`mt-4 ${segmentStripClasses}`} role="tablist">
+        }
+        description={t('list.description')}
+        title={t('list.heading')}
+      />
+      <div className="mx-auto max-w-[1000px] px-3 pb-6 sm:px-6">
+        <div aria-label={t('list.bandTabsLabel')} className={segmentStripClasses} role="tablist">
           {BANDS.map((option) => (
             <button
               key={option}

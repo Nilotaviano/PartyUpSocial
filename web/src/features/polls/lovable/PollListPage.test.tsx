@@ -104,6 +104,14 @@ describe('PollListPage', () => {
     ).toBe(true)
   })
 
+  it('focuses the page h1 on mount_D139', async () => {
+    api.get.mockResolvedValue({ data: { items: [], nextCursor: null } })
+    renderPage()
+
+    const heading = await screen.findByRole('heading', { level: 1 })
+    await waitFor(() => expect(heading).toHaveFocus())
+  })
+
   it('shows a status pill with the deadline as text while polling', async () => {
     const deadline = '2099-06-15T23:00:00Z'
     api.get.mockResolvedValue({ data: { items: [poll({ deadline })], nextCursor: null } })

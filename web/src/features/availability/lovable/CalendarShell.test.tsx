@@ -179,6 +179,13 @@ describe('CalendarShell', () => {
     )
   })
 
+  it('focuses the page h1 on mount_D139', async () => {
+    renderShell()
+
+    const heading = await screen.findByRole('heading', { level: 1 })
+    await waitFor(() => expect(heading).toHaveFocus())
+  })
+
   it('exposes the 15-minute slots as an ARIA grid for keyboard users', async () => {
     renderShell()
 

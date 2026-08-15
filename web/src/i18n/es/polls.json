@@ -1,6 +1,7 @@
 {
   "nav": {
-    "polls": "Encuestas"
+    "polls": "Encuestas",
+    "backToList": "Volver a las encuestas"
   },
   "create": {
     "heading": "Nueva encuesta",

@@ -19,6 +19,7 @@ import { useSession } from '../../../auth/useSession'
 import { Button } from '../../../components/ui/button'
 import { fieldControlClasses, raisedInteractiveClasses } from '../../../components/ui/classes'
 import { Dialog } from '../../../components/ui/dialog'
+import { PageHeader } from '../../../components/shell/PageHeader'
 import { StatusBanner } from '../../../components/ui/statusBanner'
 import { AvatarDisc } from '../../friends/AvatarDisc'
 import { getViewerProfile, viewerProfileKey } from '../../sessions/sessionQueries'
@@ -48,6 +49,7 @@ import {
   mapPollDetail,
   optionDayLabel,
   optionRange,
+  platformLabel,
   rankedOptionIds,
   tallyFor,
   VOTE_META,
@@ -1222,21 +1224,17 @@ export function PollDetailPage() {
       )}
 
       {poll && (
-        <main className="mx-auto grid max-w-[1400px] gap-4 px-3 pt-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <>
+          <PageHeader
+            actions={<StatusPill label={t(statusLabelKey(poll.status))} status={poll.status} />}
+            back={{ label: t('nav.backToList'), to: '/polls' }}
+            description={`${poll.game ? `${poll.game.name} · ` : ''}${platformLabel(poll.platform, t)}`}
+            title={poll.title}
+          />
+          <main className="mx-auto grid max-w-[1400px] gap-4 px-3 pb-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="contents lg:order-2 lg:block lg:min-w-0 lg:space-y-4 lg:sticky lg:top-4 lg:self-start">
-            <section className="order-1 surface p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h1 className="font-display text-xl font-extrabold">{poll.title}</h1>
-                  <p className="truncate text-[12px] text-muted-foreground">
-                    {poll.game ? `${poll.game.name} · ` : ''}
-                    {poll.platform}
-                  </p>
-                </div>
-                <StatusPill label={t(statusLabelKey(poll.status))} status={poll.status} />
-              </div>
-
-              <dl className="mt-3 grid grid-cols-2 gap-2 text-[12px]">
+            <section className="order-1 surface p-4" data-testid="poll-summary-card">
+              <dl className="grid grid-cols-2 gap-2 text-[12px]">
                 <Meta label={t('detailLovable.meta.duration')} value={`${poll.durationMinutes / 60}h`} />
                 <Meta
                   label={t('detailLovable.meta.privacy')}
@@ -1449,7 +1447,8 @@ export function PollDetailPage() {
               })}
             </ul>
           </section>
-        </main>
+          </main>
+        </>
       )}
 
       {poll && isOrganizer && (isAwaitingSelection || isPolling) && viableEarly.length > 0 && (

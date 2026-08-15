@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CalendarClock, Users } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router'
@@ -10,6 +10,7 @@ import { avatarImgUrl } from '../../friends/avatarImage'
 import { Button } from '../../../components/ui/button'
 import { raisedInteractiveClasses, segmentItemClasses } from '../../../components/ui/classes'
 import { Dialog } from '../../../components/ui/dialog'
+import { PageHeader } from '../../../components/shell/PageHeader'
 import { IdentityRow } from '../../../components/ui/identityRow'
 import { SegmentStrip } from '../../../components/ui/segmentStrip'
 import { StatusBanner } from '../../../components/ui/statusBanner'
@@ -235,17 +236,6 @@ export function SessionDetailPage() {
     retry: false,
   })
 
-  // D-139: the page heading takes programmatic focus on mount, same contract
-  // as the flat page's `PageHeader` (`components/ui/pageHeader.tsx`) — this
-  // page doesn't use `PageHeader` (its h1 sits inside the bespoke summary
-  // card, only rendered once `detail` resolves), so the effect fires off the
-  // data becoming available rather than off the component's own mount.
-  const heading = useRef<HTMLHeadingElement>(null)
-  const hasDetail = Boolean(detail.data)
-  useEffect(() => {
-    if (hasDetail) heading.current?.focus()
-  }, [hasDetail])
-
   // D-038/D-046: times render in the viewer's profile time zone, not the
   // browser's, falling back to the browser zone only until the profile
   // query resolves. `instantToFakeLocal` + `timeZone: 'UTC'` formatting is
@@ -457,29 +447,21 @@ export function SessionDetailPage() {
       )}
 
       {data && (
-        <main className="mx-auto grid max-w-[1400px] gap-4 px-3 pt-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <>
+          <PageHeader
+            actions={
+              isKnownSessionStatus(data.status) && (
+                <StatusPill label={t(`status.${data.status}`)} status={data.status} />
+              )
+            }
+            back={{ label: t('nav.backToList'), to: '/sessions/upcoming' }}
+            description={`${data.game ? `${data.game.name} · ` : ''}${data.platform}`}
+            title={data.title}
+          />
+          <main className="mx-auto grid max-w-[1400px] gap-4 px-3 pb-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="contents lg:order-2 lg:block lg:min-w-0 lg:space-y-4 lg:sticky lg:top-4 lg:self-start">
-            <section className="order-1 surface p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h1
-                    ref={heading}
-                    className="font-display text-xl font-extrabold focus:outline-none"
-                    tabIndex={-1}
-                  >
-                    {data.title}
-                  </h1>
-                  <p className="truncate text-[12px] text-muted-foreground">
-                    {data.game ? `${data.game.name} · ` : ''}
-                    {data.platform}
-                  </p>
-                </div>
-                {isKnownSessionStatus(data.status) && (
-                  <StatusPill label={t(`status.${data.status}`)} status={data.status} />
-                )}
-              </div>
-
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+            <section className="order-1 surface p-4" data-testid="session-summary-card">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-2 rounded-xl border border-border bg-muted/50 px-2.5 py-2">
                   <CalendarClock className="size-4 shrink-0" />
                   <span className="text-[12px] font-semibold tabular-nums">{startText}</span>
@@ -771,7 +753,8 @@ export function SessionDetailPage() {
               </div>
             </div>
           </section>
-        </main>
+          </main>
+        </>
       )}
     </div>
   )

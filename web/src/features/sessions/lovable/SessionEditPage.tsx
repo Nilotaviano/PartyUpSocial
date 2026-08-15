@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { CalendarClock, Gamepad2, Users } from 'lucide-react'
 import { isApiError } from '../../../api/client'
 import { Button } from '../../../components/ui/button'
 import { controlRowClasses, raisedInteractiveClasses } from '../../../components/ui/classes'
+import { PageHeader } from '../../../components/shell/PageHeader'
 import { StatusBanner } from '../../../components/ui/statusBanner'
 import { useDirtyGuard } from '../../../components/useDirtyGuard'
 import {
@@ -76,7 +77,6 @@ export function SessionEditPage() {
   const { sessionId = '' } = useParams()
   const summaryRef = useRef<HTMLDivElement>(null)
   const cancelTrigger = useRef<HTMLButtonElement>(null)
-  const heading = useRef<HTMLHeadingElement>(null)
   const [form, setForm] = useState<ReturnType<typeof formFrom>>()
   const [dirty, setDirty] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -97,11 +97,6 @@ export function SessionEditPage() {
       setDiscardOpen(true)
     },
   })
-
-  // D-139: the page heading takes programmatic focus on mount.
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
 
   // Adjusting state during render (not in an effect) to seed the form the
   // first time the detail query resolves, per React's documented pattern
@@ -227,15 +222,10 @@ export function SessionEditPage() {
 
   return (
     <main className="min-h-screen bg-background pb-32" data-testid="screen-session-edit">
-      <div className="mx-auto max-w-[880px] px-3 pt-5 sm:px-6">
-        <h1
-          ref={heading}
-          className="font-display text-xl font-extrabold text-ink focus:outline-none sm:text-2xl"
-          tabIndex={-1}
-        >
-          {t('edit.heading')}
-        </h1>
-      </div>
+      <PageHeader
+        back={{ label: t('nav.backToSession'), to: `/sessions/${sessionId}` }}
+        title={t('edit.heading')}
+      />
 
       <div className="mx-auto max-w-[880px] space-y-3 px-3 sm:px-6">
         {detail.isPending && <p role="status">{t('common.loading', { ns: 'common' })}</p>}

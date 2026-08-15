@@ -167,6 +167,23 @@ describe('PollDetailPage (lovable)', () => {
     }
   })
 
+  it('focuses the page h1 on mount_D139', async () => {
+    mockGet()
+    renderPage()
+
+    const heading = await screen.findByRole('heading', { level: 1 })
+    await waitFor(() => expect(heading).toHaveFocus())
+  })
+
+  it('maps the notApplicable wire platform value to a localized "Other" label, not the raw wire value', async () => {
+    mockGet({ detail: pollDetail({ platform: 'notApplicable' }) })
+    renderPage()
+
+    await screen.findByText('Raid night poll')
+    expect(screen.queryByText('notApplicable')).not.toBeInTheDocument()
+    expect(screen.getByText('Other')).toBeInTheDocument()
+  })
+
   /**
    * Ported from the pre-port PollAccessibility.test.tsx. The option row's chrome
    * must not encode the viewer's own vote: a voted row and an unvoted one carry
@@ -895,16 +912,15 @@ describe('PollDetailPage (lovable)', () => {
       await screen.findByText('Raid night poll')
       await screen.findByRole('heading', { name: 'Guest links' })
 
-      function orderOf(text: string | RegExp) {
-        return screen.getByText(text).closest('section')?.className.match(/\border-(\d+)\b/)?.[1]
-      }
       function headingOrderOf(name: string | RegExp) {
         return screen
           .getByRole('heading', { name })
           .closest('section')?.className.match(/\border-(\d+)\b/)?.[1]
       }
 
-      const summaryOrder = orderOf('Raid night poll')
+      const summaryOrder = screen
+        .getByTestId('poll-summary-card')
+        .className.match(/\border-(\d+)\b/)?.[1]
       const invitedOrder = headingOrderOf(/^Invited/)
       const guestsOrder = headingOrderOf('Guest links')
       const notificationsOrder = headingOrderOf('Notifications for this poll')

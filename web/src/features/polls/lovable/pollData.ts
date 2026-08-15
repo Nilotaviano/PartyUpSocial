@@ -209,6 +209,28 @@ export function statusLabelKey(status: PollStatus): string {
   }
 }
 
+/**
+ * Reverses `PollCreatePage`'s `platformWireValues` map for display — the
+ * wire value travels as the backend's camelCase enum serialization
+ * (`steam`/`playStation`/`xbox`/`notApplicable`), never the create form's
+ * localized "Other" label, so a bare `poll.platform` would otherwise leak
+ * `notApplicable` straight onto the page (TODO.md 2026-08-15).
+ */
+export function platformLabel(platform: string, t: (key: string) => string): string {
+  switch (platform) {
+    case 'steam':
+      return 'Steam'
+    case 'playStation':
+      return 'PlayStation'
+    case 'xbox':
+      return 'Xbox'
+    case 'notApplicable':
+      return t('create.platformOther')
+    default:
+      return platform
+  }
+}
+
 export function formatCountdown(minutes: number) {
   if (minutes <= 0) return '0h 00m'
   const h = Math.floor(minutes / 60)

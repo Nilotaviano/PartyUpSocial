@@ -1,12 +1,13 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { CalendarClock } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../../api/client'
 import { Button } from '../../../components/ui/button'
 import { raisedInteractiveClasses } from '../../../components/ui/classes'
 import { EmptyState } from '../../../components/ui/emptyState'
+import { PageHeader } from '../../../components/shell/PageHeader'
 import { StatusBanner } from '../../../components/ui/statusBanner'
 import { cn } from '../../availability/lovable/utils'
 import {
@@ -151,36 +152,23 @@ export function SessionListPage({ scope }: SessionListPageProps) {
   const headingText = scope === 'upcoming' ? t('list.upcoming') : t('list.history')
   const emptyText = scope === 'upcoming' ? t('list.emptyUpcoming') : t('list.emptyHistory')
 
-  // D-139: the page heading takes programmatic focus on mount.
-  const heading = useRef<HTMLHeadingElement>(null)
-  useEffect(() => {
-    heading.current?.focus()
-  }, [])
-
   return (
     <main className="min-h-screen bg-background pb-24" data-testid={`screen-sessions-${scope}`}>
-      <div className="mx-auto max-w-[1000px] px-3 py-6 sm:px-6">
-        <div className="surface paper-grain flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <h1
-              ref={heading}
-              className="font-display text-lg font-extrabold text-ink focus:outline-none"
-              tabIndex={-1}
-            >
-              {headingText}
-            </h1>
-          </div>
-          {scope === 'upcoming' && (
+      <PageHeader
+        actions={
+          scope === 'upcoming' && (
             <Link
               className={`inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
               to="/sessions/new"
             >
               {t('create.heading')}
             </Link>
-          )}
-        </div>
-
-        <div className="mt-4 flex flex-col gap-3">
+          )
+        }
+        title={headingText}
+      />
+      <div className="mx-auto max-w-[1000px] px-3 pb-6 sm:px-6">
+        <div className="flex flex-col gap-3">
           {isPending && (
             <p className="motion-safe:animate-pulse text-ink-soft" role="status">
               {t('common.loading', { ns: 'common' })}

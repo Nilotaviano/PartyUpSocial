@@ -2,7 +2,9 @@
   "nav": {
     "sessions": "Sessões",
     "upcoming": "Próximas",
-    "history": "Histórico"
+    "history": "Histórico",
+    "backToList": "Voltar às sessões",
+    "backToSession": "Voltar à sessão"
   },
   "create": {
     "heading": "Nova sessão",

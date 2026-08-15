@@ -1,6 +1,7 @@
 {
   "nav": {
-    "polls": "Polls"
+    "polls": "Polls",
+    "backToList": "Back to polls"
   },
   "create": {
     "heading": "New poll",

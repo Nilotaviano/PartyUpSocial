@@ -92,6 +92,14 @@ afterEach(() => {
 })
 
 describe('PollCreatePage (lovable)', () => {
+  it('focuses the page h1 on mount_D139', async () => {
+    mockGet()
+    renderPage()
+
+    const heading = await screen.findByRole('heading', { level: 1 })
+    await waitFor(() => expect(heading).toHaveFocus())
+  })
+
   it('defaults the deadline choice to 24 hours_D070', async () => {
     mockGet()
     renderPage()

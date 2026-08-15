@@ -12,6 +12,7 @@ import {
   raisedInteractiveClasses,
 } from '../../../components/ui/classes'
 import { Dialog } from '../../../components/ui/dialog'
+import { PageHeader } from '../../../components/shell/PageHeader'
 import { StatusBanner } from '../../../components/ui/statusBanner'
 import { useDirtyGuard } from '../../../components/useDirtyGuard'
 import { AvatarDisc } from '../../friends/AvatarDisc'
@@ -540,11 +541,7 @@ export function PollCreatePage() {
 
   return (
     <main className="min-h-screen bg-background pb-32" data-testid="screen-poll-create">
-      <div className="mx-auto max-w-[1400px] px-3 pt-5 sm:px-6">
-        <h1 className="font-display text-xl font-extrabold text-ink sm:text-2xl">
-          {t('create.heading')}
-        </h1>
-      </div>
+      <PageHeader back={{ label: t('nav.backToList'), to: '/polls' }} title={t('create.heading')} />
 
       {prefill.anyClamped && (
         <p aria-live="polite" className="mx-auto max-w-[1400px] px-3 sm:px-6" role="status">
