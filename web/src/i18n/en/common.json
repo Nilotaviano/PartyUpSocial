@@ -9,6 +9,7 @@
   },
   "navigation": {
     "label": "Primary navigation",
+    "tabBarLabel": "Section tabs",
     "home": "Home",
     "friends": "Friends",
     "settings": "Settings"

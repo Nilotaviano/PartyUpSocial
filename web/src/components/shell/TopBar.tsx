@@ -46,6 +46,7 @@ export function TopBar() {
                       ? 'bg-primary/20 text-foreground ring-1 ring-primary'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                   ].join(' ')}
+                  data-tour={item.tourId}
                   to={item.to}
                 >
                   <item.icon aria-hidden className="size-4" />

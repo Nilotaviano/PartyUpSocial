@@ -1,13 +1,13 @@
-import { Navigate, NavLink, Outlet, Route, Routes } from 'react-router'
-import { useTranslation } from 'react-i18next'
+import type { ReactNode } from 'react'
+import { Navigate, Outlet, Route, Routes } from 'react-router'
 import { RequireAuth } from './auth/RequireAuth'
 import { RequireOnboarded } from './auth/RequireOnboarded'
 import { useSession } from './auth/useSession'
 import { AppFooter } from './components/AppFooter'
-import { BrandMark } from './components/ui/brandMark'
+import { BottomTabBar } from './components/shell/BottomTabBar'
+import { TopBar } from './components/shell/TopBar'
 import { PageSlotProvider } from './components/ui/pageScaffold'
 import { ToastHost } from './components/ui/toastHost'
-import { AccountMenu } from './features/account/AccountMenu'
 import { AdminDashboardPage } from './features/admin/AdminDashboardPage'
 import { AdminUserDetailPage } from './features/admin/AdminUserDetailPage'
 import { AdminUsersPage } from './features/admin/AdminUsersPage'
@@ -34,7 +34,6 @@ import { HomePage } from './features/home/HomePage'
 import { CommunityStandardsPage } from './features/legal/CommunityStandardsPage'
 import { PrivacyPolicyPage } from './features/legal/PrivacyPolicyPage'
 import { TermsPage } from './features/legal/TermsPage'
-import { NotificationBell } from './features/notifications/NotificationBell'
 import { NotificationCenterPage } from './features/notifications/NotificationCenterPage'
 import { PushEnableCard } from './features/notifications/PushEnableCard'
 import { OnboardingWizard } from './features/onboarding/OnboardingWizard'
@@ -57,116 +56,32 @@ import { SessionDetailPage } from './features/sessions/lovable/SessionDetailPage
 import { SessionEditPage } from './features/sessions/lovable/SessionEditPage'
 import { SessionListPage } from './features/sessions/lovable/SessionListPage'
 
-function AuthenticatedShell() {
-  const { t } = useTranslation(['common', 'sessions', 'availability', 'home', 'polls'])
+/**
+ * Shell content wrapper: a `<div>`, deliberately not a `<main>`. Every routed
+ * page under this shell already renders its own single `<main>` landmark
+ * (`pageScaffold.tsx`'s own contract: "Shells own the chrome and pin the
+ * footer; pages keep their own `<main>`") — wrapping `Outlet` in a second one
+ * here would nest two `main` landmarks, which HTML disallows.
+ */
+function ShellContent({ children }: { children: ReactNode }) {
+  return <div className="flex w-full flex-1 flex-col">{children}</div>
+}
 
+function AuthenticatedShell() {
   return (
-    <div className="flex min-h-dvh flex-col bg-page text-ink">
-      <header className="border-b-2 border-ink bg-card">
-        <nav
-          aria-label={t('navigation.label')}
-          className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3 sm:px-8"
-        >
-          <NavLink
-            aria-label={t('navigation.home')}
-            className="mr-auto inline-flex min-h-11 flex-none items-center gap-2 rounded-control font-display font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            data-tour="home"
-            end
-            to="/app"
-          >
-            <BrandMark />
-            {t('app.name')}
-          </NavLink>
-          {/* The four bracketed utilities are raw CSS properties Tailwind has no
-              utility for: momentum scrolling, the two scrollbar-hiding halves
-              (Firefox + WebKit), and the §3.7 edge-fade mask. */}
-          {/* `pe-0.5` is scroll slack, not spacing: these items are laid out at fractional widths,
-              but `scrollWidth`/`scrollLeft` are whole pixels, so at maximum scroll the last item
-              can still hang a sub-pixel sliver past this container's own clip and never be fully
-              revealed. Two pixels of trailing room is always more than that remainder, which is
-              what lets the tour spotlight (`TourOverlay.tsx` scrolls its anchor into view here)
-              actually bring the last control entirely on screen. */}
-          <div className="flex min-w-0 snap-x snap-proximity items-center gap-2 overflow-x-auto pe-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] max-sm:[mask-image:linear-gradient(to_right,transparent,black_0.75rem,black_calc(100%-0.75rem),transparent)] [&::-webkit-scrollbar]:hidden">
-            <NavLink
-              className={({ isActive }) =>
-                `inline-flex min-h-11 flex-none snap-start items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-                  isActive
-                    ? 'bg-primary font-semibold text-primary-ink'
-                    : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
-                }`
-              }
-              data-tour="friends"
-              to="/friends"
-            >
-              {t('navigation.friends')}
-            </NavLink>
-            <NavLink
-              className={({ isActive }) =>
-                `inline-flex min-h-11 flex-none snap-start items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-                  isActive
-                    ? 'bg-primary font-semibold text-primary-ink'
-                    : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
-                }`
-              }
-              data-tour="sessions"
-              to="/sessions/upcoming"
-            >
-              {t('nav.sessions', { ns: 'sessions' })}
-            </NavLink>
-            <NavLink
-              className={({ isActive }) =>
-                `inline-flex min-h-11 flex-none snap-start items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-                  isActive
-                    ? 'bg-primary font-semibold text-primary-ink'
-                    : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
-                }`
-              }
-              data-tour="polls"
-              to="/polls"
-            >
-              {t('nav.polls', { ns: 'polls' })}
-            </NavLink>
-            <NavLink
-              className={({ isActive }) =>
-                `inline-flex min-h-11 flex-none snap-start items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-                  isActive
-                    ? 'bg-primary font-semibold text-primary-ink'
-                    : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
-                }`
-              }
-              data-tour="calendar"
-              to="/calendar"
-            >
-              {t('nav.calendar', { ns: 'availability' })}
-            </NavLink>
-            <NavLink
-              className={({ isActive }) =>
-                `inline-flex min-h-11 flex-none snap-start items-center rounded-control px-4 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-                  isActive
-                    ? 'bg-primary font-semibold text-primary-ink'
-                    : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
-                }`
-              }
-              data-tour="discover"
-              to="/discover"
-            >
-              {t('nav.discover', { ns: 'home' })}
-            </NavLink>
-            <NotificationBell />
-            <AccountMenu />
-          </div>
-        </nav>
-      </header>
+    <div className="flex min-h-dvh flex-col bg-page text-ink pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
+      <TopBar />
       <ToastHost>
         <PageSlotProvider>
-          <div className="flex flex-1 flex-col">
-            <PushEnableCard />
-            <TourOverlay />
+          <PushEnableCard />
+          <TourOverlay />
+          <ShellContent>
             <Outlet />
-          </div>
+          </ShellContent>
         </PageSlotProvider>
       </ToastHost>
       <AppFooter />
+      <BottomTabBar />
     </div>
   )
 }

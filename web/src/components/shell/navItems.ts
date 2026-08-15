@@ -16,11 +16,23 @@ export interface NavItem {
   icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
   end: boolean
   matchPrefix: string
+  /** D-182 tour anchor id (`TOUR_STEP_IDS`) — carried by both TopBar's and
+   *  BottomTabBar's rendering of this item; `TourOverlay` resolves whichever
+   *  instance is actually visible (see its anchor-resolution note). */
+  tourId: string
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { to: '/app', labelKey: 'navigation.home', ns: 'common', icon: Home, end: true, matchPrefix: '/app' },
-  { to: '/friends', labelKey: 'navigation.friends', ns: 'common', icon: Users, end: true, matchPrefix: '/friends' },
+  { to: '/app', labelKey: 'navigation.home', ns: 'common', icon: Home, end: true, matchPrefix: '/app', tourId: 'home' },
+  {
+    to: '/friends',
+    labelKey: 'navigation.friends',
+    ns: 'common',
+    icon: Users,
+    end: true,
+    matchPrefix: '/friends',
+    tourId: 'friends',
+  },
   {
     to: '/sessions/upcoming',
     labelKey: 'nav.sessions',
@@ -28,8 +40,17 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Gamepad2,
     end: false,
     matchPrefix: '/sessions',
+    tourId: 'sessions',
   },
-  { to: '/polls', labelKey: 'nav.polls', ns: 'polls', icon: Vote, end: false, matchPrefix: '/polls' },
+  {
+    to: '/polls',
+    labelKey: 'nav.polls',
+    ns: 'polls',
+    icon: Vote,
+    end: false,
+    matchPrefix: '/polls',
+    tourId: 'polls',
+  },
   {
     to: '/calendar',
     labelKey: 'nav.calendar',
@@ -37,6 +58,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: CalendarDays,
     end: true,
     matchPrefix: '/calendar',
+    tourId: 'calendar',
   },
 ]
 

@@ -19,7 +19,7 @@ describe('BottomTabBar', () => {
   it('renders five equal section links under one landmark', () => {
     renderTabs('/app')
 
-    const nav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    const nav = screen.getByRole('navigation', { name: 'Section tabs' })
     expect(nav).toBeInTheDocument()
     for (const label of ['Home', 'Friends', 'Sessions', 'Polls', 'Calendar']) {
       expect(screen.getByRole('link', { name: label })).toBeInTheDocument()

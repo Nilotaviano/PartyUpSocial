@@ -257,6 +257,41 @@ describe('TourOverlay — overrides (D-182)', () => {
   })
 })
 
+describe('TourOverlay — anchor resolution across duplicated nav instances (S2)', () => {
+  it('spotlights the visible instance when data-tour is duplicated (TopBar + BottomTabBar)', async () => {
+    mockProfile(false)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/app']}>
+          <nav>
+            <a data-tour="home" href="/app" id="hidden-home" tabIndex={-1}>Home</a>
+          </nav>
+          <ul>
+            <li>
+              <a data-tour="home" href="/app" id="visible-home" tabIndex={-1}>Home</a>
+            </li>
+          </ul>
+          <TourOverlay />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    // Simulates the real layout fact `resolveAnchor` reads (`getClientRects().length`) — jsdom never
+    // computes layout, so both instances read as equally invisible by default; this is the one
+    // stand-in a jsdom test has for "TopBar's copy is `display:none` at this viewport width,
+    // BottomTabBar's is not."
+    const hidden = document.getElementById('hidden-home') as HTMLElement
+    const visible = document.getElementById('visible-home') as HTMLElement
+    vi.spyOn(visible, 'getClientRects').mockReturnValue([{} as DOMRect] as unknown as DOMRectList)
+
+    await screen.findByRole('dialog')
+
+    expect(visible.className).toContain('z-50')
+    expect(hidden.className).not.toContain('z-50')
+  })
+})
+
 describe('TourOverlay — reposition scheduling (D-182)', () => {
   it('coalesces a burst of scroll events into a single requestAnimationFrame call', async () => {
     mockProfile(false)

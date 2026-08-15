@@ -9,6 +9,7 @@
   },
   "navigation": {
     "label": "Navegação principal",
+    "tabBarLabel": "Abas de seções",
     "home": "Início",
     "friends": "Amigos",
     "settings": "Configurações"

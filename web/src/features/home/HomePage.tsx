@@ -513,7 +513,7 @@ export function HomePage() {
               ))}
             </ul>
           )}
-          <Link className={seeAllClasses} to="/discover">
+          <Link className={seeAllClasses} data-tour="discover" to="/discover">
             {t('home.discoverable.seeAll')}
           </Link>
         </Section>

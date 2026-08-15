@@ -224,7 +224,11 @@ describe('AppNavigationTests', () => {
       renderRoute(path)
 
       expect(await screen.findByTestId(testId)).toBeInTheDocument()
-      const friends = screen.getByRole('link', { name: 'Friends' })
+      // TopBar and BottomTabBar both render the section nav (one per viewport
+      // breakpoint, both present in jsdom) — scope to TopBar's landmark by its
+      // distinct accessible name so this resolves a single "Friends" link.
+      const nav = screen.getByRole('navigation', { name: 'Primary navigation' })
+      const friends = within(nav).getByRole('link', { name: 'Friends' })
       friends.focus()
       expect(friends).toHaveFocus()
       if (path.startsWith('/settings/')) {
@@ -239,16 +243,17 @@ describe('AppNavigationTests', () => {
     setSession(session({ authenticated: true, state: 'active' }))
     renderRoute('/app')
 
-    fireEvent.click(screen.getByRole('link', { name: 'Friends' }))
+    const nav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    fireEvent.click(within(nav).getByRole('link', { name: 'Friends' }))
     expect(await screen.findByTestId('screen-friends')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Find Steam friends' }))
     expect(await screen.findByTestId('screen-steam-import')).toBeInTheDocument()
 
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Account menu' }), {
-      button: 0,
-      pointerType: 'mouse',
-    })
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Settings' }))
+    // S1's AccountMenu is now a Radix Dialog-backed Sheet: it opens on click (not
+    // pointerdown), and its rows are `link`s inside a `dialog`, not `menuitem`s.
+    fireEvent.click(screen.getByRole('button', { name: 'Account menu' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('link', { name: 'Settings' }))
     expect(
       await screen.findByTestId('screen-settings-account'),
     ).toBeInTheDocument()
@@ -262,7 +267,8 @@ describe('AppNavigationTests', () => {
     setSession(session({ authenticated: true, state: 'active' }))
     renderRoute('/app')
 
-    fireEvent.click(screen.getByRole('link', { name: 'Sessions' }))
+    const nav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    fireEvent.click(within(nav).getByRole('link', { name: 'Sessions' }))
     expect(
       await screen.findByTestId('screen-sessions-upcoming'),
     ).toBeInTheDocument()
@@ -272,7 +278,8 @@ describe('AppNavigationTests', () => {
     setSession(session({ authenticated: true, state: 'active' }))
     renderRoute('/app')
 
-    fireEvent.click(screen.getByRole('link', { name: 'Calendar' }))
+    const nav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    fireEvent.click(within(nav).getByRole('link', { name: 'Calendar' }))
     expect(await screen.findByTestId('screen-calendar')).toBeInTheDocument()
     expect(
       screen.queryByRole('link', { name: 'Agenda' }),
@@ -281,9 +288,25 @@ describe('AppNavigationTests', () => {
   })
 
   it.each([
-    ['en', 'Friends', 'Account menu', 'Settings', 'Sessions', 'Calendar', 'Discover'],
-    ['pt-BR', 'Amigos', 'Menu da conta', 'Configurações', 'Sessões', 'Calendário', 'Descobrir'],
-    ['es', 'Amistades', 'Menú de la cuenta', 'Configuración', 'Sesiones', 'Calendario', 'Descubrir'],
+    ['en', 'Friends', 'Account menu', 'Settings', 'Sessions', 'Calendar', 'Primary navigation'],
+    [
+      'pt-BR',
+      'Amigos',
+      'Menu da conta',
+      'Configurações',
+      'Sessões',
+      'Calendário',
+      'Navegação principal',
+    ],
+    [
+      'es',
+      'Amistades',
+      'Menú de la cuenta',
+      'Configuración',
+      'Sesiones',
+      'Calendario',
+      'Navegación principal',
+    ],
   ])(
     'PersistentEntries_HaveLocalizedAccessibleLabelsAndCurrentState_D139: %s',
     async (
@@ -293,42 +316,46 @@ describe('AppNavigationTests', () => {
       settingsLabel,
       sessionsLabel,
       calendarLabel,
-      discoverLabel,
+      navLabel,
     ) => {
       await i18n.changeLanguage(locale)
       setSession(session({ authenticated: true, state: 'active' }))
       renderRoute('/friends')
 
-      const link = await screen.findByRole('link', { name: friendsLabel })
+      // TopBar and BottomTabBar both render the section nav (S2: distinct
+      // accessible names, per axe's landmark-unique rule) — scope to TopBar's
+      // landmark so each assertion below resolves a single element.
+      const nav = within(await screen.findByRole('navigation', { name: navLabel }))
+      const link = nav.getByRole('link', { name: friendsLabel })
       expect(link).toHaveAttribute('aria-current', 'page')
-      expect(screen.getByRole('link', { name: sessionsLabel })).toHaveAttribute(
+      expect(nav.getByRole('link', { name: sessionsLabel })).toHaveAttribute(
         'href',
         '/sessions/upcoming',
       )
-      expect(screen.getByRole('link', { name: calendarLabel })).toHaveAttribute(
+      expect(nav.getByRole('link', { name: calendarLabel })).toHaveAttribute(
         'href',
         '/calendar',
       )
-      expect(screen.getByRole('link', { name: discoverLabel })).toHaveAttribute(
-        'href',
-        '/discover',
-      )
 
-      // Opened last: Radix's dropdown menu marks the rest of the page `aria-hidden` while open,
-      // so the persistent nav links above are no longer queryable by role once this fires.
+      // Opened last: Radix's Dialog-backed Sheet marks the rest of the page `aria-hidden` while
+      // open, so the persistent nav links above are no longer queryable by role once this fires.
       const accountMenuTrigger = screen.getByRole('button', { name: accountMenuLabel })
-      fireEvent.pointerDown(accountMenuTrigger, { button: 0, pointerType: 'mouse' })
+      fireEvent.click(accountMenuTrigger)
+      const dialog = await screen.findByRole('dialog')
       expect(
-        await screen.findByRole('menuitem', { name: settingsLabel }),
+        within(dialog).getByRole('link', { name: settingsLabel }),
       ).toHaveAttribute('href', '/settings/account')
     },
   )
 
   it('clicked Discover entry renders the guarded discover page_S7', async () => {
+    // Owner ruling: Discover is no longer a persistent nav entry — it lives on Home's
+    // discover section (`data-tour="discover"`), so this now drives the flow from there.
     setSession(session({ authenticated: true, state: 'active' }))
     renderRoute('/app')
 
-    fireEvent.click(screen.getByRole('link', { name: 'Discover' }))
+    const discoverRegion = await screen.findByTestId('home-region-discover')
+    fireEvent.click(within(discoverRegion).getByRole('link', { name: 'See all' }))
     expect(await screen.findByTestId('screen-discover')).toBeInTheDocument()
   })
 
@@ -336,7 +363,8 @@ describe('AppNavigationTests', () => {
     setSession(session({ authenticated: true, state: 'active' }))
     renderRoute('/app')
 
-    fireEvent.click(screen.getByRole('link', { name: 'Polls' }))
+    const nav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    fireEvent.click(within(nav).getByRole('link', { name: 'Polls' }))
     expect(await screen.findByTestId('screen-polls')).toBeInTheDocument()
   })
 })

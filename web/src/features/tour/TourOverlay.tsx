@@ -62,6 +62,27 @@ type ReplayState = { replayTour?: boolean } | null
 type CardPosition = { top: number; left: number; arrowLeft: number; arrowAtBottom: boolean }
 
 /**
+ * S2 shell trap: `data-tour` values are duplicated across two DOM instances of the same nav item
+ * — `TopBar`'s desktop row (`hidden lg:flex`) and `BottomTabBar`'s mobile row (`lg:hidden`) both
+ * carry every anchor, and exactly one is ever on-screen at a given viewport width. `querySelector`
+ * alone would always resolve to whichever instance is first in DOM order (TopBar), even when it's
+ * the hidden one. This picks the first candidate a real layout would actually show — `offsetParent`
+ * catches `display:none` (and its ancestors'), `getClientRects` catches zero-size/`visibility:hidden`
+ * cases `offsetParent` misses — falling back to the first match so a jsdom test tree (which never
+ * computes layout, so every candidate reads as equally invisible) keeps resolving its one real
+ * anchor exactly as before this fell in.
+ */
+function resolveAnchor(anchorId: string): HTMLElement | null {
+  const candidates = document.querySelectorAll<HTMLElement>(`[data-tour="${anchorId}"]`)
+  for (const candidate of candidates) {
+    if (candidate.offsetParent !== null || candidate.getClientRects().length > 0) {
+      return candidate
+    }
+  }
+  return candidates[0] ?? null
+}
+
+/**
  * Computes the card's viewport-fixed `{top, left}` near the active anchor and the arrow's left
  * offset pointing back at the anchor's center. Horizontally: the nav is a row, so a clamped
  * center-under-anchor offset always has room. Vertically: below the anchor by default (every
@@ -166,7 +187,7 @@ export function TourOverlay() {
     }
 
     const anchorId = TOUR_STEP_IDS[stepIndex]
-    const element = document.querySelector<HTMLElement>(`[data-tour="${anchorId}"]`)
+    const element = resolveAnchor(anchorId)
     if (!element) {
       queueMicrotask(() => setCardPosition(null))
       return
@@ -264,7 +285,7 @@ export function TourOverlay() {
             // TOUR_DESIGN.md §3: no trigger element exists to restore focus to (the tour auto-opens
             // or opens via a full navigation from Replay), so focus goes to the Home link instead.
             event.preventDefault()
-            document.querySelector<HTMLElement>('[data-tour="home"]')?.focus()
+            resolveAnchor('home')?.focus()
           }}
           onInteractOutside={(event) => event.preventDefault()}
         >
