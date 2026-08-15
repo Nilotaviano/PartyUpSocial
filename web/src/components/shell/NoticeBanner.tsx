@@ -64,7 +64,7 @@ export function NoticeBanner({
           {actionLabel && onAction && (
             <button
               aria-busy={actionBusy}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-3 font-display text-[12.5px] font-bold text-primary-foreground shadow-[var(--shadow-card)] hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
+              className="inline-flex h-9 cursor-pointer items-center justify-center rounded-lg bg-primary px-3 font-display text-[12.5px] font-bold text-primary-foreground shadow-[var(--shadow-card)] hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
               disabled={actionBusy}
               type="button"
               onClick={onAction}
@@ -74,7 +74,7 @@ export function NoticeBanner({
           )}
           {dismissLabel && onDismiss && (
             <button
-              className="inline-flex h-9 items-center justify-center rounded-lg px-3 font-display text-[12.5px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+              className="inline-flex h-9 cursor-pointer items-center justify-center rounded-lg px-3 font-display text-[12.5px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
               disabled={actionBusy}
               type="button"
               onClick={onDismiss}

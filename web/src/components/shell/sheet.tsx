@@ -45,7 +45,7 @@ export function SheetContent({
         {...props}
       >
         {children}
-        <Dialog.Close className="absolute right-3 top-3 inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
+        <Dialog.Close className="absolute right-3 top-3 inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
           <X aria-hidden className="size-4" />
           <span className="sr-only">{closeLabel}</span>
         </Dialog.Close>
