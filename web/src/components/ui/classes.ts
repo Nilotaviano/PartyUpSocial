@@ -6,6 +6,15 @@
 export const raisedInteractiveClasses =
   'min-h-11 rounded-control border-2 border-ink font-display font-semibold shadow-offset-control motion-safe:transition-transform motion-safe:motion-press motion-safe:ease-out active:translate-x-[2px] active:translate-y-[2px] active:shadow-offset-pressed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
 
+// Link-CTA recipes for hand-rolled <Link>/<button> elements that render the
+// house raised CTA (the /polls idiom, PollListPage.tsx) but can't use
+// <Button> (router Links, or an element that must stay a <button> for other
+// reasons). `primaryCtaClasses` is the accent arm; `neutralCtaClasses` sits
+// on the card/page surface.
+export const primaryCtaClasses = `inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`
+
+export const neutralCtaClasses = `inline-flex items-center justify-center gap-2 px-4 py-2 bg-card text-ink ${raisedInteractiveClasses}`
+
 // Native field skins (STYLING_OVERHAUL_DESIGN.md §3.2) — skin only, on top of
 // the shipped DOM. `control-frame`/`control-select` are the CSS recipes in
 // index.css; these constants add the layout the form fields share.

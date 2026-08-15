@@ -12,7 +12,7 @@ import {
 import { BrandMark } from '../../components/ui/brandMark'
 import { Button } from '../../components/ui/button'
 import { Checkbox } from '../../components/ui/checkbox'
-import { raisedInteractiveClasses } from '../../components/ui/classes'
+import { primaryCtaClasses, raisedInteractiveClasses } from '../../components/ui/classes'
 import { FormField, FormShell, formShellClasses } from '../../components/ui/formShell'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
@@ -579,7 +579,7 @@ export function Login() {
               )}
             </div>
           </div>
-          <button className={authRowPrimaryClasses} type="submit">
+          <button className={primaryCtaClasses} type="submit">
             {t('actions.signIn')}
           </button>
         </form>
@@ -715,7 +715,7 @@ export function Register() {
             <p className="font-body text-[13px] text-muted-foreground">
               {t('register.explainer')}
             </p>
-            <button className={authRowPrimaryClasses} type="submit">
+            <button className={primaryCtaClasses} type="submit">
               {t('actions.createAccount')}
             </button>
           </form>

@@ -6,6 +6,7 @@ import { Link, useNavigate } from 'react-router'
 import { isApiError } from '../../api/client'
 import { PageHeader } from '../../components/shell/PageHeader'
 import { SectionCard } from '../../components/shell/SectionCard'
+import { neutralCtaClasses, primaryCtaClasses } from '../../components/ui/classes'
 import { PageScaffold } from '../../components/ui/pageScaffold'
 import { StatusBanner } from '../../components/ui/statusBanner'
 import { FriendCodeInput } from './FriendCodeInput'
@@ -13,11 +14,6 @@ import { FriendList } from './FriendList'
 import { FriendRequests } from './FriendRequests'
 import { ShareCard } from './ShareCard'
 import { friendKeys, getFriendRequests, getFriends } from './friendGraph'
-
-const primaryButtonClasses =
-  'inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 font-display text-[13px] font-bold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
-const outlineButtonClasses =
-  'inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 font-display text-[13px] font-bold text-foreground hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
 
 function Loading() {
   const { t } = useTranslation('friends')
@@ -39,7 +35,7 @@ function AddFriendAction() {
   const { t } = useTranslation('friends')
   return (
     <button
-      className={primaryButtonClasses}
+      className={primaryCtaClasses}
       type="button"
       onClick={() => {
         const field = document.getElementById('friend-code')
@@ -85,7 +81,7 @@ export function FriendsPage() {
           actions={
             <>
               <AddFriendAction />
-              <Link className={outlineButtonClasses} to="/friends/import/steam">
+              <Link className={neutralCtaClasses} to="/friends/import/steam">
                 {t('actions.importSteam')}
               </Link>
             </>

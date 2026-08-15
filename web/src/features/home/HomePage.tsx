@@ -18,6 +18,7 @@ import { Button } from '../../components/ui/button'
 import { PageHeader } from '../../components/shell/PageHeader'
 import { EmptyState, SectionCard } from '../../components/shell/SectionCard'
 import { PageScaffold, PageSlot } from '../../components/ui/pageScaffold'
+import { neutralCtaClasses, primaryCtaClasses } from '../../components/ui/classes'
 import { StatusBanner } from '../../components/ui/statusBanner'
 import {
   availabilityKeys,
@@ -45,10 +46,6 @@ const SUGGESTION_LIMIT = 5
 const UPCOMING_PREVIEW_LIMIT = 5
 const POLLS_PREVIEW_LIMIT = 5
 
-const primaryButtonClasses =
-  'inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 font-display text-[13px] font-bold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
-const outlineButtonClasses =
-  'inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 font-display text-[13px] font-bold text-foreground hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
 const ghostSeeAllClasses =
   'inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg px-3 font-display text-[13px] font-bold text-foreground hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
 const itemCardClasses =
@@ -270,11 +267,11 @@ export function HomePage() {
           description={t('home.description')}
           actions={
             <>
-              <Link className={primaryButtonClasses} to="/polls/new">
+              <Link className={primaryCtaClasses} to="/polls/new">
                 <Plus aria-hidden className="size-4" />
                 {t('home.actions.newPoll')}
               </Link>
-              <Link className={outlineButtonClasses} to="/find-a-time">
+              <Link className={neutralCtaClasses} to="/find-a-time">
                 <CalendarPlus aria-hidden className="size-4" />
                 {t('home.actions.findATime')}
               </Link>
@@ -312,10 +309,10 @@ export function HomePage() {
                   <EmptyState
                     action={
                       <div className="flex flex-wrap items-center justify-center gap-2">
-                        <Link className={primaryButtonClasses} to="/friends">
+                        <Link className={primaryCtaClasses} to="/friends">
                           {t('emptyState.home.cta')}
                         </Link>
-                        <Link className={outlineButtonClasses} to="/sessions/new">
+                        <Link className={neutralCtaClasses} to="/sessions/new">
                           {t('emptyState.home.ctaSecondary')}
                         </Link>
                       </div>
@@ -535,7 +532,7 @@ export function HomePage() {
                 title={t('findATime.heading', { ns: 'availability' })}
               >
                 <div>
-                  <Link className={outlineButtonClasses} to="/find-a-time">
+                  <Link className={neutralCtaClasses} to="/find-a-time">
                     <CalendarPlus aria-hidden className="size-4" />
                     {t('findATime.heading', { ns: 'availability' })}
                   </Link>
@@ -594,7 +591,7 @@ export function HomePage() {
                 {!discover.isPending && discoverItems.length === 0 && !isQuiet && (
                   <EmptyState
                     action={
-                      <Link className={outlineButtonClasses} to="/friends">
+                      <Link className={neutralCtaClasses} to="/friends">
                         <UserPlus aria-hidden className="size-4" />
                         {t('emptyState.discover.cta')}
                       </Link>
