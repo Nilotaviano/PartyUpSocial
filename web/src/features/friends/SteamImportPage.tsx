@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { client, isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { IdentityRow } from '../../components/ui/identityRow'
-import { PageHeader } from '../../components/ui/pageHeader'
+import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold } from '../../components/ui/pageScaffold'
 import { Section } from '../../components/ui/section'
 import { AvatarDisc } from './AvatarDisc'
@@ -145,6 +145,7 @@ export function SteamImportPage() {
                 : t('actions.importSteam')}
             </Button>
           }
+          back={{ to: '/friends', label: t('pages.backToFriends') }}
           title={t('pages.importSteam')}
         />
 

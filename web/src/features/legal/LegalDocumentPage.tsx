@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { PageHeader } from '../../components/ui/pageHeader'
+import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold } from '../../components/ui/pageScaffold'
 import { LEGAL_UPDATED_AT } from './legalLocale'
 
@@ -39,7 +39,7 @@ export function LegalDocumentPage({
         width="form"
       >
         <PageHeader
-          meta={`${t('updatedLabel')}: ${updatedAt}`}
+          eyebrow={`${t('updatedLabel')}: ${updatedAt}`}
           title={title}
         />
 

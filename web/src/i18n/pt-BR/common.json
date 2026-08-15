@@ -34,7 +34,8 @@
   "actions": {
     "more": "Mais ações",
     "dismiss": "Dispensar",
-    "retry": "Tentar novamente"
+    "retry": "Tentar novamente",
+    "back": "Voltar"
   },
   "toast": {
     "regionLabel": "Avisos",

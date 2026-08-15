@@ -10,7 +10,7 @@ import {
   raisedInteractiveClasses,
 } from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
-import { PageHeader } from '../../components/ui/pageHeader'
+import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold } from '../../components/ui/pageScaffold'
 import { Section, SectionCard } from '../../components/ui/section'
 import { StatusBanner } from '../../components/ui/statusBanner'
@@ -92,7 +92,7 @@ function RevokeGuestLinkDialog({ pending, onConfirm }: RevokeGuestLinkDialogProp
 }
 
 export function SessionInvitePage() {
-  const { t } = useTranslation(['sessions', 'errors'])
+  const { t } = useTranslation(['sessions', 'errors', 'common'])
   const { sessionId = '' } = useParams()
   const queryClient = useQueryClient()
   const [status, setStatus] = useState('')
@@ -155,7 +155,10 @@ export function SessionInvitePage() {
   return (
     <main data-testid="screen-session-invite">
       <PageScaffold width="form">
-        <PageHeader title={t('invite.heading')} />
+        <PageHeader
+          back={{ to: `/sessions/${sessionId}`, label: t('actions.back', { ns: 'common' }) }}
+          title={t('invite.heading')}
+        />
 
         <p aria-live="polite" className="text-ink">
           {status}

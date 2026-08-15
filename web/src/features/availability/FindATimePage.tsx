@@ -8,7 +8,7 @@ import {
   fieldControlClasses,
   raisedInteractiveClasses,
 } from '../../components/ui/classes'
-import { PageHeader } from '../../components/ui/pageHeader'
+import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold } from '../../components/ui/pageScaffold'
 import { Section, SectionCard } from '../../components/ui/section'
 import { StatusBanner } from '../../components/ui/statusBanner'
@@ -149,7 +149,7 @@ export function FindATimePage() {
   return (
     <main data-testid="screen-find-a-time">
       <PageScaffold>
-        <PageHeader subtitle={t('findATime.subheading')} title={t('findATime.heading')} />
+        <PageHeader description={t('findATime.subheading')} title={t('findATime.heading')} />
 
         {anyError && (
           <StatusBanner role="alert" variant="danger">

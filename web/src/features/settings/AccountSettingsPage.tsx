@@ -9,7 +9,7 @@ import { startExternalProviderWithRetry } from '../../auth/externalIntent'
 import { Button } from '../../components/ui/button'
 import { FormField } from '../../components/ui/formShell'
 import { Input } from '../../components/ui/input'
-import { PageHeader } from '../../components/ui/pageHeader'
+import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold } from '../../components/ui/pageScaffold'
 import { Section, SectionCard } from '../../components/ui/section'
 import { Select } from '../../components/ui/select'
@@ -290,7 +290,7 @@ export function AccountSettingsPage() {
   return (
     <main data-testid="screen-settings-account">
       <PageScaffold>
-      <PageHeader title={t('pages.account')} />
+      <PageHeader eyebrow={t('navigation.label')} title={t('pages.account')} />
       <SettingsNavigation />
       {(location.state as { identityConfirmed?: boolean } | null)?.identityConfirmed && <p className="text-ink" role="status">{t('reauth.confirmedIdentityChooseAction')}</p>}
       <Section title={t('email.title')} titleId="account-email-heading">

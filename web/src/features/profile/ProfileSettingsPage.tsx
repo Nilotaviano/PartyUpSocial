@@ -9,7 +9,7 @@ import { SettingsNavigation } from '../settings/BlockedUsersPage'
 import { Input } from '../../components/ui/input'
 import { FormField } from '../../components/ui/formShell'
 
-import { PageHeader } from '../../components/ui/pageHeader'
+import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold } from '../../components/ui/pageScaffold'
 import { Section } from '../../components/ui/section'
 import { TimeZoneField, isKnownTimeZone } from '../../components/TimeZoneField'
@@ -141,7 +141,7 @@ export function ProfileSettingsPage() {
     return (
       <main data-testid="screen-settings-profile">
         <PageScaffold>
-          <PageHeader title={t('pages.profile')} />
+          <PageHeader eyebrow={t('navigation.label', { ns: 'settings' })} title={t('pages.profile')} />
           <SettingsNavigation />
           <p className="text-ink-soft">{t('loading')}</p>
         </PageScaffold>

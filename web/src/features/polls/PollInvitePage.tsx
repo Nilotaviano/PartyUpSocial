@@ -5,7 +5,7 @@ import { Navigate, useNavigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { controlRowClasses } from '../../components/ui/classes'
-import { PageHeader } from '../../components/ui/pageHeader'
+import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold } from '../../components/ui/pageScaffold'
 import { Section } from '../../components/ui/section'
 import { StatusBanner } from '../../components/ui/statusBanner'
@@ -20,7 +20,7 @@ import { getPollDetail, invitePollUsers, pollKeys } from './pollQueries'
  * panel). Mirrors the session page's friend checklist exactly (semantics, not markup padding).
  */
 export function PollInvitePage() {
-  const { t } = useTranslation(['polls', 'errors'])
+  const { t } = useTranslation(['polls', 'errors', 'common'])
   const { pollId = '' } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -55,7 +55,10 @@ export function PollInvitePage() {
   return (
     <main data-testid="screen-poll-invite">
       <PageScaffold width="form">
-        <PageHeader title={t('invite.heading')} />
+        <PageHeader
+          back={{ to: `/polls/${pollId}`, label: t('actions.back', { ns: 'common' }) }}
+          title={t('invite.heading')}
+        />
 
         {anyError && (
           <StatusBanner role="alert" variant="danger">

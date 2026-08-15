@@ -56,6 +56,17 @@ describe('shell PageHeader', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
   })
 
+  it('centers the column when align is center', () => {
+    render(
+      <MemoryRouter>
+        <PageHeader align="center" title="Sign in" />
+      </MemoryRouter>,
+    )
+
+    const heading = screen.getByRole('heading', { level: 1, name: 'Sign in' })
+    expect(heading.closest('div')?.parentElement?.className).toContain('items-center')
+  })
+
   it('sets aria-live only when live is requested', () => {
     render(
       <MemoryRouter>

@@ -4,7 +4,7 @@ import { client, isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { FormField, formShellClasses } from '../../components/ui/formShell'
 import { Input } from '../../components/ui/input'
-import { PageHeader } from '../../components/ui/pageHeader'
+import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold } from '../../components/ui/pageScaffold'
 import { Section } from '../../components/ui/section'
 import { StatusBanner } from '../../components/ui/statusBanner'
@@ -38,7 +38,7 @@ export function PublicDeletionRequestPage() {
     <main data-testid="screen-account-deletion">
       <PageScaffold width="form">
         <PageHeader
-          subtitle={t('publicDeletion.requestDescription')}
+          description={t('publicDeletion.requestDescription')}
           title={t('publicDeletion.requestTitle')}
         />
         {/* Not FormShell: it hardcodes `noValidate`, and this form's only guard

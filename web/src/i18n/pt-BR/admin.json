@@ -35,6 +35,7 @@
   },
   "users": {
     "heading": "Gestão de contas",
+    "back": "Voltar para o painel",
     "searchLabel": "Buscar por nome de usuário ou nome de exibição",
     "searchAction": "Buscar",
     "loading": "Carregando a lista de contas…",

@@ -5,7 +5,7 @@ import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/emptyState'
 import { IdentityRow } from '../../components/ui/identityRow'
-import { PageHeader } from '../../components/ui/pageHeader'
+import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold } from '../../components/ui/pageScaffold'
 import { Section } from '../../components/ui/section'
 import { StatusBanner } from '../../components/ui/statusBanner'
@@ -53,7 +53,11 @@ export function BlockedUsersPage() {
   return (
     <main data-testid="screen-settings-blocked">
       <PageScaffold>
-        <PageHeader subtitle={t('empty.blockedHelp')} title={t('pages.blocked')} />
+        <PageHeader
+          description={t('empty.blockedHelp')}
+          eyebrow={t('navigation.label', { ns: 'settings' })}
+          title={t('pages.blocked')}
+        />
         <SettingsNavigation />
         <p aria-live="polite" className="text-ink">
           {status}

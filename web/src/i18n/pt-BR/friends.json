@@ -5,7 +5,8 @@
     "add": "Adicionar amigo",
     "share": "Compartilhe seu perfil do PartyUp",
     "importSteam": "Encontrar amigos da Steam",
-    "blocked": "Usuários bloqueados"
+    "blocked": "Usuários bloqueados",
+    "backToFriends": "Voltar para amigos"
   },
   "sections": {
     "friends": "Amigos",

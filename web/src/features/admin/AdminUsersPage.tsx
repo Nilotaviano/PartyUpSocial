@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/button'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
-import { PageHeader } from '../../components/ui/pageHeader'
+import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold } from '../../components/ui/pageScaffold'
 import { Section } from '../../components/ui/section'
 import { StatusBanner } from '../../components/ui/statusBanner'
@@ -117,7 +117,7 @@ export function AdminUsersPage() {
   return (
     <main data-testid="screen-admin-users">
       <PageScaffold>
-        <PageHeader title={t('users.heading')} />
+        <PageHeader back={{ to: '/admin', label: t('users.back') }} title={t('users.heading')} />
 
         <form
           className="flex flex-wrap items-end gap-2"

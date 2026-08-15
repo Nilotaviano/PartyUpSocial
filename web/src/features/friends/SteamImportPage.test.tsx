@@ -6,6 +6,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SteamImportResult } from './friendGraph'
 
@@ -26,7 +27,9 @@ function renderPage() {
         new QueryClient({ defaultOptions: { queries: { retry: false } } })
       }
     >
-      <SteamImportPage />
+      <MemoryRouter>
+        <SteamImportPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }

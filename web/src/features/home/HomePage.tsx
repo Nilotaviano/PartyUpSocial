@@ -8,7 +8,7 @@ import {
   raisedInteractiveClasses,
 } from '../../components/ui/classes'
 import { EmptyState } from '../../components/ui/emptyState'
-import { PageHeader } from '../../components/ui/pageHeader'
+import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold, PageSlot } from '../../components/ui/pageScaffold'
 import { Section } from '../../components/ui/section'
 import { StatusBanner } from '../../components/ui/statusBanner'

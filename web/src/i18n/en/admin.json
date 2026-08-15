@@ -35,6 +35,7 @@
   },
   "users": {
     "heading": "User management",
+    "back": "Back to the dashboard",
     "searchLabel": "Search by username or display name",
     "searchAction": "Search",
     "loading": "Loading the user list…",

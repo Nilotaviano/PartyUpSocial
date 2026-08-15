@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams } from 'react-router'
+import { useParams } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { Checkbox } from '../../components/ui/checkbox'
 import { Dialog } from '../../components/ui/dialog'
 import { Label } from '../../components/ui/label'
-import { PageHeader } from '../../components/ui/pageHeader'
+import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold } from '../../components/ui/pageScaffold'
 import { Section, SectionCard } from '../../components/ui/section'
 import { StatusBanner } from '../../components/ui/statusBanner'
@@ -272,17 +272,7 @@ export function AdminUserDetailPage() {
   return (
     <main data-testid="screen-admin-user">
       <PageScaffold>
-        <PageHeader
-          actions={
-            <Link
-              className={`inline-flex items-center justify-center bg-card px-4 py-2 text-ink ${raisedInteractiveClasses}`}
-              to="/admin/users"
-            >
-              {t('user.back')}
-            </Link>
-          }
-          title={name}
-        />
+        <PageHeader back={{ to: '/admin/users', label: t('user.back') }} title={name} />
 
         {user.isPending && (
           <p className="motion-safe:animate-pulse text-ink-soft" role="status">

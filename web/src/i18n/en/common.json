@@ -34,7 +34,8 @@
   "actions": {
     "more": "More actions",
     "dismiss": "Dismiss",
-    "retry": "Try again"
+    "retry": "Try again",
+    "back": "Back"
   },
   "toast": {
     "regionLabel": "Alerts",

@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
-import { PageHeader } from '../../components/ui/pageHeader'
+import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold } from '../../components/ui/pageScaffold'
 import { Section } from '../../components/ui/section'
 import { StatusBanner } from '../../components/ui/statusBanner'
@@ -163,7 +163,7 @@ export function AdminDashboardPage() {
               {t('dashboard.usersLink')}
             </Link>
           }
-          subtitle={
+          description={
             dashboard.data
               ? t('dashboard.generatedAt', {
                   timestamp: dateTime.format(new Date(dashboard.data.generatedAt)),

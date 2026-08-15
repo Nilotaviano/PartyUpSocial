@@ -22,6 +22,8 @@ export interface ShellPageHeaderProps {
   actions?: ReactNode
   back?: ShellPageHeaderBack
   live?: boolean
+  /** 'center' keeps the column centered at every width (auth screens). */
+  align?: 'start' | 'center'
   className?: string
 }
 
@@ -32,6 +34,7 @@ export function PageHeader({
   actions,
   back,
   live = false,
+  align = 'start',
   className,
 }: ShellPageHeaderProps) {
   const heading = useRef<HTMLHeadingElement>(null)
@@ -39,6 +42,8 @@ export function PageHeader({
   useEffect(() => {
     heading.current?.focus()
   }, [])
+
+  const centered = align === 'center'
 
   return (
     <header
@@ -53,7 +58,13 @@ export function PageHeader({
           {back.label}
         </Link>
       )}
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+      <div
+        className={
+          centered
+            ? 'flex flex-col items-center gap-3 text-center'
+            : 'grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end'
+        }
+      >
         <div className="min-w-0">
           {eyebrow && (
             <p className="font-display text-[11px] font-extrabold tracking-[0.14em] text-muted-foreground uppercase">
@@ -68,7 +79,11 @@ export function PageHeader({
           >
             {title}
           </h1>
-          {description && <p className="mt-1 max-w-prose text-[13px] text-muted-foreground">{description}</p>}
+          {description && (
+            <p className={`mt-1 max-w-prose text-[13px] text-muted-foreground ${centered ? 'mx-auto' : ''}`}>
+              {description}
+            </p>
+          )}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2 sm:justify-end">{actions}</div>}
       </div>
