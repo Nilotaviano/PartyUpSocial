@@ -6,7 +6,7 @@ import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { ActionMenu, ActionMenuItem } from '../../components/ui/actionMenu'
 import { Button } from '../../components/ui/button'
-import { raisedInteractiveClasses } from '../../components/ui/classes'
+import { neutralCtaClasses, raisedInteractiveClasses } from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
 import { EmptyState } from '../../components/shell/SectionCard'
 import { IdentityRow } from '../../components/ui/identityRow'
@@ -96,7 +96,7 @@ export function UnfriendDialog({
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+                className={neutralCtaClasses}
                 type="button"
               >
                 {t('actions.cancel', { ns: 'settings' })}

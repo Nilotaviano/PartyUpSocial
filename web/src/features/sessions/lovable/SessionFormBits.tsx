@@ -6,7 +6,7 @@ import {
   controlRowClasses,
   fieldControlClasses,
   fieldSelectClasses,
-  raisedInteractiveClasses,
+  neutralCtaClasses,
 } from '../../../components/ui/classes'
 import { DateEcho } from '../../../components/ui/dateEcho'
 import { Dialog } from '../../../components/ui/dialog'
@@ -135,7 +135,7 @@ export function SessionDiscardDialog({
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+                className={neutralCtaClasses}
                 type="button"
               >
                 {t('dirty.stay')}

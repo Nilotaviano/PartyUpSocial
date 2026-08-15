@@ -17,7 +17,7 @@ import {
 import { isApiError } from '../../../api/client'
 import { useSession } from '../../../auth/useSession'
 import { Button } from '../../../components/ui/button'
-import { fieldControlClasses, raisedInteractiveClasses } from '../../../components/ui/classes'
+import { fieldControlClasses, neutralCtaClasses, raisedInteractiveClasses } from '../../../components/ui/classes'
 import { Dialog } from '../../../components/ui/dialog'
 import { PageHeader } from '../../../components/shell/PageHeader'
 import { StatusBanner } from '../../../components/ui/statusBanner'
@@ -510,7 +510,7 @@ function FinalizeDialog({
           <div className="mt-6 flex flex-wrap justify-end gap-2">
             <button
               ref={cancelButton}
-              className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+              className={neutralCtaClasses}
               type="button"
               onClick={onClose}
             >
@@ -622,7 +622,7 @@ function SuggestDialog({
           <div className="mt-6 flex flex-wrap justify-end gap-2">
             <button
               ref={cancelButton}
-              className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+              className={neutralCtaClasses}
               type="button"
               onClick={onClose}
             >
@@ -685,7 +685,7 @@ function DeleteOptionDialog({
           <div className="mt-6 flex flex-wrap justify-end gap-2">
             <button
               ref={cancelButton}
-              className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+              className={neutralCtaClasses}
               type="button"
               onClick={onClose}
             >
@@ -742,7 +742,7 @@ function CancelPollDialog({ pending, onConfirm }: { pending: boolean; onConfirm:
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+                className={neutralCtaClasses}
                 type="button"
               >
                 {t('dirty.stay')}
@@ -811,7 +811,7 @@ function RemoveGuestDialog({
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+                className={neutralCtaClasses}
                 type="button"
               >
                 {t('dirty.stay')}
@@ -1462,7 +1462,7 @@ export function PollDetailPage() {
                 : t('detailLovable.countdown.votingClosesIn', { time: formatCountdown(deadlineLeftMin) })}
             </p>
             <Button
-              className="h-11 rounded-xl bg-primary font-display font-extrabold text-primary-ink"
+              className="h-11 rounded-xl font-display font-extrabold"
               data-testid="finalize-trigger"
               type="button"
               variant="primary"

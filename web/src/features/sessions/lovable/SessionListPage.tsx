@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../../api/client'
 import { Button } from '../../../components/ui/button'
-import { raisedInteractiveClasses } from '../../../components/ui/classes'
+import { primaryCtaClasses } from '../../../components/ui/classes'
 import { EmptyState } from '../../../components/shell/SectionCard'
 import { PageHeader } from '../../../components/shell/PageHeader'
 import { StatusBanner } from '../../../components/ui/statusBanner'
@@ -164,7 +164,7 @@ export function SessionListPage({ scope }: SessionListPageProps) {
           actions={
             scope === 'upcoming' && (
               <Link
-                className={`inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
+                className={primaryCtaClasses}
                 to="/sessions/new"
               >
                 {t('create.heading')}
@@ -192,7 +192,7 @@ export function SessionListPage({ scope }: SessionListPageProps) {
             <EmptyState
               action={
                 <Link
-                  className={`inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
+                  className={primaryCtaClasses}
                   to="/sessions/new"
                 >
                   {t('emptyState.sessions.cta')}

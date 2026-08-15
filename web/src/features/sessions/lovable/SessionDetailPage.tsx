@@ -8,7 +8,7 @@ import { useSession } from '../../../auth/useSession'
 import { AvatarDisc } from '../../friends/AvatarDisc'
 import { avatarImgUrl } from '../../friends/avatarImage'
 import { Button } from '../../../components/ui/button'
-import { raisedInteractiveClasses, segmentItemClasses } from '../../../components/ui/classes'
+import { neutralCtaClasses, raisedInteractiveClasses, segmentItemClasses } from '../../../components/ui/classes'
 import { Dialog } from '../../../components/ui/dialog'
 import { PageHeader } from '../../../components/shell/PageHeader'
 import { IdentityRow } from '../../../components/ui/identityRow'
@@ -108,7 +108,7 @@ function CancelSessionDialog({ pending, onConfirm }: CancelDialogProps) {
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+                className={neutralCtaClasses}
                 type="button"
               >
                 {t('dirty.stay')}
@@ -178,7 +178,7 @@ function RemoveGuestDialog({ displayName, pending, onConfirm }: RemoveGuestDialo
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+                className={neutralCtaClasses}
                 type="button"
               >
                 {t('dirty.stay')}

@@ -9,6 +9,7 @@ import {
   controlRowClasses,
   fieldControlClasses,
   fieldSelectClasses,
+  neutralCtaClasses,
   raisedInteractiveClasses,
 } from '../../../components/ui/classes'
 import { Dialog } from '../../../components/ui/dialog'
@@ -240,7 +241,7 @@ function PollDiscardDialog({ open, onOpenChange, onDiscard, triggerRef }: Discar
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+                className={neutralCtaClasses}
                 type="button"
               >
                 {t('dirty.stay')}

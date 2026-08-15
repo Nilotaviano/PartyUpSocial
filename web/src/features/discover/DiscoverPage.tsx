@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
-import { quietChipClasses, raisedInteractiveClasses } from '../../components/ui/classes'
+import { primaryCtaClasses, quietChipClasses } from '../../components/ui/classes'
 import { PageHeader } from '../../components/shell/PageHeader'
 import { EmptyState } from '../../components/shell/SectionCard'
 import { PageScaffold } from '../../components/ui/pageScaffold'
@@ -68,7 +68,7 @@ export function DiscoverPage() {
           <EmptyState
             action={
               <Link
-                className={`inline-flex items-center gap-2 bg-primary px-4 py-2 text-primary-ink ${raisedInteractiveClasses}`}
+                className={primaryCtaClasses}
                 to="/friends"
               >
                 {t('emptyState.discover.cta')}

@@ -6,7 +6,7 @@ import { Link } from 'react-router'
 import { isApiError } from '../../../api/client'
 import { Button } from '../../../components/ui/button'
 import {
-  raisedInteractiveClasses,
+  primaryCtaClasses,
   segmentItemClasses,
   segmentStripClasses,
 } from '../../../components/ui/classes'
@@ -183,7 +183,7 @@ export function PollListPage() {
         <PageHeader
           actions={
             <Link
-              className={`inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
+              className={primaryCtaClasses}
               to="/polls/new"
             >
               <Plus aria-hidden="true" className="size-4" />
@@ -231,7 +231,7 @@ export function PollListPage() {
             <EmptyState
               action={
                 <Link
-                  className={`inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
+                  className={primaryCtaClasses}
                   to="/polls/new"
                 >
                   {t('emptyState.polls.cta')}

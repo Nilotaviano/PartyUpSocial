@@ -11,7 +11,7 @@ import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold } from '../../components/ui/pageScaffold'
 import { Section, SectionCard } from '../../components/ui/section'
 import { StatusBanner } from '../../components/ui/statusBanner'
-import { raisedInteractiveClasses } from '../../components/ui/classes'
+import { neutralCtaClasses } from '../../components/ui/classes'
 import {
   adminKeys,
   banAdminUser,
@@ -89,7 +89,7 @@ function PlainActionDialog({
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className={`inline-flex items-center justify-center gap-2 bg-card px-4 py-2 text-ink ${raisedInteractiveClasses}`}
+                className={neutralCtaClasses}
                 type="button"
               >
                 {cancel}
@@ -180,7 +180,7 @@ function RemoveContentDialog({
             <Dialog.Close asChild>
               <button
                 ref={cancelButton}
-                className={`inline-flex items-center justify-center gap-2 bg-card px-4 py-2 text-ink ${raisedInteractiveClasses}`}
+                className={neutralCtaClasses}
                 type="button"
               >
                 {t('user.removeContent.cancel')}

@@ -12,7 +12,7 @@ import {
 import { BrandMark } from '../../components/ui/brandMark'
 import { Button } from '../../components/ui/button'
 import { Checkbox } from '../../components/ui/checkbox'
-import { primaryCtaClasses, raisedInteractiveClasses } from '../../components/ui/classes'
+import { neutralCtaClasses, primaryCtaClasses } from '../../components/ui/classes'
 import { FormField, FormShell, formShellClasses } from '../../components/ui/formShell'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
@@ -170,13 +170,11 @@ function AuthScreen({
   )
 }
 
-const linkButtonBase = `inline-flex items-center justify-center gap-2 px-4 py-2 ${raisedInteractiveClasses}`
-
-// The sign-in-methods panel/card grammar (owner-approved Lovable design):
-// full-width h-12 rounded-xl rows on the app's `surface` card, matching the
-// row skin `AccountMenu.tsx`'s `rowClasses` already ships and the
-// primary/outline button recipes `HomePage.tsx` ships, so the auth screens
-// read as one system with the rest of the uplifted app.
+// The sign-in-methods row grammar (owner-approved Lovable design): full-width
+// h-12 rounded-xl rows. `authRowOutlineClasses` sits on a `surface` (`bg-card`)
+// panel here and on /login, distinguishing it from `AccountMenu.tsx`'s
+// `rowClasses`, which is `bg-card` itself because its rows sit directly on
+// the sheet's page background rather than inside a nested panel.
 const authRowOutlineClasses =
   'flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-center font-display text-[14px] font-bold text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
 const authRowPrimaryClasses =
@@ -315,7 +313,7 @@ export function Welcome() {
               {t('pages.login', { ns: 'auth' })}
             </Button>
             {!showLoginOptions && (
-              <Link className={`${linkButtonBase} bg-card text-ink`} to="/register">
+              <Link className={neutralCtaClasses} to="/register">
                 {t('pages.register', { ns: 'auth' })}
               </Link>
             )}
@@ -585,19 +583,21 @@ export function Login() {
         </form>
       </div>
       <div className="flex flex-col gap-3">
-        <button className={authRowOutlineClasses} type="button" onClick={() => void magic()}>
-          {t('actions.emailLink')}
-        </button>
-        {session?.providers.includes('google') && (
-          <button className={authRowOutlineClasses} type="button" onClick={() => void external('google')}>
-            {t('providers.google')}
+        <div className="surface flex flex-col gap-3 p-4">
+          <button className={authRowOutlineClasses} type="button" onClick={() => void magic()}>
+            {t('actions.emailLink')}
           </button>
-        )}
-        {session?.providers.includes('steam') && (
-          <button className={authRowOutlineClasses} type="button" onClick={() => void external('steam')}>
-            {t('providers.steam')}
-          </button>
-        )}
+          {session?.providers.includes('google') && (
+            <button className={authRowOutlineClasses} type="button" onClick={() => void external('google')}>
+              {t('providers.google')}
+            </button>
+          )}
+          {session?.providers.includes('steam') && (
+            <button className={authRowOutlineClasses} type="button" onClick={() => void external('steam')}>
+              {t('providers.steam')}
+            </button>
+          )}
+        </div>
         {sent && (
           <StatusBanner role="status" variant="success">
             {t('messages.checkInbox')}
