@@ -44,7 +44,7 @@ export function AccountMenu() {
       <SheetTrigger asChild>
         <button
           aria-label={t('accountMenu.trigger')}
-          className="grid size-11 shrink-0 place-items-center rounded-xl hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-xl hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           data-tour="settings"
           type="button"
         >
