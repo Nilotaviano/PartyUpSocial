@@ -179,20 +179,20 @@ export function PollListPage() {
 
   return (
     <main className="min-h-screen bg-background pb-24" data-testid="screen-polls">
-      <PageHeader
-        actions={
-          <Link
-            className={`inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
-            to="/polls/new"
-          >
-            <Plus aria-hidden="true" className="size-4" />
-            {t('create.heading')}
-          </Link>
-        }
-        description={t('list.description')}
-        title={t('list.heading')}
-      />
       <div className="mx-auto max-w-[1000px] px-3 pb-6 sm:px-6">
+        <PageHeader
+          actions={
+            <Link
+              className={`inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
+              to="/polls/new"
+            >
+              <Plus aria-hidden="true" className="size-4" />
+              {t('create.heading')}
+            </Link>
+          }
+          description={t('list.description')}
+          title={t('list.heading')}
+        />
         <div aria-label={t('list.bandTabsLabel')} className={segmentStripClasses} role="tablist">
           {BANDS.map((option) => (
             <button

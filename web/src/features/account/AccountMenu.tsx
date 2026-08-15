@@ -17,11 +17,9 @@ const rowClasses =
  * anchor (`data-tour="settings"`) — it must exist in the DOM regardless of the profile query's
  * state, so the tour anchor never disappears and the chrome never shifts while the profile loads.
  *
- * Ported to the prototype's Sheet grammar (right-side panel replacing the dropdown): rows are
- * links inside the panel rather than `menuitem`s, so their accessible role changes from
- * `menuitem` to `link` — App.test.tsx's dropdown-shaped assertions are stale after this (see the
- * S1 report). Sign-out stays a plain button (it triggers an async mutation, not a navigation) and
- * closes the sheet itself before firing the request, matching the prior "cannot fire twice" guard.
+ * Rows are links inside the Sheet panel, so their accessible role is `link`, not `menuitem`.
+ * Sign-out stays a plain button (it triggers an async mutation, not a navigation) and closes the
+ * sheet itself before firing the request, so it cannot be fired twice.
  */
 export function AccountMenu() {
   const { t } = useTranslation('common')

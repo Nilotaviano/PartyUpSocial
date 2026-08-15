@@ -12,11 +12,6 @@ const OVERFLOW_CEILING = 99
  * mutations refetch this same query via `invalidateNotifications`
  * (`['notifications','unread-count']`), so no bespoke focus wiring lives
  * here.
- *
- * Deviation from the pre-shell version: the prototype's bell button never
- * carries an "active current page" treatment (it's chrome, not a nav
- * item), so the `isActive`-driven highlight this component used to render
- * on `/notifications` is dropped along with the swap to lucide's `Bell`.
  */
 export function NotificationBell() {
   const { t } = useTranslation('notifications')

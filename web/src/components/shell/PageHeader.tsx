@@ -46,9 +46,7 @@ export function PageHeader({
   const centered = align === 'center'
 
   return (
-    <header
-      className={['mx-auto w-full max-w-[1400px] px-3 pt-4 pb-3 sm:px-6', className].filter(Boolean).join(' ')}
-    >
+    <header className={['pt-4 pb-3', className].filter(Boolean).join(' ')}>
       {back && (
         <Link
           className="mb-2 -ml-2 inline-flex h-11 items-center gap-1 rounded-xl px-2 font-display text-[13px] font-bold text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"

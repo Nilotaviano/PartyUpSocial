@@ -610,6 +610,7 @@ export function CalendarShell() {
   return (
     <>
       <div className="min-h-screen bg-background pb-24" data-testid="screen-calendar">
+        <div className="mx-auto max-w-[1400px] px-3 sm:px-6">
         <PageHeader
           actions={
             <div className="flex shrink-0 items-center gap-2 self-stretch sm:self-auto">
@@ -671,6 +672,7 @@ export function CalendarShell() {
           live
           title={t("lovable.weekOf", { range: weekRangeLabel })}
         />
+        </div>
 
         <main className="mx-auto grid max-w-[1400px] gap-4 px-3 sm:px-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           {/* side panel — desktop */}

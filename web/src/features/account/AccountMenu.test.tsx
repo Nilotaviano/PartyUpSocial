@@ -137,6 +137,44 @@ describe('AccountMenu — sheet panel (D183, ported to the shell Sheet grammar)'
     expect(await screen.findByTestId('screen-welcome')).toBeInTheDocument()
   })
 
+  it('the keyboard path opens the panel and operates sign out from the keyboard_D183', async () => {
+    // Both the trigger and the sign-out row are native <button> elements, so real browsers
+    // activate them on Enter/Space via built-in UA semantics with no JS keydown handler
+    // involved — jsdom does not implement that default action (a known jsdom gap; see
+    // https://github.com/jsdom/jsdom/issues/1026), so the click that a real browser would
+    // fire is dispatched explicitly here alongside the keydown, and the assertions cover
+    // that dispatching the keydown never gets prevented plus that focus lands correctly.
+    mockProfile()
+    renderMenu()
+
+    const trigger = await screen.findByRole('button', { name: 'Account menu' })
+    trigger.focus()
+    expect(trigger).toHaveFocus()
+
+    const openEvent = fireEvent.keyDown(trigger, { key: 'Enter', code: 'Enter' })
+    expect(openEvent).toBe(true)
+    fireEvent.click(trigger)
+
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toBeInTheDocument()
+
+    const signOutButton = await screen.findByRole('button', { name: 'Sign out' })
+    signOutButton.focus()
+    expect(signOutButton).toHaveFocus()
+
+    const activateEvent = fireEvent.keyDown(signOutButton, { key: ' ', code: 'Space' })
+    expect(activateEvent).toBe(true)
+    fireEvent.click(signOutButton)
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/auth/logout',
+        expect.objectContaining({ params: { header: { 'X-CSRF-TOKEN': '' } } }),
+      ),
+    )
+    expect(await screen.findByTestId('screen-welcome')).toBeInTheDocument()
+  })
+
   it('sign out closes the panel while the request is in flight, so it cannot be fired twice_D183', async () => {
     mockProfile()
     let releaseLogout: (value: { data: undefined }) => void = () => {}

@@ -541,7 +541,9 @@ export function PollCreatePage() {
 
   return (
     <main className="min-h-screen bg-background pb-32" data-testid="screen-poll-create">
-      <PageHeader back={{ label: t('nav.backToList'), to: '/polls' }} title={t('create.heading')} />
+      <div className="mx-auto max-w-[1400px] px-3 sm:px-6">
+        <PageHeader back={{ label: t('nav.backToList'), to: '/polls' }} title={t('create.heading')} />
+      </div>
 
       {prefill.anyClamped && (
         <p aria-live="polite" className="mx-auto max-w-[1400px] px-3 sm:px-6" role="status">

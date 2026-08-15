@@ -2,12 +2,13 @@ import { CalendarDays, Gamepad2, Home, Users, Vote } from 'lucide-react'
 import type { ComponentType } from 'react'
 
 /**
- * The five chrome-level sections (owner ruling: no Discover in nav — it
- * moves to the Home page in a later slice). `end` follows react-router
- * `NavLink` semantics for the common case; Sessions is the one item whose
- * link target (`/sessions/upcoming`) is narrower than its active range
- * (`/sessions/*` — detail/create/history pages too), so its active state is
- * computed from `matchPrefix` rather than from `to`/`end` alone.
+ * The five chrome-level sections (owner ruling: Discover lives on the Home
+ * page, not its own nav entry). `end` follows react-router `NavLink`
+ * semantics for the common case; Sessions, Friends, and Calendar are items
+ * whose link target is narrower than their active range (each has live
+ * sub-routes — `/sessions/*`, `/friends/import/steam`, `/calendar/agenda`),
+ * so their active state is computed from `matchPrefix` rather than from
+ * `to`/`end` alone. Home stays exact: `/app` has no sub-routes.
  */
 export interface NavItem {
   to: string
@@ -29,7 +30,7 @@ export const NAV_ITEMS: NavItem[] = [
     labelKey: 'navigation.friends',
     ns: 'common',
     icon: Users,
-    end: true,
+    end: false,
     matchPrefix: '/friends',
     tourId: 'friends',
   },
@@ -56,7 +57,7 @@ export const NAV_ITEMS: NavItem[] = [
     labelKey: 'nav.calendar',
     ns: 'availability',
     icon: CalendarDays,
-    end: true,
+    end: false,
     matchPrefix: '/calendar',
     tourId: 'calendar',
   },

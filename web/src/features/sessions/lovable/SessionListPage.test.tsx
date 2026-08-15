@@ -79,6 +79,17 @@ describe('SessionListPage', () => {
     expect(screen.queryByRole('link', { name: 'New session' })).not.toBeInTheDocument()
   })
 
+  it('maps the notApplicable wire platform value to a localized "Other" label, not the raw wire value', async () => {
+    api.get.mockResolvedValue({
+      data: { items: [session({ platform: 'notApplicable' })], nextCursor: null },
+    })
+    renderPage('upcoming')
+
+    await screen.findByText('Raid night')
+    expect(screen.queryByText('notApplicable')).not.toBeInTheDocument()
+    expect(screen.getByText('Other')).toBeInTheDocument()
+  })
+
   it('loads the next cursor page and appends results_D095', async () => {
     api.get.mockImplementation(
       (path: string, options?: { params: { query: { cursor?: string } } }) => {

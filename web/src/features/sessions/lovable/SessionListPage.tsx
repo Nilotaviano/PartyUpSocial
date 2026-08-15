@@ -20,7 +20,12 @@ import {
   type SessionSummary,
 } from '../sessionQueries'
 import { OccupancyChip, OrganizerRow, StatusPill } from './SessionBits'
-import { isKnownSessionStatus, mapSessionSummary, type SessionLabels } from './sessionData'
+import {
+  isKnownSessionStatus,
+  mapSessionSummary,
+  sessionPlatformLabel,
+  type SessionLabels,
+} from './sessionData'
 
 /**
  * `scope` is a prop, each scope its own route in `App.tsx`, so cursors reset
@@ -117,7 +122,7 @@ function SessionCard({
 
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
           {mapped.game && <span>{mapped.game.name}</span>}
-          <span>{mapped.platform}</span>
+          <span>{sessionPlatformLabel(mapped.platform, t)}</span>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -154,20 +159,20 @@ export function SessionListPage({ scope }: SessionListPageProps) {
 
   return (
     <main className="min-h-screen bg-background pb-24" data-testid={`screen-sessions-${scope}`}>
-      <PageHeader
-        actions={
-          scope === 'upcoming' && (
-            <Link
-              className={`inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
-              to="/sessions/new"
-            >
-              {t('create.heading')}
-            </Link>
-          )
-        }
-        title={headingText}
-      />
       <div className="mx-auto max-w-[1000px] px-3 pb-6 sm:px-6">
+        <PageHeader
+          actions={
+            scope === 'upcoming' && (
+              <Link
+                className={`inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-ink ${raisedInteractiveClasses}`}
+                to="/sessions/new"
+              >
+                {t('create.heading')}
+              </Link>
+            )
+          }
+          title={headingText}
+        />
         <div className="flex flex-col gap-3">
           {isPending && (
             <p className="motion-safe:animate-pulse text-ink-soft" role="status">

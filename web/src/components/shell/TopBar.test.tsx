@@ -49,7 +49,7 @@ describe('TopBar', () => {
     }
   })
 
-  it('marks the current section aria-current="page", including a Sessions sub-route_D183', async () => {
+  it('marks the current section aria-current="page", including a Sessions sub-route_D139', async () => {
     renderTopBar('/sessions/00000000-0000-0000-0000-000000000001')
 
     expect(await screen.findByRole('link', { name: 'Sessions' })).toHaveAttribute('aria-current', 'page')

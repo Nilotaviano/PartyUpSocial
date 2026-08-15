@@ -1225,12 +1225,14 @@ export function PollDetailPage() {
 
       {poll && (
         <>
-          <PageHeader
-            actions={<StatusPill label={t(statusLabelKey(poll.status))} status={poll.status} />}
-            back={{ label: t('nav.backToList'), to: '/polls' }}
-            description={`${poll.game ? `${poll.game.name} · ` : ''}${platformLabel(poll.platform, t)}`}
-            title={poll.title}
-          />
+          <div className="mx-auto max-w-[1400px] px-3 sm:px-6">
+            <PageHeader
+              actions={<StatusPill label={t(statusLabelKey(poll.status))} status={poll.status} />}
+              back={{ label: t('nav.backToList'), to: '/polls' }}
+              description={`${poll.game ? `${poll.game.name} · ` : ''}${platformLabel(poll.platform, t)}`}
+              title={poll.title}
+            />
+          </div>
           <main className="mx-auto grid max-w-[1400px] gap-4 px-3 pb-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="contents lg:order-2 lg:block lg:min-w-0 lg:space-y-4 lg:sticky lg:top-4 lg:self-start">
             <section className="order-1 surface p-4" data-testid="poll-summary-card">

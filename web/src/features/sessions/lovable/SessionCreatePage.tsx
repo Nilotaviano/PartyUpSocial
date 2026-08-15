@@ -256,10 +256,12 @@ export function SessionCreatePage() {
 
   return (
     <main className="min-h-screen bg-background pb-32" data-testid="screen-session-create">
-      <PageHeader
-        back={{ label: t('nav.backToList'), to: '/sessions/upcoming' }}
-        title={t('create.heading')}
-      />
+      <div className="mx-auto max-w-[880px] px-3 sm:px-6">
+        <PageHeader
+          back={{ label: t('nav.backToList'), to: '/sessions/upcoming' }}
+          title={t('create.heading')}
+        />
+      </div>
 
       {prefill?.startWasClamped && (
         <p aria-live="polite" className="mx-auto max-w-[880px] px-3 sm:px-6" role="status">

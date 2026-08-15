@@ -97,3 +97,21 @@ export function isKnownSessionStatus(status: string): status is SessionStatus {
     status === 'canceled'
   )
 }
+
+/** Same wire-value mapping as `SessionFormBits.tsx`'s create-form platform select, and the
+ * same shape as `../../polls/lovable/pollData.ts`'s `platformLabel` — the `sessions`
+ * namespace carries the identical `create.platformOther` key that form already renders. */
+export function sessionPlatformLabel(platform: string, t: (key: string) => string): string {
+  switch (platform) {
+    case 'steam':
+      return 'Steam'
+    case 'playStation':
+      return 'PlayStation'
+    case 'xbox':
+      return 'Xbox'
+    case 'notApplicable':
+      return t('create.platformOther')
+    default:
+      return platform
+  }
+}

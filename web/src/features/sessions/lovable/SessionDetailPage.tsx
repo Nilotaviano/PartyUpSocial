@@ -16,7 +16,7 @@ import { SegmentStrip } from '../../../components/ui/segmentStrip'
 import { StatusBanner } from '../../../components/ui/statusBanner'
 import { instantToFakeLocal } from '../../availability/lovable/zone'
 import { StatusPill } from './SessionBits'
-import { isKnownSessionStatus } from './sessionData'
+import { isKnownSessionStatus, sessionPlatformLabel } from './sessionData'
 import {
   approveJoinRequest,
   cancelSession,
@@ -448,16 +448,18 @@ export function SessionDetailPage() {
 
       {data && (
         <>
-          <PageHeader
-            actions={
-              isKnownSessionStatus(data.status) && (
-                <StatusPill label={t(`status.${data.status}`)} status={data.status} />
-              )
-            }
-            back={{ label: t('nav.backToList'), to: '/sessions/upcoming' }}
-            description={`${data.game ? `${data.game.name} · ` : ''}${data.platform}`}
-            title={data.title}
-          />
+          <div className="mx-auto max-w-[1400px] px-3 sm:px-6">
+            <PageHeader
+              actions={
+                isKnownSessionStatus(data.status) && (
+                  <StatusPill label={t(`status.${data.status}`)} status={data.status} />
+                )
+              }
+              back={{ label: t('nav.backToList'), to: '/sessions/upcoming' }}
+              description={`${data.game ? `${data.game.name} · ` : ''}${sessionPlatformLabel(data.platform, t)}`}
+              title={data.title}
+            />
+          </div>
           <main className="mx-auto grid max-w-[1400px] gap-4 px-3 pb-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="contents lg:order-2 lg:block lg:min-w-0 lg:space-y-4 lg:sticky lg:top-4 lg:self-start">
             <section className="order-1 surface p-4" data-testid="session-summary-card">

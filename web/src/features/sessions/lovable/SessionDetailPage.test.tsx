@@ -510,6 +510,22 @@ describe('SessionDetailPage (lovable)', () => {
     expect(remove).not.toHaveAccessibleName(/🍕/)
   })
 
+  it('maps the notApplicable wire platform value to a localized "Other" label, not the raw wire value', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/sessions/{sessionId}')
+        return Promise.resolve({ data: detail({ platform: 'notApplicable' }) })
+      if (path === '/api/v1/sessions/{sessionId}/join-requests')
+        return Promise.resolve({ data: { items: [], nextCursor: null } })
+      if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    renderPage()
+
+    await screen.findByText('Raid night')
+    expect(screen.queryByText('notApplicable')).not.toBeInTheDocument()
+    expect(screen.getByText('Other')).toBeInTheDocument()
+  })
+
   describe('accessibility (D-139)', () => {
     it('focuses the page h1 on mount_D139', async () => {
       renderPage()

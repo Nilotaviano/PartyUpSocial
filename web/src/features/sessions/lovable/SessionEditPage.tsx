@@ -222,10 +222,12 @@ export function SessionEditPage() {
 
   return (
     <main className="min-h-screen bg-background pb-32" data-testid="screen-session-edit">
-      <PageHeader
-        back={{ label: t('nav.backToSession'), to: `/sessions/${sessionId}` }}
-        title={t('edit.heading')}
-      />
+      <div className="mx-auto max-w-[880px] px-3 sm:px-6">
+        <PageHeader
+          back={{ label: t('nav.backToSession'), to: `/sessions/${sessionId}` }}
+          title={t('edit.heading')}
+        />
+      </div>
 
       <div className="mx-auto max-w-[880px] space-y-3 px-3 sm:px-6">
         {detail.isPending && <p role="status">{t('common.loading', { ns: 'common' })}</p>}

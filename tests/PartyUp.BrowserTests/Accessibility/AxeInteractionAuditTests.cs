@@ -478,9 +478,9 @@ public sealed class AxeInteractionAuditTests(PlaywrightFixture fixture)
     }
 
     /// <summary>
-    /// S1's flagged review item: the account-menu sheet (`AccountMenu.tsx`, right-side `Sheet`
-    /// replacing the old dropdown) plus the shell `NoticeBanner`'s heading-drop — both new in the
-    /// port. The sheet is the only state where its rows exist at all; the route scan never opens it.
+    /// The account-menu sheet (`AccountMenu.tsx`, right-side `Sheet`) plus the shell
+    /// `NoticeBanner`'s heading-drop. The sheet is the only state where its rows exist at all; the
+    /// route scan never opens it.
     /// </summary>
     [Theory]
     [InlineData(AuditedTheme.Light)]
