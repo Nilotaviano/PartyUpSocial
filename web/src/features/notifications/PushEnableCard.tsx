@@ -1,11 +1,11 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { Bell } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { getViewerProfile, viewerProfileKey } from '../sessions/sessionQueries'
-import { Button } from '../../components/ui/button'
+import { NoticeBanner } from '../../components/shell/NoticeBanner'
 import { usePageSlot } from '../../components/ui/pageSlotContext'
-import { StatusBanner } from '../../components/ui/statusBanner'
 import {
   PushPermissionDeniedError,
   enablePushInThisBrowser,
@@ -79,16 +79,15 @@ export function PushEnableCard() {
 
   if (showFallback) {
     return place(
-      <p
+      <NoticeBanner
         className={
           slot
             ? 'text-ink-soft'
             : 'mx-auto w-full max-w-page px-4 py-2 text-ink-soft sm:px-8'
         }
-        role="status"
-      >
-        {t('enable.fallback')}
-      </p>,
+        title={t('enable.fallback')}
+        variant="status"
+      />,
     )
   }
 
@@ -97,41 +96,25 @@ export function PushEnableCard() {
   }
 
   return place(
-    <section
-      aria-labelledby="push-enable-heading"
-      className={
-        slot ? 'w-full' : 'mx-auto w-full max-w-page px-4 pt-4 sm:px-8'
-      }
+    <div
+      className={slot ? 'w-full' : 'mx-auto w-full max-w-page px-4 pt-4 sm:px-8'}
       data-testid="push-enable-card"
     >
-      <StatusBanner
-        actions={
-          <>
-            <Button
-              aria-busy={enable.isPending}
-              disabled={enable.isPending}
-              variant="primary"
-              onClick={() => enable.mutate()}
-            >
-              {t('enable.confirm')}
-            </Button>
-            <Button disabled={enable.isPending} variant="neutral" onClick={dismiss}>
-              {t('enable.dismiss')}
-            </Button>
-          </>
-        }
-        variant="info"
-      >
-        <h2 className="font-display font-semibold text-body" id="push-enable-heading">
-          {t('enable.title')}
-        </h2>{' '}
-        {t('enable.body')}
-      </StatusBanner>
+      <NoticeBanner
+        actionBusy={enable.isPending}
+        actionLabel={t('enable.confirm')}
+        body={t('enable.body')}
+        dismissLabel={t('enable.dismiss')}
+        icon={Bell}
+        title={t('enable.title')}
+        onAction={() => enable.mutate()}
+        onDismiss={dismiss}
+      />
       {enable.isError && !(enable.error instanceof PushPermissionDeniedError) && (
         <p className="mt-2 text-ink" role="alert">
           {t('enable.error')}
         </p>
       )}
-    </section>,
+    </div>,
   )
 }

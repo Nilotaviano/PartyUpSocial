@@ -13,8 +13,14 @@
     "friends": "Amistades",
     "settings": "Configuración"
   },
+  "brand": {
+    "ariaLabel": "Inicio de PartyUp"
+  },
   "accountMenu": {
     "trigger": "Menú de la cuenta",
+    "closeLabel": "Cerrar",
+    "profile": "Perfil",
+    "privacy": "Privacidad y notificaciones",
     "signOut": "Cerrar sesión"
   },
   "pages": {

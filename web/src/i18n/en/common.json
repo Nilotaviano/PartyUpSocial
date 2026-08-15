@@ -13,8 +13,14 @@
     "friends": "Friends",
     "settings": "Settings"
   },
+  "brand": {
+    "ariaLabel": "PartyUp home"
+  },
   "accountMenu": {
     "trigger": "Account menu",
+    "closeLabel": "Close",
+    "profile": "Profile",
+    "privacy": "Privacy & notifications",
     "signOut": "Sign out"
   },
   "pages": {

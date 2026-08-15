@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Bell } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { NavLink } from 'react-router'
 import { getUnreadNotificationCount, notificationKeys } from './notificationQueries'
@@ -11,6 +12,11 @@ const OVERFLOW_CEILING = 99
  * mutations refetch this same query via `invalidateNotifications`
  * (`['notifications','unread-count']`), so no bespoke focus wiring lives
  * here.
+ *
+ * Deviation from the pre-shell version: the prototype's bell button never
+ * carries an "active current page" treatment (it's chrome, not a nav
+ * item), so the `isActive`-driven highlight this component used to render
+ * on `/notifications` is dropped along with the swap to lucide's `Bell`.
  */
 export function NotificationBell() {
   const { t } = useTranslation('notifications')
@@ -26,24 +32,15 @@ export function NotificationBell() {
     <>
       <NavLink
         aria-label={label}
-        className={({ isActive }) =>
-          `relative inline-flex min-h-11 flex-none items-center rounded-control px-3 py-2 font-display focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-            isActive
-              ? 'bg-primary font-semibold text-primary-ink'
-              : 'text-ink-soft hover:bg-accent hover:text-accent-ink'
-          }`
-        }
+        className="relative inline-flex size-11 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         data-tour="notifications"
         to="/notifications"
       >
-        <svg aria-hidden="true" className="size-6" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} viewBox="0 0 24 24">
-          <path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 6 2 6.5H4c.5-.5 2-2.5 2-6.5Z" />
-          <path d="M10 18.5a2 2 0 0 0 4 0" />
-        </svg>
+        <Bell aria-hidden className="size-5" />
         {count > 0 && (
           <span
             aria-hidden="true"
-            className="absolute right-0 top-0 inline-flex min-w-5 items-center justify-center rounded-full border-2 border-ink bg-accent px-1 font-display text-xs font-bold leading-none text-accent-ink"
+            className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-destructive-foreground tabular-nums"
           >
             {badgeText}
           </span>
