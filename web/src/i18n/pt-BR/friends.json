@@ -1,6 +1,8 @@
 {
   "pages": {
     "list": "Amigos",
+    "listEyebrow": "Turma",
+    "listDescription": "Com quem você joga, e como aumentar a turma.",
     "profile": "Perfil",
     "add": "Adicionar amigo",
     "share": "Compartilhe seu perfil do PartyUp",
@@ -16,6 +18,7 @@
     "findByCode": "Buscar por código de amigo"
   },
   "actions": {
+    "addFriend": "Adicionar amigo",
     "sendRequest": "Enviar solicitação de amizade",
     "resolve": "Buscar amigo",
     "accept": "Aceitar solicitação",

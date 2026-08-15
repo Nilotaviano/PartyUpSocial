@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
+import { QrCode } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import QRCode from 'react-qr-code'
+import QRCodeGraphic from 'react-qr-code'
 import { client, isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
-import { SectionCard } from '../../components/ui/section'
+import { SectionCard } from '../../components/shell/SectionCard'
 import { useToast } from '../../components/ui/toastStore'
 
 // PHASE5_1_DESIGN.md §1/§3: QR modules always render --color-qr-ink on a
@@ -73,78 +74,84 @@ export function ShareCard() {
   }
 
   return (
-    <SectionCard title={t('sections.share')} titleId="friend-share-heading">
-      {share.isPending && <p className="text-ink-soft">{t('status.loading')}</p>}
-      {share.error && (
-        <p role="alert">
-          {t(isApiError(share.error) ? share.error.code : 'generic', {
-            ns: 'errors',
-            defaultValue: t('generic', { ns: 'errors' }),
-          })}
-        </p>
-      )}
-      {share.data && (
-        <div className="grid gap-6 sm:grid-cols-[auto_1fr] sm:items-start">
-          <div aria-hidden="true" className="w-fit rounded-card bg-qr p-6">
-            <QRCode
-              aria-hidden="true"
-              bgColor={QR_CHIP_COLOR}
-              fgColor={QR_MODULE_COLOR}
-              size={152}
-              value={share.data.addUrl}
-            />
-          </div>
-          <div className="flex min-w-0 flex-col gap-5">
-            <p className="text-ink-soft">{t('qr.description')}</p>
-            <div className="flex flex-col gap-2">
-              <p className="text-meta text-ink-soft">{t('labels.friendCode')}</p>
-              <p className="select-all font-mono text-h2 font-bold tracking-widest text-ink">
-                {share.data.friendCode}
-              </p>
-              <Button
-                className="self-start"
-                variant="neutral"
-                onClick={() =>
-                  void copy(share.data.friendCode, t('labels.friendCode'))
-                }
-              >
-                {t('actions.copyCode')}
-              </Button>
+    // `id` is the anchor target both `FriendList`'s empty-state CTA and the
+    // page's own hash navigation rely on — the shell `SectionCard` doesn't
+    // expose an id prop to attach to its own h2, so the id lives on this
+    // wrapper instead (mirrors `FriendsPage.tsx`'s other region wrappers).
+    <div id="friend-share-heading">
+      <SectionCard icon={QrCode} title={t('sections.share')}>
+        {share.isPending && <p className="text-ink-soft">{t('status.loading')}</p>}
+        {share.error && (
+          <p role="alert">
+            {t(isApiError(share.error) ? share.error.code : 'generic', {
+              ns: 'errors',
+              defaultValue: t('generic', { ns: 'errors' }),
+            })}
+          </p>
+        )}
+        {share.data && (
+          <div className="grid gap-6 sm:grid-cols-[auto_1fr] sm:items-start">
+            <div aria-hidden="true" className="w-fit rounded-xl bg-qr p-6">
+              <QRCodeGraphic
+                aria-hidden="true"
+                bgColor={QR_CHIP_COLOR}
+                fgColor={QR_MODULE_COLOR}
+                size={152}
+                value={share.data.addUrl}
+              />
             </div>
-            <ShareLinkRow
-              action={
+            <div className="flex min-w-0 flex-col gap-5">
+              <p className="text-ink-soft">{t('qr.description')}</p>
+              <div className="flex flex-col gap-2">
+                <p className="text-meta text-ink-soft">{t('labels.friendCode')}</p>
+                <p className="select-all font-mono text-h2 font-bold tracking-widest text-ink">
+                  {share.data.friendCode}
+                </p>
                 <Button
+                  className="self-start"
                   variant="neutral"
                   onClick={() =>
-                    void copy(share.data.addUrl, t('actions.copyAddLink'))
+                    void copy(share.data.friendCode, t('labels.friendCode'))
                   }
                 >
-                  {t('actions.copyAddLink')}
+                  {t('actions.copyCode')}
                 </Button>
-              }
-              description={t('share.addLinkDescription')}
-              url={share.data.addUrl}
-            />
-            <ShareLinkRow
-              action={
-                <Button
-                  variant="neutral"
-                  onClick={() =>
-                    void copy(share.data.profileUrl, t('actions.copyProfileLink'))
-                  }
-                >
-                  {t('actions.copyProfileLink')}
-                </Button>
-              }
-              description={t('share.profileLinkDescription')}
-              url={share.data.profileUrl}
-            />
+              </div>
+              <ShareLinkRow
+                action={
+                  <Button
+                    variant="neutral"
+                    onClick={() =>
+                      void copy(share.data.addUrl, t('actions.copyAddLink'))
+                    }
+                  >
+                    {t('actions.copyAddLink')}
+                  </Button>
+                }
+                description={t('share.addLinkDescription')}
+                url={share.data.addUrl}
+              />
+              <ShareLinkRow
+                action={
+                  <Button
+                    variant="neutral"
+                    onClick={() =>
+                      void copy(share.data.profileUrl, t('actions.copyProfileLink'))
+                    }
+                  >
+                    {t('actions.copyProfileLink')}
+                  </Button>
+                }
+                description={t('share.profileLinkDescription')}
+                url={share.data.profileUrl}
+              />
+            </div>
           </div>
-        </div>
-      )}
-      <p aria-live="polite" className="text-ink">
-        {announcement}
-      </p>
-    </SectionCard>
+        )}
+        <p aria-live="polite" className="text-ink">
+          {announcement}
+        </p>
+      </SectionCard>
+    </div>
   )
 }

@@ -125,9 +125,14 @@ type FriendRowProps = {
 }
 
 /**
- * One hairline person row (§3.3): the shipped identity link keeps its
- * display-name-then-username accessible name, and both destructive actions move
- * behind the row's ActionMenu so nothing rests red in a list of friends.
+ * One crew row, in the prototype's item grammar (grid, bordered surface —
+ * `friends.tsx`'s `The crew` list): the shipped identity link keeps its
+ * display-name-then-username accessible name, and both destructive actions
+ * stay behind the row's ActionMenu so nothing rests red in a list of
+ * friends. `AvatarDisc`'s smallest non-badge size (`sm`, 48px) is the
+ * closest fit to the prototype's `size-10` disc — `AvatarDisc` itself is
+ * out of this ticket's write set, so its size scale isn't extended for an
+ * exact 40px match.
  */
 function FriendRow({ friend, pending, onUnfriend, onBlock }: FriendRowProps) {
   const { t } = useTranslation('friends')
@@ -135,47 +140,40 @@ function FriendRow({ friend, pending, onUnfriend, onBlock }: FriendRowProps) {
   const unfriend = useActionMenuDialog(menu)
 
   return (
-    <li className="border-t border-ink/25">
-      <div className="flex items-center gap-2 py-2">
-        <Link
-          className="flex min-h-11 min-w-0 flex-1 items-center rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-          to={`/u/${friend.username}`}
+    <li className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-border bg-background px-3 py-2.5">
+      {/*
+        AVATARS_DESIGN.md §3.5: every AvatarDisc call site seeds on userId, so the
+        same person's fill color is consistent across every surface.
+      */}
+      <AvatarDisc
+        emoji={friend.avatar.emoji}
+        imgUrl={avatarImgUrl(friend.avatar)}
+        seed={friend.userId}
+        size="sm"
+      />
+      <Link
+        className="flex min-h-11 min-w-0 items-center rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        to={`/u/${friend.username}`}
+      >
+        <IdentityRow displayName={friend.displayName} username={friend.username} />
+      </Link>
+      <ActionMenu
+        {...menu.menuProps}
+        label={`${t('actions.more', { ns: 'common' })} @${friend.username}`}
+      >
+        <ActionMenuItem destructive disabled={pending} {...unfriend.itemProps}>
+          {t('actions.unfriend')}
+        </ActionMenuItem>
+        <ActionMenuItem
+          busy={pending}
+          description={t('profile.blockConsequence')}
+          destructive
+          disabled={pending}
+          onSelect={onBlock}
         >
-          {/*
-            AVATARS_DESIGN.md §3.5: every AvatarDisc call site seeds on userId, so the
-            same person's fill color is consistent across every surface.
-          */}
-          <IdentityRow
-            avatar={
-              <AvatarDisc
-                emoji={friend.avatar.emoji}
-                imgUrl={avatarImgUrl(friend.avatar)}
-                seed={friend.userId}
-              />
-            }
-            className="flex-1"
-            displayName={friend.displayName}
-            username={friend.username}
-          />
-        </Link>
-        <ActionMenu
-          {...menu.menuProps}
-          label={`${t('actions.more', { ns: 'common' })} @${friend.username}`}
-        >
-          <ActionMenuItem destructive disabled={pending} {...unfriend.itemProps}>
-            {t('actions.unfriend')}
-          </ActionMenuItem>
-          <ActionMenuItem
-            busy={pending}
-            description={t('profile.blockConsequence')}
-            destructive
-            disabled={pending}
-            onSelect={onBlock}
-          >
-            {`${t('actions.block')} @${friend.username}`}
-          </ActionMenuItem>
-        </ActionMenu>
-      </div>
+          {`${t('actions.block')} @${friend.username}`}
+        </ActionMenuItem>
+      </ActionMenu>
       <UnfriendDialog
         contentProps={unfriend.contentProps}
         dialogProps={unfriend.dialogProps}
@@ -229,7 +227,7 @@ export function FriendList({ items, onStatus }: FriendListProps) {
 
   return (
     <>
-      <ul className="flex flex-col border-b border-ink/25">
+      <ul className="space-y-2">
         {items.map((friend) => {
           const base = {
             username: friend.username,

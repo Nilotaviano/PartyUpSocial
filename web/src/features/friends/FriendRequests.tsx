@@ -68,7 +68,7 @@ export function FriendRequests({
       <ul className="grid gap-3 sm:grid-cols-2">
         {items.map((request) => (
           <li key={request.friendshipId}>
-            <article className="flex h-full flex-col justify-between gap-4 rounded-card border-2 border-ink bg-card p-4 shadow-offset-card">
+            <article className="flex h-full flex-col justify-between gap-4 rounded-xl border border-border bg-background p-4">
               {/* D-068/D-188: a pending request exposes the username and nothing else. */}
               <IdentityRow username={request.username} variant="handle" />
               <div className="flex flex-wrap gap-2">

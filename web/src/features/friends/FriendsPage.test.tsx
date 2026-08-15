@@ -128,13 +128,13 @@ describe('FriendsPageTests', () => {
     expect(await screen.findByText('Friend One')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveFocus()
     expect(
-      screen.getByRole('heading', { name: 'Friends (1)' }),
+      screen.getByRole('heading', { name: 'Friends · 1' }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { name: 'Incoming requests (2)' }),
+      screen.getByRole('heading', { name: 'Incoming requests · 2' }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { name: 'Sent requests (1)' }),
+      screen.getByRole('heading', { name: 'Sent requests · 1' }),
     ).toBeInTheDocument()
 
     fireEvent.click(

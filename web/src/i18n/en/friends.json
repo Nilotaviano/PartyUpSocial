@@ -1,6 +1,8 @@
 {
   "pages": {
     "list": "Friends",
+    "listEyebrow": "Crew",
+    "listDescription": "Who you play with, and how to grow the crew.",
     "profile": "Profile",
     "add": "Add a friend",
     "share": "Share your PartyUp profile",
@@ -16,6 +18,7 @@
     "findByCode": "Find by friend code"
   },
   "actions": {
+    "addFriend": "Add friend",
     "sendRequest": "Send friend request",
     "resolve": "Find friend",
     "accept": "Accept request",

@@ -1,6 +1,8 @@
 {
   "pages": {
     "list": "Amistades",
+    "listEyebrow": "Grupo",
+    "listDescription": "Con quién juegas, y cómo hacer crecer el grupo.",
     "profile": "Perfil",
     "add": "Agregar amistad",
     "share": "Comparte tu perfil de PartyUp",
@@ -16,6 +18,7 @@
     "findByCode": "Buscar por código de amistad"
   },
   "actions": {
+    "addFriend": "Agregar amistad",
     "sendRequest": "Enviar solicitud de amistad",
     "resolve": "Buscar amistad",
     "accept": "Aceptar solicitud",
