@@ -158,6 +158,7 @@
     "showEarly": "Show 00:00–08:00",
     "hideEarly": "Hide 00:00–08:00",
     "paintHint": "Drag on the grid to paint · long-press on touch",
+    "paintHintTouch": "Press and hold a day to add availability",
     "dayPagerRange": "{{start}} – {{end}} · swipe the strip",
     "earlierDays": "Earlier days",
     "laterDays": "Later days",

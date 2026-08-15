@@ -646,3 +646,106 @@ describe('CalendarShell', () => {
     expect(historySpy).not.toHaveBeenCalled()
   })
 })
+
+/**
+ * The day pager is the phone's only week navigation — the header's week arrows
+ * scroll off screen there — so these run against a mobile viewport, which is
+ * what narrows the grid to a three-day window in the first place.
+ */
+describe('CalendarShell on a phone', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-08-13T18:00:00Z'))
+    vi.stubGlobal('innerWidth', 430)
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: true,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }))
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') {
+        return Promise.resolve({ data: { timeZone: 'UTC', locale: 'en' } })
+      }
+      if (path === '/api/v1/calendar') {
+        return Promise.resolve({ data: calendarResponse() })
+      }
+      return Promise.resolve({ data: undefined })
+    })
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+    vi.clearAllMocks()
+  })
+
+  const pagerLabel = () =>
+    within(screen.getByTestId('day-pager')).getByText(/·\s*swipe the strip/)
+
+  it('rolls the day pager into the next week past the last window_P5MOB01', async () => {
+    renderShell()
+    await waitForCalendar()
+
+    // Today is Thu 13 Aug, so the window opens on Wed–Fri.
+    expect(pagerLabel()).toHaveTextContent('Wed – Fri')
+    const later = screen.getByRole('button', { name: 'Later days' })
+
+    fireEvent.click(later)
+    expect(pagerLabel()).toHaveTextContent('Thu – Sat')
+
+    // The window is already at the end of the week: the next step must reach
+    // the following week rather than sticking.
+    fireEvent.click(later)
+    expect(pagerLabel()).toHaveTextContent('Sun – Tue')
+    expect(await screen.findByText(/Week of Aug 16/)).toBeInTheDocument()
+  })
+
+  it('rolls the day pager back into the previous week before the first window_P5MOB01', async () => {
+    renderShell()
+    await waitForCalendar()
+
+    const earlier = screen.getByRole('button', { name: 'Earlier days' })
+    for (const expected of ['Tue – Thu', 'Mon – Wed', 'Sun – Tue']) {
+      fireEvent.click(earlier)
+      expect(pagerLabel()).toHaveTextContent(expected)
+    }
+    expect(screen.getByText(/Week of Aug 9/)).toBeInTheDocument()
+
+    fireEvent.click(earlier)
+    expect(pagerLabel()).toHaveTextContent('Thu – Sat')
+    expect(await screen.findByText(/Week of Aug 2/)).toBeInTheDocument()
+  })
+
+  it('keeps the friend filter reset when a rollover changes the fetched week_D117', async () => {
+    renderShell()
+    await waitForCalendar()
+
+    const toggle = () =>
+      within(crewList()).getByRole('button', { name: 'Toggle availability for Mika Ortega' })
+    fireEvent.click(toggle())
+    expect(toggle()).toHaveAttribute('aria-pressed', 'false')
+
+    const later = screen.getByRole('button', { name: 'Later days' })
+    fireEvent.click(later)
+    // Same week so far — the filter is untouched by plain paging.
+    expect(toggle()).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.click(later)
+    await waitFor(() => expect(toggle()).toHaveAttribute('aria-pressed', 'true'))
+  })
+
+  it('shows the long-press paint hint on a phone_P5MOB02', async () => {
+    renderShell()
+    await waitForCalendar()
+
+    expect(screen.getByTestId('paint-hint-touch')).toHaveTextContent(
+      'Press and hold a day to add availability',
+    )
+  })
+})

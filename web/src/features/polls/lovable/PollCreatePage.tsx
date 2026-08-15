@@ -28,6 +28,7 @@ import {
   weekStartsOnIso,
 } from '../../availability/lovable/zone'
 import { mapCalendar } from '../../availability/lovable/calendarData'
+import { useIsMobile } from '../../availability/lovable/use-mobile'
 import type { WeekLabels } from '../../availability/lovable/partyup-data'
 import { availabilityKeys, getCalendarView } from '../../availability/availabilityQueries'
 import { CandidateGrid } from './CandidateGrid'
@@ -53,15 +54,16 @@ import { createPoll, type CreatePollRequest } from '../pollQueries'
  *  - Candidate times are S1's `CandidateGrid`, not the prototype's own copy.
  *    The grid only shows one week at a time, so — unlike the prototype,
  *    which had no week paging — this page adds Prev/Next-week controls so
- *    any future date stays reachable; the mobile 3-day pager is dropped
- *    (all 7 days always render) to keep this slice's scope bounded. The
+ *    any future date stays reachable. The
  *    grid's `friends` prop is the same `GET /calendar` friend-availability
  *    layer the calendar shell paints (`mapCalendar`, reused rather than
  *    duplicated), refetched for the displayed week as it's paged — so the
  *    grid highlights slots against real friend windows instead of always
- *    rendering the neutral, unhighlighted state. A failed fetch soft-fails
+ *    rendering the neutral, unhighlighted state, and the same response's
+ *    `sessions` are painted as pills underneath. A failed fetch soft-fails
  *    to that same neutral grid (`mapCalendar(undefined, ...)` already
- *    returns an empty `friends` array) rather than toasting on this page.
+ *    returns empty `friends`/`sessions` arrays) rather than toasting on this
+ *    page. The mobile 3-day pager mirrors `CalendarShell`'s.
  *  - Every user-facing string moves through `useTranslation('polls')`.
  */
 
@@ -270,6 +272,10 @@ export function PollCreatePage() {
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
   const [weekOffset, setWeekOffset] = useState(0)
   const [earlyHours, setEarlyHours] = useState(false)
+  // `null` = no explicit paging yet; the window then starts at the week's
+  // first day, the same clamped 0..4 window `CalendarShell` pages over.
+  const [pageStart, setPageStart] = useState<number | null>(null)
+  const isMobile = useIsMobile()
 
   const optionFormat = useMemo(
     () => new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }),
@@ -347,14 +353,27 @@ export function PollCreatePage() {
   // this create page has no toast wired to this query, unlike the calendar
   // shell. `voteLabel` is unused (the grid never renders poll pills) but
   // `mapCalendar` is reused whole rather than partly duplicated.
-  const friendsForGrid = useMemo(
+  const calendarLayers = useMemo(
     () =>
       mapCalendar(calendarView.data, weekStart, timeZone, {
         anonymousFriend: t('calendar.anonymousFriend', { ns: 'availability' }),
         voteLabel: () => '',
-      }).friends,
+      }),
     [calendarView.data, weekStart, timeZone, t],
   )
+
+  const pageStartValue = Math.max(0, Math.min(pageStart ?? 0, 4))
+  const visibleDays = useMemo(
+    () =>
+      isMobile
+        ? [pageStartValue, pageStartValue + 1, pageStartValue + 2]
+        : [0, 1, 2, 3, 4, 5, 6],
+    [isMobile, pageStartValue],
+  )
+
+  function stepDays(delta: -1 | 1) {
+    setPageStart(Math.max(0, Math.min(pageStartValue + delta, 4)))
+  }
 
   const durationMinutesNumber = Number(form.durationMinutes) || 0
 
@@ -404,6 +423,27 @@ export function PollCreatePage() {
         : [...current.options, iso].sort(),
     }))
     setDirty(true)
+  }
+
+  // Dragging a band to a time another candidate already holds is the same
+  // D-080 merge a repeated tap is: the moved instant collapses into the one
+  // already there rather than ever producing a duplicate.
+  function handleCandidateMove(from: Candidate, to: Candidate) {
+    const fromIso = candidateToIso(from)
+    const toIso = candidateToIso(to)
+    clearOptionsError()
+    setForm((current) => {
+      const without = current.options.filter((o) => o !== fromIso)
+      return {
+        ...current,
+        options: without.includes(toIso) ? without : [...without, toIso].sort(),
+      }
+    })
+    setDirty(true)
+  }
+
+  function handleDurationChange(minutes: number) {
+    update('durationMinutes', String(minutes))
   }
 
   function removeOption(iso: string) {
@@ -847,21 +887,69 @@ export function PollCreatePage() {
                   <ChevronRight className="size-4" />
                 </button>
               </div>
+
+              {/* mobile day pager — the calendar's own 3-day window */}
+              <div className="mt-3 md:hidden" data-testid="candidate-day-pager">
+                <div className="grid grid-cols-7 gap-1">
+                  {labels.dayNames.map((name, index) => (
+                    <button
+                      key={`${name}-${index}`}
+                      aria-pressed={visibleDays.includes(index)}
+                      className={cn(
+                        'h-11 rounded-xl border font-display text-[12px] font-bold',
+                        visibleDays.includes(index)
+                          ? 'border-primary bg-primary/20 text-ink'
+                          : 'border-border bg-background text-ink-soft',
+                      )}
+                      type="button"
+                      onClick={() => setPageStart(Math.max(0, Math.min(index, 4)))}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <button
+                    aria-label={t('create.grid.earlierDays')}
+                    className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-border"
+                    type="button"
+                    onClick={() => stepDays(-1)}
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
+                  <p className="min-w-0 flex-1 truncate text-center font-display text-[12px] font-bold text-ink-soft">
+                    {t('create.grid.dayPagerRange', {
+                      start: labels.dayNames[visibleDays[0]!],
+                      end: labels.dayNames[visibleDays[visibleDays.length - 1]!],
+                    })}
+                  </p>
+                  <button
+                    aria-label={t('create.grid.laterDays')}
+                    className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-border"
+                    type="button"
+                    onClick={() => stepDays(1)}
+                  >
+                    <ChevronRight className="size-4" />
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="surface p-2 sm:p-3" data-testid="candidate-grid">
               <CandidateGrid
                 candidates={candidatesInView}
-                days={[0, 1, 2, 3, 4, 5, 6]}
+                capReached={form.options.length >= MAX_OPTIONS}
+                days={visibleDays}
                 durationMin={durationMinutesNumber > 0 ? durationMinutesNumber : 30}
-                freeCountLabel={(day, time, count) =>
-                  t('a11y.candidateFreeCount', { day, time, count })
-                }
-                friends={friendsForGrid}
+                friends={calendarLayers.friends}
                 labels={labels}
                 max={MAX_OPTIONS}
                 rangeEnd={24 * 60}
                 rangeStart={earlyHours ? 10 * 60 : 16 * 60}
+                sessions={calendarLayers.sessions}
+                onDurationChange={handleDurationChange}
+                onMove={handleCandidateMove}
+                onPageStep={isMobile ? stepDays : undefined}
                 onToggle={handleCandidateToggle}
               />
             </div>

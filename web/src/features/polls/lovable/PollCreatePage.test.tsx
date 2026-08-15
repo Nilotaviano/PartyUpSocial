@@ -18,6 +18,13 @@ vi.mock('react-router', async () => {
 })
 
 import i18n from '../../../i18n'
+import {
+  DAY_MS,
+  fakeLocalToInstant,
+  instantToFakeLocal,
+  startOfLocaleWeek,
+  weekStartsOnIso,
+} from '../../availability/lovable/zone'
 import { PollCreatePage } from './PollCreatePage'
 
 function renderPage(initialEntry = '/polls/new') {
@@ -32,12 +39,15 @@ function renderPage(initialEntry = '/polls/new') {
   )
 }
 
-// With the default (empty) calendar response the grid never highlights any
-// friend as free, so every slot's accessible name always reports zero free
-// friends — a stable, order-only way to pick deterministic slots in tests.
+// The grid's per-30-minute cells carry the `candidate-slot-{day}-{minute}`
+// testid contract the browser tests click; reading them in DOM order gives a
+// stable, deterministic pair of slots to place candidates on.
 async function findGridSlots() {
   const grid = await screen.findByTestId('candidate-grid')
-  return within(grid).findAllByRole('button')
+  await within(grid).findAllByRole('gridcell')
+  return Array.from(
+    grid.querySelectorAll<HTMLElement>('[data-testid^="candidate-slot-"]'),
+  )
 }
 
 async function selectTwoGridSlots() {
@@ -511,6 +521,47 @@ describe('PollCreatePage (lovable)', () => {
     })
   })
 
+  it('disables free cells in the shown week once the cap is reached across weeks, not just the visible week_F5', async () => {
+    mockGet()
+    // Pinned to the exact start of a week so every candidate placed later in
+    // that week (or the next) is unambiguously in the future, regardless of
+    // which real-world weekday the suite runs on.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const anchorNow = instantToFakeLocal(new Date('2099-04-01T12:00:00Z').toISOString(), 'UTC')
+      const weekStart = startOfLocaleWeek(anchorNow, weekStartsOnIso('en'))
+      vi.setSystemTime(fakeLocalToInstant(weekStart, 'UTC'))
+
+      // 6 candidates land in the displayed week (days 0-5), 6 more land a
+      // week later — 12 total, the cap, but only 6 are ever in view at once.
+      const inWeek = Array.from({ length: 6 }, (_, i) =>
+        fakeLocalToInstant(new Date(weekStart.getTime() + i * DAY_MS + 23 * 60 * 60_000), 'UTC'),
+      )
+      const nextWeek = Array.from({ length: 6 }, (_, i) =>
+        fakeLocalToInstant(
+          new Date(weekStart.getTime() + (7 + i) * DAY_MS + 23 * 60 * 60_000),
+          'UTC',
+        ),
+      )
+      const query = [...inWeek, ...nextWeek]
+        .map((iso) => `startTimes=${encodeURIComponent(iso)}`)
+        .join('&')
+      renderPage(`/polls/new?${query}`)
+
+      const list = await screen.findByRole('group', { name: 'Candidate times' })
+      expect(within(list).getAllByRole('listitem')).toHaveLength(12)
+
+      const grid = await screen.findByTestId('candidate-grid')
+      await within(grid).findAllByRole('gridcell')
+      // Day 6 (20:00) carries no candidate in the displayed week — if the cap
+      // were checked only against the in-view 6, this cell would stay enabled.
+      const freeCell = within(grid).getByTestId('candidate-slot-6-1200')
+      expect(freeCell).toHaveAttribute('aria-disabled', 'true')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('renders real friend-availability windows on the grid as chips, masked owner drawn anonymous_F6', async () => {
     mockGet({
       calendarView: {
@@ -538,17 +589,85 @@ describe('PollCreatePage (lovable)', () => {
     renderPage()
 
     const grid = await screen.findByTestId('candidate-grid')
-    // The window spans the whole displayed week, so every slot reports the
-    // same count — any match proves the two owners rendered on the grid.
-    const [slot] = await within(grid).findAllByRole('button', { name: /2 friends free/ })
-    const discs = within(slot)
-      .getAllByText('', { exact: false, selector: 'span[aria-hidden="true"]' })
-    expect(discs).toHaveLength(2)
+    // The window spans the whole displayed week, so every cell reports the
+    // same count — any match proves the two owners reached the grid.
+    expect(await within(grid).findAllByRole('gridcell', { name: /2 friends free/ })).not.toHaveLength(
+      0,
+    )
+
+    // …and both owners are painted as chips on the friend layer, the masked
+    // one drawn as the neutral anonymous disc rather than an invented glyph.
+    const chips = await within(grid).findAllByText(/· \d\d:\d\d–/)
+    const discs = chips.map(
+      (chip) => chip.parentElement!.querySelector('[aria-hidden="true"]') as HTMLElement,
+    )
     const maskedDisc = discs.find((disc) => disc.className.includes('bg-busy'))
     const realDisc = discs.find((disc) => disc.textContent === '🎯')
-    expect(maskedDisc).toBeTruthy()
     expect(maskedDisc?.textContent).toBe('●')
     expect(realDisc).toBeTruthy()
+  })
+
+  it('edits to the duration field reflow every candidate band_D131', async () => {
+    mockGet()
+    renderPage()
+
+    const slots = await findGridSlots()
+    fireEvent.click(slots[0])
+
+    const grid = screen.getByTestId('candidate-grid')
+    const [band] = within(grid).getAllByRole('button')
+    expect(band).toHaveTextContent('16:00–18:00')
+
+    fireEvent.change(screen.getByLabelText('Duration (minutes)'), { target: { value: '90' } })
+
+    expect(within(grid).getAllByRole('button')[0]).toHaveTextContent('16:00–17:30')
+  })
+
+  it('a band resize writes the new shared duration back into the field_D131', async () => {
+    mockGet()
+    renderPage()
+
+    const slots = await findGridSlots()
+    fireEvent.click(slots[0])
+
+    const grid = screen.getByTestId('candidate-grid')
+    // Shift+Arrow is the resize handle's keyboard equivalent: it changes the
+    // poll's one shared duration, in D-131's 15-minute increments.
+    fireEvent.keyDown(within(grid).getAllByRole('button')[0], {
+      key: 'ArrowDown',
+      shiftKey: true,
+    })
+
+    expect(screen.getByLabelText('Duration (minutes)')).toHaveValue(135)
+    expect(within(grid).getAllByRole('button')[0]).toHaveTextContent('16:00–18:15')
+  })
+
+  it('paints the calendar response scheduled sessions underneath the candidate layer', async () => {
+    const zonedNow = instantToFakeLocal(new Date().toISOString(), 'UTC')
+    const weekStart = startOfLocaleWeek(zonedNow, weekStartsOnIso('en'))
+    const startTime = fakeLocalToInstant(
+      new Date(weekStart.getTime() + 2 * DAY_MS + 18 * 60 * 60_000),
+      'UTC',
+    )
+    mockGet({
+      calendarView: {
+        ...emptyCalendarView,
+        sessions: [
+          {
+            id: 'session-1',
+            title: 'Deep Rock night',
+            startTime,
+            durationMinutes: 120,
+            activeOccupancy: 3,
+          },
+        ],
+      },
+    })
+    renderPage()
+
+    const pill = await screen.findByTestId('candidate-session-session-1')
+    expect(pill).toHaveTextContent('Deep Rock night')
+    expect(pill).toHaveTextContent('3 in')
   })
 
   it('formats option instants in the account language, not the browser locale_D146', async () => {

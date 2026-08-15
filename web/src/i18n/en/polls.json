@@ -42,11 +42,16 @@
     "privacyPublic": "Public",
     "grid": {
       "heading": "Candidate start times",
-      "hint": "Tap a slot to add it as a candidate time.",
+      "hint": "Tap a time to add it. Drag a band to move it, or drag its handle to change the duration of every candidate.",
       "showDaytime": "Show daytime",
       "eveningsOnly": "Evenings only",
       "weekOf": "Week of {{range}}",
-      "count": "{{count}}/{{max}} options"
+      "count": "{{count}}/{{max}} options",
+      "sessionCount": "{{occupancy}} in",
+      "resizeDuration": "Drag to change the duration of every candidate",
+      "dayPagerRange": "{{start}} – {{end}}",
+      "earlierDays": "Earlier days",
+      "laterDays": "Later days"
     }
   },
   "validation": {
@@ -209,7 +214,15 @@
     "dialogLabel": "Confirmation dialog",
     "copyLink": "Copy invitation link",
     "candidateFreeCount_one": "{{day}} {{time}} — {{count}} friend free",
-    "candidateFreeCount_other": "{{day}} {{time}} — {{count}} friends free"
+    "candidateFreeCount_other": "{{day}} {{time}} — {{count}} friends free",
+    "candidateGridLabel": "Candidate times",
+    "candidateBand": "Candidate {{day}} {{range}}. Enter removes it, arrow keys move it, Shift with arrow keys changes the shared duration.",
+    "candidateAdded": "Candidate added: {{day}} {{range}}.",
+    "candidateRemoved": "Candidate removed: {{day}} {{range}}.",
+    "candidateMoved": "Candidate moved: {{day}} {{range}}.",
+    "candidateCapReached": "You already have the maximum of {{max}} candidate times.",
+    "durationChanged": "Duration is now {{minutes}} minutes.",
+    "friendWindow": "{{name}} · {{range}}"
   },
   "emptyState": {
     "polls": {

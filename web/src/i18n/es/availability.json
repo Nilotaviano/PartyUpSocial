@@ -158,6 +158,7 @@
     "showEarly": "Mostrar 00:00–08:00",
     "hideEarly": "Ocultar 00:00–08:00",
     "paintHint": "Arrastra en la cuadrícula para pintar · mantén pulsado en táctil",
+    "paintHintTouch": "Mantén pulsado un día para añadir disponibilidad",
     "dayPagerRange": "{{start}} – {{end}} · desliza la tira",
     "earlierDays": "Días anteriores",
     "laterDays": "Días posteriores",

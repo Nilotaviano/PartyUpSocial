@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { GripHorizontal } from "lucide-react";
 import { AvatarDisc } from "../../friends/AvatarDisc";
@@ -117,6 +117,11 @@ export function WeekGrid({
    * writes this ref in the same DOM event that queues the state update.
    */
   const dragRef = useRef<Drag>(null);
+  /**
+   * Mirrors `armed` for the DOM-level `touchmove` veto below, which runs
+   * outside React's render and cannot read state.
+   */
+  const armedRef = useRef(false);
   const applyDrag = useCallback((next: Drag) => {
     dragRef.current = next;
     setDrag(next);
@@ -147,12 +152,64 @@ export function WeekGrid({
   const top = (m: number) => ((m - rangeStart) / SLOT_MIN) * ROW_H;
   const hgt = (a: number, b: number) => ((b - a) / SLOT_MIN) * ROW_H;
 
+  /**
+   * Gridlines are real elements, not a `repeating-linear-gradient`: iOS Safari
+   * rounds each gradient tile independently at fractional device pixel ratios,
+   * so the painted spacing drifts away from the hour labels and bands down the
+   * column. Positioning them with the same `top()` the labels use makes the
+   * alignment exact by construction.
+   */
+  const gridLines = useMemo(() => {
+    const lines: { m: number; hour: boolean }[] = [];
+    for (let m = rangeStart; m < rangeEnd; m += SLOT_MIN) lines.push({ m, hour: m % 60 === 0 });
+    return lines;
+  }, [rangeStart, rangeEnd]);
+
   const onDraftCompleteRef = useRef(onDraftComplete);
   const onResizeRef = useRef(onResize);
   useEffect(() => {
     onDraftCompleteRef.current = onDraftComplete;
     onResizeRef.current = onResize;
   });
+
+  const cancelPress = useCallback(() => {
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+    pressTimer.current = null;
+    touchOrigin.current = null;
+  }, []);
+
+  /**
+   * A gesture the browser takes back (`pointercancel`, fired whenever iOS
+   * decides the touch was a pan) must leave nothing behind: no pending press,
+   * no armed state and no half-built draft that a later pointerup would
+   * commit.
+   */
+  const abortGesture = useCallback(() => {
+    cancelPress();
+    armedRef.current = false;
+    setArmed(false);
+    applyDrag(null);
+  }, [applyDrag, cancelPress]);
+
+  /**
+   * iOS locks `touch-action` when a gesture starts, so flipping the column's
+   * class mid-gesture cannot stop the pan it already granted. Vetoing
+   * `touchmove` from a non-passive listener is the only scroll refusal it
+   * honors; it applies while a press is pending or armed, and stops the moment
+   * the press is cancelled so a scroll keeps scrolling.
+   */
+  useEffect(() => {
+    const el = columnsRef.current;
+    if (!el) return;
+    const onTouchMove = (event: TouchEvent) => {
+      if (pressTimer.current === null && !armedRef.current) return;
+      event.preventDefault();
+    };
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onTouchMove);
+  }, []);
+
+  useEffect(() => cancelPress, [cancelPress]);
 
   // Global pointer handling while dragging. The effect is keyed on whether a
   // drag is live, never on the drag itself: re-running it on every pointermove
@@ -202,8 +259,12 @@ export function WeekGrid({
       const d = dragRef.current;
       applyDrag(null);
       setArmed(false);
+      armedRef.current = false;
       if (!d) return;
       if (d.mode === "new") {
+        // A draft shorter than one slot is not a paint — the browser can hand
+        // one back after it steals a gesture, and it must never reach the
+        // commit dialog.
         if (d.b - d.a < SLOT_MIN) return;
         onDraftCompleteRef.current({ day: d.day, start: d.a, end: d.b, x: e.clientX, y: e.clientY });
       } else if (d.a !== d.originStart || d.b !== d.originEnd) {
@@ -212,14 +273,14 @@ export function WeekGrid({
     };
     window.addEventListener("pointermove", move, { passive: false });
     window.addEventListener("pointerup", up);
-    window.addEventListener("pointercancel", up);
+    window.addEventListener("pointercancel", abortGesture);
     return () => {
       clearInterval(autoScroll);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
-      window.removeEventListener("pointercancel", up);
+      window.removeEventListener("pointercancel", abortGesture);
     };
-  }, [applyDrag, dragging, yToMin]);
+  }, [abortGesture, applyDrag, dragging, yToMin]);
 
   const startPaint = (e: React.PointerEvent<HTMLDivElement>, day: number) => {
     const el = e.currentTarget;
@@ -235,6 +296,9 @@ export function WeekGrid({
       // finger drag must scroll the page — painting requires a long press
       touchOrigin.current = { x: e.clientX, y: clientY };
       pressTimer.current = setTimeout(() => {
+        pressTimer.current = null;
+        touchOrigin.current = null;
+        armedRef.current = true;
         setArmed(true);
         if (navigator.vibrate) navigator.vibrate(12);
         const m = clamp(
@@ -251,18 +315,9 @@ export function WeekGrid({
     startPaint(e, day);
   };
 
-  const cancelPress = () => {
-    if (pressTimer.current) clearTimeout(pressTimer.current);
-    pressTimer.current = null;
-    touchOrigin.current = null;
-  };
-
   const onColumnPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const origin = touchOrigin.current;
-    if (!origin) {
-      cancelPress();
-      return;
-    }
+    if (!origin) return;
     if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > MOVE_CANCEL_PX) cancelPress();
   };
 
@@ -463,6 +518,7 @@ export function WeekGrid({
                 data-daycol={day}
                 onPointerDown={(e) => onColumnPointerDown(e, day)}
                 onPointerUp={cancelPress}
+                onPointerCancel={abortGesture}
                 onPointerMove={onColumnPointerMove}
                 onContextMenu={(e) => e.preventDefault()}
                 className={cn(
@@ -470,11 +526,23 @@ export function WeekGrid({
                   isToday ? "border-primary/40" : "border-border/70",
                   armed || drag ? "touch-none" : "touch-pan-y",
                 )}
-                style={{
-                  height,
-                  backgroundImage: `repeating-linear-gradient(to bottom, var(--grid-hour) 0 1px, transparent 1px ${ROW_H * 4}px), repeating-linear-gradient(to bottom, var(--grid-line) 0 1px, transparent 1px ${ROW_H}px)`,
-                }}
+                style={{ height }}
               >
+                {/* gridlines */}
+                <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+                  {gridLines.map((line) => (
+                    <div
+                      key={line.m}
+                      className="absolute inset-x-0 h-px"
+                      data-gridline={line.hour ? "hour" : "quarter"}
+                      style={{
+                        top: top(line.m),
+                        background: line.hour ? "var(--grid-hour)" : "var(--grid-line)",
+                      }}
+                    />
+                  ))}
+                </div>
+
                 {/* my availability bands */}
                 {dayBands.map((b) => (
                   <BandBlock
@@ -638,8 +706,12 @@ export function WeekGrid({
               role="row"
               style={{ gridTemplateColumns: gridTemplate }}
             >
-              <div aria-colindex={1} className="sr-only" role="rowheader">
-                {fmt(minutesOfRow(row))}
+              {/* The hiding lives on an inner span, never on the grid item
+                  itself: `sr-only` is `position: absolute`, which would take
+                  the row header out of the row's column flow and shift every
+                  day cell one track left, off the column it names. */}
+              <div aria-colindex={1} role="rowheader">
+                <span className="sr-only">{fmt(minutesOfRow(row))}</span>
               </div>
               {days.map((day, col) => {
                 const covering = busyAt(day, row);

@@ -37,6 +37,7 @@ import { AvailabilityPanel } from "./AvailabilityPanel";
 import { CommitDialog } from "./CommitDialog";
 import { mapCalendar, type MappedCalendar, type PollGroup } from "./calendarData";
 import {
+  SLOT_MIN,
   fmtRange,
   ruleLabel,
   type Friend,
@@ -314,6 +315,13 @@ export function CalendarShell() {
     return () => cancelAnimationFrame(raf);
   }, [draft]);
 
+  // A gesture the browser cancels mid-paint can hand back a degenerate range;
+  // the commit dialog only ever opens on a proposal of at least one slot.
+  function acceptDraft(next: Draft) {
+    if (next.end - next.start < SLOT_MIN) return;
+    setDraft(next);
+  }
+
   async function commit(repeats: boolean) {
     if (!draft) return;
     // The dialog stays up for the write so `pending` can disable Save; it is
@@ -517,8 +525,23 @@ export function CalendarShell() {
     setPageStart(null);
   }
 
+  // The header's week arrows scroll off a phone screen, so the day pager is the
+  // only way forward there: stepping past either end of the window rolls the
+  // week over rather than sticking. `weekOffset` moves `from`, which the
+  // render-phase reset above keys the friend filter off — no extra wiring.
   function stepDays(delta: -1 | 1) {
-    setPageStart(Math.max(0, Math.min(pageStartValue + delta, 4)));
+    const next = pageStartValue + delta;
+    if (next > 4) {
+      setWeekOffset((value) => value + 1);
+      setPageStart(0);
+      return;
+    }
+    if (next < 0) {
+      setWeekOffset((value) => value - 1);
+      setPageStart(4);
+      return;
+    }
+    setPageStart(next);
   }
 
   const totalHours = rules.reduce((acc, r) => acc + ((r.end - r.start) / 60) * r.days.length, 0);
@@ -721,6 +744,14 @@ export function CalendarShell() {
                 <span className="hidden text-[12px] text-muted-foreground sm:inline">
                   {t("lovable.paintHint")}
                 </span>
+                {/* The desktop hint names a drag; a phone paints with a long
+                    press, so the touch wording is the one shown below sm. */}
+                <span
+                  className="text-[12px] text-muted-foreground sm:hidden"
+                  data-testid="paint-hint-touch"
+                >
+                  {t("lovable.paintHintTouch")}
+                </span>
                 <p
                   aria-live="polite"
                   className="sr-only"
@@ -803,7 +834,7 @@ export function CalendarShell() {
                   nowMinutes={nowMinutes}
                   selectedId={selectedId}
                   onSelect={setSelectedId}
-                  onDraftComplete={setDraft}
+                  onDraftComplete={acceptDraft}
                   onResize={handleResize}
                   onPageStep={isMobile ? stepDays : undefined}
                 />

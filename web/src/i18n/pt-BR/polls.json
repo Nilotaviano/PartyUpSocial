@@ -42,11 +42,16 @@
     "privacyPublic": "Pública",
     "grid": {
       "heading": "Horários candidatos",
-      "hint": "Toque em um horário para adicioná-lo como candidato.",
+      "hint": "Toque em um horário para adicioná-lo. Arraste uma faixa para movê-la ou arraste a alça para mudar a duração de todos os candidatos.",
       "showDaytime": "Mostrar horário diurno",
       "eveningsOnly": "Somente à noite",
       "weekOf": "Semana de {{range}}",
-      "count": "{{count}}/{{max}} opções"
+      "count": "{{count}}/{{max}} opções",
+      "sessionCount": "{{occupancy}} confirmados",
+      "resizeDuration": "Arraste para mudar a duração de todos os candidatos",
+      "dayPagerRange": "{{start}} – {{end}}",
+      "earlierDays": "Dias anteriores",
+      "laterDays": "Dias seguintes"
     }
   },
   "validation": {
@@ -209,7 +214,15 @@
     "dialogLabel": "Caixa de confirmação",
     "copyLink": "Copiar link de convite",
     "candidateFreeCount_one": "{{day}} {{time}} — {{count}} amigo livre",
-    "candidateFreeCount_other": "{{day}} {{time}} — {{count}} amigos livres"
+    "candidateFreeCount_other": "{{day}} {{time}} — {{count}} amigos livres",
+    "candidateGridLabel": "Horários candidatos",
+    "candidateBand": "Candidato {{day}} {{range}}. Enter remove, as setas movem e Shift com as setas muda a duração compartilhada.",
+    "candidateAdded": "Candidato adicionado: {{day}} {{range}}.",
+    "candidateRemoved": "Candidato removido: {{day}} {{range}}.",
+    "candidateMoved": "Candidato movido: {{day}} {{range}}.",
+    "candidateCapReached": "Você já tem o máximo de {{max}} horários candidatos.",
+    "durationChanged": "A duração agora é de {{minutes}} minutos.",
+    "friendWindow": "{{name}} · {{range}}"
   },
   "emptyState": {
     "polls": {

@@ -158,6 +158,7 @@
     "showEarly": "Mostrar 00:00–08:00",
     "hideEarly": "Ocultar 00:00–08:00",
     "paintHint": "Arraste na grade para pintar · toque longo no celular",
+    "paintHintTouch": "Toque e segure um dia para adicionar disponibilidade",
     "dayPagerRange": "{{start}} – {{end}} · deslize a faixa",
     "earlierDays": "Dias anteriores",
     "laterDays": "Dias seguintes",

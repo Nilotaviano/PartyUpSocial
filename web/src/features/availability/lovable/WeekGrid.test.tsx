@@ -277,6 +277,194 @@ describe('WeekGrid pointer flow', () => {
   })
 })
 
+describe('WeekGrid touch gesture safety', () => {
+  function stubColumn(day: number) {
+    const column = document.querySelector<HTMLElement>(`[data-daycol="${day}"]`)!
+    vi.spyOn(column, 'getBoundingClientRect').mockReturnValue({
+      top: 0,
+      left: 0,
+      bottom: 960,
+      right: 100,
+      width: 100,
+      height: 960,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect)
+    return column
+  }
+
+  it('discards an in-flight paint when the browser cancels the gesture_P5TOUCH02', () => {
+    const { onDraftComplete } = renderGrid()
+    const column = stubColumn(1)
+    const root = document.querySelector('[data-grid-root]')!
+
+    fireEvent.pointerDown(column, { button: 0, clientY: 37 })
+    fireEvent.pointerMove(window, { clientY: 200 })
+    // iOS fires pointercancel the moment it decides the touch was a pan.
+    fireEvent.pointerCancel(window)
+    // A pointerup can still arrive after the cancel; it must find nothing.
+    fireEvent.pointerUp(window, { clientX: 20, clientY: 200 })
+
+    expect(onDraftComplete).not.toHaveBeenCalled()
+    expect(root).toHaveAttribute('data-touch-dragging', 'false')
+  })
+
+  it('clears a pending long press when the gesture is cancelled_P5TOUCH02', () => {
+    vi.useFakeTimers()
+    try {
+      const { onDraftComplete } = renderGrid()
+      const column = stubColumn(1)
+      const root = document.querySelector('[data-grid-root]')!
+
+      fireEvent.pointerDown(column, { button: 0, pointerType: 'touch', clientY: 60 })
+      fireEvent.pointerCancel(column)
+      act(() => {
+        vi.advanceTimersByTime(400)
+      })
+
+      // The timer was cleared, so nothing ever armed and no draft exists.
+      expect(root).toHaveAttribute('data-touch-dragging', 'false')
+      fireEvent.pointerUp(window, { clientX: 20, clientY: 60 })
+      expect(onDraftComplete).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('never completes a draft shorter than one slot_P5TOUCH02', () => {
+    const { onDraftComplete } = renderGrid()
+    const column = stubColumn(1)
+
+    fireEvent.pointerDown(column, { button: 0, clientY: 37 })
+    // The drag collapses back onto its own anchor: a zero-length proposal.
+    fireEvent.pointerMove(window, { clientY: 30 })
+    fireEvent.pointerUp(window, { clientX: 20, clientY: 30 })
+
+    expect(onDraftComplete).not.toHaveBeenCalled()
+  })
+
+  it('vetoes the page scroll from a non-passive touchmove listener only while painting_P5TOUCH03', () => {
+    vi.useFakeTimers()
+    const addSpy = vi.spyOn(Element.prototype, 'addEventListener')
+    const removeSpy = vi.spyOn(Element.prototype, 'removeEventListener')
+    try {
+      const view = render(
+        <WeekGrid
+          rules={[]}
+          merged={[]}
+          friends={[]}
+          sessions={[]}
+          polls={[]}
+          labels={labels}
+          days={[0, 1, 2, 3, 4, 5, 6]}
+          rangeStart={8 * 60}
+          rangeEnd={24 * 60}
+          todayIndex={1}
+          nowMinutes={null}
+          selectedId={null}
+          onSelect={vi.fn()}
+          onDraftComplete={vi.fn()}
+          onResize={vi.fn()}
+        />,
+      )
+      // iOS locks touch-action at gesture start, so the class flip is a no-op
+      // there: the listener must be non-passive to be allowed to veto at all.
+      const index = addSpy.mock.calls.findIndex(
+        (call) =>
+          call[0] === 'touchmove' &&
+          (call[2] as AddEventListenerOptions | undefined)?.passive === false,
+      )
+      expect(index).toBeGreaterThanOrEqual(0)
+      // It is the column container that refuses the pan, not some ancestor.
+      const host = addSpy.mock.instances[index] as Element
+      expect(host.querySelector('[data-daycol]')).not.toBeNull()
+
+      const column = stubColumn(1)
+      const idle = new Event('touchmove', { bubbles: true, cancelable: true })
+      column.dispatchEvent(idle)
+      // No press pending: the finger keeps scrolling the page natively.
+      expect(idle.defaultPrevented).toBe(false)
+
+      fireEvent.pointerDown(column, { button: 0, pointerType: 'touch', clientY: 60 })
+      const pending = new Event('touchmove', { bubbles: true, cancelable: true })
+      column.dispatchEvent(pending)
+      expect(pending.defaultPrevented).toBe(true)
+
+      act(() => {
+        vi.advanceTimersByTime(400)
+      })
+      const armed = new Event('touchmove', { bubbles: true, cancelable: true })
+      column.dispatchEvent(armed)
+      expect(armed.defaultPrevented).toBe(true)
+
+      fireEvent.pointerCancel(window)
+      const afterCancel = new Event('touchmove', { bubbles: true, cancelable: true })
+      column.dispatchEvent(afterCancel)
+      // The gesture is the browser's again — vetoing on would freeze the page.
+      expect(afterCancel.defaultPrevented).toBe(false)
+
+      view.unmount()
+      expect(removeSpy.mock.calls.some((call) => call[0] === 'touchmove')).toBe(true)
+    } finally {
+      vi.useRealTimers()
+      addSpy.mockRestore()
+      removeSpy.mockRestore()
+    }
+  })
+
+  it('stops vetoing once movement past the slop reclaims the gesture_P5TOUCH03', () => {
+    vi.useFakeTimers()
+    try {
+      renderGrid()
+      const column = stubColumn(1)
+
+      fireEvent.pointerDown(column, { button: 0, pointerType: 'touch', clientY: 60 })
+      fireEvent.pointerMove(column, { clientX: 0, clientY: 200 })
+      act(() => {
+        vi.advanceTimersByTime(400)
+      })
+
+      const afterSlop = new Event('touchmove', { bubbles: true, cancelable: true })
+      column.dispatchEvent(afterSlop)
+      expect(afterSlop.defaultPrevented).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('WeekGrid gridlines', () => {
+  it('draws gridlines as elements on the label math, never as a repeating gradient_P5IOS01', () => {
+    renderGrid()
+    const column = document.querySelector<HTMLElement>('[data-daycol="1"]')!
+
+    // A repeating gradient tiles with per-tile rounding on iOS Safari, so the
+    // spacing drifts away from the DOM-positioned hour labels down the column.
+    expect(column.style.backgroundImage).toBe('')
+
+    const lines = column.querySelectorAll<HTMLElement>('[data-gridline]')
+    // 08:00–24:00 at one line per 15-minute row, 16 of them on the hour.
+    expect(lines).toHaveLength(64)
+    expect(column.querySelectorAll('[data-gridline="hour"]')).toHaveLength(16)
+
+    // Every line sits exactly where the same top() math puts a band or label.
+    lines.forEach((line, index) => {
+      expect(line.style.top).toBe(`${index * 15}px`)
+    })
+    expect(lines[0].getAttribute('data-gridline')).toBe('hour')
+    expect(lines[4].getAttribute('data-gridline')).toBe('hour')
+    expect(lines[1].getAttribute('data-gridline')).toBe('quarter')
+    expect(lines[0].style.background).toBe('var(--grid-hour)')
+    expect(lines[1].style.background).toBe('var(--grid-line)')
+
+    // Decoration only: no pointer target, nothing for a screen reader.
+    const layer = lines[0].parentElement!
+    expect(layer).toHaveAttribute('aria-hidden', 'true')
+    expect(layer.className).toContain('pointer-events-none')
+  })
+})
+
 describe('WeekGrid layers', () => {
   it('paints busy state from the server merge, never re-derived from occurrences_D101', () => {
     // The true union of these two rules is 09:00–09:45, so a fixture using that
@@ -447,6 +635,27 @@ describe('WeekGrid layers', () => {
       />,
     )
     expect(container.querySelector('.bg-destructive')).toBeNull()
+  })
+
+  it('keeps the row header in the grid flow, hiding it via an inner span rather than sr-only on the grid item itself', () => {
+    renderGrid()
+
+    const rowHeader = screen.getAllByRole('rowheader')[0]
+    // `sr-only` is `position: absolute` — on the grid item itself it would take
+    // the row header out of the row's column flow and shift every day cell one
+    // track left, off the column it names (the CandidateGrid poll-grid bug this
+    // mirrors). The hiding must live on an inner span instead.
+    expect(rowHeader.className).not.toContain('sr-only')
+    expect(rowHeader.querySelector(':scope > .sr-only')).not.toBeNull()
+
+    // Structural proof, not just an attribute value: the row header div is
+    // itself the row's first grid child (nothing takes it out of flow), and
+    // it carries exactly one child — the sr-only span — mirroring
+    // CandidateGrid's fixed rowheader markup.
+    const row = rowHeader.parentElement
+    expect(row?.children[0]).toBe(rowHeader)
+    expect(rowHeader.children).toHaveLength(1)
+    expect(rowHeader.children[0]).toHaveClass('sr-only')
   })
 })
 
