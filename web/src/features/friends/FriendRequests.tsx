@@ -42,8 +42,8 @@ export function FriendRequests({
   })
 
   if (items.length === 0) {
-    // An empty request queue is a good terminal state, so it takes the quiet
-    // variant (STYLING_OVERHAUL_DESIGN.md §3.6) rather than a CTA.
+    // An empty request queue is a good terminal state (STYLING_OVERHAUL_DESIGN.md
+    // §3.6), so no CTA.
     return (
       <EmptyState
         icon={Mail}

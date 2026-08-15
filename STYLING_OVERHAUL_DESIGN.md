@@ -92,7 +92,7 @@ Motion as `@utility` (offset-shadow precedent); `--spacing-*` stays the 4px scal
 
 ### 3.6 Empty states & brand (F8, F11, F6)
 
-- **`EmptyState`**: illustration + product-voice sentence + CTA. `variant="quiet"` (no CTA) wherever empty is a *good terminal state* (Notifications inbox, blocked list — `empty.blockedHelp` as body); CTA required everywhere else. Instances: Friends→share CTA, requests (existing keys), Sessions→Criar sessão, Polls→Criar enquete, Discover→"Adicione amigos…"→/friends, Home below.
+- **`EmptyState`** (since 2026-08-15 the shell component in `shell/SectionCard.tsx`: lucide icon disc + title + optional description + optional CTA): no CTA wherever empty is a *good terminal state* (Notifications inbox, blocked list); CTA required everywhere else. Instances: Friends→share CTA, requests (existing keys), Sessions→Criar sessão, Polls→Criar enquete, Discover→"Adicione amigos…"→/friends, Home below.
 - **Brand mark:** two offset time-blocks overlapping into one filled cell (welcome-hero figure reduced); ink outline, `#E4572E` fill per the 5.1 brand-moment reservation; inline SVG `aria-hidden` beside the wordmark (nav, welcome, onboarding). S1 verifies dark-mode 3:1; accent fallback if recomputation disagrees.
 - **Onboarding:** steps in one centered FormShell; 6-dot progress row (`aria-current="step"`; SR text stays); brand mark above; navigation flow + shipped finish slap untouched.
 - **Welcome below-fold:** static 3-step "how it works" band.
