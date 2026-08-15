@@ -24,6 +24,11 @@ vi.mock('../../api/client', () => ({
 import '../../i18n'
 import { FriendsPage } from './FriendsPage'
 
+Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+  configurable: true,
+  value: vi.fn(),
+})
+
 const friend = {
   friendshipId: 'friendship-accepted',
   userId: 'user-friend-one',
@@ -262,6 +267,17 @@ describe('FriendsPageTests', () => {
     expect(await screen.findByText('23456789AB')).toBeInTheDocument()
   })
 })
+describe('Friends page add-friend focus', () => {
+  it('moves focus to the friend code input when "Add friend" is clicked', async () => {
+    renderPage()
+
+    await screen.findByText('Friend One')
+    fireEvent.click(screen.getByRole('button', { name: 'Add friend' }))
+
+    expect(screen.getByLabelText('Friend code')).toHaveFocus()
+  })
+})
+
 describe('Friends page error focus', () => {
   it('moves focus to the first mutation error summary_D139', async () => {
     api.post.mockRejectedValueOnce(new Error('failed'))

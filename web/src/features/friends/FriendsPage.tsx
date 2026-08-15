@@ -14,7 +14,6 @@ import { FriendRequests } from './FriendRequests'
 import { ShareCard } from './ShareCard'
 import { friendKeys, getFriendRequests, getFriends } from './friendGraph'
 
-// Uplift header-action recipes (HomePage.tsx's exact classes).
 const primaryButtonClasses =
   'inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 font-display text-[13px] font-bold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
 const outlineButtonClasses =
@@ -30,24 +29,34 @@ function Loading() {
 }
 
 /**
- * The header's primary action is a same-page jump, not a new route: a native
- * `href="#find-by-code-heading"` anchor so hash navigation (and the browser's
- * back/forward + no-JS fallback) still works, plus an imperative `.focus()`
- * on the code field itself — the anchor's default landing spot is the
- * section's non-focusable container, which would leave a keyboard/AT user
- * one more Tab away from typing a code.
+ * The header's primary action is a same-page jump, not a new route: a plain
+ * button (not a `href="#…"` anchor) scrolls the code field into view and
+ * focuses it directly, so focus lands on the input itself rather than being
+ * re-driven by fragment navigation onto the section's non-focusable
+ * container.
  */
 function AddFriendAction() {
   const { t } = useTranslation('friends')
   return (
-    <a
+    <button
       className={primaryButtonClasses}
-      href="#find-by-code-heading"
-      onClick={() => document.getElementById('friend-code')?.focus()}
+      type="button"
+      onClick={() => {
+        const field = document.getElementById('friend-code')
+        if (!field) return
+        const reducedMotion =
+          typeof window.matchMedia === 'function' &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        field.scrollIntoView({
+          behavior: reducedMotion ? 'auto' : 'smooth',
+          block: 'center',
+        })
+        field.focus()
+      }}
     >
       <UserPlus aria-hidden className="size-4" />
       {t('actions.addFriend')}
-    </a>
+    </button>
   )
 }
 
@@ -99,10 +108,9 @@ export function FriendsPage() {
         )}
 
         {/* `id` here (not on the SectionCard's own h2, which the shell
-            component doesn't expose an id prop for) is the anchor target for
-            both the header action above and no-JS hash navigation; `role`/
-            `aria-label` give the region the landmark name the old `Section`
-            wrapper carried via `aria-labelledby`. */}
+            component doesn't expose an id prop for) is the scroll target for
+            the header action above; `role`/`aria-label` give the region a
+            landmark name. */}
         <div aria-label={t('sections.findByCode')} id="find-by-code-heading" role="region">
           <SectionCard icon={UserPlus} title={t('sections.findByCode')}>
             <FriendCodeInput

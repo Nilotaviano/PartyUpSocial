@@ -129,10 +129,8 @@ type FriendRowProps = {
  * `friends.tsx`'s `The crew` list): the shipped identity link keeps its
  * display-name-then-username accessible name, and both destructive actions
  * stay behind the row's ActionMenu so nothing rests red in a list of
- * friends. `AvatarDisc`'s smallest non-badge size (`sm`, 48px) is the
- * closest fit to the prototype's `size-10` disc — `AvatarDisc` itself is
- * out of this ticket's write set, so its size scale isn't extended for an
- * exact 40px match.
+ * friends. `AvatarDisc`'s `xs` size (36px) is the closest fit to the
+ * prototype's `size-10` (40px) disc.
  */
 function FriendRow({ friend, pending, onUnfriend, onBlock }: FriendRowProps) {
   const { t } = useTranslation('friends')
@@ -149,7 +147,7 @@ function FriendRow({ friend, pending, onUnfriend, onBlock }: FriendRowProps) {
         emoji={friend.avatar.emoji}
         imgUrl={avatarImgUrl(friend.avatar)}
         seed={friend.userId}
-        size="sm"
+        size="xs"
       />
       <Link
         className="flex min-h-11 min-w-0 items-center rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"

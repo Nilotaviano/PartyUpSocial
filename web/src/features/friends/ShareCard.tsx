@@ -74,11 +74,12 @@ export function ShareCard() {
   }
 
   return (
-    // `id` is the anchor target both `FriendList`'s empty-state CTA and the
-    // page's own hash navigation rely on — the shell `SectionCard` doesn't
-    // expose an id prop to attach to its own h2, so the id lives on this
-    // wrapper instead (mirrors `FriendsPage.tsx`'s other region wrappers).
-    <div id="friend-share-heading">
+    // `id` is the anchor target `FriendList`'s empty-state CTA relies on —
+    // the shell `SectionCard` doesn't expose an id prop to attach to its own
+    // h2, so the id lives on this wrapper instead; `role`/`aria-label` give
+    // the region a landmark name, matching `FriendsPage.tsx`'s sibling
+    // wrappers.
+    <div aria-label={t('sections.share')} id="friend-share-heading" role="region">
       <SectionCard icon={QrCode} title={t('sections.share')}>
         {share.isPending && <p className="text-ink-soft">{t('status.loading')}</p>}
         {share.error && (
