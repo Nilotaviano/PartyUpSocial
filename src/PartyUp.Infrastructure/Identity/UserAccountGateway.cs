@@ -157,8 +157,47 @@ public sealed partial class UserAccountGateway(
     public async Task ConfirmEmailAsync(UserId id, CancellationToken cancellationToken)
     {
         AuthUser user = await RequireUserAsync(id, cancellationToken);
-        user.EmailConfirmed = true;
-        ThrowIfFailed(await userManager.UpdateAsync(user), "confirm the email address");
+        for (int attempt = 1; attempt <= AccessFailureRetryLimit; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (user.EmailConfirmed)
+            {
+                // A concurrent redemption already confirmed it; D-067's per-token race has one
+                // semantic winner, and every loser observes the same confirmed state.
+                return;
+            }
+
+            user.EmailConfirmed = true;
+            IdentityResult result;
+            try
+            {
+                result = await userManager.UpdateAsync(user);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                await context.Entry(user).ReloadAsync(cancellationToken);
+                continue;
+            }
+
+            if (result.Succeeded)
+            {
+                return;
+            }
+
+            bool isConcurrencyFailure = result.Errors.Any(error =>
+                string.Equals(error.Code, "ConcurrencyFailure", StringComparison.Ordinal));
+            if (!isConcurrencyFailure)
+            {
+                ThrowIfFailed(result, "confirm the email address");
+            }
+
+            await context.Entry(user).ReloadAsync(cancellationToken);
+        }
+
+        if (!user.EmailConfirmed)
+        {
+            LogConcurrencyRetryExhausted("confirm the email address", user);
+        }
     }
 
     public async Task<AccountEmailInfo?> GetEmailAsync(
