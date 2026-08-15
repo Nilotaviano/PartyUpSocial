@@ -173,7 +173,17 @@ builder.Services.AddHangfire((services, config) => config
 // of dialing Hangfire storage synchronously on the startup path (that would make every non-"Testing"
 // host build, including WebApplicationFactory-based integration tests, fail whenever storage isn't
 // reachable yet).
-if (!builder.Environment.IsEnvironment("Testing"))
+//
+// The browser lane's spawned API runs as a real (non-"Testing") host with a real Hangfire server, so
+// the "Testing" guard above never applies to it — its five `Cron.Minutely` jobs fire into the same
+// WSL Postgres the lane's parallel test collections use, at each minute boundary. `Jobs:DisableRecurring`
+// gives that lane a second, independent way to opt out of just this Hangfire server/registration pair
+// without pretending to be the "Testing" environment (the spawned API needs the real, non-"Testing"
+// startup path for everything else). It never touches `PushDispatchTriggerService` immediately below,
+// whose own `Push:DispatchIntervalSeconds` seam is how that lane gets push delivery instead —
+// production/dev never set this flag, so this is unchanged there.
+bool disableRecurringJobs = builder.Configuration.GetValue("Jobs:DisableRecurring", false);
+if (!builder.Environment.IsEnvironment("Testing") && !disableRecurringJobs)
 {
     builder.Services.AddHangfireServer();
     builder.Services.AddHostedService<RecurringJobRegistrationService>();

@@ -160,6 +160,15 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
     /// </summary>
     private const string PushDispatchIntervalSecondsOverride = "2";
 
+    /// <summary>
+    /// <c>Jobs:DisableRecurring</c>'s value in this lane (<c>Program.cs</c>'s own remarks): the
+    /// spawned API is a real, non-"Testing" host, so without this its five <c>Cron.Minutely</c>
+    /// Hangfire jobs fire into the same WSL Postgres this lane's parallel test collections use, at
+    /// each minute boundary. Production/dev never set this key and keep the minutely Hangfire
+    /// cadence as-is.
+    /// </summary>
+    private const string DisableRecurringJobsOverride = "true";
+
     private static readonly string _repoRoot = FindRepoRoot();
     private static readonly List<IBrowserContext> _tracedContexts = [];
     private static readonly Lock _tracedContextsLock = new();
@@ -336,6 +345,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
                 ["Network__TrustedProxies__1"] = "::1",
                 ["ConnectionStrings__Db"] = _dbConnectionString,
                 ["Push__DispatchIntervalSeconds"] = PushDispatchIntervalSecondsOverride,
+                ["Jobs__DisableRecurring"] = DisableRecurringJobsOverride,
                 ["Push__Provider"] = "log",
                 ["Push__DropPath"] = _pushDropPath,
                 ["Push__Vapid__PublicKey"] = _pushVapidPublicKey,
@@ -408,6 +418,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime, IDisposable
                 ["Network__TrustedProxies__0"] = "127.0.0.1",
                 ["Network__TrustedProxies__1"] = "::1",
                 ["Push__DispatchIntervalSeconds"] = PushDispatchIntervalSecondsOverride,
+                ["Jobs__DisableRecurring"] = DisableRecurringJobsOverride,
                 ["Push__Provider"] = "log",
                 ["Push__DropPath"] = _pushDropPath,
                 ["Push__Vapid__PublicKey"] = _pushVapidPublicKey,

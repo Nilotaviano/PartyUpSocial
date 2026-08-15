@@ -52,6 +52,55 @@ public sealed class RecurringJobRegistrationHostStartupTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
+
+    // The browser lane's spawned API is a real (non-"Testing") host, so `Jobs:DisableRecurring` is
+    // its independent way to opt out of the Hangfire server/registration pair Program.cs gates
+    // above — proven here the same way the "Testing" gate is proven elsewhere (ARCHITECTURE.md:217):
+    // neither the hosted service nor any Hangfire-owned hosted service is present in the container
+    // once the flag is set. Unlike the unreachable-Db host-start proof above, this host must
+    // actually finish starting (AdminSeeder's own unconditional role-ensure write runs on every
+    // startup, flag or not), so it targets the same local dev Postgres the browser lane itself uses
+    // (`ConnectionStrings__Db`'s own default, `PlaywrightFixture.InitializeLocalTopology`) rather
+    // than the unreachable placeholder. `Jobs:DisableRecurring` itself is set via `UseSetting`
+    // rather than `ConfigureAppConfiguration` above: Program.cs reads it off `builder.Configuration`
+    // before `builder.Build()`, and `ConfigureAppConfiguration`'s override is not visible that
+    // early — `UseSetting` is.
+    [Fact]
+    public async Task RecurringJobsAreNotRegistered_WhenJobsDisableRecurringIsSet()
+    {
+        string connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Db")
+            ?? "Host=localhost;Port=5432;Database=partyup;Username=partyup;Password=partyup";
+
+        await using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(webHost =>
+            {
+                webHost.UseEnvironment("Development");
+                webHost.UseSetting("Jobs:DisableRecurring", "true");
+                webHost.ConfigureAppConfiguration((_, configuration) =>
+                    configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["ConnectionStrings:Db"] = connectionString,
+                        ["Database:MigrateOnStartup"] = "false",
+                    }));
+            });
+
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(15));
+        using HttpClient client = factory.CreateClient();
+        HttpResponseMessage response = await client.GetAsync(
+            "/api/v1/auth/antiforgery",
+            timeout.Token);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        IReadOnlyList<IHostedService> hostedServices =
+            [.. factory.Services.GetServices<IHostedService>()];
+        Assert.DoesNotContain(hostedServices, service => service is RecurringJobRegistrationService);
+        Assert.DoesNotContain(
+            hostedServices,
+            service => (service.GetType().FullName ?? string.Empty).StartsWith(
+                "Hangfire.",
+                StringComparison.Ordinal));
+    }
 }
 
 /// <summary>
