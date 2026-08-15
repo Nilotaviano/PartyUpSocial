@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- computeCardPosition is exported for a direct unit test, not a route component */
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -92,16 +93,24 @@ function resolveAnchor(anchorId: string): HTMLElement | null {
  * it spotlights (a short landscape-phone height clamping the flipped top to `CARD_MARGIN_PX`,
  * which sits on top of a top-header anchor, is exactly that case) — so on a viewport too short for
  * either to fit cleanly, this stays below and clamped, never flips into the anchor.
+ * <p>
+ * `occupiedBottomPx` (from `getOccupiedBottomPx`) is the height of a fixed bottom bar covering the
+ * lower edge of the viewport — `BottomTabBar` at `lg:hidden` widths, where the nav anchors
+ * themselves live inside that band. Every vertical bound below that reads `window.innerHeight` is
+ * read from `viewportBottom` instead, so "below the anchor" and the clamp floor both stop at the
+ * bar's top edge rather than sliding underneath it — an anchor sitting inside the bar therefore
+ * flips the card above it instead of drawing below/into its own bar.
  */
-function computeCardPosition(anchorRect: DOMRect): CardPosition {
+export function computeCardPosition(anchorRect: DOMRect, occupiedBottomPx = 0): CardPosition {
+  const viewportBottom = window.innerHeight - occupiedBottomPx
   const cardWidth = Math.min(CARD_WIDTH_PX, window.innerWidth - CARD_MARGIN_PX * 2)
   const anchorCenter = anchorRect.left + anchorRect.width / 2
   const maxLeft = Math.max(window.innerWidth - cardWidth - CARD_MARGIN_PX, CARD_MARGIN_PX)
   const left = Math.min(Math.max(anchorCenter - cardWidth / 2, CARD_MARGIN_PX), maxLeft)
 
-  const cardHeight = Math.min(CARD_MAX_HEIGHT_PX, window.innerHeight - CARD_MARGIN_PX * 2)
+  const cardHeight = Math.min(CARD_MAX_HEIGHT_PX, viewportBottom - CARD_MARGIN_PX * 2)
   const belowTop = anchorRect.bottom + CARD_GAP_PX
-  const fitsBelow = belowTop + cardHeight <= window.innerHeight - CARD_MARGIN_PX
+  const fitsBelow = belowTop + cardHeight <= viewportBottom - CARD_MARGIN_PX
   const aboveTop = anchorRect.top - CARD_GAP_PX - cardHeight
   const canFlipAbove = !fitsBelow && aboveTop >= CARD_MARGIN_PX
   // The below-anchor position is clamped at BOTH ends, not just the bottom: an anchor can sit
@@ -111,13 +120,34 @@ function computeCardPosition(anchorRect: DOMRect): CardPosition {
   // the card reachable; when the anchor is on-screen the lower bound never binds.
   const top = canFlipAbove
     ? aboveTop
-    : Math.min(Math.max(belowTop, CARD_MARGIN_PX), window.innerHeight - CARD_MARGIN_PX)
+    : Math.min(Math.max(belowTop, CARD_MARGIN_PX), viewportBottom - CARD_MARGIN_PX)
 
   const arrowLeft = Math.min(
     Math.max(anchorCenter - left, ARROW_HALF_PX * 2),
     cardWidth - ARROW_HALF_PX * 2,
   )
   return { top, left, arrowLeft, arrowAtBottom: canFlipAbove }
+}
+
+/**
+ * Measures a fixed-position `<nav>` pinned to the viewport's bottom edge (`BottomTabBar` at
+ * `lg:hidden` widths) and returns how much of the viewport's lower edge it covers, or `0` when no
+ * such bar is present or visible (desktop widths, where `BottomTabBar` is `display:none`). Reads
+ * `position` off `getComputedStyle` rather than hardcoding a class name or height, so this tracks
+ * whatever bar is actually on screen — including a taller one from a future safe-area inset —
+ * instead of a number that silently drifts from the real layout. Scoped to `<nav>` so `TopBar`'s
+ * sticky-but-not-fixed bar (see its own `position: sticky`) never matches.
+ */
+function getOccupiedBottomPx(): number {
+  let occupied = 0
+  for (const candidate of document.querySelectorAll<HTMLElement>('nav')) {
+    if (candidate.offsetParent === null && candidate.getClientRects().length === 0) continue
+    if (window.getComputedStyle(candidate).position !== 'fixed') continue
+    const rect = candidate.getBoundingClientRect()
+    if (rect.height <= 0 || rect.bottom < window.innerHeight - 1) continue
+    occupied = Math.max(occupied, window.innerHeight - rect.top)
+  }
+  return occupied
 }
 
 /**
@@ -194,7 +224,7 @@ export function TourOverlay() {
     }
 
     function reposition() {
-      setCardPosition(computeCardPosition(element!.getBoundingClientRect()))
+      setCardPosition(computeCardPosition(element!.getBoundingClientRect(), getOccupiedBottomPx()))
     }
 
     // Coalesces however many scroll/resize events land in one frame into a single recompute —

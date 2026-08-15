@@ -12,7 +12,7 @@ vi.mock('../../api/client', () => ({
 
 import '../../i18n'
 import { viewerProfileKey } from '../sessions/sessionQueries'
-import { TourOverlay } from './TourOverlay'
+import { computeCardPosition, TourOverlay } from './TourOverlay'
 
 Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
 
@@ -292,6 +292,56 @@ describe('TourOverlay — anchor resolution across duplicated nav instances (S2)
   })
 })
 
+describe('TourOverlay — reposition measures a fixed bottom bar (D-182)', () => {
+  const originalInnerWidth = window.innerWidth
+  const originalInnerHeight = window.innerHeight
+
+  afterEach(() => {
+    vi.stubGlobal('innerWidth', originalInnerWidth)
+    vi.stubGlobal('innerHeight', originalInnerHeight)
+  })
+
+  it('keeps the card clear of a fixed bottom nav that contains the spotlit anchor', async () => {
+    vi.stubGlobal('innerWidth', 568)
+    vi.stubGlobal('innerHeight', 320)
+    mockProfile(false)
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/app']}>
+          {/* Inline `position: fixed` (rather than a Tailwind class) is what `getComputedStyle`
+              can read without a real stylesheet loaded in jsdom — the same fact `BottomTabBar`'s
+              built CSS supplies in the real app and in the Playwright D-182 browser test. */}
+          <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: '64px' }}>
+            <a data-tour="home" href="/app" id="tab-bar-home" tabIndex={-1}>Home</a>
+          </nav>
+          <TourOverlay />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    const anchor = document.getElementById('tab-bar-home') as HTMLElement
+    const anchorRect = { top: 256, bottom: 320, left: 0, right: 64, width: 64, height: 64 } as DOMRect
+    const barRect = { top: 256, bottom: 320, left: 0, right: 568, width: 568, height: 64 } as DOMRect
+    const bar = anchor.parentElement as HTMLElement
+    vi.spyOn(anchor, 'getClientRects').mockReturnValue([{} as DOMRect] as unknown as DOMRectList)
+    vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue(anchorRect)
+    vi.spyOn(bar, 'getClientRects').mockReturnValue([{} as DOMRect] as unknown as DOMRectList)
+    vi.spyOn(bar, 'getBoundingClientRect').mockReturnValue(barRect)
+
+    const dialog = await screen.findByRole('dialog')
+    await settle()
+
+    const card = screen.getByTestId('tour-overlay')
+    const top = Number.parseFloat(card.style.top)
+    const cardHeight = Math.min(280, 320 - 64 - 32)
+
+    expect(top + cardHeight).toBeLessThanOrEqual(anchorRect.top)
+    expect(dialog).toBeInTheDocument()
+  })
+})
+
 describe('TourOverlay — reposition scheduling (D-182)', () => {
   it('coalesces a burst of scroll events into a single requestAnimationFrame call', async () => {
     mockProfile(false)
@@ -309,6 +359,55 @@ describe('TourOverlay — reposition scheduling (D-182)', () => {
 
     expect(rafSpy).toHaveBeenCalledTimes(1)
     rafSpy.mockRestore()
+  })
+})
+
+describe('TourOverlay — computeCardPosition occupied-bottom band (D-182)', () => {
+  const originalInnerWidth = window.innerWidth
+  const originalInnerHeight = window.innerHeight
+
+  function setViewport(width: number, height: number) {
+    vi.stubGlobal('innerWidth', width)
+    vi.stubGlobal('innerHeight', height)
+  }
+
+  afterEach(() => {
+    vi.stubGlobal('innerWidth', originalInnerWidth)
+    vi.stubGlobal('innerHeight', originalInnerHeight)
+  })
+
+  it('with no occupied band, flips above only when the below position cannot fit (existing contract)', () => {
+    setViewport(568, 320)
+    // A header-style anchor near the top: below does not fit at this height, so it flips above.
+    const anchorRect = { top: 8, bottom: 56, left: 0, right: 64, width: 64, height: 48 } as DOMRect
+
+    const position = computeCardPosition(anchorRect, 0)
+
+    expect(position.arrowAtBottom).toBe(false)
+    expect(position.top + 8).toBeGreaterThan(56)
+  })
+
+  it('treats a fixed bottom tab bar as occupied space and flips the card above it instead of over the anchor', () => {
+    setViewport(568, 320)
+    // The anchor lives inside a 64px-tall fixed bottom bar, exactly the failing D-182 case.
+    const anchorRect = { top: 256, bottom: 320, left: 0, right: 64, width: 64, height: 64 } as DOMRect
+
+    const position = computeCardPosition(anchorRect, 64)
+
+    expect(position.arrowAtBottom).toBe(true)
+    // The card's bottom edge (top + its clamped max height) must clear the anchor's top — never
+    // draw over the anchor the way the pre-fix `occupiedBottomPx`-less call did.
+    const cardHeight = Math.min(280, 320 - 64 - 32)
+    expect(position.top + cardHeight).toBeLessThanOrEqual(anchorRect.top)
+  })
+
+  it('a larger occupied band pushes the clamp floor up so the card never sits under it', () => {
+    setViewport(568, 320)
+    const anchorRect = { top: 8, bottom: 56, left: 0, right: 64, width: 64, height: 48 } as DOMRect
+
+    const position = computeCardPosition(anchorRect, 96)
+
+    expect(position.top).toBeLessThanOrEqual(320 - 96 - 16)
   })
 })
 
