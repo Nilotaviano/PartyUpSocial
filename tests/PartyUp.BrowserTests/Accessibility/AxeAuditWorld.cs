@@ -129,7 +129,8 @@ internal static class AxeAuditWorld
             await organizer.Page.Locator("#field-duration").FillAsync("60");
             await organizer.Page.Locator("#field-min").FillAsync("1");
             await organizer.Page.Locator("#field-max").FillAsync("4");
-            await organizer.Page.GetByLabel("Private session").CheckAsync();
+            await organizer.Page.GetByRole(AriaRole.Radiogroup, new() { Name = "Private session" })
+                .GetByRole(AriaRole.Radio, new() { Name = "Private" }).ClickAsync();
             await organizer.Page.GetByRole(AriaRole.Button, new() { Name = "Create session" }).ClickAsync();
             await organizer.Page.WaitForURLAsync(url => Regex.IsMatch(url, @"/sessions/[0-9a-fA-F-]{36}$"));
             string sessionId = new Uri(organizer.Page.Url).Segments[^1];

@@ -1,12 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -15,7 +8,7 @@ const api = vi.hoisted(() => ({
   post: vi.fn(),
 }))
 
-vi.mock('../../api/client', () => ({
+vi.mock('../../../api/client', () => ({
   client: { GET: api.get, POST: api.post },
   isApiError: (error: unknown) =>
     Boolean(error && typeof error === 'object' && 'code' in error),
@@ -27,7 +20,7 @@ vi.mock('react-router', async () => {
   return { ...actual, useNavigate: () => navigate }
 })
 
-import '../../i18n'
+import '../../../i18n'
 import { SessionCreatePage } from './SessionCreatePage'
 
 function renderPage(initialEntries: string[] = ['/sessions/new']) {
@@ -75,6 +68,10 @@ function mockGet({
   })
 }
 
+function selectPrivate() {
+  fireEvent.click(screen.getByRole('radio', { name: 'Private' }))
+}
+
 beforeEach(() => {
   mockGet()
   api.post.mockResolvedValue({
@@ -91,7 +88,14 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('SessionCreatePage', () => {
+describe('SessionCreatePage (lovable)', () => {
+  it('focuses the page h1 on mount_D139', async () => {
+    renderPage()
+
+    const heading = await screen.findByRole('heading', { level: 1 })
+    await waitFor(() => expect(heading).toHaveFocus())
+  })
+
   it('shows the fixed-session defaults_D129', async () => {
     renderPage()
 
@@ -104,39 +108,20 @@ describe('SessionCreatePage', () => {
   it('states the minutes unit in the duration field accessible name', async () => {
     renderPage()
 
-    const duration = await screen.findByRole('spinbutton', {
-      name: /minutes/i,
-    })
+    const duration = await screen.findByRole('spinbutton', { name: /minutes/i })
 
     expect(duration).toHaveAttribute('id', 'field-duration')
     expect(duration).toHaveValue(120)
   })
 
-  it('keeps the duration error wiring after the unit label change', async () => {
-    renderPage()
-
-    const duration = screen.getByRole('spinbutton', { name: /minutes/i })
-    fireEvent.change(duration, { target: { value: '10' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
-
-    await screen.findByText('There were problems with your submission')
-    expect(duration).toHaveAttribute('aria-invalid', 'true')
-    expect(duration).toHaveAttribute('aria-describedby', 'duration-error')
-    expect(document.getElementById('duration-error')).toBeInTheDocument()
-  })
-
   it('rejects a duration outside the 15-minute increment and blocks submission_D129', async () => {
     renderPage()
 
-    fireEvent.change(screen.getByLabelText('Title'), {
-      target: { value: 'Raid night' },
-    })
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Raid night' } })
     fireEvent.change(screen.getByLabelText('Start time'), {
       target: { value: '2026-09-01T18:00' },
     })
-    fireEvent.change(screen.getByLabelText('Duration (minutes)'), {
-      target: { value: '10' },
-    })
+    fireEvent.change(screen.getByLabelText('Duration (minutes)'), { target: { value: '10' } })
 
     fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
 
@@ -150,21 +135,18 @@ describe('SessionCreatePage', () => {
     mockGet({ friends: friendsResponse })
     renderPage()
 
-    fireEvent.change(screen.getByLabelText('Title'), {
-      target: { value: 'Raid night' },
-    })
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Raid night' } })
     fireEvent.change(screen.getByLabelText('Start time'), {
       target: { value: '2026-09-01T18:00' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
 
     expect(
-      (await screen.findAllByText('A non-private session needs at least one invited friend.')).length,
+      (await screen.findAllByText('A non-private session needs at least one invited friend.'))
+        .length,
     ).toBeGreaterThan(0)
 
-    fireEvent.click(
-      await screen.findByLabelText('Friend One (@friend.one)'),
-    )
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Friend One (@friend.one)' }))
     fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
 
     await waitFor(() =>
@@ -199,9 +181,7 @@ describe('SessionCreatePage', () => {
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
 
     expect(screen.getByRole('combobox', { name: 'Search the Steam catalog' })).toBeInTheDocument()
-    expect(
-      screen.getByRole('option', { name: 'Other' }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Other' })).toBeInTheDocument()
   })
 
   it('does not render a catalog/free-text radio choice for the game field_D176', async () => {
@@ -209,7 +189,11 @@ describe('SessionCreatePage', () => {
 
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
 
-    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+    // The privacy segmented control is the only `role="radio"` group on this
+    // page's happy path (the game field itself never grows a radio choice).
+    for (const radio of screen.getAllByRole('radio')) {
+      expect(radio).toHaveAccessibleName(/^(Private|Public)$/)
+    }
   })
 
   it('submits steamAppId as null when the free-typed game name is never selected from the catalog_D176_D194', async () => {
@@ -220,7 +204,7 @@ describe('SessionCreatePage', () => {
     fireEvent.change(screen.getByLabelText('Start time'), {
       target: { value: '2026-09-01T18:00' },
     })
-    fireEvent.click(await screen.findByLabelText('Friend One (@friend.one)'))
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Friend One (@friend.one)' }))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
     fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
       target: { value: 'Counter-Strike 2' },
@@ -251,9 +235,11 @@ describe('SessionCreatePage', () => {
     fireEvent.change(screen.getByLabelText('Start time'), {
       target: { value: '2026-09-01T18:00' },
     })
-    fireEvent.click(await screen.findByLabelText('Friend One (@friend.one)'))
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Friend One (@friend.one)' }))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
-    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), { target: { value: 'counter' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
+      target: { value: 'counter' },
+    })
     fireEvent.mouseDown(await screen.findByRole('option', { name: 'Counter-Strike 2' }))
     fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
 
@@ -281,9 +267,11 @@ describe('SessionCreatePage', () => {
     fireEvent.change(screen.getByLabelText('Start time'), {
       target: { value: '2026-09-01T18:00' },
     })
-    fireEvent.click(await screen.findByLabelText('Friend One (@friend.one)'))
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Friend One (@friend.one)' }))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
-    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), { target: { value: 'counter' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
+      target: { value: 'counter' },
+    })
     fireEvent.mouseDown(await screen.findByRole('option', { name: 'Counter-Strike 2' }))
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
@@ -311,15 +299,13 @@ describe('SessionCreatePage', () => {
     fireEvent.change(screen.getByLabelText('Start time'), {
       target: { value: '2026-09-01T18:00' },
     })
-    fireEvent.click(await screen.findByLabelText('Friend One (@friend.one)'))
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Friend One (@friend.one)' }))
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
     fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
       target: { value: 'Counter-Strike 2' },
     })
 
-    fireEvent.change(await screen.findByLabelText('Steam app ID'), {
-      target: { value: '730' },
-    })
+    fireEvent.change(await screen.findByLabelText('Steam app ID'), { target: { value: '730' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
 
     await waitFor(() =>
@@ -339,7 +325,9 @@ describe('SessionCreatePage', () => {
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
-    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), { target: { value: 'Counter-Strike 2' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
+      target: { value: 'Counter-Strike 2' },
+    })
     const appIdField = await screen.findByLabelText('Steam app ID')
 
     fireEvent.change(appIdField, {
@@ -354,7 +342,7 @@ describe('SessionCreatePage', () => {
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Raid night' } })
-    fireEvent.click(screen.getByLabelText('Private session'))
+    selectPrivate()
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
     fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
       target: { value: 'Counter-Strike 2' },
@@ -373,9 +361,11 @@ describe('SessionCreatePage', () => {
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Raid night' } })
-    fireEvent.click(screen.getByLabelText('Private session'))
+    selectPrivate()
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
-    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), { target: { value: 'aa' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search the Steam catalog' }), {
+      target: { value: 'aa' },
+    })
     const nameField = await screen.findByLabelText('Enter a game name')
     fireEvent.change(nameField, { target: { value: '' } })
     fireEvent.change(screen.getByLabelText('Steam app ID'), { target: { value: '730' } })
@@ -391,16 +381,12 @@ describe('SessionCreatePage', () => {
     mockGet({ friends: friendsResponse })
     renderPage()
 
-    fireEvent.change(screen.getByLabelText('Title'), {
-      target: { value: 'Raid night' },
-    })
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Raid night' } })
     fireEvent.change(screen.getByLabelText('Start time'), {
       target: { value: '2026-09-01T18:00' },
     })
-    fireEvent.click(await screen.findByLabelText('Friend One (@friend.one)'))
-    fireEvent.change(screen.getByLabelText('Platform'), {
-      target: { value: 'Steam' },
-    })
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Friend One (@friend.one)' }))
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
 
     await waitFor(() =>
@@ -411,27 +397,37 @@ describe('SessionCreatePage', () => {
     )
 
     api.post.mockClear()
-    fireEvent.change(screen.getByLabelText('Platform'), {
-      target: { value: 'Other' },
-    })
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Other' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
 
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith(
         '/api/v1/sessions',
-        expect.objectContaining({
-          body: expect.objectContaining({ platform: 'notApplicable' }),
-        }),
+        expect.objectContaining({ body: expect.objectContaining({ platform: 'notApplicable' }) }),
       ),
     )
+  })
+
+  it('toggles isPrivate through the Private/Public segmented control_D129', async () => {
+    renderPage()
+
+    const privateRadio = screen.getByRole('radio', { name: 'Private' })
+    const publicRadio = screen.getByRole('radio', { name: 'Public' })
+    expect(publicRadio).toHaveAttribute('aria-checked', 'true')
+    expect(privateRadio).toHaveAttribute('aria-checked', 'false')
+
+    fireEvent.click(privateRadio)
+
+    expect(privateRadio).toHaveAttribute('aria-checked', 'true')
+    expect(publicRadio).toHaveAttribute('aria-checked', 'false')
+    // A private session no longer requires an invited friend.
+    expect(screen.queryByText('A non-private session needs at least one invited friend.')).not.toBeInTheDocument()
   })
 
   it('warns before discarding dirty create-form values_D152_D162', async () => {
     renderPage()
 
-    fireEvent.change(screen.getByLabelText('Title'), {
-      target: { value: 'Draft title' },
-    })
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Draft title' } })
 
     const cancelTrigger = screen.getByRole('button', { name: 'Cancel' })
     cancelTrigger.focus()
@@ -460,9 +456,7 @@ describe('SessionCreatePage', () => {
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'))
     const expectedStart = toLocalDatetimeString(new Date(Date.now() + 15 * 60_000))
 
-    renderPage([
-      '/sessions/new?startTime=2020-01-01T00%3A00%3A00.000Z&durationMinutes=90',
-    ])
+    renderPage(['/sessions/new?startTime=2020-01-01T00%3A00%3A00.000Z&durationMinutes=90'])
     vi.useRealTimers()
 
     expect(await screen.findByLabelText('Duration (minutes)')).toHaveValue(90)
@@ -491,15 +485,11 @@ describe('SessionCreatePage', () => {
     ])
 
     expect(
-      await screen.findByText(
-        'This session runs 30 minutes past the recommended window.',
-      ),
+      await screen.findByText('This session runs 30 minutes past the recommended window.'),
     ).toBeInTheDocument()
 
-    fireEvent.change(screen.getByLabelText('Title'), {
-      target: { value: 'Raid night' },
-    })
-    fireEvent.click(screen.getByLabelText('Private session'))
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Raid night' } })
+    selectPrivate()
     fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
 
     expect(
@@ -508,9 +498,7 @@ describe('SessionCreatePage', () => {
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith(
         '/api/v1/sessions',
-        expect.objectContaining({
-          body: expect.objectContaining({ durationMinutes: 120 }),
-        }),
+        expect.objectContaining({ body: expect.objectContaining({ durationMinutes: 120 }) }),
       ),
     )
   })

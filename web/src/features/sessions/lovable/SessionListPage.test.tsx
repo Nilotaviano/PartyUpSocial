@@ -5,12 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({ get: vi.fn() }))
 
-vi.mock('../../api/client', () => ({
+vi.mock('../../../api/client', () => ({
   client: { GET: api.get },
   isApiError: () => false,
 }))
 
-import '../../i18n'
+import '../../../i18n'
 import { SessionListPage } from './SessionListPage'
 
 function session(overrides: Partial<Record<string, unknown>> = {}) {
@@ -26,6 +26,8 @@ function session(overrides: Partial<Record<string, unknown>> = {}) {
     isPrivate: false,
     maxCapacity: 8,
     activeOccupancy: 2,
+    organizer: { ordinal: 0, displayName: 'Alex Chen', avatar: null },
+    viewerRelation: 'organizer',
     ...overrides,
   }
 }
@@ -66,7 +68,7 @@ describe('SessionListPage', () => {
     expect(await screen.findByText('In progress')).toBeInTheDocument()
   })
 
-  it('renders only the Completed-only history list with no badge_D095', async () => {
+  it('renders only the Completed-only history list with no badge and no create-session action_D095', async () => {
     api.get.mockResolvedValue({
       data: { items: [session({ status: 'completed' })], nextCursor: null },
     })
@@ -104,6 +106,14 @@ describe('SessionListPage', () => {
     expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
   })
 
+  it('focuses the page h1 on mount_D139', async () => {
+    api.get.mockResolvedValue({ data: { items: [], nextCursor: null } })
+    renderPage('upcoming')
+
+    const heading = await screen.findByRole('heading', { level: 1 })
+    await waitFor(() => expect(heading).toHaveFocus())
+  })
+
   it('shows the empty-upcoming state', async () => {
     api.get.mockResolvedValue({ data: { items: [], nextCursor: null } })
     renderPage('upcoming')
@@ -136,5 +146,73 @@ describe('SessionListPage', () => {
     renderPage('upcoming')
 
     expect(await screen.findByText(format(profileZone))).toBeInTheDocument()
+  })
+
+  it('shows a session status pill with its caller-resolved label, not color alone_D139', async () => {
+    api.get.mockResolvedValue({
+      data: { items: [session({ status: 'unconfirmed' })], nextCursor: null },
+    })
+    renderPage('upcoming')
+
+    expect(await screen.findByText('Waiting for players')).toBeInTheDocument()
+  })
+
+  it('shows occupancy as a text-coded chip against the capacity limit', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        items: [session({ maxCapacity: 8, activeOccupancy: 3 })],
+        nextCursor: null,
+      },
+    })
+    renderPage('upcoming')
+
+    expect(await screen.findByText('3/8 going')).toBeInTheDocument()
+  })
+
+  it('shows occupancy without a capacity denominator for an unlimited session', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        items: [session({ maxCapacity: null, activeOccupancy: 5 })],
+        nextCursor: null,
+      },
+    })
+    renderPage('upcoming')
+
+    expect(await screen.findByText('5 going')).toBeInTheDocument()
+  })
+
+  it('shows the organizer identity via name and avatar disc', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        items: [session({ organizer: { ordinal: 0, displayName: 'Alex Chen', avatar: null } })],
+        nextCursor: null,
+      },
+    })
+    renderPage('upcoming')
+
+    expect(await screen.findByText('Alex Chen')).toBeInTheDocument()
+  })
+
+  it('masks the organizer identity when the wire withholds it, never leaking a real name_D076', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        items: [
+          session({ organizerId: null, organizer: { ordinal: 0, displayName: null, avatar: null } }),
+        ],
+        nextCursor: null,
+      },
+    })
+    renderPage('upcoming')
+
+    expect(await screen.findByText('Anonymous User')).toBeInTheDocument()
+  })
+
+  it('links to /sessions/new to create a session on the upcoming scope', async () => {
+    api.get.mockResolvedValue({ data: { items: [], nextCursor: null } })
+    renderPage('upcoming')
+
+    expect(
+      (await screen.findAllByRole('link', { name: 'New session' }))[0],
+    ).toHaveAttribute('href', '/sessions/new')
   })
 })

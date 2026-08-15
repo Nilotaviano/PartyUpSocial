@@ -51,11 +51,11 @@ import { BlockedUsersPage } from './features/settings/BlockedUsersPage'
 import { EmailUnsubscribePage } from './features/settings/EmailUnsubscribePage'
 import { NotificationSettingsPage } from './features/settings/NotificationSettingsPage'
 import { GuestSessionPage } from './features/sessions/GuestSessionPage'
-import { SessionCreatePage } from './features/sessions/SessionCreatePage'
-import { SessionDetailPage } from './features/sessions/SessionDetailPage'
-import { SessionEditPage } from './features/sessions/SessionEditPage'
 import { SessionInvitePage } from './features/sessions/SessionInvitePage'
-import { SessionListPage } from './features/sessions/SessionListPage'
+import { SessionCreatePage } from './features/sessions/lovable/SessionCreatePage'
+import { SessionDetailPage } from './features/sessions/lovable/SessionDetailPage'
+import { SessionEditPage } from './features/sessions/lovable/SessionEditPage'
+import { SessionListPage } from './features/sessions/lovable/SessionListPage'
 
 function AuthenticatedShell() {
   const { t } = useTranslation(['common', 'sessions', 'availability', 'home', 'polls'])

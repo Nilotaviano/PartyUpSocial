@@ -17,6 +17,8 @@
     "max": "Capacidad máxima",
     "unlimited": "Capacidad ilimitada",
     "private": "Sesión privada",
+    "privacyPrivate": "Privada",
+    "privacyPublic": "Pública",
     "invitees": "Invitar amigos",
     "guestLinks": "Enlaces de invitado",
     "defaults": "Valores predeterminados: mínimo 4, máximo 4, 2 horas, sin plataforma, no privada.",
@@ -156,7 +158,9 @@
     "emptyUpcoming": "No hay sesiones próximas.",
     "emptyHistory": "Aún no hay sesiones completadas.",
     "loadMore": "Cargar más",
-    "inProgress": "En curso"
+    "inProgress": "En curso",
+    "occupancy": "{{active}}/{{max}} confirmados",
+    "occupancyUnlimited": "{{active}} confirmados"
   },
   "guest": {
     "claimHeading": "Unirse a esta sesión",

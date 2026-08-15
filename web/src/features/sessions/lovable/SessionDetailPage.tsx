@@ -1,25 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { CalendarClock, Users } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router'
-import { isApiError } from '../../api/client'
-import { AvatarDisc } from '../friends/AvatarDisc'
-import { avatarImgUrl } from '../friends/avatarImage'
-import { Button } from '../../components/ui/button'
-import {
-  chipClasses,
-  quietChipClasses,
-  raisedInteractiveClasses,
-  segmentItemClasses,
-} from '../../components/ui/classes'
-import { Dialog } from '../../components/ui/dialog'
-import { IdentityRow } from '../../components/ui/identityRow'
-import { PageHeader } from '../../components/ui/pageHeader'
-import { PageScaffold } from '../../components/ui/pageScaffold'
-import { Section, SectionCard } from '../../components/ui/section'
-import { SegmentStrip } from '../../components/ui/segmentStrip'
-import { useSession } from '../../auth/useSession'
-import { SessionStatusChip } from './SessionStatusChip'
+import { isApiError } from '../../../api/client'
+import { useSession } from '../../../auth/useSession'
+import { AvatarDisc } from '../../friends/AvatarDisc'
+import { avatarImgUrl } from '../../friends/avatarImage'
+import { Button } from '../../../components/ui/button'
+import { raisedInteractiveClasses, segmentItemClasses } from '../../../components/ui/classes'
+import { Dialog } from '../../../components/ui/dialog'
+import { IdentityRow } from '../../../components/ui/identityRow'
+import { SegmentStrip } from '../../../components/ui/segmentStrip'
+import { StatusBanner } from '../../../components/ui/statusBanner'
+import { instantToFakeLocal } from '../../availability/lovable/zone'
+import { StatusPill } from './SessionBits'
+import { isKnownSessionStatus } from './sessionData'
 import {
   approveJoinRequest,
   cancelSession,
@@ -43,7 +39,21 @@ import {
   withdrawJoinRequest,
   type ParticipationResponse,
   type ReminderChoiceValue,
-} from './sessionQueries'
+} from '../sessionQueries'
+
+/**
+ * RSVP is a pressed-button `SegmentStrip`, not a radiogroup — D-084's
+ * arrow-key hazard is why RSVP uses a pressed-button group
+ * (`components/ui/segmentStrip.tsx` §doc).
+ *
+ * Guest-link minting has no home on this page (that surface is
+ * `SessionInvitePage.tsx`); only the roster's per-row "remove guest" action
+ * for a `guestLink`-origin participant lives here.
+ *
+ * Mandated below-`lg` stacking order: summary(1) -> main RSVP column(2) ->
+ * roster(3) -> waitlist(3, same tier) -> join requests(4) ->
+ * notifications(6) -> danger zone(7, last).
+ */
 
 const reminderOptions: { value: ReminderChoiceValue; key: string }[] = [
   { value: null, key: 'reminder.accountDefault' },
@@ -69,7 +79,7 @@ function CancelSessionDialog({ pending, onConfirm }: CancelDialogProps) {
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <Button disabled={pending} variant="danger">
+        <Button disabled={pending} type="button" variant="danger">
           {t('cancel.action')}
         </Button>
       </Dialog.Trigger>
@@ -88,8 +98,8 @@ function CancelSessionDialog({ pending, onConfirm }: CancelDialogProps) {
             {t('cancel.title')}
           </Dialog.Title>
           <Dialog.Description
-            id="cancel-session-description"
             className="mt-2 text-ink-soft"
+            id="cancel-session-description"
           >
             {t('cancel.body')}
           </Dialog.Description>
@@ -126,11 +136,7 @@ type RemoveGuestDialogProps = {
   onConfirm: () => void
 }
 
-function RemoveGuestDialog({
-  displayName,
-  pending,
-  onConfirm,
-}: RemoveGuestDialogProps) {
+function RemoveGuestDialog({ displayName, pending, onConfirm }: RemoveGuestDialogProps) {
   const { t } = useTranslation('sessions')
   const [open, setOpen] = useState(false)
   const cancelButton = useRef<HTMLButtonElement>(null)
@@ -141,6 +147,7 @@ function RemoveGuestDialog({
         <Button
           aria-label={`${t('invite.removeGuest')} ${displayName}`}
           disabled={pending}
+          type="button"
           variant="danger"
         >
           {t('invite.removeGuest')}
@@ -161,8 +168,8 @@ function RemoveGuestDialog({
             {t('invite.removeGuest')}
           </Dialog.Title>
           <Dialog.Description
-            id="remove-guest-description"
             className="mt-2 text-ink-soft"
+            id="remove-guest-description"
           >
             {t('invite.removeGuestConfirm')}
           </Dialog.Description>
@@ -202,8 +209,9 @@ type RosterIdentityProps = {
 
 /**
  * A roster/waitlist person. The masked arm is a separate call rather than a
- * computed `variant` prop so the D-076 row keeps IdentityRow's own type-level
- * guarantee that no username can ride along with it.
+ * computed `variant` prop so the D-076 row keeps `IdentityRow`'s own
+ * type-level guarantee that no username can ride along with it — carried
+ * unchanged from the flat page's own `RosterIdentity`.
  */
 function RosterIdentity({ actions, avatar, displayName, masked }: RosterIdentityProps) {
   return masked ? (
@@ -217,7 +225,7 @@ export function SessionDetailPage() {
   const { t, i18n } = useTranslation(['sessions', 'errors', 'common'])
   const { sessionId = '' } = useParams()
   const queryClient = useQueryClient()
-  const [status, setStatus] = useState('')
+  const [announcement, setAnnouncement] = useState('')
   const { data: session } = useSession()
 
   const detail = useQuery({
@@ -227,14 +235,27 @@ export function SessionDetailPage() {
     retry: false,
   })
 
+  // D-139: the page heading takes programmatic focus on mount, same contract
+  // as the flat page's `PageHeader` (`components/ui/pageHeader.tsx`) — this
+  // page doesn't use `PageHeader` (its h1 sits inside the bespoke summary
+  // card, only rendered once `detail` resolves), so the effect fires off the
+  // data becoming available rather than off the component's own mount.
+  const heading = useRef<HTMLHeadingElement>(null)
+  const hasDetail = Boolean(detail.data)
+  useEffect(() => {
+    if (hasDetail) heading.current?.focus()
+  }, [hasDetail])
+
   // D-038/D-046: times render in the viewer's profile time zone, not the
   // browser's, falling back to the browser zone only until the profile
-  // query resolves.
+  // query resolves. `instantToFakeLocal` + `timeZone: 'UTC'` formatting is
+  // the same zoned-conversion boundary `./sessionData`'s list mapper uses.
   const profile = useQuery({
     queryKey: viewerProfileKey,
     queryFn: getViewerProfile,
   })
-  const viewerTimeZone = profile.data?.timeZone ?? undefined
+  const viewerTimeZone =
+    profile.data?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
 
   const isOrganizer =
     Boolean(detail.data) && detail.data?.organizerId === session?.userId
@@ -246,7 +267,7 @@ export function SessionDetailPage() {
   })
 
   async function afterMutation(message: string, options?: { removeDetail?: boolean }) {
-    setStatus(message)
+    setAnnouncement(message)
     await invalidateSessionQueries(queryClient, sessionId, options)
   }
 
@@ -366,11 +387,19 @@ export function SessionDetailPage() {
   const inProgress = data ? isSessionInProgress(data) : false
   const maxCapacity = data?.maxCapacity ?? null
 
+  const startText = data
+    ? new Intl.DateTimeFormat(i18n.language, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'UTC',
+      }).format(instantToFakeLocal(data.startTime, viewerTimeZone))
+    : ''
+
   function rosterRow(entry: (typeof going)[number]) {
     return (
       <li
         key={entry.participationId}
-        className="border-t border-ink/25 py-2 first:border-t-0"
+        className="flex items-center justify-between gap-2 border-t border-border py-2 first:border-t-0"
         data-testid={`roster-entry-${entry.participationId}`}
       >
         <RosterIdentity
@@ -399,206 +428,151 @@ export function SessionDetailPage() {
     )
   }
 
+  const anyErrorMessage = anyError
+    ? t(isApiError(anyError) ? `errors.codes.${anyError.code}` : 'errors.generic', {
+        defaultValue: t('errors.generic'),
+      })
+    : null
+
   return (
-    <main data-testid="screen-session-detail">
-      <PageScaffold>
-        <PageHeader
-          actions={
-            data && isOrganizer ? (
-              <>
-                <Link
-                  className={`inline-flex items-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
-                  to={`/sessions/${sessionId}/edit`}
-                >
-                  {t('edit.heading')}
-                </Link>
-                <Link
-                  className={`inline-flex items-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
-                  to={`/sessions/${sessionId}/invite`}
-                >
-                  {t('invite.heading')}
-                </Link>
-              </>
-            ) : undefined
-          }
-          live
-          meta={
-            data ? (
-              <div className="flex w-full flex-col gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <SessionStatusChip status={data.status} />
-                  {inProgress && <span className={chipClasses}>{t('detail.inProgress')}</span>}
-                </div>
-                {data.status === 'unconfirmed' && (
-                  <p className="font-body text-body text-ink">
-                    {t('detail.progress', {
-                      going: going.length,
-                      min: Number(data.minAttendance),
-                    })}
-                    {maxCapacity !== null && ` ${t('detail.progressWaitlist')}`}
-                  </p>
-                )}
-              </div>
-            ) : undefined
-          }
-          title={data?.title ?? t('common.loading', { ns: 'common' })}
-        />
+    <div className="min-h-screen bg-background pb-24" data-testid="screen-session-detail">
+      <p aria-live="polite" className="sr-only" role="status">
+        {announcement}
+      </p>
 
-        <p aria-live="polite" className="text-ink">
-          {status}
+      {detail.isPending && (
+        <p className="p-6 text-ink-soft" role="status">
+          {t('common.loading', { ns: 'common' })}
         </p>
+      )}
 
-        {anyError && (
-          <p ref={(node) => node?.focus()} role="alert" tabIndex={-1}>
-            {t(
-              isApiError(anyError) ? `errors.codes.${anyError.code}` : 'errors.generic',
-              { defaultValue: t('errors.generic') },
-            )}
-          </p>
-        )}
+      {anyErrorMessage && (
+        <div className="mx-auto max-w-[1400px] px-3 pt-4 sm:px-6">
+          <StatusBanner role="alert" variant="danger">
+            <span ref={(node) => node?.focus()} tabIndex={-1}>
+              {anyErrorMessage}
+            </span>
+          </StatusBanner>
+        </div>
+      )}
 
-        {data && (
-          <>
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={quietChipClasses}>
-                  {new Intl.DateTimeFormat(i18n.language, {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                    timeZone: viewerTimeZone,
-                  }).format(new Date(data.startTime))}
-                </span>
-                {data.platform && <span className={quietChipClasses}>{data.platform}</span>}
-                {data.game?.name && <span className={quietChipClasses}>{data.game.name}</span>}
-                {data.muted && <span className={quietChipClasses}>{t('detail.muted')}</span>}
-              </div>
-              {data.notes && <p className="text-ink">{data.notes}</p>}
-            </div>
-
-            <SectionCard title={t('rsvp.heading')} titleId="rsvp-heading">
-              <div aria-labelledby="rsvp-heading" role="group">
-                <SegmentStrip>
-                  {(['Going', 'Maybe', 'Declined'] as const).map((choice) => {
-                    const pressed = viewerEntry?.status === choice.toLowerCase()
-                    return (
-                      <button
-                        key={choice}
-                        aria-pressed={pressed}
-                        className={segmentItemClasses(pressed)}
-                        disabled={respond.isPending}
-                        type="button"
-                        onClick={() => respond.mutate(choice)}
-                      >
-                        {t(`rsvp.${choice.toLowerCase()}`)}
-                      </button>
-                    )
-                  })}
-                </SegmentStrip>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  disabled={leave.isPending}
-                  type="button"
-                  variant="ghost"
-                  onClick={() => leave.mutate()}
-                >
-                  {t('rsvp.leave')}
-                </Button>
-                {canRequestJoin && (
-                  <>
-                    <Button
-                      disabled={join.isPending}
-                      type="button"
-                      variant="ghost"
-                      onClick={() => join.mutate()}
-                    >
-                      {t('join.request')}
-                    </Button>
-                    <Button
-                      disabled={withdraw.isPending}
-                      type="button"
-                      variant="ghost"
-                      onClick={() => withdraw.mutate()}
-                    >
-                      {t('join.withdraw')}
-                    </Button>
-                  </>
+      {data && (
+        <main className="mx-auto grid max-w-[1400px] gap-4 px-3 pt-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="contents lg:order-2 lg:block lg:min-w-0 lg:space-y-4 lg:sticky lg:top-4 lg:self-start">
+            <section className="order-1 surface p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h1
+                    ref={heading}
+                    className="font-display text-xl font-extrabold focus:outline-none"
+                    tabIndex={-1}
+                  >
+                    {data.title}
+                  </h1>
+                  <p className="truncate text-[12px] text-muted-foreground">
+                    {data.game ? `${data.game.name} · ` : ''}
+                    {data.platform}
+                  </p>
+                </div>
+                {isKnownSessionStatus(data.status) && (
+                  <StatusPill label={t(`status.${data.status}`)} status={data.status} />
                 )}
               </div>
-            </SectionCard>
 
-            {isOrganizer && joinRequests.data && joinRequests.data.items.length > 0 && (
-              <Section
-                title={`${t('detail.joinRequests')} (${joinRequests.data.items.length})`}
-                titleId="join-requests-heading"
-              >
-                <ul>
-                  {joinRequests.data.items.map((request) => (
-                    <li
-                      key={request.id}
-                      className="flex flex-wrap items-center justify-between gap-2 border-t border-ink/25 py-2 first:border-t-0"
-                    >
-                      <span className="text-ink">
-                        {request.requester?.displayName ?? t('detail.anonymous')}
-                      </span>
-                      <span className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => approve.mutate(request.id)}
-                        >
-                          {t('join.approve')}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => reject.mutate(request.id)}
-                        >
-                          {t('join.reject')}
-                        </Button>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </Section>
-            )}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 rounded-xl border border-border bg-muted/50 px-2.5 py-2">
+                  <CalendarClock className="size-4 shrink-0" />
+                  <span className="text-[12px] font-semibold tabular-nums">{startText}</span>
+                </span>
+                {inProgress && (
+                  <span className="rounded-full border-2 border-ink bg-accent px-2.5 py-1 font-display text-[11px] font-bold text-accent-ink">
+                    {t('detail.inProgress')}
+                  </span>
+                )}
+                {data.muted && (
+                  <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+                    {t('detail.muted')}
+                  </span>
+                )}
+              </div>
 
-            <Section
-              label={t('a11y.rosterLabel')}
-              labelledBy="roster-heading"
-              title={t('detail.roster')}
-              titleId="roster-heading"
-            >
-              {(
-                [
-                  ['going', going],
-                  ['maybe', maybe],
-                  ['declined', declined],
-                  ['pending', pending],
-                ] as const
-              ).map(([key, entries]) => (
-                <div key={key} className="flex flex-col gap-2">
-                  <h3 className="font-display font-semibold text-ink">
-                    {t(`detail.${key}`)} ({entries.length})
-                  </h3>
-                  <ul>{entries.map(rosterRow)}</ul>
+              {data.status === 'unconfirmed' && (
+                <p className="mt-2 text-[12px] text-ink-soft">
+                  {t('detail.progress', {
+                    going: going.length,
+                    min: Number(data.minAttendance),
+                  })}
+                  {maxCapacity !== null && ` ${t('detail.progressWaitlist')}`}
+                </p>
+              )}
+
+              {data.notes && (
+                <p className="mt-3 rounded-xl border border-border bg-muted/50 p-2.5 text-[12px] text-ink">
+                  {data.notes}
+                </p>
+              )}
+
+              {isOrganizer && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link
+                    className={`inline-flex items-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+                    to={`/sessions/${sessionId}/edit`}
+                  >
+                    {t('edit.heading')}
+                  </Link>
+                  <Link
+                    className={`inline-flex items-center gap-2 px-4 py-2 text-ink bg-card ${raisedInteractiveClasses}`}
+                    to={`/sessions/${sessionId}/invite`}
+                  >
+                    {t('invite.heading')}
+                  </Link>
                 </div>
-              ))}
-            </Section>
+              )}
+            </section>
+
+            <section className="order-3 surface p-4">
+              <h2
+                className="flex items-center gap-2 font-display text-base font-extrabold"
+                id="roster-heading"
+              >
+                <Users className="size-4" /> {t('detail.roster')}
+              </h2>
+              <section aria-label={t('a11y.rosterLabel')} aria-labelledby="roster-heading">
+                {(
+                  [
+                    ['going', going],
+                    ['maybe', maybe],
+                    ['declined', declined],
+                    ['pending', pending],
+                  ] as const
+                ).map(([key, entries]) => (
+                  <div key={key} className="mt-3 first:mt-2">
+                    <h3 className="font-display text-[13px] font-bold text-muted-foreground">
+                      {t(`detail.${key}`)} ({entries.length})
+                    </h3>
+                    <ul className="mt-1.5 space-y-1.5">{entries.map(rosterRow)}</ul>
+                  </div>
+                ))}
+              </section>
+            </section>
 
             {waitlisted.length > 0 && (
-              <Section
-                label={t('a11y.waitlistLabel')}
-                labelledBy="waitlist-heading"
-                title={`${t('waitlist.heading')} (${waitlisted.length})`}
-                titleId="waitlist-heading"
-              >
-                <ul>
+              <section className="order-3 surface p-4">
+                <h2
+                  className="font-display text-base font-extrabold"
+                  id="waitlist-heading"
+                >
+                  {t('waitlist.heading')} ({waitlisted.length})
+                </h2>
+                <ul
+                  aria-label={t('a11y.waitlistLabel')}
+                  aria-labelledby="waitlist-heading"
+                  className="mt-2 space-y-1.5"
+                >
                   {waitlisted.map((entry) => (
                     <li
                       key={entry.participationId}
-                      className="border-t border-ink/25 py-2 first:border-t-0"
+                      className="border-t border-border py-2 first:border-t-0"
                     >
                       <RosterIdentity
                         actions={
@@ -638,17 +612,56 @@ export function SessionDetailPage() {
                     </li>
                   ))}
                 </ul>
-              </Section>
+              </section>
             )}
 
-            <Section
-              title={t('detail.notificationsHeading')}
-              titleId="session-notifications-heading"
-            >
-              <div className="flex flex-wrap items-end gap-6">
+            {isOrganizer && joinRequests.data && joinRequests.data.items.length > 0 && (
+              <section className="order-4 surface p-4">
+                <h2
+                  className="font-display text-base font-extrabold"
+                  id="join-requests-heading"
+                >
+                  {t('detail.joinRequests')} ({joinRequests.data.items.length})
+                </h2>
+                <ul className="mt-2 space-y-1.5">
+                  {joinRequests.data.items.map((request) => (
+                    <li
+                      key={request.id}
+                      className="flex flex-wrap items-center justify-between gap-2 border-t border-border py-2 first:border-t-0"
+                    >
+                      <span className="text-[13px] font-semibold">
+                        {request.requester?.displayName ?? t('detail.anonymous')}
+                      </span>
+                      <span className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => approve.mutate(request.id)}
+                        >
+                          {t('join.approve')}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => reject.mutate(request.id)}
+                        >
+                          {t('join.reject')}
+                        </Button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            <section className="order-6 surface p-4">
+              <h2 className="font-display text-base font-extrabold">
+                {t('detail.notificationsHeading')}
+              </h2>
+              <div className="mt-3 flex flex-wrap items-end gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label
-                    className="font-body font-semibold text-ink"
+                    className="text-[12px] font-bold text-muted-foreground"
                     htmlFor="reminder-select"
                   >
                     {t('reminder.label')}
@@ -679,26 +692,87 @@ export function SessionDetailPage() {
                   {data.muted ? t('mute.off') : t('mute.on')}
                 </Button>
               </div>
-              <p className="font-body text-meta text-ink-soft">{t('mute.copy')}</p>
-            </Section>
+              <p className="mt-2 text-[12px] text-muted-foreground">{t('mute.copy')}</p>
+            </section>
 
             {isOrganizer && (
-              <SectionCard
-                title={t('detail.dangerZone')}
-                titleId="session-danger-heading"
-              >
-                <div className="flex flex-wrap gap-2">
+              <section className="order-7 surface border-danger/40 p-4">
+                <h2 className="font-display text-base font-extrabold">
+                  {t('detail.dangerZone')}
+                </h2>
+                <div className="mt-3 flex flex-wrap gap-2">
                   <CancelSessionDialog
                     pending={cancel.isPending}
                     onConfirm={() => cancel.mutate()}
                   />
                 </div>
-              </SectionCard>
+              </section>
             )}
-          </>
-        )}
-      </PageScaffold>
-    </main>
+          </div>
+
+          <section className="order-2 min-w-0 space-y-3 lg:order-1">
+            <div
+              aria-labelledby="rsvp-heading"
+              className="surface p-4"
+              role="group"
+            >
+              <h2 className="font-display text-lg font-extrabold" id="rsvp-heading">
+                {t('rsvp.heading')}
+              </h2>
+              <div className="mt-3">
+                <SegmentStrip>
+                  {(['Going', 'Maybe', 'Declined'] as const).map((choice) => {
+                    const pressed = viewerEntry?.status === choice.toLowerCase()
+                    return (
+                      <button
+                        key={choice}
+                        aria-pressed={pressed}
+                        className={segmentItemClasses(pressed)}
+                        disabled={respond.isPending}
+                        type="button"
+                        onClick={() => respond.mutate(choice)}
+                      >
+                        {t(`rsvp.${choice.toLowerCase()}`)}
+                      </button>
+                    )
+                  })}
+                </SegmentStrip>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  disabled={leave.isPending}
+                  type="button"
+                  variant="ghost"
+                  onClick={() => leave.mutate()}
+                >
+                  {t('rsvp.leave')}
+                </Button>
+                {canRequestJoin && (
+                  <>
+                    <Button
+                      disabled={join.isPending}
+                      type="button"
+                      variant="ghost"
+                      onClick={() => join.mutate()}
+                    >
+                      {t('join.request')}
+                    </Button>
+                    <Button
+                      disabled={withdraw.isPending}
+                      type="button"
+                      variant="ghost"
+                      onClick={() => withdraw.mutate()}
+                    >
+                      {t('join.withdraw')}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </section>
+        </main>
+      )}
+    </div>
   )
 }
-

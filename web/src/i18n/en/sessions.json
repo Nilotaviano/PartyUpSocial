@@ -17,6 +17,8 @@
     "max": "Maximum capacity",
     "unlimited": "Unlimited capacity",
     "private": "Private session",
+    "privacyPrivate": "Private",
+    "privacyPublic": "Public",
     "invitees": "Invite friends",
     "guestLinks": "Guest links",
     "defaults": "Defaults: 4 minimum, 4 maximum, 2 hours, no platform, not private.",
@@ -156,7 +158,9 @@
     "emptyUpcoming": "No upcoming sessions.",
     "emptyHistory": "No completed sessions yet.",
     "loadMore": "Load more",
-    "inProgress": "In progress"
+    "inProgress": "In progress",
+    "occupancy": "{{active}}/{{max}} going",
+    "occupancyUnlimited": "{{active}} going"
   },
   "guest": {
     "claimHeading": "Join this session",

@@ -10,7 +10,7 @@ const api = vi.hoisted(() => ({
   delete: vi.fn(),
 }))
 
-vi.mock('../../api/client', () => ({
+vi.mock('../../../api/client', () => ({
   client: { GET: api.get, PUT: api.put, POST: api.post, DELETE: api.delete },
   isApiError: (error: unknown) =>
     Boolean(error && typeof error === 'object' && 'code' in error),
@@ -27,11 +27,11 @@ vi.mock('../../api/client', () => ({
 
 const mockedUseSession = vi.hoisted(() => vi.fn())
 
-vi.mock('../../auth/useSession', () => ({
+vi.mock('../../../auth/useSession', () => ({
   useSession: mockedUseSession,
 }))
 
-import '../../i18n'
+import '../../../i18n'
 import { SessionDetailPage } from './SessionDetailPage'
 
 function detail(overrides: Partial<Record<string, unknown>> = {}) {
@@ -116,7 +116,7 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe('SessionDetailPage', () => {
+describe('SessionDetailPage (lovable)', () => {
   it('masks a participant with no display name as Anonymous User_D076_D114', async () => {
     renderPage()
 
@@ -508,5 +508,370 @@ describe('SessionDetailPage', () => {
     const remove = within(row).getByRole('button')
     expect(remove).toHaveAccessibleName('Remove guest Guest Bob')
     expect(remove).not.toHaveAccessibleName(/🍕/)
+  })
+
+  describe('accessibility (D-139)', () => {
+    it('focuses the page h1 on mount_D139', async () => {
+      renderPage()
+
+      const heading = await screen.findByRole('heading', { level: 1 })
+      await waitFor(() => expect(heading).toHaveFocus())
+    })
+
+    it('reports RSVP outcomes through an aria-live=polite region_D139', async () => {
+      const { container } = renderPage()
+
+      const status = container.querySelector('p[aria-live="polite"]')
+      expect(status).not.toBeNull()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Going' }))
+      await waitFor(() => expect(status).toHaveTextContent('Your response was updated.'))
+    })
+
+    it('every interactive control meets the 44px touch target and visible-focus duties_D139', async () => {
+      renderPage()
+      await screen.findByRole('button', { name: 'Going' })
+
+      for (const button of screen.getAllByRole('button')) {
+        expect(button).toHaveClass('min-h-11')
+        expect(button.className).toContain('focus-visible:outline-2')
+      }
+    })
+
+    it('the cancel dialog is focused and traps focus, closing on Escape and restoring the trigger_D139', async () => {
+      renderPage()
+      const trigger = await screen.findByRole('button', { name: 'Cancel session' })
+      trigger.focus()
+      fireEvent.click(trigger)
+
+      const dialog = screen.getByRole('dialog')
+      await waitFor(() =>
+        expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus(),
+      )
+
+      fireEvent.keyDown(document, { key: 'Escape' })
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      expect(trigger).toHaveFocus()
+    })
+
+    it('roster status is conveyed by text, not color alone_D139', async () => {
+      renderPage()
+
+      expect(await screen.findByText('Going (2)')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /Roster/ })).toBeInTheDocument()
+    })
+
+    it('exposes the roster as a named region, not a bare aria-labelled div_D139', async () => {
+      renderPage()
+
+      await screen.findByText('Going (2)')
+      expect(screen.getByRole('region', { name: 'Roster' })).toBeInTheDocument()
+    })
+
+    it('the remove-guest dialog is reachable and named for assistive technology_D139', async () => {
+      renderPage()
+
+      const trigger = await screen.findByRole('button', { name: 'Remove guest Guest Bob' })
+      fireEvent.click(trigger)
+
+      const dialog = await screen.findByRole('dialog', { name: 'Remove guest' })
+      expect(dialog).toHaveAccessibleDescription(/lose access immediately/i)
+    })
+  })
+
+  describe('status hero (ported from the flat page SessionStatusHero.test.tsx)', () => {
+    it.each([
+      ['unconfirmed', 'Waiting for players'],
+      ['confirmed', 'Confirmed'],
+      ['completed', 'Completed'],
+      ['expired', 'Expired'],
+      ['canceled', 'Canceled'],
+    ])('names the %s status as text, never colour alone_D139', async (status, label) => {
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/sessions/{sessionId}')
+          return Promise.resolve({ data: detail({ status }) })
+        if (path === '/api/v1/sessions/{sessionId}/join-requests')
+          return Promise.resolve({ data: { items: [], nextCursor: null } })
+        if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+        throw new Error(`Unexpected GET ${path}`)
+      })
+      renderPage()
+
+      const screenRoot = screen.getByTestId('screen-session-detail')
+      expect(await within(screenRoot).findByText(label)).toBeInTheDocument()
+    })
+
+    it('renders no status pill for a status this build does not know', async () => {
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/sessions/{sessionId}')
+          return Promise.resolve({ data: detail({ status: 'someFutureStatus' }) })
+        if (path === '/api/v1/sessions/{sessionId}/join-requests')
+          return Promise.resolve({ data: { items: [], nextCursor: null } })
+        if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+        throw new Error(`Unexpected GET ${path}`)
+      })
+      renderPage()
+
+      expect(await screen.findByText('Raid night')).toBeInTheDocument()
+      for (const label of [
+        'Waiting for players',
+        'Confirmed',
+        'Completed',
+        'Expired',
+        'Canceled',
+      ]) {
+        expect(screen.queryByText(label)).not.toBeInTheDocument()
+      }
+    })
+
+    it('adds the in-progress chip alongside the status pill_D095', async () => {
+      const now = Date.now()
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/sessions/{sessionId}')
+          return Promise.resolve({
+            data: detail({
+              startTime: new Date(now - 60_000).toISOString(),
+              durationMinutes: 60,
+              status: 'confirmed',
+            }),
+          })
+        if (path === '/api/v1/sessions/{sessionId}/join-requests')
+          return Promise.resolve({ data: { items: [], nextCursor: null } })
+        if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+        throw new Error(`Unexpected GET ${path}`)
+      })
+      renderPage()
+
+      expect(await screen.findByText('Confirmed')).toBeInTheDocument()
+      expect(screen.getByText('In progress')).toBeInTheDocument()
+    })
+
+    it('shows the progress line only while unconfirmed_D074', async () => {
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/sessions/{sessionId}')
+          return Promise.resolve({ data: detail({ status: 'unconfirmed' }) })
+        if (path === '/api/v1/sessions/{sessionId}/join-requests')
+          return Promise.resolve({ data: { items: [], nextCursor: null } })
+        if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+        throw new Error(`Unexpected GET ${path}`)
+      })
+      const { unmount } = renderPage()
+      expect(await screen.findByText(/2 of 4 confirmed/)).toBeInTheDocument()
+      unmount()
+      cleanup()
+
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/sessions/{sessionId}')
+          return Promise.resolve({ data: detail({ status: 'confirmed' }) })
+        if (path === '/api/v1/sessions/{sessionId}/join-requests')
+          return Promise.resolve({ data: { items: [], nextCursor: null } })
+        if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+        throw new Error(`Unexpected GET ${path}`)
+      })
+      renderPage()
+      expect(await screen.findByText('Confirmed')).toBeInTheDocument()
+      expect(screen.queryByText(/of 4 confirmed/)).not.toBeInTheDocument()
+    })
+
+    it('counts only non-waitlisted Going rows in the progress numerator_D062', async () => {
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/sessions/{sessionId}')
+          return Promise.resolve({
+            data: detail({
+              roster: [
+                {
+                  participationId: 'p-a',
+                  userId: 'user-a',
+                  guestIdentityId: null,
+                  displayName: 'Ada',
+                  status: 'going',
+                  isWaitlisted: false,
+                  origin: 'invited',
+                  reminderChoice: null,
+                },
+                {
+                  participationId: 'p-b',
+                  userId: 'user-b',
+                  guestIdentityId: null,
+                  displayName: 'Bo',
+                  status: 'going',
+                  isWaitlisted: false,
+                  origin: 'invited',
+                  reminderChoice: null,
+                },
+                {
+                  participationId: 'p-c',
+                  userId: 'user-c',
+                  guestIdentityId: null,
+                  displayName: 'Cy',
+                  status: 'going',
+                  isWaitlisted: true,
+                  origin: 'invited',
+                  reminderChoice: null,
+                },
+                {
+                  participationId: 'p-d',
+                  userId: 'user-d',
+                  guestIdentityId: null,
+                  displayName: 'Di',
+                  status: 'maybe',
+                  isWaitlisted: false,
+                  origin: 'invited',
+                  reminderChoice: null,
+                },
+              ],
+            }),
+          })
+        if (path === '/api/v1/sessions/{sessionId}/join-requests')
+          return Promise.resolve({ data: { items: [], nextCursor: null } })
+        if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+        throw new Error(`Unexpected GET ${path}`)
+      })
+      renderPage()
+
+      expect(await screen.findByText(/2 of 4 confirmed/)).toBeInTheDocument()
+    })
+
+    it('adds the waitlist sentence only when the session has a maximum capacity', async () => {
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/sessions/{sessionId}')
+          return Promise.resolve({ data: detail({ maxCapacity: 8 }) })
+        if (path === '/api/v1/sessions/{sessionId}/join-requests')
+          return Promise.resolve({ data: { items: [], nextCursor: null } })
+        if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+        throw new Error(`Unexpected GET ${path}`)
+      })
+      const { unmount } = renderPage()
+      expect(await screen.findByText(/join the waitlist/)).toBeInTheDocument()
+      unmount()
+      cleanup()
+
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/sessions/{sessionId}')
+          return Promise.resolve({ data: detail({ maxCapacity: null }) })
+        if (path === '/api/v1/sessions/{sessionId}/join-requests')
+          return Promise.resolve({ data: { items: [], nextCursor: null } })
+        if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+        throw new Error(`Unexpected GET ${path}`)
+      })
+      renderPage()
+      expect(await screen.findByText(/2 of 4 confirmed/)).toBeInTheDocument()
+      expect(screen.queryByText(/join the waitlist/)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('RSVP group (ported from the flat page SessionStatusHero.test.tsx)', () => {
+    it('never mutates a response while the keyboard traverses the group_D084', async () => {
+      renderPage()
+
+      const going = await screen.findByRole('button', { name: 'Going' })
+      const maybe = screen.getByRole('button', { name: 'Maybe' })
+      const declined = screen.getByRole('button', { name: 'Declined' })
+
+      for (const button of [going, maybe, declined]) {
+        button.focus()
+        expect(button).toHaveFocus()
+        fireEvent.keyDown(button, { key: 'ArrowRight' })
+        fireEvent.keyDown(button, { key: 'ArrowLeft' })
+        fireEvent.keyDown(button, { key: 'ArrowDown' })
+        fireEvent.keyDown(button, { key: 'Tab' })
+        fireEvent.keyUp(button, { key: 'Tab' })
+      }
+
+      expect(api.put).not.toHaveBeenCalled()
+
+      // The same group still commits on explicit activation, so the assertion
+      // above is about traversal and not about a dead control.
+      fireEvent.click(going)
+      await waitFor(() =>
+        expect(api.put).toHaveBeenCalledWith(
+          '/api/v1/sessions/{sessionId}/my-participation',
+          expect.objectContaining({ body: { response: 'Going' } }),
+        ),
+      )
+    })
+
+    it('keeps each RSVP choice a pressed-button, not a radio_D084', async () => {
+      renderPage()
+
+      const going = await screen.findByRole('button', { name: 'Going' })
+      expect(going).toHaveAttribute('aria-pressed')
+      expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
+      expect(screen.queryAllByRole('radio')).toHaveLength(0)
+    })
+  })
+
+  describe('mobile sidebar stacking order (S3)', () => {
+    it('gives every sidebar card its own order class, in the intended below-lg stacking order', async () => {
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/sessions/{sessionId}') {
+          const data = detail()
+          data.roster[0].isWaitlisted = true
+          return Promise.resolve({ data })
+        }
+        if (path === '/api/v1/sessions/{sessionId}/join-requests')
+          return Promise.resolve({
+            data: {
+              items: [
+                {
+                  id: 'jr-1',
+                  requesterId: '22222222-2222-2222-2222-222222222222',
+                  status: 'pending',
+                  createdAt: '2030-08-01T00:00:00Z',
+                  requester: { ordinal: 0, displayName: 'Requester One' },
+                },
+              ],
+              nextCursor: null,
+            },
+          })
+        if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+        throw new Error(`Unexpected GET ${path}`)
+      })
+      renderPage()
+
+      await screen.findByText('Raid night')
+      await screen.findByText('Requester One')
+
+      function orderOf(text: string | RegExp) {
+        return screen.getByText(text).closest('section')?.className.match(/\border-(\d+)\b/)?.[1]
+      }
+      function headingOrderOf(name: string | RegExp) {
+        return screen
+          .getByRole('heading', { name })
+          .closest('section')?.className.match(/\border-(\d+)\b/)?.[1]
+      }
+
+      const summaryOrder = orderOf('Raid night')
+      const rosterHeadingOrder = screen
+        .getByRole('heading', { name: /Roster/ })
+        .closest('section')?.className.match(/\border-(\d+)\b/)?.[1]
+      const waitlistOrder = headingOrderOf(/^Waitlist/)
+      const joinRequestsOrder = headingOrderOf(/^Join requests/)
+      const notificationsOrder = headingOrderOf('Notifications for this session')
+      const dangerOrder = headingOrderOf('Danger zone')
+
+      // Every card has an explicit order class (none silently falls back to order:0).
+      for (const value of [
+        summaryOrder,
+        rosterHeadingOrder,
+        waitlistOrder,
+        joinRequestsOrder,
+        notificationsOrder,
+        dangerOrder,
+      ]) {
+        expect(value).toBeDefined()
+      }
+
+      // Main RSVP content is a sibling `order-2` section outside this sidebar wrapper —
+      // summary(1) -> RSVP column(2) -> roster(3) -> waitlist(3, same tier) -> join
+      // requests(4) -> notifications(6) -> danger zone(last), and no card ties with the
+      // RSVP column's order-2.
+      expect(Number(summaryOrder)).toBe(1)
+      expect(Number(rosterHeadingOrder)).toBeGreaterThan(2)
+      expect(Number(waitlistOrder)).toBeGreaterThanOrEqual(Number(rosterHeadingOrder))
+      expect(Number(joinRequestsOrder)).toBeGreaterThan(Number(waitlistOrder))
+      expect(Number(notificationsOrder)).toBeGreaterThan(Number(joinRequestsOrder))
+      expect(Number(dangerOrder)).toBeGreaterThan(Number(notificationsOrder))
+    })
   })
 })

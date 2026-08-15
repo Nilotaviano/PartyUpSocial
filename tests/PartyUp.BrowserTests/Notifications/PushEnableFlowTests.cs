@@ -136,7 +136,8 @@ public sealed class PushEnableFlowTests(PlaywrightFixture fixture)
         await recipient.Page.Locator("#field-duration").FillAsync("60");
         await recipient.Page.Locator("#field-min").FillAsync("1");
         await recipient.Page.Locator("#field-max").FillAsync("4");
-        await recipient.Page.GetByLabel("Private session").CheckAsync();
+        await recipient.Page.GetByRole(AriaRole.Radiogroup, new() { Name = "Private session" })
+            .GetByRole(AriaRole.Radio, new() { Name = "Private" }).ClickAsync();
         await recipient.Page.GetByRole(AriaRole.Button, new() { Name = "Create session" }).ClickAsync();
         await recipient.Page.WaitForURLAsync(url => Regex.IsMatch(url, @"/sessions/[0-9a-fA-F-]{36}$"));
 
@@ -243,7 +244,8 @@ public sealed class PushEnableFlowTests(PlaywrightFixture fixture)
         await user.Page.Locator("#field-duration").FillAsync("60");
         await user.Page.Locator("#field-min").FillAsync("1");
         await user.Page.Locator("#field-max").FillAsync("4");
-        await user.Page.GetByLabel("Private session").CheckAsync();
+        await user.Page.GetByRole(AriaRole.Radiogroup, new() { Name = "Private session" })
+            .GetByRole(AriaRole.Radio, new() { Name = "Private" }).ClickAsync();
         await user.Page.GetByRole(AriaRole.Button, new() { Name = "Create session" }).ClickAsync();
         await user.Page.WaitForURLAsync(url => Regex.IsMatch(url, @"/sessions/[0-9a-fA-F-]{36}$"));
 

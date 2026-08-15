@@ -8,7 +8,7 @@ const api = vi.hoisted(() => ({
   patch: vi.fn(),
 }))
 
-vi.mock('../../api/client', () => ({
+vi.mock('../../../api/client', () => ({
   client: { GET: api.get, PATCH: api.patch },
   isApiError: (error: unknown) =>
     Boolean(error && typeof error === 'object' && 'code' in error),
@@ -29,8 +29,8 @@ vi.mock('react-router', async () => {
   return { ...actual, useNavigate: () => navigate }
 })
 
-import { ApiError } from '../../api/client'
-import '../../i18n'
+import { ApiError } from '../../../api/client'
+import '../../../i18n'
 import { SessionEditPage } from './SessionEditPage'
 
 function detail(overrides: Partial<Record<string, unknown>> = {}) {
@@ -73,10 +73,6 @@ function renderPage() {
 // already 2+ chars) through this same mocked `client.GET`. Dispatching by
 // path keeps those calls from consuming the session-detail response queue
 // tests below rely on (`mockResolvedValueOnce` chains, call-count asserts).
-// D-194's fallback-only degradation (catalogAvailable: false) is exercised
-// directly in SteamGamePicker.test.tsx and the picker-select tests below;
-// every other test here wants the pre-D-194 manual App ID field, which is
-// exactly what a stable `catalogAvailable: false` response yields.
 function mockSessionDetail(next: (call: number) => unknown) {
   let call = 0
   api.get.mockImplementation((path: string) => {
@@ -97,7 +93,14 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe('SessionEditPage', () => {
+describe('SessionEditPage (lovable)', () => {
+  it('focuses the page h1 on mount_D139', async () => {
+    renderPage()
+
+    const heading = await screen.findByRole('heading', { level: 1 })
+    await waitFor(() => expect(heading).toHaveFocus())
+  })
+
   it('maps the clear-max/notes/game checkboxes onto the clear list and omits the cleared keys from the body_A070', async () => {
     api.patch.mockResolvedValue({ data: detail({ maxCapacity: null, notes: null, game: null }) })
     renderPage()
@@ -156,10 +159,7 @@ describe('SessionEditPage', () => {
     api.get.mockImplementation((path: string) => {
       if (path === '/api/v1/steam-catalog') {
         return Promise.resolve({
-          data: {
-            catalogAvailable: true,
-            results: [{ appId: 1091500, name: 'Cyberpunk 2077' }],
-          },
+          data: { catalogAvailable: true, results: [{ appId: 1091500, name: 'Cyberpunk 2077' }] },
         })
       }
       return Promise.resolve({ data: detail() })
@@ -190,10 +190,7 @@ describe('SessionEditPage', () => {
     api.get.mockImplementation((path: string) => {
       if (path === '/api/v1/steam-catalog') {
         return Promise.resolve({
-          data: {
-            catalogAvailable: true,
-            results: [{ appId: 1091500, name: 'Cyberpunk 2077' }],
-          },
+          data: { catalogAvailable: true, results: [{ appId: 1091500, name: 'Cyberpunk 2077' }] },
         })
       }
       return Promise.resolve({ data: detail() })
@@ -326,7 +323,22 @@ describe('SessionEditPage', () => {
   it('shows the silent-change disclosure next to the privacy control_D123', async () => {
     renderPage()
 
-    expect(await screen.findByText('This change does not notify participants.')).toBeInTheDocument()
+    expect(
+      await screen.findByText('This change does not notify participants.'),
+    ).toBeInTheDocument()
+  })
+
+  it('toggles isPrivate through the Private/Public segmented control_D123', async () => {
+    renderPage()
+
+    const privateRadio = await screen.findByRole('radio', { name: 'Private' })
+    const publicRadio = screen.getByRole('radio', { name: 'Public' })
+    expect(publicRadio).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.click(privateRadio)
+
+    expect(privateRadio).toHaveAttribute('aria-checked', 'true')
+    expect(publicRadio).toHaveAttribute('aria-checked', 'false')
   })
 
   it('retries exactly once after a session_conflict then surfaces the error on repeat failure_A071', async () => {
@@ -345,7 +357,9 @@ describe('SessionEditPage', () => {
         'This session changed elsewhere. We refreshed it and are retrying your save.',
       ),
     ).toBeInTheDocument()
-    expect(await screen.findByText('This session changed elsewhere. Please try again.')).toBeInTheDocument()
+    expect(
+      await screen.findByText('This session changed elsewhere. Please try again.'),
+    ).toBeInTheDocument()
   })
 
   it('succeeds after exactly one automatic refetch-and-retry on conflict_A071', async () => {
@@ -359,6 +373,22 @@ describe('SessionEditPage', () => {
 
     await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(2))
     expect(api.patch.mock.calls[1][1].body.ifMatch).toBe('v2')
+  })
+
+  it('locks the start time and minimum attendance while the session is in progress', async () => {
+    const now = new Date()
+    mockSessionDetail(() =>
+      detail({
+        startTime: new Date(now.getTime() - 5 * 60_000).toISOString(),
+        status: 'confirmed',
+      }),
+    )
+    renderPage()
+
+    expect(await screen.findByText('The start time can no longer be changed.')).toBeInTheDocument()
+    expect(
+      screen.getByText('The minimum attendance can no longer be changed.'),
+    ).toBeInTheDocument()
   })
 
   it('warns before discarding dirty edit-form values_D152_D162', async () => {
