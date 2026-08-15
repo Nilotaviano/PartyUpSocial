@@ -61,45 +61,57 @@ public sealed class RecurringJobRegistrationHostStartupTests
     // actually finish starting (AdminSeeder's own unconditional role-ensure write runs on every
     // startup, flag or not), so it targets the same local dev Postgres the browser lane itself uses
     // (`ConnectionStrings__Db`'s own default, `PlaywrightFixture.InitializeLocalTopology`) rather
-    // than the unreachable placeholder. `Jobs:DisableRecurring` itself is set via `UseSetting`
-    // rather than `ConfigureAppConfiguration` above: Program.cs reads it off `builder.Configuration`
-    // before `builder.Build()`, and `ConfigureAppConfiguration`'s override is not visible that
-    // early — `UseSetting` is.
+    // than the unreachable placeholder — but it takes that database from <see cref="SharedPostgres"/>,
+    // the suite's own Testcontainers server, exactly as every other host here does. An ambient
+    // localhost Postgres exists on the dev machine and on no CI runner, so depending on one is a
+    // failure the full local suite structurally cannot catch. `Jobs:DisableRecurring` itself is set
+    // via `UseSetting` rather than `ConfigureAppConfiguration` above: Program.cs reads it off
+    // `builder.Configuration` before `builder.Build()`, and `ConfigureAppConfiguration`'s override is
+    // not visible that early — `UseSetting` is.
     [Fact]
     public async Task RecurringJobsAreNotRegistered_WhenJobsDisableRecurringIsSet()
     {
-        string connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Db")
-            ?? "Host=localhost;Port=5432;Database=partyup;Username=partyup;Password=partyup";
+        string connectionString = await SharedPostgres.CreateDatabaseAsync();
+        try
+        {
+            await using var factory = new WebApplicationFactory<Program>()
+                .WithWebHostBuilder(webHost =>
+                {
+                    webHost.UseEnvironment("Development");
+                    webHost.UseSetting("Jobs:DisableRecurring", "true");
+                    webHost.ConfigureAppConfiguration((_, configuration) =>
+                        configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                        {
+                            ["ConnectionStrings:Db"] = connectionString,
+                            ["Database:MigrateOnStartup"] = "false",
+                            ["Deletion:SweepEnabled"] = "false",
+                            ["Email:Provider"] = "log",
+                        }));
+                });
 
-        await using var factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(webHost =>
-            {
-                webHost.UseEnvironment("Development");
-                webHost.UseSetting("Jobs:DisableRecurring", "true");
-                webHost.ConfigureAppConfiguration((_, configuration) =>
-                    configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                    {
-                        ["ConnectionStrings:Db"] = connectionString,
-                        ["Database:MigrateOnStartup"] = "false",
-                    }));
-            });
+            using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(15));
+            using HttpClient client = factory.CreateClient();
+            HttpResponseMessage response = await client.GetAsync(
+                "/api/v1/auth/antiforgery",
+                timeout.Token);
 
-        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(15));
-        using HttpClient client = factory.CreateClient();
-        HttpResponseMessage response = await client.GetAsync(
-            "/api/v1/auth/antiforgery",
-            timeout.Token);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        IReadOnlyList<IHostedService> hostedServices =
-            [.. factory.Services.GetServices<IHostedService>()];
-        Assert.DoesNotContain(hostedServices, service => service is RecurringJobRegistrationService);
-        Assert.DoesNotContain(
-            hostedServices,
-            service => (service.GetType().FullName ?? string.Empty).StartsWith(
-                "Hangfire.",
-                StringComparison.Ordinal));
+            IReadOnlyList<IHostedService> hostedServices =
+                [.. factory.Services.GetServices<IHostedService>()];
+            Assert.DoesNotContain(
+                hostedServices,
+                service => service is RecurringJobRegistrationService);
+            Assert.DoesNotContain(
+                hostedServices,
+                service => (service.GetType().FullName ?? string.Empty).StartsWith(
+                    "Hangfire.",
+                    StringComparison.Ordinal));
+        }
+        finally
+        {
+            await SharedPostgres.DropDatabaseAsync(connectionString);
+        }
     }
 }
 

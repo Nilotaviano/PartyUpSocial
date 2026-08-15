@@ -161,6 +161,12 @@ public sealed class MagicLinkFlowTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new { token = secondToken, ageGateAttested = true }));
         HttpResponseMessage[] responses = await Task.WhenAll(first, second);
 
+        // Asserted before the status codes: a barrier that gave up is the test failing to overlap the
+        // two redemptions, and it surfaces as a 500 that looks exactly like the server-side defect
+        // this test exists to catch. Naming it keeps the two apart.
+        Assert.False(
+            barrier.TimedOut,
+            "the two redemptions never overlapped inside ConfirmEmailAsync; the barrier timed out.");
         Assert.Equal(2, barrier.Arrivals);
         foreach (HttpResponseMessage response in responses)
         {
@@ -195,15 +201,24 @@ public sealed class MagicLinkFlowTests : IAsyncLifetime, IDisposable
 
     private async Task<string> RequestAsync(HttpClient client, string email)
     {
+        bool Matches(EmailMessage candidate) =>
+            candidate.ToAddress == email && candidate.Template == EmailTemplate.MagicLink;
+
+        // The magic-link mail is dispatched after the 202 is written, so waiting for "a" matching
+        // message would hand back the message a previous request for the same address already left
+        // in the capture — two requests then yield the same token, which is a different test than
+        // the one the caller wrote. Waiting for one more than are already there is the token this
+        // call just asked for.
+        int alreadyCaptured = _factory.EmailSender.Messages.Count(Matches);
         HttpResponseMessage response = await AntiforgeryTestClient.PostAsync(
             client,
             "/api/v1/auth/magic-link",
             JsonContent.Create(new { email, locale = "es-ES" }));
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
-        EmailMessage message = await _factory.EmailSender.WaitForAsync(
-            candidate => candidate.ToAddress == email &&
-                candidate.Template == EmailTemplate.MagicLink);
-        return message.Model["Token"];
+        IReadOnlyList<EmailMessage> messages = await _factory.EmailSender.WaitForCountAsync(
+            Matches,
+            alreadyCaptured + 1);
+        return messages[^1].Model["Token"];
     }
 
     private sealed class ConfirmEmailBarrier
@@ -211,8 +226,11 @@ public sealed class MagicLinkFlowTests : IAsyncLifetime, IDisposable
         private readonly TaskCompletionSource _bothArrived =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _arrivals;
+        private int _timedOut;
 
         internal int Arrivals => Volatile.Read(ref _arrivals);
+
+        internal bool TimedOut => Volatile.Read(ref _timedOut) != 0;
 
         internal async Task ArriveAsync(CancellationToken cancellationToken)
         {
@@ -221,7 +239,15 @@ public sealed class MagicLinkFlowTests : IAsyncLifetime, IDisposable
                 _bothArrived.TrySetResult();
             }
 
-            await _bothArrived.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            try
+            {
+                await _bothArrived.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            }
+            catch (TimeoutException)
+            {
+                Volatile.Write(ref _timedOut, 1);
+                throw;
+            }
         }
     }
 
