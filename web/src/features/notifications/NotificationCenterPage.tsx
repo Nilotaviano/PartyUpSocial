@@ -1,11 +1,12 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Bell } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { segmentItemClasses, segmentStripClasses } from '../../components/ui/classes'
-import { EmptyState } from '../../components/ui/emptyState'
+import { EmptyState } from '../../components/shell/SectionCard'
 import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold, PageSlot } from '../../components/ui/pageScaffold'
 import { Section } from '../../components/ui/section'
@@ -264,9 +265,7 @@ export function NotificationCenterPage() {
 
         {/* An empty inbox is a good terminal state, so it is quiet: no CTA. */}
         {!isPending && items.length === 0 && !error && (
-          <EmptyState illustration="🔔" variant="quiet">
-            {t(`list.empty.${scope}`)}
-          </EmptyState>
+          <EmptyState icon={Bell} title={t(`list.empty.${scope}`)} />
         )}
 
         {items.length > 0 && (

@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
-import { EmptyState } from '../../components/ui/emptyState'
+import { EmptyState } from '../../components/shell/SectionCard'
 import { IdentityRow } from '../../components/ui/identityRow'
 import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold } from '../../components/ui/pageScaffold'
@@ -78,9 +79,7 @@ export function BlockedUsersPage() {
         )}
         {/* An empty blocked list is a good terminal state (§3.6): quiet, no CTA. */}
         {blocks.data?.length === 0 && (
-          <EmptyState illustration="🛡️" variant="quiet">
-            {t('empty.blocked')}
-          </EmptyState>
+          <EmptyState icon={ShieldCheck} title={t('empty.blocked')} />
         )}
         {blocks.data && blocks.data.length > 0 && (
           <Section label={t('pages.blocked')}>

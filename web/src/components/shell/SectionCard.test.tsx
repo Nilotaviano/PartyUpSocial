@@ -41,4 +41,11 @@ describe('EmptyState', () => {
 
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
+
+  it('renders without a description', () => {
+    render(<EmptyState icon={Vote} title="No polls" />)
+
+    expect(screen.getByText('No polls')).toBeInTheDocument()
+    expect(screen.queryByText('Nothing here yet.')).not.toBeInTheDocument()
+  })
 })

@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Mail } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
-import { EmptyState } from '../../components/ui/emptyState'
+import { EmptyState } from '../../components/shell/SectionCard'
 import { IdentityRow } from '../../components/ui/identityRow'
 import {
   invalidateFriendGraph,
@@ -44,9 +45,10 @@ export function FriendRequests({
     // An empty request queue is a good terminal state, so it takes the quiet
     // variant (STYLING_OVERHAUL_DESIGN.md §3.6) rather than a CTA.
     return (
-      <EmptyState illustration="✉️" variant="quiet">
-        {t(direction === 'incoming' ? 'empty.incoming' : 'empty.outgoing')}
-      </EmptyState>
+      <EmptyState
+        icon={Mail}
+        title={t(direction === 'incoming' ? 'empty.incoming' : 'empty.outgoing')}
+      />
     )
   }
 

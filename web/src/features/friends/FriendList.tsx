@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Dices } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
@@ -7,7 +8,7 @@ import { ActionMenu, ActionMenuItem } from '../../components/ui/actionMenu'
 import { Button } from '../../components/ui/button'
 import { raisedInteractiveClasses } from '../../components/ui/classes'
 import { Dialog } from '../../components/ui/dialog'
-import { EmptyState } from '../../components/ui/emptyState'
+import { EmptyState } from '../../components/shell/SectionCard'
 import { IdentityRow } from '../../components/ui/identityRow'
 import {
   useActionMenu,
@@ -220,10 +221,9 @@ export function FriendList({ items, onStatus }: FriendListProps) {
             {t('sections.share')}
           </a>
         }
-        illustration="🎲"
-      >
-        {t('empty.friends')}
-      </EmptyState>
+        icon={Dices}
+        title={t('empty.friends')}
+      />
     )
   }
 

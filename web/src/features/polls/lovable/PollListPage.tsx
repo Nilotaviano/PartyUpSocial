@@ -1,5 +1,5 @@
 import { useQueries } from '@tanstack/react-query'
-import { CalendarClock, Plus, Vote as VoteIcon } from 'lucide-react'
+import { CalendarClock, Plus, Telescope, Vote as VoteIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
@@ -10,7 +10,7 @@ import {
   segmentItemClasses,
   segmentStripClasses,
 } from '../../../components/ui/classes'
-import { EmptyState } from '../../../components/ui/emptyState'
+import { EmptyState } from '../../../components/shell/SectionCard'
 import { PageHeader } from '../../../components/shell/PageHeader'
 import { useToast } from '../../../components/ui/toastStore'
 import { cn } from '../../availability/lovable/utils'
@@ -237,17 +237,14 @@ export function PollListPage() {
                   {t('emptyState.polls.cta')}
                 </Link>
               }
-              illustration="🗳️"
+              description={t('emptyState.polls.body')}
+              icon={VoteIcon}
               title={emptyText}
-            >
-              {t('emptyState.polls.body')}
-            </EmptyState>
+            />
           )}
 
           {!isPending && items.length === 0 && !error && band !== 'involved' && (
-            <EmptyState illustration="🔭" variant="quiet">
-              {emptyText}
-            </EmptyState>
+            <EmptyState icon={Telescope} title={emptyText} />
           )}
 
           {items.length > 0 && (

@@ -37,7 +37,7 @@ export function EmptyState({
 }: {
   icon: ComponentType<{ className?: string }>
   title: string
-  description: string
+  description?: string
   action?: ReactNode
 }) {
   return (
@@ -46,7 +46,9 @@ export function EmptyState({
         <Icon className="size-5 text-muted-foreground" />
       </span>
       <p className="mt-3 font-display text-[15px] font-extrabold">{title}</p>
-      <p className="mx-auto mt-1 max-w-[36ch] text-[12.5px] text-muted-foreground">{description}</p>
+      {description && (
+        <p className="mx-auto mt-1 max-w-[36ch] text-[12.5px] text-muted-foreground">{description}</p>
+      )}
       {action && <div className="mt-4 flex justify-center">{action}</div>}
     </div>
   )

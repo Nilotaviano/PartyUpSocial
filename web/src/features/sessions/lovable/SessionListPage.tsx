@@ -1,12 +1,12 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
-import { CalendarClock } from 'lucide-react'
+import { CalendarClock, Dices } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../../api/client'
 import { Button } from '../../../components/ui/button'
 import { raisedInteractiveClasses } from '../../../components/ui/classes'
-import { EmptyState } from '../../../components/ui/emptyState'
+import { EmptyState } from '../../../components/shell/SectionCard'
 import { PageHeader } from '../../../components/shell/PageHeader'
 import { StatusBanner } from '../../../components/ui/statusBanner'
 import { cn } from '../../availability/lovable/utils'
@@ -198,11 +198,10 @@ export function SessionListPage({ scope }: SessionListPageProps) {
                   {t('emptyState.sessions.cta')}
                 </Link>
               }
-              illustration="🎲"
+              description={t('emptyState.sessions.body')}
+              icon={Dices}
               title={emptyText}
-            >
-              {t('emptyState.sessions.body')}
-            </EmptyState>
+            />
           )}
 
           {items.length > 0 && (
