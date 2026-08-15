@@ -1,7 +1,7 @@
 {
   "home": {
     "heading": "Home",
-    "eyebrow": "{{today}} · week of {{weekStart}}–{{weekEnd}}",
+    "eyebrow": "{{today}} · week of {{weekRange}}",
     "description": "Everything waiting on you, in one scroll.",
     "actions": {
       "newPoll": "New poll",
@@ -31,7 +31,7 @@
   },
   "discover": {
     "heading": "Discover",
-    "empty": "No sessions to discover right now.",
+    "empty": "Nothing open to join right now.",
     "loadMore": "Load more",
     "organizedBy": "Organized by {{name}}"
   },
@@ -39,12 +39,11 @@
     "home": {
       "title": "Nothing here yet.",
       "description": "Share your friend code to get people on board, or start a session and pick a time.",
-      "body": "Nothing here yet. Share your friend code to get people on board, or start a session and pick a time.",
       "cta": "Share your code",
       "ctaSecondary": "New session"
     },
     "discover": {
-      "body": "Nothing open to join right now. Add a few friends and their public sessions will show up here.",
+      "body": "Add a few friends and their public sessions will show up here.",
       "cta": "Find friends"
     }
   }

@@ -25,7 +25,8 @@ vi.mock('../../api/client', () => ({
   },
 }))
 
-import '../../i18n'
+import i18n from '../../i18n'
+import { DAY_MS, startOfLocaleWeek, weekStartsOnIso } from '../availability/lovable/zone'
 import { HomePage } from './HomePage'
 
 function actionableInbox(
@@ -178,7 +179,7 @@ describe('HomePage', () => {
     ).toBeInTheDocument()
   })
 
-  it('computes the eyebrow as today plus the Monday-Sunday week range_D103', async () => {
+  it('computes the eyebrow as today plus its locale week range, Sunday-first for en_D103', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date(2030, 8, 4, 12, 0, 0)) // Wednesday 4 Sep 2030, local time
     try {
@@ -186,20 +187,64 @@ describe('HomePage', () => {
       const heading = await screen.findByRole('heading', { level: 1, name: 'Home' })
       const eyebrow = heading.parentElement?.querySelector('p')
 
+      // Same "fake local" encoding `HomePage.formatEyebrow` uses: the local
+      // wall-clock fields read back through `timeZone: 'UTC'` formatters.
+      const zonedNow = new Date(Date.UTC(2030, 8, 4, 12, 0, 0))
+      const weekStart = startOfLocaleWeek(zonedNow, weekStartsOnIso('en'))
+      const weekEnd = new Date(weekStart.getTime() + 6 * DAY_MS)
+
       const today = new Intl.DateTimeFormat('en', {
         weekday: 'short',
         day: 'numeric',
         month: 'short',
-      }).format(new Date(2030, 8, 4))
-      const weekStart = new Intl.DateTimeFormat('en', { day: 'numeric' }).format(
-        new Date(2030, 8, 2),
-      )
-      const weekEnd = new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short' }).format(
-        new Date(2030, 8, 8),
-      )
+        timeZone: 'UTC',
+      }).format(zonedNow)
+      const weekRange = new Intl.DateTimeFormat('en', {
+        day: 'numeric',
+        month: 'short',
+        timeZone: 'UTC',
+      }).formatRange(weekStart, weekEnd)
 
-      expect(eyebrow?.textContent).toBe(`${today} · week of ${weekStart}–${weekEnd}`)
+      // en resolves Sunday-first (D-103): the displayed week starts on the
+      // Sunday before the Wednesday anchor, not the Monday.
+      expect(weekStart.getUTCDate()).toBe(1)
+      expect(eyebrow?.textContent).toBe(`${today} · week of ${weekRange}`)
     } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('computes the eyebrow week range Monday-first for es, matching the calendar convention_D103', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2030, 8, 4, 12, 0, 0)) // Wednesday 4 Sep 2030, local time
+    await i18n.changeLanguage('es')
+    try {
+      renderPage()
+      const heading = await screen.findByRole('heading', { level: 1, name: 'Inicio' })
+      const eyebrow = heading.parentElement?.querySelector('p')
+
+      const zonedNow = new Date(Date.UTC(2030, 8, 4, 12, 0, 0))
+      const weekStart = startOfLocaleWeek(zonedNow, weekStartsOnIso('es'))
+      const weekEnd = new Date(weekStart.getTime() + 6 * DAY_MS)
+
+      const today = new Intl.DateTimeFormat('es', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        timeZone: 'UTC',
+      }).format(zonedNow)
+      const weekRange = new Intl.DateTimeFormat('es', {
+        day: 'numeric',
+        month: 'short',
+        timeZone: 'UTC',
+      }).formatRange(weekStart, weekEnd)
+
+      // es resolves Monday-first (D-103): the displayed week starts on the
+      // Monday of the Wednesday anchor's week.
+      expect(weekStart.getUTCDate()).toBe(2)
+      expect(eyebrow?.textContent).toBe(`${today} · semana del ${weekRange}`)
+    } finally {
+      await i18n.changeLanguage('en')
       vi.useRealTimers()
     }
   })

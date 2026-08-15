@@ -1,7 +1,7 @@
 {
   "home": {
     "heading": "Inicio",
-    "eyebrow": "{{today}} · semana del {{weekStart}} al {{weekEnd}}",
+    "eyebrow": "{{today}} · semana del {{weekRange}}",
     "description": "Todo lo que te espera, en un solo scroll.",
     "actions": {
       "newPoll": "Nueva encuesta",
@@ -31,7 +31,7 @@
   },
   "discover": {
     "heading": "Descubrir",
-    "empty": "No hay sesiones para descubrir en este momento.",
+    "empty": "No hay nada abierto para unirse ahora.",
     "loadMore": "Cargar más",
     "organizedBy": "Organizado por {{name}}"
   },
@@ -39,12 +39,11 @@
     "home": {
       "title": "Todavía no hay nada aquí.",
       "description": "Comparte tu código de amigo para sumar gente, o crea una sesión y elige un horario.",
-      "body": "Todavía no hay nada aquí. Comparte tu código de amigo para sumar gente, o crea una sesión y elige un horario.",
       "cta": "Compartir mi código",
       "ctaSecondary": "Crear sesión"
     },
     "discover": {
-      "body": "No hay nada abierto para unirse ahora. Agrega algunos amigos y sus sesiones públicas aparecerán aquí.",
+      "body": "Agrega algunos amigos y sus sesiones públicas aparecerán aquí.",
       "cta": "Buscar amigos"
     }
   }

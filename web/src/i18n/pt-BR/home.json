@@ -1,7 +1,7 @@
 {
   "home": {
     "heading": "Início",
-    "eyebrow": "{{today}} · semana de {{weekStart}} a {{weekEnd}}",
+    "eyebrow": "{{today}} · semana de {{weekRange}}",
     "description": "Tudo que precisa de você, em uma rolagem só.",
     "actions": {
       "newPoll": "Nova enquete",
@@ -31,7 +31,7 @@
   },
   "discover": {
     "heading": "Descobrir",
-    "empty": "Nenhuma sessão para descobrir no momento.",
+    "empty": "Nada aberto para entrar agora.",
     "loadMore": "Carregar mais",
     "organizedBy": "Organizado por {{name}}"
   },
@@ -39,12 +39,11 @@
     "home": {
       "title": "Nada por aqui ainda.",
       "description": "Compartilhe seu código de amigo para chamar a galera, ou crie uma sessão e escolha um horário.",
-      "body": "Nada por aqui ainda. Compartilhe seu código de amigo para chamar a galera, ou crie uma sessão e escolha um horário.",
       "cta": "Compartilhar meu código",
       "ctaSecondary": "Criar sessão"
     },
     "discover": {
-      "body": "Nada aberto para entrar agora. Adicione alguns amigos e as sessões públicas deles aparecem aqui.",
+      "body": "Adicione alguns amigos e as sessões públicas deles aparecem aqui.",
       "cta": "Encontrar amigos"
     }
   }

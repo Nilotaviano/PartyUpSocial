@@ -25,6 +25,11 @@ import {
 } from '../availability/availabilityQueries'
 import { PollStatusChip } from '../polls/PollStatusChip'
 import { getPollList, pollKeys, pollWindowState } from '../polls/pollQueries'
+import {
+  DAY_MS,
+  startOfLocaleWeek,
+  weekStartsOnIso,
+} from '../availability/lovable/zone'
 import { SessionStatusChip } from '../sessions/SessionStatusChip'
 import {
   approveJoinRequest,
@@ -45,7 +50,7 @@ const primaryButtonClasses =
 const outlineButtonClasses =
   'inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 font-display text-[13px] font-bold text-foreground hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
 const ghostSeeAllClasses =
-  'inline-flex h-10 shrink-0 items-center justify-center rounded-lg px-3 font-display text-[13px] font-bold text-foreground hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
+  'inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg px-3 font-display text-[13px] font-bold text-foreground hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
 const itemCardClasses =
   'block rounded-xl border border-border bg-background p-3 hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
 const itemTitleClasses = 'truncate font-display text-[15px] font-extrabold'
@@ -58,40 +63,47 @@ const triageTitleClasses = 'block truncate font-display text-[14px] font-bold'
 const triageMetaClasses = 'block truncate text-[12px] text-muted-foreground'
 
 /**
- * D-103's eyebrow: today plus the Monday–Sunday week it falls in, formatted
+ * D-103's eyebrow: today plus the locale's own week it falls in, formatted
  * for the viewer's language via `Intl.DateTimeFormat` — never a hardcoded
- * English string. The week boundary is fixed at Monday (product decision,
- * not a locale-detected first-day-of-week) to match the calendar feature's
- * own week convention (`startOfLocaleWeek`'s ISO default in
- * `features/availability/lovable/zone.ts`).
+ * English string. The week boundary reuses the calendar feature's own
+ * `startOfLocaleWeek`/`weekStartsOnIso` helpers (`features/availability/
+ * lovable/zone.ts`, also driving `CalendarShell`), so Home's "week of" range
+ * always matches what `/calendar` shows for the same locale.
  */
 function formatEyebrow(t: TFunction, locale: string, now: Date): string {
-  const dayOfWeek = now.getDay() // 0 = Sunday .. 6 = Saturday
-  const diffToMonday = (dayOfWeek + 6) % 7
-  const monday = new Date(now)
-  monday.setDate(now.getDate() - diffToMonday)
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
+  // Encode `now`'s local wall-clock fields onto UTC accessors — the "fake
+  // local" convention `zone.ts` documents — so `startOfLocaleWeek`'s
+  // UTC-based day math operates on the viewer's actual local day, and the
+  // formatters below can read it back with `timeZone: 'UTC'`.
+  const zonedNow = new Date(
+    Date.UTC(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      now.getHours(),
+      now.getMinutes(),
+      now.getSeconds(),
+      now.getMilliseconds(),
+    ),
+  )
+  const weekStart = startOfLocaleWeek(zonedNow, weekStartsOnIso(locale))
+  const weekEnd = new Date(weekStart.getTime() + 6 * DAY_MS)
 
-  const sameMonth = monday.getMonth() === sunday.getMonth()
   const todayText = new Intl.DateTimeFormat(locale, {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
-  }).format(now)
-  const weekStartText = new Intl.DateTimeFormat(
-    locale,
-    sameMonth ? { day: 'numeric' } : { day: 'numeric', month: 'short' },
-  ).format(monday)
-  const weekEndText = new Intl.DateTimeFormat(locale, {
+    timeZone: 'UTC',
+  }).format(zonedNow)
+  const weekRangeText = new Intl.DateTimeFormat(locale, {
     day: 'numeric',
     month: 'short',
-  }).format(sunday)
+    timeZone: 'UTC',
+  }).formatRange(weekStart, weekEnd)
 
   return t('home.eyebrow', {
     today: todayText,
-    weekStart: weekStartText,
-    weekEnd: weekEndText,
+    weekRange: weekRangeText,
   })
 }
 
@@ -289,6 +301,7 @@ export function HomePage() {
               role="region"
             >
               <SectionCard icon={AlertCircle} title={t('home.actionable.heading')}>
+                <div className="space-y-2">
                 {actionable.isPending && loading()}
 
                 {!actionable.isPending && !hasActionable && !isQuiet && (
@@ -422,6 +435,7 @@ export function HomePage() {
                     {t('home.actionable.seeAll')}
                   </Link>
                 )}
+                </div>
               </SectionCard>
             </div>
 
@@ -539,7 +553,7 @@ export function HomePage() {
                           className="rounded-xl border border-border bg-background p-3"
                           key={`${window.start}-${index}`}
                         >
-                          <p className={`${itemTitleClasses} tabular-nums`}>
+                          <p className="font-display text-[15px] font-extrabold tabular-nums">
                             {timeFormat.format(new Date(window.start))} –{' '}
                             {timeFormat.format(new Date(window.end))}
                           </p>
