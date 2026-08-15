@@ -99,7 +99,7 @@ import {
  *    all (it never modeled guests, muting, leaving or cancelling) — each is
  *    placed as its own `surface` card in the sidebar, in the same relative
  *    order the pre-port `PollDetailPage` used (guests -> notifications ->
- *    danger zone), directly below the "Legend" card.
+ *    danger zone).
  *  - Every user-facing string moves through `useTranslation('polls')`
  *    (existing S5/S6/S7 keys reused where the meaning matches exactly; new
  *    keys live under `polls:detailLovable`).
@@ -1344,32 +1344,6 @@ export function PollDetailPage() {
                     </li>
                   )
                 })}
-              </ul>
-            </section>
-
-            <section className="order-5 surface p-4">
-              <h3 className="font-display text-base font-extrabold">{t('detailLovable.legendHeading')}</h3>
-              <ul className="mt-2 space-y-1.5 text-[12px]">
-                {(Object.keys(VOTE_META) as VoteValue[]).map((key) => {
-                  const meta = VOTE_META[key]
-                  const Icon = meta.icon
-                  return (
-                    <li key={key} className="flex items-center gap-2">
-                      <span className={cn('grid size-6 shrink-0 place-items-center rounded-lg border', meta.cls)}>
-                        <Icon className="size-3.5" />
-                      </span>
-                      <span className="font-semibold">{t(`vote.${key}`)}</span>
-                      <span className="ml-auto text-muted-foreground">{t('detailLovable.legendHint')}</span>
-                    </li>
-                  )
-                })}
-                <li className="flex items-center gap-2">
-                  <span className="grid size-6 shrink-0 place-items-center rounded-lg border border-border bg-muted">
-                    <History className="size-3.5" />
-                  </span>
-                  <span className="font-semibold">{t('detailLovable.pastOptionLegend')}</span>
-                  <span className="ml-auto text-muted-foreground">{t('detailLovable.pastOptionHint')}</span>
-                </li>
               </ul>
             </section>
 

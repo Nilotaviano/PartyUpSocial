@@ -907,7 +907,6 @@ describe('PollDetailPage (lovable)', () => {
       const summaryOrder = orderOf('Raid night poll')
       const invitedOrder = headingOrderOf(/^Invited/)
       const guestsOrder = headingOrderOf('Guest links')
-      const legendOrder = headingOrderOf('Legend')
       const notificationsOrder = headingOrderOf('Notifications for this poll')
       const dangerOrder = headingOrderOf('Danger zone')
 
@@ -916,7 +915,6 @@ describe('PollDetailPage (lovable)', () => {
         summaryOrder,
         invitedOrder,
         guestsOrder,
-        legendOrder,
         notificationsOrder,
         dangerOrder,
       ]) {
@@ -929,8 +927,7 @@ describe('PollDetailPage (lovable)', () => {
       expect(Number(summaryOrder)).toBe(1)
       expect(Number(invitedOrder)).toBeGreaterThan(2)
       expect(Number(guestsOrder)).toBeGreaterThan(Number(invitedOrder))
-      expect(Number(legendOrder)).toBeGreaterThan(Number(guestsOrder))
-      expect(Number(notificationsOrder)).toBeGreaterThan(Number(legendOrder))
+      expect(Number(notificationsOrder)).toBeGreaterThan(Number(guestsOrder))
       expect(Number(dangerOrder)).toBeGreaterThan(Number(notificationsOrder))
     })
   })
