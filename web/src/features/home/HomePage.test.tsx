@@ -102,7 +102,7 @@ describe('HomePage', () => {
 
     const regions = screen
       .getAllByRole('heading', { level: 2 })
-      .map((el) => el.closest('section')?.dataset.testid)
+      .map((el) => el.closest('[role="region"]')?.getAttribute('data-testid'))
 
     expect(regions).toEqual([
       'home-region-actionable',

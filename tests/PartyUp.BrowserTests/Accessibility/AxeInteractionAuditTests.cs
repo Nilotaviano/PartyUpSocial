@@ -478,6 +478,32 @@ public sealed class AxeInteractionAuditTests(PlaywrightFixture fixture)
     }
 
     /// <summary>
+    /// S1's flagged review item: the account-menu sheet (`AccountMenu.tsx`, right-side `Sheet`
+    /// replacing the old dropdown) plus the shell `NoticeBanner`'s heading-drop — both new in the
+    /// port. The sheet is the only state where its rows exist at all; the route scan never opens it.
+    /// </summary>
+    [Theory]
+    [InlineData(AuditedTheme.Light)]
+    [InlineData(AuditedTheme.Dark)]
+    public async Task AccountMenuSheetOpen_HasNoWcagViolation_D139(AuditedTheme theme)
+    {
+        IBrowserContext organizer = await GetOrganizerContextAsync();
+
+        await AssertInteractionStateIsAxeCleanAsync(
+            "account-menu-sheet-open",
+            theme,
+            organizer,
+            "/app",
+            async page =>
+            {
+                await page.GetByRole(AriaRole.Button, new() { Name = "Account menu" }).ClickAsync();
+                ILocator dialog = page.GetByRole(AriaRole.Dialog);
+                await dialog.WaitForAsync();
+                await Assertions.Expect(dialog.GetByRole(AriaRole.Button).First).ToBeVisibleAsync();
+            });
+    }
+
+    /// <summary>
     /// Round-1 F8 (NOTE, detection-power proof): the 29/29-clean result above is only meaningful if
     /// this harness can actually catch a real violation — this negative control proves it can,
     /// independent of the app, by scanning a deliberately inaccessible DOM (an unlabeled input and

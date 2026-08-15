@@ -1,12 +1,13 @@
 import { useQueries } from '@tanstack/react-query'
 import { useState } from 'react'
+import { Telescope } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { quietChipClasses, raisedInteractiveClasses } from '../../components/ui/classes'
-import { EmptyState } from '../../components/ui/emptyState'
 import { PageHeader } from '../../components/shell/PageHeader'
+import { EmptyState } from '../../components/shell/SectionCard'
 import { PageScaffold } from '../../components/ui/pageScaffold'
 import { Section } from '../../components/ui/section'
 import { StatusBanner } from '../../components/ui/statusBanner'
@@ -73,11 +74,10 @@ export function DiscoverPage() {
                 {t('emptyState.discover.cta')}
               </Link>
             }
-            illustration="🔭"
+            description={t('emptyState.discover.body')}
+            icon={Telescope}
             title={t('discover.empty')}
-          >
-            {t('emptyState.discover.body')}
-          </EmptyState>
+          />
         )}
 
         {items.length > 0 && (

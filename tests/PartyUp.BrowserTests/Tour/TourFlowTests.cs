@@ -89,45 +89,7 @@ public sealed class TourFlowTests(PlaywrightFixture fixture)
 
         // TOUR_DESIGN.md §3's onCloseAutoFocus override: no trigger element exists, so focus lands
         // on the Home link instead.
-        await Assertions.Expect(user.Page.Locator("[data-tour='home']")).ToBeFocusedAsync();
-    }
-
-    /// <summary>
-    /// TOUR_DESIGN.md §3: the nav scrolls horizontally on small screens (`App.tsx:64`) — the
-    /// spotlight's scroll-into-view (not merely the ring) is what makes an off-screen anchor like
-    /// Settings (the eighth stop) reachable at all at a narrow viewport.
-    /// </summary>
-    [Fact]
-    public async Task Spotlight_ScrollsTheOffScreenAnchorIntoViewAtANarrowViewport_D182()
-    {
-        RegisteredUser user = await GetUserAsync();
-        await user.Page.SetViewportSizeAsync(375, 667);
-        await OpenViaReplayAsync(user.Page);
-
-        ILocator settingsAnchor = user.Page.Locator("[data-tour='settings']");
-
-        // Proves the nav genuinely overflows at this width — without this, a nav that happened to
-        // fit everything on screen would pass the post-scroll assertion below for free, without the
-        // spotlight's scroll-into-view doing any real work.
-        await Assertions.Expect(settingsAnchor).Not.ToBeInViewportAsync();
-
-        for (int step = 0; step < 7; step++)
-        {
-            await user.Page.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
-        }
-
-        await user.Page.GetByText("Step 8 of 8: Settings").WaitForAsync();
-        // Ratio = 1 demands full containment and auto-retries, which also waits out the smooth
-        // scroll animation — a one-shot BoundingBox sample here races it on slow runners.
-        await Assertions.Expect(settingsAnchor).ToBeInViewportAsync(new() { Ratio = 1 });
-
-        // Dismiss so a leaked open tour never reaches a later fact sharing this account.
-        IResponse response = await user.Page.RunAndWaitForResponseAsync(
-            () => user.Page.GetByRole(AriaRole.Button, new() { Name = "Skip tour" }).ClickAsync(),
-            candidate => candidate.Url.Contains("/api/v1/me/tour-completed", StringComparison.Ordinal) &&
-                candidate.Request.Method == "POST");
-        Assert.Equal(204, response.Status);
-        await user.Page.SetViewportSizeAsync(1280, 800);
+        await Assertions.Expect(user.Page.Locator("[data-tour='home']:visible")).ToBeFocusedAsync();
     }
 
     /// <summary>
@@ -135,8 +97,8 @@ public sealed class TourFlowTests(PlaywrightFixture fixture)
     /// the active anchor (`TourOverlay.tsx`'s `computeCardPosition`), not pinned to a fixed screen
     /// location — a regression back to a static card would be caught by nothing else (jsdom's
     /// degenerate rects make this unprovable in vitest). A full-width viewport keeps every anchor
-    /// on-screen without the horizontal nav scroll the narrow-viewport spotlight test above already
-    /// covers, so this is purely a geometry check: the card actually moves across three stops
+    /// on-screen (the fixed 5-tab bottom bar and compact TopBar clip nothing at this width), so
+    /// this is purely a geometry check: the card actually moves across three stops
     /// (Home and Settings at the two clamped horizontal extremes, Polls — step 4 — in the
     /// unclamped middle of the nav row, closing the blind spot the two-extreme version left), and
     /// each sampled position mirrors <see cref="AssertCardCenteredOnAnchor"/>'s copy of
@@ -151,9 +113,9 @@ public sealed class TourFlowTests(PlaywrightFixture fixture)
         await user.Page.SetViewportSizeAsync(1280, 800);
         await OpenViaReplayAsync(user.Page);
 
-        ILocator homeAnchor = user.Page.Locator("[data-tour='home']");
-        ILocator pollsAnchor = user.Page.Locator("[data-tour='polls']");
-        ILocator settingsAnchor = user.Page.Locator("[data-tour='settings']");
+        ILocator homeAnchor = user.Page.Locator("[data-tour='home']:visible");
+        ILocator pollsAnchor = user.Page.Locator("[data-tour='polls']:visible");
+        ILocator settingsAnchor = user.Page.Locator("[data-tour='settings']:visible");
         int innerWidth = await user.Page.EvaluateAsync<int>("() => window.innerWidth");
 
         // Auto-retrying — waits out the anchor's own settle the same way the narrow-viewport test's
@@ -233,7 +195,7 @@ public sealed class TourFlowTests(PlaywrightFixture fixture)
         await user.Page.SetViewportSizeAsync(568, 320);
         await OpenViaReplayAsync(user.Page);
 
-        ILocator homeAnchor = user.Page.Locator("[data-tour='home']");
+        ILocator homeAnchor = user.Page.Locator("[data-tour='home']:visible");
         await Assertions.Expect(homeAnchor).ToBeInViewportAsync();
 
         LocatorBoundingBoxResult? anchorBox = await homeAnchor.BoundingBoxAsync();

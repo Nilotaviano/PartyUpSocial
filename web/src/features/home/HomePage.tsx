@@ -9,8 +9,8 @@ import {
 } from '../../components/ui/classes'
 import { EmptyState } from '../../components/ui/emptyState'
 import { PageHeader } from '../../components/shell/PageHeader'
+import { SectionCard } from '../../components/shell/SectionCard'
 import { PageScaffold, PageSlot } from '../../components/ui/pageScaffold'
-import { Section } from '../../components/ui/section'
 import { StatusBanner } from '../../components/ui/statusBanner'
 import {
   availabilityKeys,
@@ -208,12 +208,13 @@ export function HomePage() {
         {/* D-103 region 1 — the attention band (§3.6): a page-scoped triage
             Section, marked by an accent rule only while it actually carries
             work the viewer has to do. */}
-        <Section
+        <div
+          aria-label={t('home.actionable.heading')}
           className={hasActionable ? 'border-l-4 border-accent pl-4' : undefined}
           data-testid="home-region-actionable"
-          title={t('home.actionable.heading')}
-          titleId="home-actionable-heading"
+          role="region"
         >
+        <SectionCard title={t('home.actionable.heading')}>
           {actionable.isPending && loading()}
 
           {!actionable.isPending && !hasActionable && !isQuiet && (
@@ -352,14 +353,12 @@ export function HomePage() {
               {t('home.actionable.seeAll')}
             </Link>
           )}
-        </Section>
+        </SectionCard>
+        </div>
 
         {/* D-103 region 2 (Phase 6 S7 fill): the involved band's still-polling polls. */}
-        <Section
-          data-testid="home-region-polls"
-          title={t('home.polls.heading')}
-          titleId="home-polls-heading"
-        >
+        <div aria-label={t('home.polls.heading')} data-testid="home-region-polls" role="region">
+        <SectionCard title={t('home.polls.heading')}>
           {polls.isPending && loading()}
           {/* The one section-empty line that stays: `HomePage.test.tsx` binds it
               as the honest disclosure of the polling-only predicate above. */}
@@ -387,14 +386,16 @@ export function HomePage() {
               </Link>
             </>
           )}
-        </Section>
+        </SectionCard>
+        </div>
 
         {/* D-103 region 3 */}
-        <Section
+        <div
+          aria-label={t('home.upcoming.heading')}
           data-testid="home-region-upcoming"
-          title={t('home.upcoming.heading')}
-          titleId="home-upcoming-heading"
+          role="region"
         >
+        <SectionCard title={t('home.upcoming.heading')}>
           {upcoming.isPending && loading()}
           {upcomingItems.length > 0 && (
             <ul>
@@ -420,14 +421,16 @@ export function HomePage() {
           <Link className={seeAllClasses} to="/sessions/upcoming">
             {t('home.upcoming.seeAll')}
           </Link>
-        </Section>
+        </SectionCard>
+        </div>
 
         {/* D-103 region 4 / D-110 / D-116 */}
-        <Section
+        <div
+          aria-label={t('findATime.heading', { ns: 'availability' })}
           data-testid="home-region-findatime"
-          title={t('findATime.heading', { ns: 'availability' })}
-          titleId="home-findatime-heading"
+          role="region"
         >
+        <SectionCard title={t('findATime.heading', { ns: 'availability' })}>
           <div>
             <Link
               className={`inline-flex items-center gap-2 bg-primary px-4 py-2 text-primary-ink ${raisedInteractiveClasses}`}
@@ -468,14 +471,16 @@ export function HomePage() {
               {t('findATime.seeAll', { ns: 'availability' })}
             </Link>
           )}
-        </Section>
+        </SectionCard>
+        </div>
 
         {/* D-103 region 5 / D-149 */}
-        <Section
+        <div
+          aria-label={t('home.discoverable.heading')}
           data-testid="home-region-discover"
-          title={t('home.discoverable.heading')}
-          titleId="home-discover-heading"
+          role="region"
         >
+        <SectionCard title={t('home.discoverable.heading')}>
           {discover.isPending && loading()}
           {!discover.isPending && discoverItems.length === 0 && !isQuiet && (
             <EmptyState
@@ -516,7 +521,8 @@ export function HomePage() {
           <Link className={seeAllClasses} data-tour="discover" to="/discover">
             {t('home.discoverable.seeAll')}
           </Link>
-        </Section>
+        </SectionCard>
+        </div>
       </PageScaffold>
     </main>
   )

@@ -1,8 +1,6 @@
 {
   "nav": {
     "sessions": "Sessões",
-    "upcoming": "Próximas",
-    "history": "Histórico",
     "backToList": "Voltar às sessões",
     "backToSession": "Voltar à sessão"
   },
