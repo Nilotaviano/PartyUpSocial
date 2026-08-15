@@ -178,6 +178,32 @@ describe('HomePage', () => {
     ).toBeInTheDocument()
   })
 
+  it('computes the eyebrow as today plus the Monday-Sunday week range_D103', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2030, 8, 4, 12, 0, 0)) // Wednesday 4 Sep 2030, local time
+    try {
+      renderPage()
+      const heading = await screen.findByRole('heading', { level: 1, name: 'Home' })
+      const eyebrow = heading.parentElement?.querySelector('p')
+
+      const today = new Intl.DateTimeFormat('en', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+      }).format(new Date(2030, 8, 4))
+      const weekStart = new Intl.DateTimeFormat('en', { day: 'numeric' }).format(
+        new Date(2030, 8, 2),
+      )
+      const weekEnd = new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short' }).format(
+        new Date(2030, 8, 8),
+      )
+
+      expect(eyebrow?.textContent).toBe(`${today} · week of ${weekStart}–${weekEnd}`)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('shows five suggestions with see all_D110_D116', async () => {
     const suggestions = Array.from({ length: 5 }, (_, index) => ({
       start: `2030-08-0${index + 1}T10:00:00Z`,

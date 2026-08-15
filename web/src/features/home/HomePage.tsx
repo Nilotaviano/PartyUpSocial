@@ -1,15 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  AlertCircle,
+  CalendarPlus,
+  Compass,
+  Dices,
+  Gamepad2,
+  Plus,
+  Telescope,
+  UserPlus,
+  Vote,
+} from 'lucide-react'
+import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
-import {
-  quietChipClasses,
-  raisedInteractiveClasses,
-} from '../../components/ui/classes'
-import { EmptyState } from '../../components/ui/emptyState'
 import { PageHeader } from '../../components/shell/PageHeader'
-import { SectionCard } from '../../components/shell/SectionCard'
+import { EmptyState, SectionCard } from '../../components/shell/SectionCard'
 import { PageScaffold, PageSlot } from '../../components/ui/pageScaffold'
 import { StatusBanner } from '../../components/ui/statusBanner'
 import {
@@ -33,11 +40,60 @@ const SUGGESTION_LIMIT = 5
 const UPCOMING_PREVIEW_LIMIT = 5
 const POLLS_PREVIEW_LIMIT = 5
 
-const rowClasses = 'border-t border-ink/25 first:border-t-0'
-const rowLinkClasses =
-  'flex flex-col gap-1 rounded-control px-2 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
-const seeAllClasses =
-  'inline-flex min-h-11 items-center font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
+const primaryButtonClasses =
+  'inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 font-display text-[13px] font-bold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
+const outlineButtonClasses =
+  'inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 font-display text-[13px] font-bold text-foreground hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
+const ghostSeeAllClasses =
+  'inline-flex h-10 shrink-0 items-center justify-center rounded-lg px-3 font-display text-[13px] font-bold text-foreground hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
+const itemCardClasses =
+  'block rounded-xl border border-border bg-background p-3 hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
+const itemTitleClasses = 'truncate font-display text-[15px] font-extrabold'
+const itemMetaClasses = 'mt-1 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground'
+const triageRowClasses =
+  'grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-xl border border-border bg-background px-3 py-2.5 hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
+const triageIconClasses =
+  'grid size-9 shrink-0 place-items-center rounded-full bg-maybe text-maybe-foreground'
+const triageTitleClasses = 'block truncate font-display text-[14px] font-bold'
+const triageMetaClasses = 'block truncate text-[12px] text-muted-foreground'
+
+/**
+ * D-103's eyebrow: today plus the Monday–Sunday week it falls in, formatted
+ * for the viewer's language via `Intl.DateTimeFormat` — never a hardcoded
+ * English string. The week boundary is fixed at Monday (product decision,
+ * not a locale-detected first-day-of-week) to match the calendar feature's
+ * own week convention (`startOfLocaleWeek`'s ISO default in
+ * `features/availability/lovable/zone.ts`).
+ */
+function formatEyebrow(t: TFunction, locale: string, now: Date): string {
+  const dayOfWeek = now.getDay() // 0 = Sunday .. 6 = Saturday
+  const diffToMonday = (dayOfWeek + 6) % 7
+  const monday = new Date(now)
+  monday.setDate(now.getDate() - diffToMonday)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+
+  const sameMonth = monday.getMonth() === sunday.getMonth()
+  const todayText = new Intl.DateTimeFormat(locale, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }).format(now)
+  const weekStartText = new Intl.DateTimeFormat(
+    locale,
+    sameMonth ? { day: 'numeric' } : { day: 'numeric', month: 'short' },
+  ).format(monday)
+  const weekEndText = new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+  }).format(sunday)
+
+  return t('home.eyebrow', {
+    today: todayText,
+    weekStart: weekStartText,
+    weekEnd: weekEndText,
+  })
+}
 
 export function HomePage() {
   const { t, i18n } = useTranslation([
@@ -196,7 +252,23 @@ export function HomePage() {
   return (
     <main data-testid="screen-app">
       <PageScaffold>
-        <PageHeader title={t('home.heading')} />
+        <PageHeader
+          title={t('home.heading')}
+          eyebrow={formatEyebrow(t, i18n.language, new Date())}
+          description={t('home.description')}
+          actions={
+            <>
+              <Link className={primaryButtonClasses} to="/polls/new">
+                <Plus aria-hidden className="size-4" />
+                {t('home.actions.newPoll')}
+              </Link>
+              <Link className={outlineButtonClasses} to="/find-a-time">
+                <CalendarPlus aria-hidden className="size-4" />
+                {t('home.actions.findATime')}
+              </Link>
+            </>
+          }
+        />
         <PageSlot />
 
         {anyError && (
@@ -205,323 +277,339 @@ export function HomePage() {
           </StatusBanner>
         )}
 
-        {/* D-103 region 1 — the attention band (§3.6): a page-scoped triage
-            Section, marked by an accent rule only while it actually carries
-            work the viewer has to do. */}
-        <div
-          aria-label={t('home.actionable.heading')}
-          className={hasActionable ? 'border-l-4 border-accent pl-4' : undefined}
-          data-testid="home-region-actionable"
-          role="region"
-        >
-        <SectionCard title={t('home.actionable.heading')}>
-          {actionable.isPending && loading()}
-
-          {!actionable.isPending && !hasActionable && !isQuiet && (
-            <p className="text-ink-soft">{t('home.actionable.empty')}</p>
-          )}
-
-          {!actionable.isPending && !hasActionable && isQuiet && (
-            <EmptyState
-              action={
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <Link
-                    className={`inline-flex items-center gap-2 bg-primary px-4 py-2 text-primary-ink ${raisedInteractiveClasses}`}
-                    to="/friends"
-                  >
-                    {t('emptyState.home.cta')}
-                  </Link>
-                  <Link
-                    className={`inline-flex items-center gap-2 bg-card px-4 py-2 text-ink ${raisedInteractiveClasses}`}
-                    to="/sessions/new"
-                  >
-                    {t('emptyState.home.ctaSecondary')}
-                  </Link>
-                </div>
-              }
-              illustration="🎲"
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
+          <div className="space-y-4">
+            {/* D-103 region 1 — the attention band (§3.6): a page-scoped triage
+                Section, marked by an accent rule only while it actually carries
+                work the viewer has to do. */}
+            <div
+              aria-label={t('home.actionable.heading')}
+              className={hasActionable ? 'border-l-4 border-accent pl-4' : undefined}
+              data-testid="home-region-actionable"
+              role="region"
             >
-              {t('emptyState.home.body')}
-            </EmptyState>
-          )}
+              <SectionCard icon={AlertCircle} title={t('home.actionable.heading')}>
+                {actionable.isPending && loading()}
 
-          {invitations.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <h3 className="font-display font-semibold text-ink">
-                {t('home.actionable.invitationsHeading')}
-              </h3>
-              <ul>
-                {invitations.map(({ session, invitedAt }) => (
-                  <li key={session.id} className={rowClasses} data-invited-at={invitedAt}>
-                    <div className="flex flex-col gap-2 px-2 py-3">
-                      <Link
-                        className="flex flex-wrap items-center gap-2 rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                        to={`/sessions/${session.id}`}
-                      >
-                        <span className="font-display font-semibold text-ink">
-                          {session.title}
-                        </span>
-                        <SessionStatusChip status={session.status} />
-                        <span className={quietChipClasses}>
-                          {timeFormat.format(new Date(session.startTime))}
-                        </span>
-                      </Link>
-                      <div className="flex flex-wrap gap-2">
-                        {(['Going', 'Maybe', 'Declined'] as const).map((choice) => (
-                          <Button
-                            key={choice}
-                            disabled={respond.isPending}
-                            type="button"
-                            variant="neutral"
-                            onClick={() =>
-                              respond.mutate({ sessionId: session.id, response: choice })
-                            }
+                {!actionable.isPending && !hasActionable && !isQuiet && (
+                  <p className="text-ink-soft">{t('home.actionable.empty')}</p>
+                )}
+
+                {!actionable.isPending && !hasActionable && isQuiet && (
+                  <EmptyState
+                    action={
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <Link className={primaryButtonClasses} to="/friends">
+                          {t('emptyState.home.cta')}
+                        </Link>
+                        <Link className={outlineButtonClasses} to="/sessions/new">
+                          {t('emptyState.home.ctaSecondary')}
+                        </Link>
+                      </div>
+                    }
+                    description={t('emptyState.home.description')}
+                    icon={Dices}
+                    title={t('emptyState.home.title')}
+                  />
+                )}
+
+                {invitations.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <h3 className="font-display font-semibold text-ink">
+                      {t('home.actionable.invitationsHeading')}
+                    </h3>
+                    <ul className="space-y-2">
+                      {invitations.map(({ session, invitedAt }) => (
+                        <li key={session.id} data-invited-at={invitedAt}>
+                          <Link className={triageRowClasses} to={`/sessions/${session.id}`}>
+                            <span className={triageIconClasses}>
+                              <Gamepad2 aria-hidden className="size-4" />
+                            </span>
+                            <span className="min-w-0">
+                              <span className={triageTitleClasses}>{session.title}</span>
+                              <span className={triageMetaClasses}>
+                                {timeFormat.format(new Date(session.startTime))}
+                              </span>
+                            </span>
+                          </Link>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 pl-12">
+                            <SessionStatusChip status={session.status} />
+                            {(['Going', 'Maybe', 'Declined'] as const).map((choice) => (
+                              <Button
+                                key={choice}
+                                disabled={respond.isPending}
+                                type="button"
+                                variant="neutral"
+                                onClick={() =>
+                                  respond.mutate({ sessionId: session.id, response: choice })
+                                }
+                              >
+                                {t(`rsvp.${choice.toLowerCase()}`, { ns: 'sessions' })}
+                              </Button>
+                            ))}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {joinRequests.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <h3 className="font-display font-semibold text-ink">
+                      {t('home.actionable.joinRequestsHeading')}
+                    </h3>
+                    <ul className="space-y-2">
+                      {joinRequests.map((request) => (
+                        <li key={request.joinRequestId}>
+                          <Link
+                            className={triageRowClasses}
+                            to={`/sessions/${request.session.id}`}
                           >
-                            {t(`rsvp.${choice.toLowerCase()}`, { ns: 'sessions' })}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+                            <span className={triageIconClasses}>
+                              <UserPlus aria-hidden className="size-4" />
+                            </span>
+                            <span className="min-w-0">
+                              <span className={triageTitleClasses}>
+                                {request.session.title}
+                              </span>
+                              <span className={triageMetaClasses}>
+                                {t('home.actionable.requestedBy', {
+                                  name:
+                                    request.requester.displayName ??
+                                    t('detail.anonymous', { ns: 'sessions' }),
+                                })}
+                              </span>
+                            </span>
+                          </Link>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 pl-12">
+                            <SessionStatusChip status={request.session.status} />
+                            <Button
+                              disabled={approve.isPending}
+                              type="button"
+                              variant="neutral"
+                              onClick={() =>
+                                approve.mutate({
+                                  sessionId: request.session.id,
+                                  requestId: request.joinRequestId,
+                                })
+                              }
+                            >
+                              {t('join.approve', { ns: 'sessions' })}
+                            </Button>
+                            <Button
+                              disabled={reject.isPending}
+                              type="button"
+                              variant="neutral"
+                              onClick={() =>
+                                reject.mutate({
+                                  sessionId: request.session.id,
+                                  requestId: request.joinRequestId,
+                                })
+                              }
+                            >
+                              {t('join.reject', { ns: 'sessions' })}
+                            </Button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
-          {joinRequests.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <h3 className="font-display font-semibold text-ink">
-                {t('home.actionable.joinRequestsHeading')}
-              </h3>
-              <ul>
-                {joinRequests.map((request) => (
-                  <li key={request.joinRequestId} className={rowClasses}>
-                    <div className="flex flex-col gap-2 px-2 py-3">
-                      <Link
-                        className="flex flex-wrap items-center gap-2 rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                        to={`/sessions/${request.session.id}`}
-                      >
-                        <span className="font-display font-semibold text-ink">
-                          {request.session.title}
-                        </span>
-                        <SessionStatusChip status={request.session.status} />
-                      </Link>
-                      <p className="text-ink-soft">
-                        {t('home.actionable.requestedBy', {
-                          name:
-                            request.requester.displayName ??
-                            t('detail.anonymous', { ns: 'sessions' }),
-                        })}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          disabled={approve.isPending}
-                          type="button"
-                          variant="neutral"
-                          onClick={() =>
-                            approve.mutate({
-                              sessionId: request.session.id,
-                              requestId: request.joinRequestId,
-                            })
-                          }
-                        >
-                          {t('join.approve', { ns: 'sessions' })}
-                        </Button>
-                        <Button
-                          disabled={reject.isPending}
-                          type="button"
-                          variant="neutral"
-                          onClick={() =>
-                            reject.mutate({
-                              sessionId: request.session.id,
-                              requestId: request.joinRequestId,
-                            })
-                          }
-                        >
-                          {t('join.reject', { ns: 'sessions' })}
-                        </Button>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {hasActionable && hasMoreActionable && (
-            <Link className={seeAllClasses} to="/sessions/upcoming">
-              {t('home.actionable.seeAll')}
-            </Link>
-          )}
-        </SectionCard>
-        </div>
-
-        {/* D-103 region 2 (Phase 6 S7 fill): the involved band's still-polling polls. */}
-        <div aria-label={t('home.polls.heading')} data-testid="home-region-polls" role="region">
-        <SectionCard title={t('home.polls.heading')}>
-          {polls.isPending && loading()}
-          {/* The one section-empty line that stays: `HomePage.test.tsx` binds it
-              as the honest disclosure of the polling-only predicate above. */}
-          {!polls.isPending && pollItems.length === 0 && (
-            <p className="text-ink-soft">{t('home.polls.empty')}</p>
-          )}
-          {pollItems.length > 0 && (
-            <>
-              <ul data-testid="home-polls-list">
-                {pollItems.map((poll) => (
-                  <li key={poll.id} className={rowClasses}>
-                    <Link className={rowLinkClasses} to={`/polls/${poll.id}`}>
-                      <span className="font-display font-semibold text-ink">
-                        {poll.title}
-                      </span>
-                      <span className="flex flex-wrap items-center gap-2">
-                        <PollStatusChip poll={poll} />
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-              <Link className={seeAllClasses} to="/polls">
-                {t('home.polls.seeAll')}
-              </Link>
-            </>
-          )}
-        </SectionCard>
-        </div>
-
-        {/* D-103 region 3 */}
-        <div
-          aria-label={t('home.upcoming.heading')}
-          data-testid="home-region-upcoming"
-          role="region"
-        >
-        <SectionCard title={t('home.upcoming.heading')}>
-          {upcoming.isPending && loading()}
-          {upcomingItems.length > 0 && (
-            <ul>
-              {upcomingItems.map((session) => (
-                <li key={session.id} className={rowClasses}>
-                  <Link className={rowLinkClasses} to={`/sessions/${session.id}`}>
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="font-display font-semibold text-ink">
-                        {session.title}
-                      </span>
-                      <SessionStatusChip status={session.status} />
-                    </span>
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className={quietChipClasses}>
-                        {timeFormat.format(new Date(session.startTime))}
-                      </span>
-                    </span>
+                {hasActionable && hasMoreActionable && (
+                  <Link className={ghostSeeAllClasses} to="/sessions/upcoming">
+                    {t('home.actionable.seeAll')}
                   </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-          <Link className={seeAllClasses} to="/sessions/upcoming">
-            {t('home.upcoming.seeAll')}
-          </Link>
-        </SectionCard>
-        </div>
+                )}
+              </SectionCard>
+            </div>
 
-        {/* D-103 region 4 / D-110 / D-116 */}
-        <div
-          aria-label={t('findATime.heading', { ns: 'availability' })}
-          data-testid="home-region-findatime"
-          role="region"
-        >
-        <SectionCard title={t('findATime.heading', { ns: 'availability' })}>
-          <div>
-            <Link
-              className={`inline-flex items-center gap-2 bg-primary px-4 py-2 text-primary-ink ${raisedInteractiveClasses}`}
-              to="/find-a-time"
+            {/* D-103 region 2 (Phase 6 S7 fill): the involved band's still-polling polls. */}
+            <div
+              aria-label={t('home.polls.heading')}
+              data-testid="home-region-polls"
+              role="region"
             >
-              {t('findATime.heading', { ns: 'availability' })}
-            </Link>
+              <SectionCard
+                action={
+                  pollItems.length > 0 && (
+                    <Link className={ghostSeeAllClasses} to="/polls">
+                      {t('home.polls.seeAll')}
+                    </Link>
+                  )
+                }
+                icon={Vote}
+                title={t('home.polls.heading')}
+              >
+                {polls.isPending && loading()}
+                {/* The one section-empty line that stays: `HomePage.test.tsx` binds it
+                    as the honest disclosure of the polling-only predicate above. */}
+                {!polls.isPending && pollItems.length === 0 && (
+                  <p className="text-ink-soft">{t('home.polls.empty')}</p>
+                )}
+                {pollItems.length > 0 && (
+                  <ul className="space-y-2" data-testid="home-polls-list">
+                    {pollItems.map((poll) => (
+                      <li key={poll.id}>
+                        <Link className={itemCardClasses} to={`/polls/${poll.id}`}>
+                          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                            <span className={itemTitleClasses}>{poll.title}</span>
+                            <PollStatusChip poll={poll} />
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </SectionCard>
+            </div>
           </div>
 
-          {suggestions.isPending && loading()}
-          {suggestionItems.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <h3 className="font-display font-semibold text-ink">
-                {t('findATime.suggestionsHeading', { ns: 'availability' })}
-              </h3>
-              <ul data-testid="home-suggestions-list">
-                {suggestionItems.map((window, index) => (
-                  <li key={`${window.start}-${index}`} className={rowClasses}>
-                    <div className="flex flex-col gap-1 px-2 py-3">
-                      <span className="text-ink">
-                        {timeFormat.format(new Date(window.start))} –{' '}
-                        {timeFormat.format(new Date(window.end))}
-                      </span>
-                      <span className="text-meta text-ink-soft">
-                        {t('findATime.available', {
-                          ns: 'availability',
-                          count: window.available.length,
-                        })}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {suggestions.data?.hasMore && (
-            <Link className={seeAllClasses} to="/find-a-time">
-              {t('findATime.seeAll', { ns: 'availability' })}
-            </Link>
-          )}
-        </SectionCard>
-        </div>
-
-        {/* D-103 region 5 / D-149 */}
-        <div
-          aria-label={t('home.discoverable.heading')}
-          data-testid="home-region-discover"
-          role="region"
-        >
-        <SectionCard title={t('home.discoverable.heading')}>
-          {discover.isPending && loading()}
-          {!discover.isPending && discoverItems.length === 0 && !isQuiet && (
-            <EmptyState
-              action={
-                <Link
-                  className={`inline-flex items-center gap-2 bg-primary px-4 py-2 text-primary-ink ${raisedInteractiveClasses}`}
-                  to="/friends"
-                >
-                  {t('emptyState.discover.cta')}
-                </Link>
-              }
-              illustration="🔭"
+          <div className="space-y-4">
+            {/* D-103 region 3 */}
+            <div
+              aria-label={t('home.upcoming.heading')}
+              data-testid="home-region-upcoming"
+              role="region"
             >
-              {t('emptyState.discover.body')}
-            </EmptyState>
-          )}
-          {discoverItems.length > 0 && (
-            <ul data-testid="home-discover-list">
-              {discoverItems.map((session) => (
-                <li key={session.id} className={rowClasses}>
-                  <Link className={rowLinkClasses} to={`/sessions/${session.id}`}>
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="font-display font-semibold text-ink">
-                        {session.title}
-                      </span>
-                      <SessionStatusChip status={session.status} />
-                    </span>
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className={quietChipClasses}>
-                        {timeFormat.format(new Date(session.startTime))}
-                      </span>
-                    </span>
+              <SectionCard
+                action={
+                  <Link className={ghostSeeAllClasses} to="/sessions/upcoming">
+                    {t('home.upcoming.seeAll')}
                   </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-          <Link className={seeAllClasses} data-tour="discover" to="/discover">
-            {t('home.discoverable.seeAll')}
-          </Link>
-        </SectionCard>
+                }
+                icon={Gamepad2}
+                title={t('home.upcoming.heading')}
+              >
+                {upcoming.isPending && loading()}
+                {upcomingItems.length > 0 && (
+                  <ul className="space-y-2">
+                    {upcomingItems.map((session) => (
+                      <li key={session.id}>
+                        <Link className={itemCardClasses} to={`/sessions/${session.id}`}>
+                          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                            <span className={itemTitleClasses}>{session.title}</span>
+                            <SessionStatusChip status={session.status} />
+                          </div>
+                          <p className={`${itemMetaClasses} tabular-nums`}>
+                            {timeFormat.format(new Date(session.startTime))}
+                          </p>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </SectionCard>
+            </div>
+
+            {/* D-103 region 4 / D-110 / D-116 */}
+            <div
+              aria-label={t('findATime.heading', { ns: 'availability' })}
+              data-testid="home-region-findatime"
+              role="region"
+            >
+              <SectionCard
+                action={
+                  suggestions.data?.hasMore && (
+                    <Link className={ghostSeeAllClasses} to="/find-a-time">
+                      {t('findATime.seeAll', { ns: 'availability' })}
+                    </Link>
+                  )
+                }
+                icon={CalendarPlus}
+                title={t('findATime.heading', { ns: 'availability' })}
+              >
+                <div>
+                  <Link className={outlineButtonClasses} to="/find-a-time">
+                    <CalendarPlus aria-hidden className="size-4" />
+                    {t('findATime.heading', { ns: 'availability' })}
+                  </Link>
+                </div>
+
+                {suggestions.isPending && loading()}
+                {suggestionItems.length > 0 && (
+                  <div className="mt-3 flex flex-col gap-2">
+                    <h3 className="font-display font-semibold text-ink">
+                      {t('findATime.suggestionsHeading', { ns: 'availability' })}
+                    </h3>
+                    <ul className="space-y-2" data-testid="home-suggestions-list">
+                      {suggestionItems.map((window, index) => (
+                        <li
+                          className="rounded-xl border border-border bg-background p-3"
+                          key={`${window.start}-${index}`}
+                        >
+                          <p className={`${itemTitleClasses} tabular-nums`}>
+                            {timeFormat.format(new Date(window.start))} –{' '}
+                            {timeFormat.format(new Date(window.end))}
+                          </p>
+                          <p className={itemMetaClasses}>
+                            {t('findATime.available', {
+                              ns: 'availability',
+                              count: window.available.length,
+                            })}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </SectionCard>
+            </div>
+
+            {/* D-103 region 5 / D-149 */}
+            <div
+              aria-label={t('home.discoverable.heading')}
+              data-testid="home-region-discover"
+              role="region"
+            >
+              <SectionCard
+                action={
+                  <Link
+                    className={ghostSeeAllClasses}
+                    data-tour="discover"
+                    to="/discover"
+                  >
+                    {t('home.discoverable.seeAll')}
+                  </Link>
+                }
+                icon={Compass}
+                title={t('home.discoverable.heading')}
+              >
+                {discover.isPending && loading()}
+                {!discover.isPending && discoverItems.length === 0 && !isQuiet && (
+                  <EmptyState
+                    action={
+                      <Link className={outlineButtonClasses} to="/friends">
+                        <UserPlus aria-hidden className="size-4" />
+                        {t('emptyState.discover.cta')}
+                      </Link>
+                    }
+                    description={t('emptyState.discover.body')}
+                    icon={Telescope}
+                    title={t('discover.empty')}
+                  />
+                )}
+                {discoverItems.length > 0 && (
+                  <ul className="space-y-2" data-testid="home-discover-list">
+                    {discoverItems.map((session) => (
+                      <li key={session.id}>
+                        <Link className={itemCardClasses} to={`/sessions/${session.id}`}>
+                          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                            <span className={itemTitleClasses}>{session.title}</span>
+                            <SessionStatusChip status={session.status} />
+                          </div>
+                          <p className={`${itemMetaClasses} tabular-nums`}>
+                            {timeFormat.format(new Date(session.startTime))}
+                          </p>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </SectionCard>
+            </div>
+          </div>
         </div>
       </PageScaffold>
     </main>

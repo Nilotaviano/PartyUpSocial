@@ -1,6 +1,12 @@
 {
   "home": {
     "heading": "Início",
+    "eyebrow": "{{today}} · semana de {{weekStart}} a {{weekEnd}}",
+    "description": "Tudo que precisa de você, em uma rolagem só.",
+    "actions": {
+      "newPoll": "Nova enquete",
+      "findATime": "Achar um horário"
+    },
     "actionable": {
       "heading": "Precisa da sua atenção",
       "invitationsHeading": "Convites",
@@ -31,6 +37,8 @@
   },
   "emptyState": {
     "home": {
+      "title": "Nada por aqui ainda.",
+      "description": "Compartilhe seu código de amigo para chamar a galera, ou crie uma sessão e escolha um horário.",
       "body": "Nada por aqui ainda. Compartilhe seu código de amigo para chamar a galera, ou crie uma sessão e escolha um horário.",
       "cta": "Compartilhar meu código",
       "ctaSecondary": "Criar sessão"

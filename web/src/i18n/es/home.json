@@ -1,6 +1,12 @@
 {
   "home": {
     "heading": "Inicio",
+    "eyebrow": "{{today}} · semana del {{weekStart}} al {{weekEnd}}",
+    "description": "Todo lo que te espera, en un solo scroll.",
+    "actions": {
+      "newPoll": "Nueva encuesta",
+      "findATime": "Buscar un horario"
+    },
     "actionable": {
       "heading": "Necesita tu atención",
       "invitationsHeading": "Invitaciones",
@@ -31,6 +37,8 @@
   },
   "emptyState": {
     "home": {
+      "title": "Todavía no hay nada aquí.",
+      "description": "Comparte tu código de amigo para sumar gente, o crea una sesión y elige un horario.",
       "body": "Todavía no hay nada aquí. Comparte tu código de amigo para sumar gente, o crea una sesión y elige un horario.",
       "cta": "Compartir mi código",
       "ctaSecondary": "Crear sesión"

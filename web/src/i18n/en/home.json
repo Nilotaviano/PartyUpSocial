@@ -1,6 +1,12 @@
 {
   "home": {
     "heading": "Home",
+    "eyebrow": "{{today}} · week of {{weekStart}}–{{weekEnd}}",
+    "description": "Everything waiting on you, in one scroll.",
+    "actions": {
+      "newPoll": "New poll",
+      "findATime": "Find a time"
+    },
     "actionable": {
       "heading": "Needs your attention",
       "invitationsHeading": "Invitations",
@@ -31,6 +37,8 @@
   },
   "emptyState": {
     "home": {
+      "title": "Nothing here yet.",
+      "description": "Share your friend code to get people on board, or start a session and pick a time.",
       "body": "Nothing here yet. Share your friend code to get people on board, or start a session and pick a time.",
       "cta": "Share your code",
       "ctaSecondary": "New session"
