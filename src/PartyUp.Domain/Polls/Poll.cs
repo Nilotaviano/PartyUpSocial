@@ -31,7 +31,7 @@ public sealed class Poll : AggregateRoot
     private readonly List<JoinRequest> _joinRequests = [];
     private readonly List<GuestIdentity> _guestIdentities = [];
     private readonly List<GuestLink> _guestLinks = [];
-    private readonly List<FriendGroupId> _audienceGroupIds = [];
+    private readonly List<PollAudienceGroup> _audienceGroups = [];
 
     private Poll()
     {
@@ -56,7 +56,7 @@ public sealed class Poll : AggregateRoot
         MaxCapacity = details.MaxCapacity;
         Visibility = details.Visibility;
         DeadlineChoice = deadlineChoice;
-        _audienceGroupIds.AddRange(audienceGroupIds);
+        _audienceGroups.AddRange(audienceGroupIds.Select(id => new PollAudienceGroup(id)));
         Deadline = deadlineChoice.DeadlineFrom(createdAt);
         Status = PollStatus.Polling;
         CreatedAt = createdAt;
@@ -83,7 +83,7 @@ public sealed class Poll : AggregateRoot
     public ContentVisibility Visibility { get; private set; }
 
     /// <summary>D-201: the friend groups a <c>Groups</c> poll is shared with; empty otherwise.</summary>
-    public IReadOnlyCollection<FriendGroupId> AudienceGroupIds => _audienceGroupIds;
+    public IReadOnlyCollection<FriendGroupId> AudienceGroupIds => [.. _audienceGroups.Select(row => row.GroupId)];
 
     /// <summary>D-070: 6, 12, 24 or 48 hours; 24 is the D-131 default, applied by the application layer.</summary>
     public PollDeadlineChoice DeadlineChoice { get; private set; }
@@ -689,7 +689,7 @@ public sealed class Poll : AggregateRoot
             roster,
             initialStatus,
             clock,
-            [.. _audienceGroupIds]);
+            [.. _audienceGroups.Select(row => row.GroupId)]);
 
         foreach (GuestIdentity identity in _guestIdentities)
         {

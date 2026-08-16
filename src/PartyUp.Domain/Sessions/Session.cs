@@ -20,7 +20,7 @@ public sealed class Session : AggregateRoot
     private readonly List<JoinRequest> _joinRequests = [];
     private readonly List<GuestIdentity> _guestIdentities = [];
     private readonly List<GuestLink> _guestLinks = [];
-    private readonly List<FriendGroupId> _audienceGroupIds = [];
+    private readonly List<SessionAudienceGroup> _audienceGroups = [];
 
     private Session()
     {
@@ -47,7 +47,7 @@ public sealed class Session : AggregateRoot
         MaxCapacity = details.MaxCapacity;
         Visibility = details.Visibility;
         OriginPollId = originPollId;
-        _audienceGroupIds.AddRange(audienceGroupIds);
+        _audienceGroups.AddRange(audienceGroupIds.Select(id => new SessionAudienceGroup(id)));
         Status = status;
         CreatedAt = createdAt;
     }
@@ -77,7 +77,7 @@ public sealed class Session : AggregateRoot
     public ContentVisibility Visibility { get; private set; }
 
     /// <summary>D-201: the friend groups a <c>Groups</c> session is shared with; empty otherwise.</summary>
-    public IReadOnlyCollection<FriendGroupId> AudienceGroupIds => _audienceGroupIds;
+    public IReadOnlyCollection<FriendGroupId> AudienceGroupIds => [.. _audienceGroups.Select(row => row.GroupId)];
 
     /// <summary>Set by poll finalization — D-160's poll→session success linkage.</summary>
     public PollId? OriginPollId { get; private set; }
@@ -896,8 +896,8 @@ public sealed class Session : AggregateRoot
         }
 
         Visibility = visibility;
-        _audienceGroupIds.Clear();
-        _audienceGroupIds.AddRange(audienceGroupIds);
+        _audienceGroups.Clear();
+        _audienceGroups.AddRange(audienceGroupIds.Select(id => new SessionAudienceGroup(id)));
     }
 
     /// <summary>D-082: a per-session override of the account reminder default; registered only.</summary>

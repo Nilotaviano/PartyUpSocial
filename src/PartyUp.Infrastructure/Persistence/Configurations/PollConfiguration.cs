@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.ValueGeneration;
 using NodaTime;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
@@ -44,6 +45,19 @@ public sealed class PollConfiguration : IEntityTypeConfiguration<Poll>
             game.Property(value => value!.SteamAppId).HasColumnName("game_steam_app_id");
         });
         builder.Navigation(poll => poll.Game).IsRequired(false);
+        builder.OwnsMany<PollAudienceGroup>("_audienceGroups", audience =>
+        {
+            audience.ToTable("poll_audience_groups");
+            audience.WithOwner().HasForeignKey("PollId");
+            audience.Property<PollId>("PollId").HasConversion(new TypedIdConverter<PollId>());
+            audience.Property(row => row.GroupId).HasConversion(new TypedIdConverter<FriendGroupId>());
+            audience.HasKey("PollId", nameof(PollAudienceGroup.GroupId));
+            // D-205: hard-deleting a group empties every audience that targeted it.
+            audience.HasOne<FriendGroup>()
+                .WithMany()
+                .HasForeignKey(row => row.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
 
         // D-088/§1: the 48-hour selection-window end is a pure function of Deadline, but the
         // materialized-status invariant forbids deriving it in a query — this shadow column is

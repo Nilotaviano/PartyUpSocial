@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
@@ -39,6 +40,19 @@ public sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
             game.Property(value => value!.SteamAppId).HasColumnName("game_steam_app_id");
         });
         builder.Navigation(session => session.Game).IsRequired(false);
+        builder.OwnsMany<SessionAudienceGroup>("_audienceGroups", audience =>
+        {
+            audience.ToTable("session_audience_groups");
+            audience.WithOwner().HasForeignKey("SessionId");
+            audience.Property<SessionId>("SessionId").HasConversion(new TypedIdConverter<SessionId>());
+            audience.Property(row => row.GroupId).HasConversion(new TypedIdConverter<FriendGroupId>());
+            audience.HasKey("SessionId", nameof(SessionAudienceGroup.GroupId));
+            // D-205: hard-deleting a group empties every audience that targeted it.
+            audience.HasOne<FriendGroup>()
+                .WithMany()
+                .HasForeignKey(row => row.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
         builder.Ignore(session => session.EndTime);
         builder.Ignore(session => session.Window);
         builder.Ignore(session => session.IsTerminal);

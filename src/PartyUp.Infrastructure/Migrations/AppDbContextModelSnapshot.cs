@@ -284,6 +284,41 @@ namespace PartyUp.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("PartyUp.Domain.FriendGroups.FriendGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_user_id");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_friend_groups");
+
+                    b.HasIndex("OwnerId")
+                        .HasDatabaseName("ix_friend_groups_owner");
+
+                    b.ToTable("friend_groups", (string)null);
+                });
+
             modelBuilder.Entity("PartyUp.Domain.Friendships.Block", b =>
                 {
                     b.Property<Guid>("Id")
@@ -605,10 +640,6 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("duration_minutes");
 
-                    b.Property<bool>("IsPrivate")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_private");
-
                     b.Property<int?>("MaxCapacity")
                         .HasColumnType("integer")
                         .HasColumnName("max_capacity");
@@ -650,6 +681,10 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasColumnType("character varying(80)")
                         .HasColumnName("title");
 
+                    b.Property<short>("Visibility")
+                        .HasColumnType("smallint")
+                        .HasColumnName("visibility");
+
                     b.HasKey("Id")
                         .HasName("pk_polls");
 
@@ -668,6 +703,8 @@ namespace PartyUp.Infrastructure.Migrations
                             t.HasCheckConstraint("ck_polls_game_shape", "(game_steam_app_id IS NULL OR platform = 0) AND (game_steam_app_id IS NULL OR game_name IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_polls_min_attendance", "min_attendance >= 1");
+
+                            t.HasCheckConstraint("ck_polls_visibility", "visibility IN (0, 1, 2)");
                         });
                 });
 
@@ -1030,10 +1067,6 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("duration_minutes");
 
-                    b.Property<bool>("IsPrivate")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_private");
-
                     b.Property<int?>("MaxCapacity")
                         .HasColumnType("integer")
                         .HasColumnName("max_capacity");
@@ -1074,6 +1107,10 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasColumnType("character varying(80)")
                         .HasColumnName("title");
 
+                    b.Property<short>("Visibility")
+                        .HasColumnType("smallint")
+                        .HasColumnName("visibility");
+
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -1102,6 +1139,8 @@ namespace PartyUp.Infrastructure.Migrations
                             t.HasCheckConstraint("ck_sessions_game_shape", "(game_steam_app_id IS NULL OR platform = 0) AND (game_steam_app_id IS NULL OR game_name IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_sessions_min_attendance", "min_attendance >= 1");
+
+                            t.HasCheckConstraint("ck_sessions_visibility", "visibility IN (0, 1, 2)");
                         });
                 });
 
@@ -1819,6 +1858,65 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasConstraintName("fk_availability_series_users_owner_id");
                 });
 
+            modelBuilder.Entity("PartyUp.Domain.FriendGroups.FriendGroup", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_friend_groups_users_owner_user_id");
+
+                    b.OwnsMany("PartyUp.Domain.FriendGroups.FriendGroupMember", "Members", b1 =>
+                        {
+                            b1.Property<Guid>("GroupId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("group_id");
+
+                            b1.Property<Guid>("UserId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("user_id");
+
+                            b1.Property<Instant?>("AcceptedAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("accepted_at");
+
+                            b1.Property<Instant>("InvitedAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("invited_at");
+
+                            b1.Property<short>("Status")
+                                .HasColumnType("smallint")
+                                .HasColumnName("status");
+
+                            b1.HasKey("GroupId", "UserId")
+                                .HasName("pk_friend_group_members");
+
+                            b1.HasIndex("UserId")
+                                .HasDatabaseName("ix_friend_group_members_user");
+
+                            b1.ToTable("friend_group_members", null, t =>
+                                {
+                                    t.HasCheckConstraint("ck_friend_group_members_accept_time", "(status = 0 AND accepted_at IS NULL) OR (status = 1 AND accepted_at IS NOT NULL)");
+
+                                    t.HasCheckConstraint("ck_friend_group_members_status", "status IN (0, 1)");
+                                });
+
+                            b1.WithOwner()
+                                .HasForeignKey("GroupId")
+                                .HasConstraintName("fk_friend_group_members_friend_groups_group_id");
+
+                            b1.HasOne("PartyUp.Domain.Users.User", null)
+                                .WithMany()
+                                .HasForeignKey("UserId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .IsRequired()
+                                .HasConstraintName("fk_friend_group_members_users_user_id");
+                        });
+
+                    b.Navigation("Members");
+                });
+
             modelBuilder.Entity("PartyUp.Domain.Friendships.Block", b =>
                 {
                     b.HasOne("PartyUp.Domain.Users.User", null)
@@ -1954,7 +2052,36 @@ namespace PartyUp.Infrastructure.Migrations
                                 .HasConstraintName("fk_polls_polls_id");
                         });
 
+                    b.OwnsMany("PartyUp.Domain.Polls.PollAudienceGroup", "_audienceGroups", b1 =>
+                        {
+                            b1.Property<Guid>("PollId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("poll_id");
+
+                            b1.Property<Guid>("GroupId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("group_id");
+
+                            b1.HasKey("PollId", "GroupId")
+                                .HasName("pk_poll_audience_groups");
+
+                            b1.ToTable("poll_audience_groups", (string)null);
+
+                            b1.HasOne("PartyUp.Domain.FriendGroups.FriendGroup", null)
+                                .WithMany()
+                                .HasForeignKey("GroupId")
+                                .OnDelete(DeleteBehavior.Cascade)
+                                .IsRequired()
+                                .HasConstraintName("fk_poll_audience_groups_friend_groups_group_id");
+
+                            b1.WithOwner()
+                                .HasForeignKey("PollId")
+                                .HasConstraintName("fk_poll_audience_groups_polls_poll_id");
+                        });
+
                     b.Navigation("Game");
+
+                    b.Navigation("_audienceGroups");
                 });
 
             modelBuilder.Entity("PartyUp.Domain.Polls.PollOption", b =>
@@ -2138,7 +2265,36 @@ namespace PartyUp.Infrastructure.Migrations
                                 .HasConstraintName("fk_sessions_sessions_id");
                         });
 
+                    b.OwnsMany("PartyUp.Domain.Sessions.SessionAudienceGroup", "_audienceGroups", b1 =>
+                        {
+                            b1.Property<Guid>("SessionId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("session_id");
+
+                            b1.Property<Guid>("GroupId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("group_id");
+
+                            b1.HasKey("SessionId", "GroupId")
+                                .HasName("pk_session_audience_groups");
+
+                            b1.ToTable("session_audience_groups", (string)null);
+
+                            b1.HasOne("PartyUp.Domain.FriendGroups.FriendGroup", null)
+                                .WithMany()
+                                .HasForeignKey("GroupId")
+                                .OnDelete(DeleteBehavior.Cascade)
+                                .IsRequired()
+                                .HasConstraintName("fk_session_audience_groups_friend_groups_group_id");
+
+                            b1.WithOwner()
+                                .HasForeignKey("SessionId")
+                                .HasConstraintName("fk_session_audience_groups_sessions_session_id");
+                        });
+
                     b.Navigation("Game");
+
+                    b.Navigation("_audienceGroups");
                 });
 
             modelBuilder.Entity("PartyUp.Domain.Users.AvatarSource", b =>
