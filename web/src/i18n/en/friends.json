@@ -5,7 +5,6 @@
     "listDescription": "Who you play with, and how to grow the crew.",
     "profile": "Profile",
     "add": "Add a friend",
-    "share": "Share your PartyUp profile",
     "importSteam": "Find Steam friends",
     "blocked": "Blocked users",
     "backToFriends": "Back to friends"
@@ -44,15 +43,11 @@
   "labels": {
     "friendCode": "Your friend code",
     "friendCodeHelp": "Spaces and hyphens are removed; letters are capitalized.",
-    "qrCode": "Add-friend QR code",
     "blockedOn": "Blocked {{date}}"
   },
   "status": {
     "loading": "Loading…",
     "none": "Not connected",
-    "incoming_pending": "Request received",
-    "outgoing_pending": "Request sent",
-    "accepted": "Friends",
     "pendingIncoming": "Request received",
     "pendingOutgoing": "Request sent",
     "friends": "Friends",
@@ -82,8 +77,7 @@
     "profileLinkDescription": "Share this link to your PartyUp profile."
   },
   "qr": {
-    "description": "Scan the QR code or use the visible add link below.",
-    "fallback": "Use the add link if you cannot scan the QR code."
+    "description": "Scan the QR code or use the visible add link below."
   },
   "dialogs": {
     "unfriendTitle": "Remove {{username}}?",
@@ -112,9 +106,6 @@
     "refreshFailed": "Your profile is active, but PartyUp could not refresh your secure session."
   },
   "live": {
-    "copied": "{{label}} copied.",
-    "listUpdated": "Friends list updated.",
-    "requestUpdated": "Friend request updated.",
-    "blockUpdated": "Blocked users updated."
+    "copied": "{{label}} copied."
   }
 }

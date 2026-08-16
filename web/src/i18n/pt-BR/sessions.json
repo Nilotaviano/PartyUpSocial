@@ -50,10 +50,7 @@
     "range": "Insira um valor dentro do intervalo permitido.",
     "increment": "Escolha um horário em incrementos de 15 minutos.",
     "minMax": "A presença mínima não pode exceder a capacidade máxima.",
-    "capacity": "A capacidade não pode ser reduzida abaixo do número de pessoas já confirmadas.",
     "invitedFriend": "Uma sessão não privada precisa de pelo menos um amigo convidado.",
-    "startWindow": "Escolha um horário de início dentro da janela de agendamento permitida.",
-    "waitlistCapacity": "Uma lista de espera exige uma capacidade máxima.",
     "tooManyInvitees": "Você pode convidar até 50 amigos.",
     "tooManyGuestLinks": "Você pode criar até 20 links de convidado.",
     "steamAppIdDigits": "Digite apenas o ID numérico do aplicativo Steam.",
@@ -62,13 +59,10 @@
   "detail": {
     "organizer": "Organizador",
     "roster": "Lista de participantes",
-    "status": "Status",
-    "notes": "Notas",
     "going": "Confirmado",
     "maybe": "Talvez",
     "declined": "Recusado",
     "pending": "Pendente",
-    "waitlisted": "Na lista de espera",
     "anonymous": "Usuário Anônimo",
     "inProgress": "Em andamento",
     "muted": "Silenciada",
@@ -113,7 +107,6 @@
     "promote": "Promover",
     "reject": "Remover da lista de espera",
     "vacancy": "Uma vaga foi aberta.",
-    "added": "Adicionado à lista de espera.",
     "promoted": "Promovido da lista de espera."
   },
   "invite": {
@@ -169,7 +162,6 @@
     "live": "Esta sessão está em andamento.",
     "canceled": "Esta sessão foi cancelada.",
     "revoked": "Este link foi revogado.",
-    "removed": "Você foi removido desta sessão.",
     "ended": "Esta sessão terminou.",
     "invalid": "Este link não é válido.",
     "linkExpiredReopen": "Este link expirou. Abra novamente seu link de convite original.",
@@ -182,9 +174,6 @@
     "discard": "Descartar"
   },
   "errors": {
-    "notFound": "Essa sessão não pôde ser encontrada.",
-    "conflict": "Esta sessão mudou em outro lugar. Tente novamente.",
-    "rateLimited": "Muitas tentativas. Tente novamente mais tarde.",
     "generic": "Algo deu errado.",
     "codes": {
       "session_not_found": "Essa sessão não pôde ser encontrada.",
@@ -215,7 +204,6 @@
     }
   },
   "a11y": {
-    "statusAnnounce": "Status atualizado",
     "rosterLabel": "Lista de participantes da sessão",
     "waitlistLabel": "Lista de espera da sessão",
     "validationSummary": "Houve problemas com seu envio",

@@ -3,79 +3,41 @@
     "calendar": "Calendar"
   },
   "calendar": {
-    "heading": "Calendar",
     "viewSwitcher": "Calendar view",
     "week": "Week",
     "agenda": "Agenda",
     "previousWeek": "Previous week",
     "nextWeek": "Next week",
     "dayPager": {
-      "label": "Days shown",
-      "previousDay": "Show the earlier day",
-      "nextDay": "Show the later day",
-      "showDay": "Show {{day}}",
-      "showDayToday": "Show {{day}}, today",
-      "today": "Today",
-      "range": "{{start}} – {{end}}"
+      "today": "Today"
     },
     "agendaEmpty": "Nothing scheduled in this range.",
     "anonymousFriend": "Anonymous User",
     "layers": {
-      "heading": "Layers",
-      "myAvailability": "My availability",
-      "friendAvailability": "Friends' availability",
-      "sessions": "Sessions",
-      "pollOptions": "Poll options",
-      "friendFilterHeading": "Friends shown"
+      "myAvailability": "My availability"
     }
   },
   "viewport": {
-    "showEarlyHours": "Show earlier hours",
-    "hideEarlyHours": "Hide earlier hours",
     "earlyHoursShown": "Earlier hours shown. The grid now starts at midnight.",
     "earlyHoursHidden": "Earlier hours hidden. The grid now starts in the morning."
   },
   "summary": {
-    "heading": "Your availability",
-    "empty": "You have not published any availability yet.",
     "weeklyHeading": "Repeats weekly",
     "oneOffHeading": "This week only",
     "kindRecurring": "Repeats weekly",
     "kindOneOff": "One-time",
     "oneOffEmpty": "No one-off windows yet.",
-    "weeklyRule": "Every {{weekday}} · {{start}}–{{end}}",
-    "oneOffRule": "{{date}} · {{start}}–{{end}}",
-    "delete": "Delete",
-    "deleteNamed": "Delete {{rule}}",
-    "cancel": "Keep it",
-    "deleteSeriesTitle": "Delete this weekly availability?",
-    "deleteSeriesBody": "This removes the whole weekly window, including occurrences you already changed on their own.",
-    "deleteSeriesConfirm": "Delete series",
-    "windowsCount_one": "{{count}} window",
-    "windowsCount_other": "{{count}} windows",
-    "expand": "Show your availability",
-    "collapse": "Hide your availability"
+    "cancel": "Keep it"
   },
   "commit": {
-    "range": "{{start}}–{{end}}",
-    "recurrenceLegend": "How often",
-    "once": "Just this time",
-    "weekly": "Repeats weekly",
     "save": "Save",
     "cancel": "Cancel",
-    "savedOnce": "Availability added.",
-    "savedWeekly": "Weekly availability added.",
-    "undo": "Undo",
-    "dismiss": "Dismiss",
-    "notificationLabel": "Notification",
-    "notificationsRegion": "Notifications ({hotkey})"
+    "undo": "Undo"
   },
   "block": {
-    "editHeading": "Edit availability",
     "start": "Start time",
     "end": "End time",
     "save": "Save",
-    "delete": "Delete",
     "cancel": "Cancel",
     "scopeHeading": "Which occurrences?",
     "scopeOnlyThis": "Only this occurrence",
@@ -86,10 +48,6 @@
     "clamped": "The start time was moved to the earliest time allowed (15 minutes from now).",
     "overDuration": "This session runs {{minutes}} minutes past the recommended window."
   },
-  "validation": {
-    "endBeforeStart": "End time must be after the start time.",
-    "offGrid": "Choose a time in 15-minute increments."
-  },
   "findATime": {
     "heading": "Find a time",
     "subheading": "See when your friends are free.",
@@ -99,7 +57,6 @@
     "friendsSelected_one": "{{count}} selected",
     "friendsSelected_other": "{{count}} selected",
     "rangeLabel": "Date range",
-    "rangeDefault": "Next 7 days",
     "resultsHeading": "Suggested windows",
     "available_one": "{{count}} available",
     "available_other": "{{count}} available",
@@ -128,14 +85,6 @@
     "selectionExtent": "Selected {{start}} to {{end}}.",
     "selectionReady": "Selected {{start}} to {{end}}. Confirm how often it repeats.",
     "selectionCanceled": "Selection canceled.",
-    "friendAvailable": "{{name}} available",
-    "friendsAvailable_one": "{{count}} friend available",
-    "friendsAvailable_other": "{{count}} friends available",
-    "sessionLabel": "{{title}}",
-    "sessionInherited": "{{title}} (discoverable)",
-    "inherited": "Discoverable",
-    "pollOption": "{{title}} poll option",
-    "pollOptionWithVote": "{{title}} poll option, your vote {{vote}}",
     "pollVote": {
       "available": "available",
       "maybe": "maybe",

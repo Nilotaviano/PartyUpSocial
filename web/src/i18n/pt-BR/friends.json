@@ -5,7 +5,6 @@
     "listDescription": "Com quem você joga, e como aumentar a turma.",
     "profile": "Perfil",
     "add": "Adicionar amigo",
-    "share": "Compartilhe seu perfil do PartyUp",
     "importSteam": "Encontrar amigos da Steam",
     "blocked": "Usuários bloqueados",
     "backToFriends": "Voltar para amigos"
@@ -44,15 +43,11 @@
   "labels": {
     "friendCode": "Seu código de amigo",
     "friendCodeHelp": "Espaços e hífens são removidos; as letras viram maiúsculas.",
-    "qrCode": "QR code para adicionar amigo",
     "blockedOn": "Bloqueado em {{date}}"
   },
   "status": {
     "loading": "Carregando…",
     "none": "Sem conexão",
-    "incoming_pending": "Solicitação recebida",
-    "outgoing_pending": "Solicitação enviada",
-    "accepted": "Amigos",
     "pendingIncoming": "Solicitação recebida",
     "pendingOutgoing": "Solicitação enviada",
     "friends": "Amigos",
@@ -82,8 +77,7 @@
     "profileLinkDescription": "Compartilhe este link para o seu perfil do PartyUp."
   },
   "qr": {
-    "description": "Escaneie o QR code ou use o link visível abaixo.",
-    "fallback": "Use o link para adicionar se não puder escanear o QR code."
+    "description": "Escaneie o QR code ou use o link visível abaixo."
   },
   "dialogs": {
     "unfriendTitle": "Remover {{username}}?",
@@ -112,9 +106,6 @@
     "refreshFailed": "Seu perfil está ativo, mas o PartyUp não conseguiu atualizar sua sessão segura."
   },
   "live": {
-    "copied": "{{label}} copiado.",
-    "listUpdated": "Lista de amigos atualizada.",
-    "requestUpdated": "Solicitação de amizade atualizada.",
-    "blockUpdated": "Usuários bloqueados atualizados."
+    "copied": "{{label}} copiado."
   }
 }

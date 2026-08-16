@@ -62,11 +62,6 @@ function segmentsInWeek(start: Date, end: Date, weekStart: Date) {
   return out
 }
 
-/** The wire id behind a rule id; continuation segments carry a `#day` suffix. */
-export function baseRuleId(ruleId: string): string {
-  return ruleId.split('#')[0]
-}
-
 export function mapCalendar(
   view: CalendarView | undefined,
   weekStart: Date,

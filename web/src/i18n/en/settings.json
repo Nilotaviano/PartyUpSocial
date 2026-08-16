@@ -110,8 +110,7 @@
       "title": "Email notifications",
       "description": "Receive email when you're invited to a session or poll, or when your join request is approved.",
       "toggleOn": "Turn on email notifications",
-      "toggleOff": "Turn off email notifications",
-      "error": "Something went wrong changing your email notification setting."
+      "toggleOff": "Turn off email notifications"
     }
   },
   "emailUnsubscribe": {

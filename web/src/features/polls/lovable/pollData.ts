@@ -40,10 +40,6 @@ export type Voter = {
   isActive: boolean
 }
 
-export function voterName(voter: Voter) {
-  return voter.name
-}
-
 export type PollOptionT = {
   id: string
   /** Fake-local instant (D-046) — a poll option carries no duration (spec §7.3-1). */

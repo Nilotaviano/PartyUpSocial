@@ -110,8 +110,7 @@
       "title": "Notificações por e-mail",
       "description": "Receba e-mail quando você for convidado para uma sessão ou enquete, ou quando seu pedido de participação for aprovado.",
       "toggleOn": "Ativar notificações por e-mail",
-      "toggleOff": "Desativar notificações por e-mail",
-      "error": "Algo deu errado ao alterar sua configuração de notificações por e-mail."
+      "toggleOff": "Desativar notificações por e-mail"
     }
   },
   "emailUnsubscribe": {

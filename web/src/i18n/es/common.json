@@ -25,15 +25,10 @@
     "signOut": "Cerrar sesión"
   },
   "pages": {
-    "welcome": "Bienvenida",
-    "ageGate": "Verificación de edad",
-    "app": "Inicio",
-    "accountDeletion": "Eliminar cuenta",
-    "accountDeletionConfirm": "Confirmar eliminación de la cuenta"
+    "welcome": "Bienvenida"
   },
   "actions": {
     "more": "Más acciones",
-    "dismiss": "Descartar",
     "retry": "Intentar de nuevo",
     "back": "Volver"
   },

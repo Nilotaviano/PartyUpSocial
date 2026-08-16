@@ -3,79 +3,41 @@
     "calendar": "Calendario"
   },
   "calendar": {
-    "heading": "Calendario",
     "viewSwitcher": "Vista del calendario",
     "week": "Semana",
     "agenda": "Agenda",
     "previousWeek": "Semana anterior",
     "nextWeek": "Semana siguiente",
     "dayPager": {
-      "label": "Días mostrados",
-      "previousDay": "Mostrar el día anterior",
-      "nextDay": "Mostrar el día siguiente",
-      "showDay": "Mostrar {{day}}",
-      "showDayToday": "Mostrar {{day}}, hoy",
-      "today": "Hoy",
-      "range": "{{start}} – {{end}}"
+      "today": "Hoy"
     },
     "agendaEmpty": "Nada programado en este período.",
     "anonymousFriend": "Usuario Anónimo",
     "layers": {
-      "heading": "Capas",
-      "myAvailability": "Mi disponibilidad",
-      "friendAvailability": "Disponibilidad de amistades",
-      "sessions": "Sesiones",
-      "pollOptions": "Opciones de encuesta",
-      "friendFilterHeading": "Amistades mostradas"
+      "myAvailability": "Mi disponibilidad"
     }
   },
   "viewport": {
-    "showEarlyHours": "Mostrar horas anteriores",
-    "hideEarlyHours": "Ocultar horas anteriores",
     "earlyHoursShown": "Horas anteriores mostradas. La cuadrícula ahora empieza a medianoche.",
     "earlyHoursHidden": "Horas anteriores ocultadas. La cuadrícula ahora empieza por la mañana."
   },
   "summary": {
-    "heading": "Tu disponibilidad",
-    "empty": "Todavía no has publicado ninguna disponibilidad.",
     "weeklyHeading": "Se repite cada semana",
     "oneOffHeading": "Solo esta semana",
     "kindRecurring": "Se repite cada semana",
     "kindOneOff": "Una sola vez",
     "oneOffEmpty": "Todavía no hay ventanas puntuales.",
-    "weeklyRule": "Cada {{weekday}} · {{start}}–{{end}}",
-    "oneOffRule": "{{date}} · {{start}}–{{end}}",
-    "delete": "Eliminar",
-    "deleteNamed": "Eliminar {{rule}}",
-    "cancel": "Conservar",
-    "deleteSeriesTitle": "¿Eliminar esta disponibilidad semanal?",
-    "deleteSeriesBody": "Esto elimina la ventana semanal completa, incluidas las ocurrencias que ya cambiaste por separado.",
-    "deleteSeriesConfirm": "Eliminar serie",
-    "windowsCount_one": "{{count}} ventana",
-    "windowsCount_other": "{{count}} ventanas",
-    "expand": "Mostrar tu disponibilidad",
-    "collapse": "Ocultar tu disponibilidad"
+    "cancel": "Conservar"
   },
   "commit": {
-    "range": "{{start}}–{{end}}",
-    "recurrenceLegend": "Con qué frecuencia",
-    "once": "Solo esta vez",
-    "weekly": "Se repite cada semana",
     "save": "Guardar",
     "cancel": "Cancelar",
-    "savedOnce": "Disponibilidad agregada.",
-    "savedWeekly": "Disponibilidad semanal agregada.",
-    "undo": "Deshacer",
-    "dismiss": "Cerrar",
-    "notificationLabel": "Notificación",
-    "notificationsRegion": "Notificaciones ({hotkey})"
+    "undo": "Deshacer"
   },
   "block": {
-    "editHeading": "Editar disponibilidad",
     "start": "Hora de inicio",
     "end": "Hora de finalización",
     "save": "Guardar",
-    "delete": "Eliminar",
     "cancel": "Cancelar",
     "scopeHeading": "¿Qué ocurrencias?",
     "scopeOnlyThis": "Solo esta ocurrencia",
@@ -86,10 +48,6 @@
     "clamped": "La hora de inicio se movió a la hora más próxima permitida (15 minutos a partir de ahora).",
     "overDuration": "Esta sesión dura {{minutes}} minutos más que la ventana recomendada."
   },
-  "validation": {
-    "endBeforeStart": "La hora de finalización debe ser posterior a la hora de inicio.",
-    "offGrid": "Elige una hora en incrementos de 15 minutos."
-  },
   "findATime": {
     "heading": "Encontrar un horario",
     "subheading": "Mira cuándo están libres tus amistades.",
@@ -99,7 +57,6 @@
     "friendsSelected_one": "{{count}} seleccionada",
     "friendsSelected_other": "{{count}} seleccionadas",
     "rangeLabel": "Rango de fechas",
-    "rangeDefault": "Próximos 7 días",
     "resultsHeading": "Horarios sugeridos",
     "available_one": "{{count}} disponible",
     "available_other": "{{count}} disponibles",
@@ -128,14 +85,6 @@
     "selectionExtent": "Seleccionado de {{start}} a {{end}}.",
     "selectionReady": "Seleccionado de {{start}} a {{end}}. Confirma con qué frecuencia se repite.",
     "selectionCanceled": "Selección cancelada.",
-    "friendAvailable": "{{name}} disponible",
-    "friendsAvailable_one": "{{count}} amistad disponible",
-    "friendsAvailable_other": "{{count}} amistades disponibles",
-    "sessionLabel": "{{title}}",
-    "sessionInherited": "{{title}} (descubrible)",
-    "inherited": "Descubrible",
-    "pollOption": "Opción de la encuesta {{title}}",
-    "pollOptionWithVote": "Opción de la encuesta {{title}}, tu voto {{vote}}",
     "pollVote": {
       "available": "disponible",
       "maybe": "tal vez",

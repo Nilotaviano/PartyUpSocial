@@ -110,8 +110,7 @@
       "title": "Notificaciones por correo electrónico",
       "description": "Recibe un correo cuando te inviten a una sesión o encuesta, o cuando se apruebe tu solicitud de unirte.",
       "toggleOn": "Activar notificaciones por correo electrónico",
-      "toggleOff": "Desactivar notificaciones por correo electrónico",
-      "error": "Algo salió mal al cambiar tu configuración de notificaciones por correo electrónico."
+      "toggleOff": "Desactivar notificaciones por correo electrónico"
     }
   },
   "emailUnsubscribe": {

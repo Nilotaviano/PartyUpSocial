@@ -25,15 +25,10 @@
     "signOut": "Sign out"
   },
   "pages": {
-    "welcome": "Welcome",
-    "ageGate": "Age gate",
-    "app": "Home",
-    "accountDeletion": "Delete account",
-    "accountDeletionConfirm": "Confirm account deletion"
+    "welcome": "Welcome"
   },
   "actions": {
     "more": "More actions",
-    "dismiss": "Dismiss",
     "retry": "Try again",
     "back": "Back"
   },
