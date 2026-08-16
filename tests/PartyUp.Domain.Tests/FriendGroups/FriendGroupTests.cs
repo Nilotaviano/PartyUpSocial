@@ -9,7 +9,7 @@ public class FriendGroupTests
 {
     private static readonly Instant Origin = Instant.FromUtc(2026, 8, 16, 12, 0);
 
-    private static UserId Owner => UserId.New();
+    private static readonly UserId Owner = UserId.New();
 
     private static FakeClock Clock() => new(Origin);
 
@@ -164,6 +164,7 @@ public class FriendGroupTests
 
         Assert.Equal(DomainError.LimitExceeded, ex.Error);
         Assert.Equal(FriendGroup.MaxMembers, group.Members.Count);
+        Assert.Equal(100, FriendGroup.MaxMembers);
     }
 
     [Fact]
@@ -225,10 +226,12 @@ public class FriendGroupTests
         FakeClock clock = Clock();
         FriendGroup group = FriendGroup.Create(owner, GroupName.Create("D&D crew"), clock);
         group.Invite(owner, invitee, isAcceptedFriendOfOwner: true, clock);
+        group.DequeueEvents();
 
         group.DeclineInvite(invitee);
 
         Assert.DoesNotContain(group.Members, m => m.UserId == invitee);
+        Assert.Empty(group.DequeueEvents());
     }
 
     [Fact]
@@ -239,10 +242,12 @@ public class FriendGroupTests
         FakeClock clock = Clock();
         FriendGroup group = FriendGroup.Create(owner, GroupName.Create("D&D crew"), clock);
         group.Invite(owner, invitee, isAcceptedFriendOfOwner: true, clock);
+        group.DequeueEvents();
 
         group.RevokeInvite(owner, invitee);
 
         Assert.DoesNotContain(group.Members, m => m.UserId == invitee);
+        Assert.Empty(group.DequeueEvents());
     }
 
     [Fact]
@@ -254,10 +259,12 @@ public class FriendGroupTests
         FriendGroup group = FriendGroup.Create(owner, GroupName.Create("D&D crew"), clock);
         group.Invite(owner, member, isAcceptedFriendOfOwner: true, clock);
         group.AcceptInvite(member, clock);
+        group.DequeueEvents();
 
         group.Leave(member);
 
         Assert.DoesNotContain(group.Members, m => m.UserId == member);
+        Assert.Empty(group.DequeueEvents());
     }
 
     [Fact]
@@ -269,10 +276,12 @@ public class FriendGroupTests
         FriendGroup group = FriendGroup.Create(owner, GroupName.Create("D&D crew"), clock);
         group.Invite(owner, member, isAcceptedFriendOfOwner: true, clock);
         group.AcceptInvite(member, clock);
+        group.DequeueEvents();
 
         group.RemoveMember(owner, member);
 
         Assert.DoesNotContain(group.Members, m => m.UserId == member);
+        Assert.Empty(group.DequeueEvents());
     }
 
     [Fact]
