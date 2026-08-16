@@ -33,12 +33,14 @@ public static class DeletionExecutor
         Instant now = clock.GetCurrentInstant();
         UserId subject = user.Id;
 
-        // 1–4. Cancel owned not-started sessions, expire owned live polls, remove the subject from
-        //      other people's not-started content, and sever their groups (D-209). Shared with the
-        //      D-180 content-removal action (admin ban path), which runs exactly this and stops.
+        // 1–3, plus step 4's group severing (D-209). Cancel owned not-started sessions, expire owned
+        //      live polls, remove the subject from other people's not-started content, and sever their
+        //      groups. Shared with the D-180 content-removal action (admin ban path), which runs
+        //      exactly this and stops.
         ContentRemovalResult contentRemoval = ContentRemovalExecutor.Execute(subject, scope, clock);
 
-        // 5. Friendships (accepted and still-pending requests alike) and blocks in both directions.
+        // 4. Friendships (accepted and still-pending requests alike) and blocks in both directions;
+        //    the groups half of this step ran above, inside the shared content removal.
         List<Friendship> deletedFriendships = [];
         foreach (Friendship friendship in scope.Friendships)
         {
