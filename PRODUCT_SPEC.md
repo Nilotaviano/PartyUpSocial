@@ -56,7 +56,7 @@ Confirmed:
 - Anyone can register directly; invitations are an additional entry path, not a registration gate.
 - Friends can see one another's shared availability. Per-block visibility restrictions are outside the initial release.
 - A session organizer can directly invite friends.
-- Unless a session is private, the organizer, pending invitees, approved participants, Going and Maybe participants, and waitlisted registered users extend visibility to their friends. Unapproved join requesters do not. A declined invitation, rejected request, or departed participant no longer extends visibility.
+- A **public** session lets the organizer, pending invitees, approved participants, Going and Maybe participants, and waitlisted registered users extend visibility to their friends; unapproved join requesters do not. A **Groups** session instead grants access only to a targeted friend group's Accepted members and owner (D-198), with no such friend-of-participant extension. A declined invitation, rejected request, or departed participant no longer extends visibility either way. (amended for D-198)
 - Anyone who can see a session can see its attendee list and individual responses.
 - Anyone who can see a session can also see its notes before requesting to join.
 - A session can instead be private. It is visible to its invitees plus any participants and outstanding requesters retained when an existing session becomes private.
@@ -116,9 +116,9 @@ The following working terms will be refined during discovery:
    The organizer begins as Going but may later change their own attendance without transferring ownership.
 2. The organizer supplies a required title and minimum attendance and may specify a game, platform, notes, and maximum capacity. The game and maximum capacity are optional.
 3. The organizer invites friends, including through a shareable invitation link.
-   A non-private session requires at least one directly invited registered friend when created; a guest link alone does not satisfy this requirement.
+   A **public** session requires at least one directly invited registered friend when created; a **Groups** session instead requires at least one targeted friend group (D-198); a guest link alone satisfies neither requirement. (amended for D-198)
 4. Registered or guest invitees respond **Going**, **Maybe**, or **Declined**.
-5. Unless the session is private, eligible friends can see it and request to join.
+5. Unless the session is private, eligible friends or group members can see it and request to join — a **public** session extends this through friend-of-participant inheritance, a **Groups** session extends it to the targeted friend group's Accepted members and owner (D-198). (amended for D-198)
 6. Every join request requires organizer approval. A requester does not choose an attendance intent; approval marks them Going, or Going-waitlisted if capacity is full. Invitations can also be added after creation.
 7. The organizer and Going guests count toward minimum attendance. Both Going and Maybe participants consume optional maximum capacity.
 8. When optional maximum capacity is reached, new Going or Maybe responders enter the waitlist with their selected attendance status.
@@ -153,7 +153,7 @@ Candidate options remain visible and selectable after their start times pass. A 
 
 If the chosen option has started but not ended, finalization creates an in-progress session. If it has already ended, finalization immediately evaluates its mapped Going count and creates a Completed result when the minimum is met or an Expired result otherwise. An Expired result is not retained in history.
 
-A non-private poll follows the same inherited visibility rules as a fixed session and requires at least one directly invited registered friend. Eligible friends can request to join while it is Polling; approval makes them a voter with access to all current options. A private poll may instead be created using only guest links.
+A **public** poll follows the same inherited visibility rules as a fixed session and requires at least one directly invited registered friend. A **Groups** poll instead requires at least one targeted friend group at creation (D-198) and grants that group's Accepted members and owner the same see-and-request-to-join access. Eligible friends or group members can request to join while it is Polling; approval makes them a voter with access to all current options. A private poll may instead be created using only guest links. (amended for D-198)
 
 When a poll is finalized with more Available and Maybe voters than maximum capacity, allocate active capacity in this order: organizer, Available voters ordered by response time, then Maybe voters ordered by response time. Overflow enters the matching Going or Maybe waitlist state. A voter's response time is the timestamp of their first submitted poll response and does not change when they revise their votes.
 
@@ -165,7 +165,7 @@ Confirmed:
 
 - A session may be created directly for a fixed start time.
 - A session has a duration in 15-minute increments, with a minimum of 15 minutes and a maximum of 24 hours.
-- Fixed-session defaults are minimum attendance 4, maximum capacity 4, two-hour duration, platform N/A, and non-private visibility. The organizer may change these values and may clear maximum capacity for unlimited attendance.
+- Fixed-session defaults are minimum attendance 4, maximum capacity 4, two-hour duration, platform N/A, and **public** visibility (D-198's three-level `Public | Private | Groups`). The organizer may change these values and may clear maximum capacity for unlimited attendance. (amended for D-198)
 - The initial release does not let users save custom session-creation defaults.
 - A session must start at least 15 minutes in the future and no more than one year in the future.
 - Invitees can respond **Going**, **Maybe**, or **Declined**.
@@ -182,7 +182,7 @@ Confirmed:
 - Poll options remain visible and selectable after their start time. A poll does not expire early merely because all options have passed.
 - Polls support at most 12 distinct date-time options. Duplicate date-times are merged, suggesting an option beyond the limit fails with a clear error, and the organizer can delete any option without notifying its voters.
 - At the deadline, voting closes and the organizer selects the final option manually. The poll expires after 48 additional hours without a selection, notifying its registered participants.
-- Non-private polls use normal inherited visibility, accept join requests during Polling, and require one directly invited registered friend. Approved requesters become voters with all current options.
+- **Public** polls use normal inherited visibility, accept join requests during Polling, and require one directly invited registered friend; **Groups** polls instead require one targeted friend group at creation and grant its Accepted members and owner the same request-to-join access (D-198). Approved requesters become voters with all current options. (amended for D-198)
 - Private polls can be created with guest links only.
 - Poll finalization allocates capacity to the organizer first, then Available voters by response time, then Maybe voters by response time; overflow is waitlisted with matching attendance status. Response time is the timestamp of the voter's first submitted poll response and is not changed by later revisions.
 - Voter-suggested times become poll options immediately without organizer approval.
@@ -222,7 +222,7 @@ Confirmed:
 - Once a Confirmed session starts, later attendance changes cannot unconfirm it and it will become Completed. An unconfirmed session may still Confirm until its end time.
 - Join requests do not include attendance intent. Approval makes the requester Going, or Going-waitlisted when maximum capacity is full.
 - Join requesters can withdraw pending requests. Acceptance and rejection both notify the requester, and an accepted requester can subsequently change attendance normally.
-- A non-private session must include at least one directly invited registered friend at creation.
+- A **public** session must include at least one directly invited registered friend at creation; a **Groups** session must instead include at least one targeted friend group (D-198). (amended for D-198)
 - Reducing maximum capacity below current Going + Maybe occupancy is forbidden. Increasing maximum leaves waitlist promotion manual.
 - Changing minimum attendance, allowed only before the session starts, immediately recalculates confirmation and sends the corresponding confirmation/unconfirmation notification. Raising the minimum above the current Going count follows the normal waitlist grace: a Confirmed session remains Confirmed while any Going-waitlisted candidate remains and becomes unconfirmed only when none remains.
 - Changing duration sends a rescheduling notification without resetting RSVPs.
@@ -247,7 +247,7 @@ Default values:
 - Maximum capacity: 4.
 - Duration: 2 hours.
 - Platform: N/A.
-- Visibility: non-private.
+- Visibility: **public** (D-198's three-level `Public | Private | Groups`). (amended for D-198)
 
 Duration is entered in 15-minute increments from 15 minutes through 24 hours. The initial release always starts creation with the product defaults above; users cannot save personal defaults.
 
@@ -498,7 +498,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-004 | The product serves existing friends; stranger discovery and public matchmaking are out of scope. | Confirmed |
 | D-005 | An organizer can create a session for a fixed time and invite friends. | Confirmed |
 | D-006 | Invitees can respond Going, Maybe, or Declined. | Confirmed |
-| D-007 | Unless a session is private, eligible non-invited friends can see it and request to join. | Confirmed |
+| D-007 | A **public** session lets eligible non-invited friends see it and request to join via friend-of-participant inheritance (rule 2); a **Groups** session instead grants that same see-and-request-to-join access to a targeted friend group's Accepted members and owner (rule 2g, D-198), with no further inheritance; a private session grants neither. (amended for D-198) | Confirmed |
 | D-008 | Session viability is ultimately the organizer's judgment. | Confirmed |
 | D-009 | Users can publish one-time and recurring availability blocks for friends to see. | Confirmed |
 | D-010 | A session's game is optional. | Confirmed |
@@ -509,7 +509,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-015 | Friendship is a mutual connection accepted by both people. | Confirmed |
 | D-016 | Anyone can register directly; invitations are also supported. | Confirmed |
 | D-017 | A link invitee can respond as a guest using only a display name. | Confirmed |
-| D-018 | The organizer, pending invitees, approved participants, and waitlisted users extend a non-private session's visibility; unapproved requesters, Declined users, and Rejected users do not. | Confirmed |
+| D-018 | The organizer, pending invitees, approved participants, and waitlisted users extend a **public** session's visibility; unapproved requesters, Declined users, and Rejected users do not. Groups-level sessions do not extend via this inheritance chain at all — see D-198's rule 2g. (amended for D-198) | Confirmed |
 | D-019 | An organizer can make a session private; it is visible only to invitees and any retained participants or requesters. | Confirmed |
 | D-020 | Join requests require organizer approval, and invitations can be added after session creation. | Confirmed |
 | D-021 | Sessions can have a maximum player count and a waitlist. | Confirmed |
@@ -574,7 +574,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-082 | Each user gets one reminder chosen from Off, 15m, 30m, 1h, 3h, 12h, or 24h; default is 1h. | Confirmed |
 | D-083 | The initial audience is 13+ and not directed to children. | Confirmed |
 | D-084 | Going and Maybe both consume maximum capacity; at capacity, new Going or Maybe responses are waitlisted without displacing active Maybes. | Confirmed |
-| D-085 | The organizer continues organizing and extending visibility while Maybe or Declined. | Confirmed |
+| D-085 | The organizer continues organizing and extending a **public** session's visibility while Maybe or Declined. Groups sessions instead extend access only through rule 2g's group membership (D-198), independent of the organizer's own attendance. (amended for D-198) | Confirmed |
 | D-086 | Anonymous User retains normal attendance and capacity effects; anonymization applies only between the blocked pair. | Confirmed |
 | D-087 | Users can link more authentication methods later; no warning is required when only one remains. | Confirmed |
 | D-088 | Closed polls expire after 48 hours without organizer selection; deleting a poll option does not notify voters. | Confirmed |
@@ -588,7 +588,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-096 | User-authored text uses agreed length limits, limited punctuation, Unicode letters/numbers, and profanity filtering. | Confirmed |
 | D-097 | Mobile release may add minimal report-user/report-field and moderation functionality if store review requires it. | Confirmed |
 | D-098 | Join requests carry no attendance choice; approval makes the requester Going or Going-waitlisted when full. | Confirmed |
-| D-099 | A non-private session requires at least one directly invited registered friend when created. | Confirmed |
+| D-099 | A **public** session requires at least one directly invited registered friend when created; a **Groups** session requires at least one targeted friend group at creation (direct invitees optional). D-198's visibility levels define the terms. (amended for D-198) | Confirmed |
 | D-100 | Availability matching uses selected friends and a date/time range, not desired duration. | Confirmed |
 | D-101 | Overlapping availability blocks merge visually and algorithmically into continuous intervals. | Confirmed |
 | D-102 | Recommendations can prefill either a fixed session or a poll. | Confirmed |
@@ -607,18 +607,18 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-115 | Private sessions support transferable unique guest links; possession controls that guest identity. | Confirmed |
 | D-116 | Home shows five automatic all-friends suggestions with See all for the complete list. | Confirmed |
 | D-117 | Calendar shows all friends' availability by default and offers filters to reduce clutter. | Confirmed |
-| D-118 | Non-private polls inherit normal visibility and accept join requests during Polling. | Confirmed |
+| D-118 | A **public** poll inherits normal (rule 2) visibility and accepts join requests during Polling; a **Groups** poll instead grants that same request-to-join access to a targeted friend group's Accepted members and owner (rule 2g, D-198). (amended for D-198) | Confirmed |
 | D-119 | Poll finalization allocates organizer first, Available by response time, then Maybe by response time; overflow is waitlisted. | Confirmed |
 | D-120 | Suggested poll options notify only the organizer; poll closure notifies everyone; deadline warning is one hour before. | Confirmed |
 | D-121 | Maximum capacity cannot be reduced below active Going + Maybe occupancy. | Confirmed |
 | D-122 | Minimum changes recalculate confirmation immediately, with raises subject to the D-074 Going-waitlist grace; duration changes send rescheduling notifications without resetting RSVPs. | Confirmed |
 | D-123 | Title, game, platform, notes, maximum, and privacy changes do not notify participants. | Confirmed |
 | D-124 | Guest-link access does not require the 13+ age gate. | Confirmed with policy risk |
-| D-125 | Private sessions may be created with guest links only; non-private polls require an invited registered friend. | Confirmed |
+| D-125 | Private sessions may be created with guest links only; a **public** poll requires an invited registered friend, and a **Groups** poll instead requires at least one targeted friend group at creation (D-198). (amended for D-198) | Confirmed |
 | D-126 | Multi-device guest-link edits use last-write-wins until revocation or expiry. | Confirmed |
 | D-127 | Onboarding is age gate, authentication, username, display name, avatar, time zone, optional platform linking, then friends. | Confirmed |
 | D-128 | Usernames are case-insensitive and changeable once every 30 days; old profile links stop while stable friend codes persist. | Confirmed |
-| D-129 | Fixed-session defaults are minimum 4, maximum 4, two hours, N/A platform, and non-private. | Confirmed |
+| D-129 | Fixed-session defaults are minimum 4, maximum 4, two hours, N/A platform, and **public** visibility (D-198's three-level `Public | Private | Groups`). (amended for D-198) | Confirmed |
 | D-130 | Sessions start at least 15 minutes and at most one year in the future. | Confirmed |
 | D-131 | Polls default to 24 hours, require two initial options, and may contain options before the deadline. | Confirmed |
 | D-132 | Availability is selected on a week calendar in 15-minute increments with one-time or weekly recurrence. | Confirmed |
@@ -687,6 +687,19 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-195 | Per-option poll votes (who voted Available/Maybe/Unavailable, ordered by first response time) are visible to everyone who can read the poll, guest-link holders included. Voter identities carry the response's standard masking: a blocked-pair counterpart renders as Anonymous User with no avatar in the option lists exactly as in the roster (D-076), and the registered arm and guest arm expose the same lists their existing read paths already serve. | Confirmed |
 | D-196 | A suggested poll option displays who suggested it, as a small attribution visible to everyone who can read the poll. The suggester identity carries the same masking as D-195's voter lists (blocked-pair counterparts render as Anonymous User; guest suggesters render under their guest display name). Organizer-created options carry no attribution. | Confirmed |
 | D-197 | When a signed-in user's browser time zone differs from their profile time zone, the app prompts once — a dismissible dialog offering to update the profile zone to the detected one. Dismissal persists per zone pair in the browser (D-181 idiom): the same mismatch never re-prompts, a new mismatch does. Declining changes nothing; accepting updates the profile zone through the normal settings path. | Confirmed |
+| D-198 | Session/poll visibility gains a third level: `Public \| Private \| Groups`. A **Groups** target admits access only through rule 2g — the viewer is the owner or an **Accepted** member of ≥1 of the target's targeted friend groups; `Invited` membership grants nothing. Groups visibility is strict: there is no friend-of-extender inheritance on a Groups target the way rule 2 gives Public targets. The canonical visibility-rule evaluation order is **4 → 1 → level gate → inheritance** (rule 4 blocking, then rule 1 direct access, then the Public/Private/Groups level gate, then inheritance — rule 2g for Groups, rule 2 for Public). See DOMAIN_MODEL §7. | Confirmed |
+| D-199 | A **FriendGroup** is a new shared, owner-managed aggregate: `Name` 1–50 characters trimmed, unique per owner case-insensitive; only the owner can rename, delete, invite, revoke, or remove; members see the group's name and roster. Deleting a group is a hard delete cascading its membership rows and every session/poll audience junction row that targeted it (sessions/polls that targeted it live on with a shrunken audience, per D-205). | Confirmed |
+| D-200 | Friend-group membership is invite/accept consented, same row model as Friendship (no tombstones): decline, revoke, leave, and remove all delete the membership row outright. An invite requires an Accepted friendship between owner and invitee **at invite time only**, checked best-effort without cross-aggregate locking; membership then **survives unfriending** — friendship is required only at the moment of invite, never re-validated afterward. | Confirmed |
+| D-201 | A session or poll can target **1 to n** friend groups; the audience is their membership union. A **Groups**-level session/poll requires ≥1 targeted group at creation. Any owner or Accepted member of a group may target it on their own sessions/polls. Targeting authority is re-checked only for a **newly added** group at creation or edit time — an already-targeted group is never re-validated later, so an organizer who has left group G can still edit other fields or add group H without being forced to drop G. | Confirmed |
+| D-202 | A block between a friend-group **owner and a member** (either direction) deletes that membership row — both `Invited` and `Accepted` — silently, in the same transaction as the friendship deletion (mirrors D-077's organizer↔participant removal, with the group owner as the organizer-analog). A block between two **non-owner members** leaves both rows in place; their coexistence is masked at render time (a D-076 extension). The group-invite command returns the identical "not a friend" error whether the target is a stranger or a blocked user — a distinguishable error would be a block-detection oracle. | Confirmed |
+| D-203 | DOMAIN_MODEL §5.6's "becomes private" retention rule generalizes to **"audience narrows"**: Public→Private, Public→Groups, Groups→Private, or removing a targeted group from a Groups audience all retain the existing rule-1 set (D-043/D-047 posture) and are silent (D-123). Any edit that leaves the Groups level deletes the audience junction rows outright — returning to Groups later means re-picking, never a silent resurrection of stale or no-longer-authorized targeting. | Confirmed |
+| D-204 | Poll finalization carries the poll's visibility level onto the created session exactly as it carries every other detail (D-154), and copies the poll's audience junction rows onto the session in the same finalization transaction. | Confirmed |
+| D-205 | A targeted friend group's deletion can leave a Groups-level session/poll with an empty audience. This zero-group state is a legal degenerate state: the target degrades to rule-1-only (effectively private) visibility, fail-closed; the ≥1-group requirement (D-201) is creation/edit-time only, not a standing invariant, mirroring D-099's own creation-time-only posture. Affected organizers receive an in-app notification that a targeted group was deleted. | Confirmed |
+| D-206 | A session/poll card shows the granting friend group's name — a "via `<group>`" label — only to viewers who are that group's owner or a member, rendered from the live group row so a later rename stays accurate. Every other viewer with access to a Groups target (direct invitees, guest-link holders, pending requesters, members of only a different targeted group) instead sees a neutral "shared with a group" label. Group names are never serialized to non-members; this is presentation on top of real access, not a second visibility channel (the D-196 posture). | Confirmed |
+| D-207 | In-app notifications for friend groups, committed transactionally (A-016): a group invite received (→ invitee), an invite accepted (→ owner), and a targeted group's deletion (→ each affected organizer). Silent: decline, revoke, remove, leave, and block-driven membership removal — the same D-105 push posture that keeps friend-removal and blocking non-punitive. | Confirmed |
+| D-208 | Friend-group caps, app-checked under lock: 50 groups owned per user (creation locks the owner's `users` row before counting) and 100 membership rows per group, counting both `Invited` and `Accepted` (invite/accept lock the group row before counting, the session-RSVP idiom). The owner is never counted toward the 100-row cap — they are an implicit member with no row. | Confirmed |
+| D-209 | Account deletion execution (§11) and D-180's admin content removal hard-delete every friend group the subject owns (full cascade, D-199) and every membership row — `Invited` and `Accepted` — the subject holds in others' groups, in the same executor pass as the D-092/D-180 effects they already run. | Confirmed |
+| D-210 | Because friend-group membership survives unfriending (D-200), the unfriend flow shows the acting user, and only them, which of their groups the unfriended person remains in, with an optional one-tap "also remove from my groups" action. Backend unfriend behavior is unchanged; this is actor-side presentation only. | Confirmed |
 
 ## 15. Open questions
 
