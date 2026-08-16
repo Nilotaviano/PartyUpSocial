@@ -723,7 +723,7 @@ describe('PollCreatePage (lovable)', () => {
       const slots = await findGridSlots()
       fireEvent.click(slots[0])
 
-      const list = await screen.findByRole('group', { name: 'Horários candidatos' })
+      const list = await screen.findByRole('group', { name: 'Opções de horário' })
       const [item] = within(list).getAllByRole('listitem')
 
       // pt-BR's Intl format never matches the English one for the same instant.

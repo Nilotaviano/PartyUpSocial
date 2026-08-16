@@ -102,7 +102,7 @@
     }
   },
   "lovable": {
-    "weekOf": "Semana de {{range}} · QG da noite de jogos",
+    "weekOf": "Semana de {{range}} · sua central de jogatina",
     "myAvailability": "Minha disponibilidade",
     "summaryLine": "{{windows}} janelas · {{hours}}h esta semana",
     "showEarly": "Mostrar 00:00–08:00",
@@ -135,8 +135,8 @@
     "grid": {
       "weekly": "semanal",
       "oneTime": "uma vez",
-      "inCount_one": "{{count}} confirmado",
-      "inCount_other": "{{count}} confirmados",
+      "inCount_one": "{{count}} vai",
+      "inCount_other": "{{count}} vão",
       "pollPill": "enquete · {{vote}}"
     },
     "upNext": {

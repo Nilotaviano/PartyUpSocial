@@ -58,7 +58,7 @@
   },
   "detail": {
     "organizer": "Organizador",
-    "roster": "Lista de participantes",
+    "roster": "Quem vai",
     "going": "Confirmado",
     "maybe": "Talvez",
     "declined": "Recusado",
@@ -88,9 +88,9 @@
   },
   "rsvp": {
     "heading": "Sua resposta",
-    "going": "Confirmado",
+    "going": "Vou",
     "maybe": "Talvez",
-    "declined": "Recusado",
+    "declined": "Não vou",
     "leave": "Sair da sessão",
     "updated": "Sua resposta foi atualizada."
   },

@@ -6,8 +6,8 @@
   "create": {
     "heading": "Nova enquete",
     "title": "Título",
-    "options": "Horários candidatos",
-    "optionsHelp": "Adicione pelo menos dois horários candidatos. Se você adicionar o mesmo horário duas vezes, ele vira uma opção só.",
+    "options": "Opções de horário",
+    "optionsHelp": "Adicione pelo menos duas opções de horário. Se você adicionar o mesmo horário duas vezes, ele vira uma opção só.",
     "removeOption": "Remover",
     "deadline": "Prazo de votação",
     "deadlineChoice": {
@@ -42,14 +42,14 @@
     "privacyPrivate": "Privada",
     "privacyPublic": "Pública",
     "grid": {
-      "heading": "Horários candidatos",
-      "hint": "Toque em um horário para adicioná-lo. Arraste uma faixa para movê-la ou arraste a alça para mudar a duração de todos os candidatos.",
+      "heading": "Opções de horário",
+      "hint": "Toque em um horário para adicioná-lo. Arraste uma faixa para movê-la ou arraste a alça para mudar a duração de todas as opções.",
       "showDaytime": "Mostrar horário diurno",
       "eveningsOnly": "Somente à noite",
       "weekOf": "Semana de {{range}}",
       "count": "{{count}}/{{max}} opções",
       "sessionCount": "{{occupancy}} confirmados",
-      "resizeDuration": "Arraste para mudar a duração de todos os candidatos",
+      "resizeDuration": "Arraste para mudar a duração de todas as opções",
       "dayPagerRange": "{{start}} – {{end}}",
       "earlierDays": "Dias anteriores",
       "laterDays": "Dias seguintes"
@@ -63,14 +63,14 @@
     "invitedFriend": "Uma enquete não privada precisa de pelo menos um amigo convidado.",
     "tooManyInvitees": "Você pode convidar até 50 amigos.",
     "tooManyGuestLinks": "Você pode criar até 20 links de convidado.",
-    "optionMinimum": "Adicione pelo menos dois horários candidatos.",
-    "optionCap": "Uma enquete pode ter no máximo 12 horários candidatos.",
+    "optionMinimum": "Adicione pelo menos duas opções de horário.",
+    "optionCap": "Uma enquete pode ter no máximo 12 opções de horário.",
     "steamAppIdDigits": "Digite apenas o ID numérico do app na Steam.",
     "steamAppIdNeedsGameName": "Digite o nome do jogo que acompanha esse ID da Steam."
   },
   "list": {
     "heading": "Enquetes",
-    "description": "Vote nos horários candidatos e finalize o horário vencedor em uma sessão.",
+    "description": "Vote nas opções de horário e finalize o horário vencedor em uma sessão.",
     "bandTabsLabel": "Grupos de enquetes",
     "involved": "Suas enquetes",
     "discoverable": "Descobrir",
@@ -122,10 +122,10 @@
     "heading": "Sugerir um horário",
     "add": "Sugerir",
     "added": "Sua sugestão foi adicionada.",
-    "optionCap": "Esta enquete já tem 12 horários candidatos, o máximo que ela pode ter."
+    "optionCap": "Esta enquete já tem 12 opções de horário, o máximo que ela pode ter."
   },
   "prefill": {
-    "pollTruncated": "Apenas os primeiros {{max}} horários candidatos da sua seleção foram mantidos — uma enquete pode ter no máximo {{max}}."
+    "pollTruncated": "Apenas as primeiras {{max}} opções de horário da sua seleção foram mantidas — uma enquete pode ter no máximo {{max}}."
   },
   "mute": {
     "on": "Silenciar",
@@ -196,7 +196,7 @@
     "codes": {
       "poll_not_found": "Não encontramos essa enquete.",
       "poll_validation": "Verifique os campos destacados e tente novamente.",
-      "poll_option_cap": "Uma enquete pode ter no máximo 12 horários candidatos.",
+      "poll_option_cap": "Uma enquete pode ter no máximo 12 opções de horário.",
       "poll_option_not_found": "Não encontramos essa opção.",
       "poll_voting_closed": "A votação desta enquete já terminou.",
       "poll_terminal": "Esta enquete não pode mais ser alterada.",
@@ -223,12 +223,12 @@
     "copyLink": "Copiar link de convite",
     "candidateFreeCount_one": "{{day}} {{time}} — {{count}} amigo livre",
     "candidateFreeCount_other": "{{day}} {{time}} — {{count}} amigos livres",
-    "candidateGridLabel": "Horários candidatos",
-    "candidateBand": "Candidato {{day}} {{range}}. Enter remove, as setas movem e Shift com as setas muda a duração compartilhada.",
-    "candidateAdded": "Candidato adicionado: {{day}} {{range}}.",
-    "candidateRemoved": "Candidato removido: {{day}} {{range}}.",
-    "candidateMoved": "Candidato movido: {{day}} {{range}}.",
-    "candidateCapReached": "Você já tem o máximo de {{max}} horários candidatos.",
+    "candidateGridLabel": "Opções de horário",
+    "candidateBand": "Opção {{day}} {{range}}. Enter remove, as setas movem e Shift com as setas muda a duração compartilhada.",
+    "candidateAdded": "Opção adicionada: {{day}} {{range}}.",
+    "candidateRemoved": "Opção removida: {{day}} {{range}}.",
+    "candidateMoved": "Opção movida: {{day}} {{range}}.",
+    "candidateCapReached": "Você já tem o máximo de {{max}} opções de horário.",
     "durationChanged": "A duração agora é de {{minutes}} minutos.",
     "friendWindow": "{{name}} · {{range}}"
   },
@@ -269,7 +269,7 @@
     "deleteOptionBody": "Todos os votos neste horário são removidos. As outras opções não são afetadas.",
     "keepIt": "Manter",
     "yourVoteHeading": "Seu voto",
-    "seated": "Vagas confirmadas",
+    "seated": "Confirmados",
     "waitlist": "Lista de espera",
     "nobodyCanMake": "Ninguém pode neste horário.",
     "everyoneFits": "Todo mundo cabe.",
@@ -279,9 +279,9 @@
     "previewAndFinalize": "Ver prévia e finalizar",
     "suggestDialogTitle": "Sugerir outro horário",
     "suggestDialogHelp": "Vira uma opção na hora — não precisa de aprovação.",
-    "nudgeNotice": "Todos recebem um aviso para votar na nova opção.",
+    "nudgeNotice": "Todos recebem uma cutucada para votar na nova opção.",
     "cancel": "Cancelar",
-    "candidateHeading": "Horários candidatos",
+    "candidateHeading": "Opções de horário",
     "candidateHint": "Ordenados por Disponível, depois Talvez. Vote em todas as opções.",
     "voterChipsLabel": "Votantes de {{category}}: {{names}}",
     "voterChipsOverflow": "+{{count}} outros",
