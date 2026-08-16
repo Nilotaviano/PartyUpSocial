@@ -18,6 +18,7 @@ import {
   invalidateFriendGraph,
   runFriendGraphAction,
 } from '../friends/friendGraph'
+import { getViewerProfile, viewerProfileKey } from '../sessions/sessionQueries'
 
 export function SettingsNavigation() {
   const { t } = useTranslation('settings')
@@ -43,6 +44,11 @@ export function BlockedUsersPage() {
     queryKey: friendKeys.blocks,
     queryFn: getBlockedUsers,
   })
+  // D-038/D-046: times render in the viewer's profile time zone, not the
+  // browser's, falling back to the browser zone only until the profile
+  // query resolves (same idiom as SessionListPage/CalendarShell).
+  const profile = useQuery({ queryKey: viewerProfileKey, queryFn: getViewerProfile })
+  const viewerTimeZone = profile.data?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
   const unblock = useMutation({
     mutationFn: runFriendGraphAction,
     onSuccess: async (_result, input) => {
@@ -87,6 +93,7 @@ export function BlockedUsersPage() {
               {blocks.data.map((blocked) => {
                 const date = new Intl.DateTimeFormat(i18n.language, {
                   dateStyle: 'medium',
+                  timeZone: viewerTimeZone,
                 }).format(new Date(blocked.createdAt))
                 return (
                   <li

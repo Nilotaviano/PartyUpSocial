@@ -76,6 +76,10 @@ export function AccountSettingsPage() {
   const [setPasswordSuccess, setSetPasswordSuccess] = useState(false)
   const [setPasswordProof, setSetPasswordProof] = useState<PasswordProof | null>(null)
   const [timeZoneInvalid, setTimeZoneInvalid] = useState(false)
+  // D-038/D-046: times render in the viewer's profile time zone, not the
+  // browser's, falling back to the browser zone only until the session
+  // query resolves (same idiom as SessionListPage/CalendarShell).
+  const viewerTimeZone = session?.profile?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
 
   useEffect(() => {
     const accountLocale = session?.profile?.locale
@@ -499,6 +503,7 @@ export function AccountSettingsPage() {
               graceEndsAt: new Intl.DateTimeFormat(i18n.language, {
                 dateStyle: 'medium',
                 timeStyle: 'short',
+                timeZone: viewerTimeZone,
               }).format(new Date(graceEndsAt)),
             })}
           </p>

@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
+const useSessionMock = vi.hoisted(() => vi.fn())
 vi.mock('../../api/client', () => ({ client: { GET: api.get, POST: api.post }, isApiError: () => false }))
-vi.mock('../../auth/useSession', () => ({ useSession: vi.fn().mockReturnValue({ data: { profile: null, providers: [] } }), sessionQueryKey: ['session'] }))
+vi.mock('../../auth/useSession', () => ({ useSession: useSessionMock, sessionQueryKey: ['session'] }))
 
 import '../../i18n'
 import { setReauthProof } from '../../auth/reauthProof'
@@ -17,7 +18,12 @@ function renderPage() {
   return { queryClient, ...render(<QueryClientProvider client={queryClient}><MemoryRouter><AccountSettingsPage /></MemoryRouter></QueryClientProvider>) }
 }
 
+beforeEach(() => {
+  useSessionMock.mockReturnValue({ data: { profile: null, providers: [] } })
+})
+
 afterEach(() => {
+  cleanup()
   sessionStorage.clear()
   vi.clearAllMocks()
 })
@@ -53,5 +59,29 @@ describe('DeleteAccount', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(expected)
     await waitFor(() => expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['session'] }))
     expect(getPendingSettingsAction()).toBeNull()
+  })
+
+  it('renders the deletion grace deadline in the viewer profile time zone rather than the browser zone_D038_D046', async () => {
+    const graceEndsAt = '2026-08-08T00:00:00Z'
+    const format = (timeZone?: string) =>
+      new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short', timeZone }).format(
+        new Date(graceEndsAt),
+      )
+    const hostRender = format()
+    // A profile zone whose rendering provably differs from the host zone, so the
+    // assertion fails if the component silently falls back to the browser zone.
+    const profileZone = ['Pacific/Midway', 'Pacific/Kiritimati'].find(
+      (zone) => format(zone) !== hostRender,
+    )!
+    useSessionMock.mockReturnValue({ data: { profile: { timeZone: profileZone }, providers: [] } })
+    api.get.mockResolvedValue({ data: { methods: [{ kind: 'password', linked: true, removable: true, detail: 'Password' }] } })
+    api.post.mockResolvedValue({ data: { graceEndsAt } })
+    setPendingSettingsAction({ kind: 'deleteAccount' })
+    setReauthProof('proof-from-callback')
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue with confirmed identity' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(format(profileZone))
   })
 })

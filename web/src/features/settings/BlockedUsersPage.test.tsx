@@ -123,4 +123,29 @@ describe('BlockedUsersPageTests', () => {
 
     expect(await screen.findByText('No blocked users.')).toBeInTheDocument()
   })
+
+  it('renders the blocked-at date in the viewer profile time zone rather than the browser zone_D038_D046', async () => {
+    const createdAt = '2026-08-01T12:00:00Z'
+    const format = (timeZone?: string) =>
+      new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone }).format(new Date(createdAt))
+    const hostRender = format()
+    // A profile zone whose rendering provably differs from the host zone, so the
+    // assertion fails if the component silently falls back to the browser zone.
+    const profileZone = ['Pacific/Midway', 'Pacific/Kiritimati'].find(
+      (zone) => format(zone) !== hostRender,
+    )!
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') {
+        return Promise.resolve({ data: { timeZone: profileZone } })
+      }
+      return Promise.resolve({
+        data: { items: [{ blockId: 'block-1', username: 'snapshot.name', createdAt }] },
+      })
+    })
+    renderPage()
+
+    expect(
+      await screen.findByText(`Blocked ${format(profileZone)}`),
+    ).toBeInTheDocument()
+  })
 })
