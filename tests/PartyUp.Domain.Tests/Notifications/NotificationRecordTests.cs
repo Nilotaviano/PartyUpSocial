@@ -188,11 +188,21 @@ public class NotificationRecordTests
     {
         NotificationType[] types = Enum.GetValues<NotificationType>();
 
-        // One member per spec §8.4 row plus the reminder; renumbering would rewrite stored history.
-        Assert.Equal(25, types.Length);
+        // One member per spec §8.4 row plus the reminder, plus the D-207 friend-group trio; renumbering
+        // would rewrite stored history.
+        Assert.Equal(28, types.Length);
         Assert.Equal(0, (int)NotificationType.SessionInvitation);
-        Assert.Equal(24, (int)NotificationType.SteamImportMatch);
-        Assert.All(types, type => Assert.True(type.NeedsSessionRef() || type.NeedsPollRef() || type.NeedsActorRef()));
+        Assert.Equal(27, (int)NotificationType.AudienceGroupDeleted);
+        Assert.All(
+            types,
+            type => Assert.True(
+                type.NeedsSessionRef() ||
+                type.NeedsPollRef() ||
+                type.NeedsActorRef() ||
+                // D-205: an AudienceGroupDeleted row carries no ref at all -- the group that would be
+                // named is the very thing that is gone, and it is one row per organizer, not per
+                // affected session/poll.
+                type == NotificationType.AudienceGroupDeleted));
     }
 
     // ---- NotificationMute ------------------------------------------------------------------------

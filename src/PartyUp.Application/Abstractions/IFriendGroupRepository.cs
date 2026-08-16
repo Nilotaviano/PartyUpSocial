@@ -34,4 +34,29 @@ public interface IFriendGroupRepository
 
     /// <summary>Every group the user owns or holds a row in — <c>Invited</c> rows included.</summary>
     Task<IReadOnlyCollection<FriendGroup>> ListInvolvingAsync(UserId userId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// D-205's deletion-time read: the distinct organizer of every session and poll whose audience
+    /// currently targets <paramref name="groupId"/> — the recipient set for the one
+    /// <c>AudienceGroupDeleted</c> notification a deletion produces per affected organizer. Must be
+    /// read before the caller calls <see cref="Remove"/>, in the same transaction as the group's own
+    /// <see cref="LoadForUpdateAsync"/> lock.
+    /// </summary>
+    Task<IReadOnlyCollection<UserId>> ListDistinctOrganizersTargetingAsync(
+        FriendGroupId groupId,
+        CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// Thrown by <see cref="IUnitOfWork.ExecuteAsync{T}"/> when a friend group's create/rename insert
+/// loses the race against <c>ux_friend_groups_owner_name</c> (D-199's per-owner, case-insensitive name
+/// space) — the same treatment <c>FriendshipPairUniqueConflictException</c> gets for
+/// <c>ux_friendships_pair</c>.
+/// </summary>
+public sealed class FriendGroupNameConflictException : Exception
+{
+    public FriendGroupNameConflictException(Exception innerException)
+        : base(nameof(FriendGroupNameConflictException), innerException)
+    {
+    }
 }

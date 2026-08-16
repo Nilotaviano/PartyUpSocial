@@ -313,9 +313,6 @@ namespace PartyUp.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_friend_groups");
 
-                    b.HasIndex("OwnerId")
-                        .HasDatabaseName("ix_friend_groups_owner");
-
                     b.ToTable("friend_groups", (string)null);
                 });
 

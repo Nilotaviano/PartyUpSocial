@@ -37,8 +37,9 @@ public sealed class FriendGroupConfiguration : IEntityTypeConfiguration<FriendGr
             .OnDelete(DeleteBehavior.Restrict);
 
         // The unique index is on (owner_user_id, lower(name)) -- D-199's per-owner, case-insensitive
-        // name space. EF has no expression-index primitive, so it is raw SQL in the migration.
-        builder.HasIndex(group => group.OwnerId).HasDatabaseName("ix_friend_groups_owner");
+        // name space. EF has no expression-index primitive, so it is raw SQL in the migration. Its
+        // (owner_user_id, ...) prefix already covers owner-only lookups, so no separate index on
+        // OwnerId alone is needed.
 
         builder.OwnsMany(group => group.Members, member =>
         {

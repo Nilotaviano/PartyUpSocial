@@ -9,6 +9,7 @@ using PartyUp.Application.Auth;
 using PartyUp.Application.Availability;
 using PartyUp.Application.Email;
 using PartyUp.Application.Friends;
+using PartyUp.Application.FriendGroups;
 using PartyUp.Application.Notifications;
 using PartyUp.Application.Polls;
 using PartyUp.Application.Push;
@@ -165,6 +166,8 @@ public static class DependencyInjection
         services.AddScoped<BlockUserUseCase>();
         services.AddScoped<UnblockUserUseCase>();
         services.AddScoped<ImportSteamFriendsUseCase>();
+        services.AddScoped<FriendGroupUseCases>();
+        services.AddScoped<FriendGroupReadUseCases>();
         services.AddSingleton<IPublicLinkBuilder>(new PublicLinkBuilder(
             configuration["PublicBaseUrl"] ?? "http://localhost:5173"));
         services.AddScoped<SecurityTokenService>();

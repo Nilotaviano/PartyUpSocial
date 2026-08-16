@@ -158,11 +158,6 @@ namespace PartyUp.Infrastructure.Migrations
                 table: "friend_group_members",
                 column: "user_id");
 
-            migrationBuilder.CreateIndex(
-                name: "ix_friend_groups_owner",
-                table: "friend_groups",
-                column: "owner_user_id");
-
             // D-199's per-owner, case-insensitive name space. EF has no expression-index primitive,
             // so the unique index is raw SQL (same treatment as ix_steam_apps_name_trgm).
             migrationBuilder.Sql(

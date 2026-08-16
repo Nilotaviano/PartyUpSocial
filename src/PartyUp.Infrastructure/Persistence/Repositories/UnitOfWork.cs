@@ -58,6 +58,17 @@ public sealed class UnitOfWork(AppDbContext context) : IUnitOfWork
                 context.ChangeTracker.Clear();
                 throw new FriendshipPairUniqueConflictException(exception);
             }
+            catch (DbUpdateException exception) when (
+                exception.InnerException is PostgresException
+                {
+                    SqlState: PostgresErrorCodes.UniqueViolation,
+                    ConstraintName: "ux_friend_groups_owner_name",
+                })
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                context.ChangeTracker.Clear();
+                throw new FriendGroupNameConflictException(exception);
+            }
             catch (Exception exception) when (attempt < MaxAttempts && IsTransientConflict(exception))
             {
                 await transaction.RollbackAsync(CancellationToken.None);

@@ -92,4 +92,25 @@ public sealed class FriendGroupRepository(AppDbContext context) : IFriendGroupRe
             .Where(group => group.OwnerId == userId || group.Members.Any(member => member.UserId == userId))
             .OrderBy(group => group.Id)
             .ToListAsync(cancellationToken);
+
+    /// <summary>D-205's deletion-time read, raw SQL over the two audience junction tables (neither has its own DbSet).</summary>
+    public async Task<IReadOnlyCollection<UserId>> ListDistinctOrganizersTargetingAsync(
+        FriendGroupId groupId,
+        CancellationToken cancellationToken)
+    {
+        Guid id = groupId.Value;
+        List<Guid> organizerIds = await context.Database.SqlQuery<Guid>($"""
+            SELECT organizer_id AS "Value"
+            FROM sessions s
+            JOIN session_audience_groups sag ON sag.session_id = s.id
+            WHERE sag.group_id = {id}
+            UNION
+            SELECT organizer_id AS "Value"
+            FROM polls p
+            JOIN poll_audience_groups pag ON pag.poll_id = p.id
+            WHERE pag.group_id = {id}
+            """).ToListAsync(cancellationToken);
+
+        return [.. organizerIds.Select(UserId.From)];
+    }
 }

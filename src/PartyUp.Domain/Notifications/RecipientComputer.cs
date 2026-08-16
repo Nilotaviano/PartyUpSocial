@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Domain.Friendships;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
@@ -509,6 +510,46 @@ public static class RecipientComputer
             NotificationType.SteamImportMatch,
             NotificationSubject.ForActor(matchedUserId),
             filter);
+
+    // ---- §10 friend-group rows ------------------------------------------------------------------
+
+    /// <summary>D-207: the invitee, naming the owner who sent it.</summary>
+    public static IReadOnlyList<NotificationRequest> FriendGroupInviteReceived(
+        FriendGroupInviteSent domainEvent,
+        RecipientFilter filter)
+    {
+        ArgumentNullException.ThrowIfNull(domainEvent);
+
+        return ExplicitTarget(
+            domainEvent.InviteeId,
+            NotificationType.FriendGroupInviteReceived,
+            NotificationSubject.ForActor(domainEvent.OwnerId),
+            filter);
+    }
+
+    /// <summary>D-207: the owner, naming the invitee who accepted.</summary>
+    public static IReadOnlyList<NotificationRequest> GroupInviteAccepted(
+        FriendGroupInviteAccepted domainEvent,
+        RecipientFilter filter)
+    {
+        ArgumentNullException.ThrowIfNull(domainEvent);
+
+        return ExplicitTarget(
+            domainEvent.OwnerId,
+            NotificationType.FriendGroupInviteAccepted,
+            NotificationSubject.ForActor(domainEvent.InviteeId),
+            filter);
+    }
+
+    /// <summary>D-207: decline/revoke/remove/leave/block-driven removal raise no event and are silent.</summary>
+    public static IReadOnlyList<NotificationRequest> ForFriendGroupEvent(
+        IDomainEvent domainEvent,
+        RecipientFilter filter) => domainEvent switch
+        {
+            FriendGroupInviteSent e => FriendGroupInviteReceived(e, filter),
+            FriendGroupInviteAccepted e => GroupInviteAccepted(e, filter),
+            _ => [],
+        };
 
     // ---- dispatchers ----------------------------------------------------------------------------
 

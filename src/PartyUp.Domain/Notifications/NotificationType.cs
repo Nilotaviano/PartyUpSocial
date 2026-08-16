@@ -33,6 +33,9 @@ public enum NotificationType
     PollJoinRequestRejected = 22,
     FriendRequestReceived = 23,
     SteamImportMatch = 24,
+    FriendGroupInviteReceived = 25,
+    FriendGroupInviteAccepted = 26,
+    AudienceGroupDeleted = 27,
 }
 
 /// <summary>
@@ -82,8 +85,14 @@ public static class NotificationTypeExtensions
 
     /// <summary>
     /// The friend-graph rows (D-105) name a person and nothing else: the requester, or the matched
-    /// Steam friend (§12-32). Carrying a session or poll ref on one of them is a shape error.
+    /// Steam friend (§12-32). Carrying a session or poll ref on one of them is a shape error. The two
+    /// friend-group membership rows (D-207) follow the identical shape: the counterpart in the invite
+    /// (the owner who sent it, or the invitee who accepted it) and nothing else — <c>AudienceGroupDeleted</c>
+    /// carries no ref at all, since the group that would be named is the very thing that is gone.
     /// </summary>
     public static bool NeedsActorRef(this NotificationType type) =>
-        type is NotificationType.FriendRequestReceived or NotificationType.SteamImportMatch;
+        type is NotificationType.FriendRequestReceived
+            or NotificationType.SteamImportMatch
+            or NotificationType.FriendGroupInviteReceived
+            or NotificationType.FriendGroupInviteAccepted;
 }
