@@ -166,6 +166,16 @@ export function FindATimePage() {
           title={t('findATime.friendsLabel')}
           titleId="find-a-time-friends-heading"
         >
+          {friends.isPending && (
+            <p
+              className="motion-safe:animate-pulse text-ink-soft"
+              data-testid="find-a-time-friends-loading"
+              role="status"
+            >
+              {t('common.loading', { ns: 'common' })}
+            </p>
+          )}
+
           <ul className="grid gap-2 sm:grid-cols-2">
             {(friends.data ?? []).map((friend) => (
               <li key={friend.friendshipId}>
@@ -301,6 +311,38 @@ export function FindATimePage() {
                       {' · '}
                       {t('findATime.maybe', { count: window.maybe.length })}
                     </p>
+                    {(window.available.length > 0 || window.maybe.length > 0) && (
+                      <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+                        {window.available.length > 0 && (
+                          <div className="flex flex-col gap-1">
+                            <h4 className="font-display text-meta font-semibold text-ink-soft">
+                              {t('findATime.available', { count: window.available.length })}
+                            </h4>
+                            <ul className="text-meta text-ink-soft">
+                              {window.available.map((participant) => (
+                                <li key={participant.ordinal}>
+                                  {participant.displayName ?? t('detail.anonymous', { ns: 'sessions' })}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {window.maybe.length > 0 && (
+                          <div className="flex flex-col gap-1">
+                            <h4 className="font-display text-meta font-semibold text-ink-soft">
+                              {t('findATime.maybe', { count: window.maybe.length })}
+                            </h4>
+                            <ul className="text-meta text-ink-soft">
+                              {window.maybe.map((participant) => (
+                                <li key={participant.ordinal}>
+                                  {participant.displayName ?? t('detail.anonymous', { ns: 'sessions' })}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {overMinutes > 0 && (
                       <p className="text-meta font-semibold text-danger" role="status">
                         {t('findATime.overDurationWarning', { minutes: overMinutes })}

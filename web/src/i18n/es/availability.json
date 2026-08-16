@@ -26,6 +26,7 @@
     "oneOffHeading": "Solo esta semana",
     "kindRecurring": "Se repite cada semana",
     "kindOneOff": "Una sola vez",
+    "weeklyEmpty": "Todavía no hay reglas semanales.",
     "oneOffEmpty": "Todavía no hay ventanas puntuales.",
     "cancel": "Conservar"
   },

@@ -14,6 +14,7 @@ import { Link, useLocation } from "react-router";
 import { isApiError } from "../../../api/client";
 import { PageHeader } from "../../../components/shell/PageHeader";
 import { segmentItemClasses } from "../../../components/ui/classes";
+import { StatusBanner } from "../../../components/ui/statusBanner";
 import { useToast } from "../../../components/ui/toastStore";
 import { AgendaView, type AgendaEntry } from "../AgendaView";
 import { OccurrenceScopeDialog, type OccurrenceScope } from "../OccurrenceScopeDialog";
@@ -71,7 +72,7 @@ function isoDayOfWeek(fakeLocal: Date) {
 }
 
 export function CalendarShell() {
-  const { t, i18n } = useTranslation(["availability", "errors"]);
+  const { t, i18n } = useTranslation(["availability", "errors", "common"]);
   const queryClient = useQueryClient();
   const showToast = useToast();
   const isMobile = useIsMobile();
@@ -175,6 +176,21 @@ export function CalendarShell() {
   useEffect(() => {
     if (calendar.error) showToast({ message: errorMessage(calendar.error) });
   }, [calendar.error, errorMessage, showToast]);
+
+  // A failed profile fetch permanently disables `calendar` (it's gated on
+  // `profile.data`) and, unlike a failed `calendar` fetch, has no query of its
+  // own to retry from — so this toast carries its own retry action rather than
+  // relying on TanStack Query's automatic retries alone.
+  useEffect(() => {
+    if (!profile.error) return;
+    showToast({
+      message: errorMessage(profile.error),
+      action: {
+        label: t("actions.retry", { ns: "common" }),
+        onAction: () => void profile.refetch(),
+      },
+    });
+  }, [profile.error, profile.refetch, errorMessage, showToast, t]);
 
   // `timeZone: 'UTC'` is not a bug: the week dates hold the profile-zone wall
   // clock on their UTC accessors (D-046), so formatting reads them back the
@@ -596,6 +612,11 @@ export function CalendarShell() {
     [i18n.language],
   );
 
+  // Only the very first paint of a range needs the skeleton: once `calendar`
+  // has ever resolved data for it, a background refetch (week paging, a
+  // mutation's invalidation) keeps the last-good grid on screen instead.
+  const initialLoad = (profile.isPending || calendar.isPending) && !calendar.data;
+
   const panel = (
     <AvailabilityPanel
       rules={rules}
@@ -674,6 +695,29 @@ export function CalendarShell() {
         />
         </div>
 
+        {profile.error ? (
+          // A failed profile fetch leaves `calendar` disabled (it's gated on
+          // `profile.data`), so `rules`/`mapped` never has anything real to
+          // paint — rendering the grid here would show a normal-looking empty
+          // week rather than the failure that produced it.
+          <main className="mx-auto max-w-[1400px] px-3 sm:px-6">
+            <StatusBanner
+              actions={
+                <Button
+                  className="h-11 rounded-xl font-display font-bold"
+                  variant="outline"
+                  onClick={() => void profile.refetch()}
+                >
+                  {t("actions.retry", { ns: "common" })}
+                </Button>
+              }
+              role="alert"
+              variant="danger"
+            >
+              {errorMessage(profile.error)}
+            </StatusBanner>
+          </main>
+        ) : (
         <main className="mx-auto grid max-w-[1400px] gap-4 px-3 sm:px-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           {/* side panel — desktop */}
           <aside className="hidden lg:block">
@@ -815,7 +859,9 @@ export function CalendarShell() {
             </div>
 
             <div className="surface p-2 sm:p-3" ref={gridContainerRef}>
-              {agendaMode ? (
+              {initialLoad ? (
+                <CalendarSkeleton days={days.length} />
+              ) : agendaMode ? (
                 <AgendaView
                   dateLabelFormatter={(date) => agendaDate.format(date)}
                   entries={agendaEntries}
@@ -848,6 +894,7 @@ export function CalendarShell() {
             </div>
           </section>
         </main>
+        )}
 
         <OccurrenceScopeDialog
           open={pendingScope !== null}
@@ -872,6 +919,29 @@ export function CalendarShell() {
         />
       </div>
     </>
+  );
+}
+
+function CalendarSkeleton({ days }: { days: number }) {
+  const { t } = useTranslation("common");
+  return (
+    <div data-testid="calendar-skeleton">
+      <p aria-live="polite" className="sr-only" role="status">
+        {t("common.loading")}
+      </p>
+      <div
+        aria-hidden="true"
+        className="grid gap-1"
+        style={{ gridTemplateColumns: `repeat(${days}, minmax(0, 1fr))` }}
+      >
+        {Array.from({ length: days * 6 }, (_, i) => (
+          <div
+            key={i}
+            className="h-10 rounded-lg bg-muted motion-safe:animate-pulse"
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 

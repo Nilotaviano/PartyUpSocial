@@ -134,6 +134,9 @@ export function AvailabilityPanel({
           {t("summary.weeklyHeading")}
         </p>
         <ul className="space-y-2">{recurring.map(renderRule)}</ul>
+        {recurring.length === 0 && (
+          <p className="text-[12px] text-muted-foreground">{t("summary.weeklyEmpty")}</p>
+        )}
 
         <p className="mt-4 mb-2 font-display text-[11px] font-bold tracking-[0.14em] text-muted-foreground uppercase">
           {t("summary.oneOffHeading")}

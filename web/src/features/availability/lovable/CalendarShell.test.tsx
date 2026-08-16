@@ -179,6 +179,59 @@ describe('CalendarShell', () => {
     )
   })
 
+  it('surfaces a profile-fetch failure instead of a silent-empty week, with a retry', async () => {
+    let profileCalls = 0
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') {
+        profileCalls += 1
+        if (profileCalls === 1) {
+          return Promise.reject({ code: 'internal_error' })
+        }
+        return Promise.resolve({ data: { timeZone: 'UTC', locale: 'en' } })
+      }
+      if (path === '/api/v1/calendar') {
+        return Promise.resolve({ data: calendarResponse() })
+      }
+      return Promise.resolve({ data: undefined })
+    })
+    renderShell()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toBeInTheDocument()
+    // Never a normal-looking empty week rendered underneath the failure.
+    expect(screen.queryByRole('grid')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('calendar-skeleton')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    expect(await screen.findByRole('grid')).toBeInTheDocument()
+  })
+
+  it('shows a skeleton, not an empty grid, during the initial load', async () => {
+    let resolveProfile!: (value: { data: { timeZone: string; locale: string } }) => void
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') {
+        return new Promise((resolve) => {
+          resolveProfile = resolve
+        })
+      }
+      if (path === '/api/v1/calendar') {
+        return Promise.resolve({ data: calendarResponse() })
+      }
+      return Promise.resolve({ data: undefined })
+    })
+    renderShell()
+
+    expect(await screen.findByTestId('calendar-skeleton')).toBeInTheDocument()
+    expect(screen.queryByRole('grid')).not.toBeInTheDocument()
+
+    resolveProfile({ data: { timeZone: 'UTC', locale: 'en' } })
+
+    await waitFor(() => expect(screen.queryByTestId('calendar-skeleton')).not.toBeInTheDocument())
+    expect(await screen.findByRole('grid')).toBeInTheDocument()
+  })
+
   it('focuses the page h1 on mount_D139', async () => {
     renderShell()
 

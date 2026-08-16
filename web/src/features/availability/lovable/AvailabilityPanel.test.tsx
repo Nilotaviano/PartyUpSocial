@@ -75,6 +75,17 @@ describe('AvailabilityPanel', () => {
     expect(screen.getByText('No one-off windows yet.')).toBeInTheDocument()
   })
 
+  it('states the empty weekly group rather than showing nothing_S4', () => {
+    renderPanel([oneOff])
+    expect(screen.getByText('No weekly rules yet.')).toBeInTheDocument()
+  })
+
+  it('shows neither empty-group message once both groups have a rule_S4', () => {
+    renderPanel([weekly, oneOff])
+    expect(screen.queryByText('No weekly rules yet.')).not.toBeInTheDocument()
+    expect(screen.queryByText('No one-off windows yet.')).not.toBeInTheDocument()
+  })
+
   it('deletes a one-off window without a confirm step_D025', () => {
     const { onDelete } = renderPanel([oneOff])
 

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -103,7 +103,9 @@ describe('FindATimePage', () => {
     renderPage()
 
     const list = await screen.findByTestId('find-a-time-results')
-    const items = list.querySelectorAll('li')
+    // `:scope > li` — each window's own participant-name lists nest their own
+    // `<li>`s inside these top-level window rows.
+    const items = list.querySelectorAll(':scope > li')
     expect(items).toHaveLength(3)
     expect(items[0]).toHaveTextContent('2 available')
     expect(items[1]).toHaveTextContent('1 available')
@@ -262,7 +264,9 @@ describe('FindATimePage', () => {
     expect(
       await screen.findByText('This session runs 30 minutes past this window.'),
     ).toBeInTheDocument()
-    expect(screen.getByTestId('find-a-time-results').querySelectorAll('li')).toHaveLength(1)
+    expect(
+      screen.getByTestId('find-a-time-results').querySelectorAll(':scope > li'),
+    ).toHaveLength(1)
   })
 
   it('builds the prefill url from a recommendation_D102', async () => {
@@ -293,6 +297,60 @@ describe('FindATimePage', () => {
       'href',
       '/sessions/new?startTime=2030-09-01T18%3A00%3A00Z&durationMinutes=120&overDurationMinutes=0',
     )
+  })
+
+  it('renders each window participant by name, masking the same way consideredFriends does', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/availability/overlaps') {
+        return Promise.resolve({
+          data: {
+            windows: [
+              {
+                start: '2030-09-01T18:00:00Z',
+                end: '2030-09-01T20:00:00Z',
+                available: [
+                  { ordinal: 0, displayName: 'Ada' },
+                  { ordinal: 1, displayName: null },
+                ],
+                maybe: [{ ordinal: 2, displayName: 'Blaine' }],
+              },
+            ],
+            range: { start: '', end: '' },
+            selectionSource: 'allFriends',
+            consideredFriends: [],
+          },
+        })
+      }
+      return defaultGetHandler(path)
+    })
+    renderPage()
+
+    const list = await screen.findByTestId('find-a-time-results')
+    expect(within(list).getByText('Ada')).toBeInTheDocument()
+    expect(within(list).getByText('Blaine')).toBeInTheDocument()
+    // §D-076 masking: a null displayName falls back to the same anonymous
+    // label consideredFriends renders, never a client-invented name.
+    expect(within(list).getByText('Anonymous User')).toBeInTheDocument()
+  })
+
+  it('shows a loading affordance for the friends checklist while it fetches', async () => {
+    let resolveFriends!: (value: { data: { items: unknown[] } }) => void
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/friends') {
+        return new Promise((resolve) => {
+          resolveFriends = resolve
+        })
+      }
+      return defaultGetHandler(path)
+    })
+    renderPage()
+
+    expect(await screen.findByTestId('find-a-time-friends-loading')).toHaveTextContent(
+      'Loading...',
+    )
+
+    resolveFriends({ data: { items: [] } })
+    await screen.findByRole('heading', { name: 'Friends' })
   })
 
   it('accumulates selected windows into a repeated startTimes poll-arm url_D102', async () => {
