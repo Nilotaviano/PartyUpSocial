@@ -10,6 +10,7 @@ function options() {
       startTime: '2099-01-01T10:00:00Z',
       suggestedByUserId: null,
       suggestedByGuestIdentityId: null,
+      suggester: null,
       availableCount: 0,
       maybeCount: 0,
       unavailableCount: 0,

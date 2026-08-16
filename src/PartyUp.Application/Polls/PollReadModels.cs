@@ -44,6 +44,10 @@ public sealed record PollRosterEntry(
 /// <see cref="PollReadUseCases"/> when the suggester is the roster's masked-for-viewer row -- the
 /// wire contract omits the suggester's user id when it is set, matching the roster's own D-076
 /// omission rather than leaking the real id through a second, unmasked channel.
+/// <see cref="SuggestedByEntry"/> (D-196) is the resolved, already-masked attribution: the SAME
+/// <see cref="PollRosterEntry"/> row the roster and the voter lists carry for that participant --
+/// never a second masking pass -- and is null when the suggester is the poll organizer (DOMAIN_MODEL
+/// §12-38: organizer-created options carry no attribution).
 /// Per-category voter lists reuse the same <see cref="PollRosterEntry"/> rows the roster itself
 /// carries (looked up by the vote's <see cref="ParticipantRef"/>) rather than recomputing masking:
 /// a voter's <see cref="PollRosterEntry.MaskedForViewer"/> and <see cref="PollRosterEntry.ParticipationId"/>
@@ -56,6 +60,7 @@ public sealed record PollOptionGridEntry(
     Instant StartTime,
     ParticipantRef SuggestedBy,
     bool SuggestedByMasked,
+    PollRosterEntry? SuggestedByEntry,
     int AvailableCount,
     int MaybeCount,
     int UnavailableCount,

@@ -212,6 +212,83 @@ describe('PollDetailPage (lovable)', () => {
     expect(within(maskedRow).getAllByText('Anonymous User').length).toBeGreaterThan(0)
   })
 
+  it('renders a small "Suggested by" attribution line for an option with a resolved suggester_D196', async () => {
+    mockGet({
+      detail: pollDetail({
+        options: [
+          {
+            id: 'option-1',
+            startTime: '2099-01-01T10:00:00Z',
+            suggestedByUserId: 'participation-2-user',
+            suggestedByGuestIdentityId: null,
+            suggester: {
+              participationId: 'participation-2',
+              userId: 'participation-2-user',
+              guestIdentityId: null,
+              displayName: 'Suggester Sam',
+              isActive: true,
+              avatar: null,
+            },
+            availableCount: 0,
+            maybeCount: 0,
+            unavailableCount: 0,
+            viewerVote: null,
+            availableVoters: [],
+            maybeVoters: [],
+            unavailableVoters: [],
+          },
+        ],
+      }),
+    })
+    renderPage()
+
+    const option = await screen.findByTestId('poll-option-suggested-by-option-1')
+    expect(option).toHaveTextContent('Suggested by Suggester Sam')
+  })
+
+  it('renders the masked Anonymous User attribution for a blocked-pair suggester_D196', async () => {
+    mockGet({
+      detail: pollDetail({
+        options: [
+          {
+            id: 'option-1',
+            startTime: '2099-01-01T10:00:00Z',
+            suggestedByUserId: null,
+            suggestedByGuestIdentityId: null,
+            suggester: {
+              participationId: 'participation-2',
+              userId: null,
+              guestIdentityId: null,
+              displayName: null,
+              isActive: true,
+              avatar: null,
+            },
+            availableCount: 0,
+            maybeCount: 0,
+            unavailableCount: 0,
+            viewerVote: null,
+            availableVoters: [],
+            maybeVoters: [],
+            unavailableVoters: [],
+          },
+        ],
+      }),
+    })
+    renderPage()
+
+    const option = await screen.findByTestId('poll-option-suggested-by-option-1')
+    expect(option).toHaveTextContent('Suggested by Anonymous User')
+  })
+
+  it('renders no attribution line at all for an organizer-created option_D196', async () => {
+    mockGet()
+    renderPage()
+
+    await screen.findByTestId('poll-option-option-1')
+    expect(screen.queryByTestId('poll-option-suggested-by-option-1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('poll-option-suggested-by-option-2')).not.toBeInTheDocument()
+  })
+
   it('renders an avatar disc on each poll roster row, masked without the real emoji_D188', async () => {
     mockGet({
       detail: pollDetail({

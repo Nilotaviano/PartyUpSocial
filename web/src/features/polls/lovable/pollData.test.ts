@@ -53,6 +53,7 @@ function pollResponse(overrides: Partial<PollDetailResponse> = {}): PollDetailRe
         startTime: '2026-08-15T20:00:00Z',
         suggestedByUserId: null,
         suggestedByGuestIdentityId: null,
+        suggester: null,
         availableCount: 2,
         maybeCount: 1,
         unavailableCount: 0,
@@ -83,6 +84,7 @@ function pollResponse(overrides: Partial<PollDetailResponse> = {}): PollDetailRe
         startTime: '2026-08-15T21:30:00Z',
         suggestedByUserId: null,
         suggestedByGuestIdentityId: null,
+        suggester: null,
         availableCount: 3,
         maybeCount: 0,
         unavailableCount: 1,
@@ -177,6 +179,77 @@ describe('mapPollDetail', () => {
     expect(option.availableCount).toBe(3)
     expect(option.availableVoters).toEqual([])
   })
+
+  it('maps a resolved suggester through the same identity resolution as the roster_D196', () => {
+    const mapped = mapPollDetail(
+      pollResponse({
+        options: [
+          {
+            id: 'opt-1',
+            startTime: '2026-08-15T20:00:00Z',
+            suggestedByUserId: 'user-2',
+            suggestedByGuestIdentityId: null,
+            suggester: {
+              participationId: 'part-2',
+              userId: 'user-2',
+              guestIdentityId: null,
+              displayName: 'Suggester Sam',
+              isActive: true,
+              avatar: { kind: 'emoji', emoji: '🎲', avatarSourceId: null, imgUrl: null },
+            },
+            availableCount: 0,
+            maybeCount: 0,
+            unavailableCount: 0,
+            viewerVote: null,
+            availableVoters: [],
+            maybeVoters: [],
+            unavailableVoters: [],
+          },
+        ],
+      }) as PollDetailResponse,
+      'UTC',
+      labels,
+    )!
+    expect(mapped.options[0]!.suggestedBy).toEqual({ name: 'Suggester Sam', masked: false })
+  })
+
+  it('masks a blocked-pair suggester exactly like a masked roster row_D196', () => {
+    const mapped = mapPollDetail(
+      pollResponse({
+        options: [
+          {
+            id: 'opt-1',
+            startTime: '2026-08-15T20:00:00Z',
+            suggestedByUserId: null,
+            suggestedByGuestIdentityId: null,
+            suggester: {
+              participationId: 'part-2',
+              userId: null,
+              guestIdentityId: null,
+              displayName: null,
+              isActive: true,
+              avatar: null,
+            },
+            availableCount: 0,
+            maybeCount: 0,
+            unavailableCount: 0,
+            viewerVote: null,
+            availableVoters: [],
+            maybeVoters: [],
+            unavailableVoters: [],
+          },
+        ],
+      }) as PollDetailResponse,
+      'UTC',
+      labels,
+    )!
+    expect(mapped.options[0]!.suggestedBy).toEqual({ name: 'Anonymous User', masked: true })
+  })
+
+  it('leaves suggestedBy null for an organizer-created option_D196', () => {
+    const mapped = mapPollDetail(pollResponse(), 'UTC', labels)!
+    expect(mapped.options[0]!.suggestedBy).toBeNull()
+  })
 })
 
 describe('D-052 ranking: Available then Maybe', () => {
@@ -194,6 +267,7 @@ describe('D-052 ranking: Available then Maybe', () => {
             startTime: '2026-08-15T22:00:00Z',
             suggestedByUserId: null,
             suggestedByGuestIdentityId: null,
+            suggester: null,
             availableCount: 2,
             maybeCount: 0,
             unavailableCount: 0,
@@ -207,6 +281,7 @@ describe('D-052 ranking: Available then Maybe', () => {
             startTime: '2026-08-15T20:00:00Z',
             suggestedByUserId: null,
             suggestedByGuestIdentityId: null,
+            suggester: null,
             availableCount: 2,
             maybeCount: 1,
             unavailableCount: 0,

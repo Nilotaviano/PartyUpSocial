@@ -122,11 +122,18 @@ public sealed class PollReadUseCases(
 
             bool suggesterMasked = option.SuggestedBy.UserId is { } suggesterId && maskedUserIds.Contains(suggesterId);
 
+            // D-196: an organizer-created option carries no attribution (DOMAIN_MODEL §12-38);
+            // otherwise the suggester renders through the identical roster row the voter lists use,
+            // so its masking agrees with the roster without a second masking pass.
+            PollRosterEntry? suggestedByEntry = option.SuggestedBy.UserId == poll.OrganizerId
+                ? null
+                : rosterByParticipant.GetValueOrDefault(option.SuggestedBy);
+
             var (availableVoters, maybeVoters, unavailableVoters) =
                 PollVoterListBuilder.Build(option.Id, poll.Votes, rosterByParticipant);
 
             options.Add(new PollOptionGridEntry(
-                option.Id, option.StartTime, option.SuggestedBy, suggesterMasked,
+                option.Id, option.StartTime, option.SuggestedBy, suggesterMasked, suggestedByEntry,
                 available, maybe, unavailable, ownVote,
                 availableVoters, maybeVoters, unavailableVoters));
         }

@@ -262,6 +262,7 @@
     "winningTime": "Winning time",
     "alreadyPassed": "Already passed",
     "repliedCount": "{{responded}}/{{total}} replied",
+    "suggestedBy": "Suggested by {{name}}",
     "previewSeats": "Preview seats",
     "deleteOption": "Delete option",
     "deleteOptionTitle": "Delete this option?",

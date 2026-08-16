@@ -262,6 +262,7 @@
     "winningTime": "Horário vencedor",
     "alreadyPassed": "Já passou",
     "repliedCount": "{{responded}}/{{total}} responderam",
+    "suggestedBy": "Sugerido por {{name}}",
     "previewSeats": "Pré-visualizar vagas",
     "deleteOption": "Excluir opção",
     "deleteOptionTitle": "Excluir esta opção?",

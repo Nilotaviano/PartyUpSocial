@@ -106,8 +106,15 @@ public sealed class GuestPollReadUseCases(IPollRepository polls, IPollReadReposi
             var (availableVoters, maybeVoters, unavailableVoters) =
                 PollVoterListBuilder.Build(option.Id, poll.Votes, rosterByParticipant);
 
+            // D-196: same organizer-null rule as the registered read; a guest viewer never masks
+            // (D-076 is a User-to-User relation only), so the resolved entry always carries the
+            // real display name.
+            PollRosterEntry? suggestedByEntry = option.SuggestedBy.UserId == poll.OrganizerId
+                ? null
+                : rosterByParticipant.GetValueOrDefault(option.SuggestedBy);
+
             options.Add(new PollOptionGridEntry(
-                option.Id, option.StartTime, option.SuggestedBy, false,
+                option.Id, option.StartTime, option.SuggestedBy, false, suggestedByEntry,
                 available, maybe, unavailable, ownVote,
                 availableVoters, maybeVoters, unavailableVoters));
         }

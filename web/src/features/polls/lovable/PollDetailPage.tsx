@@ -297,6 +297,14 @@ function OptionCard({
                 })}
               </span>
             </p>
+            {option.suggestedBy && (
+              <p
+                className="text-[12px] text-muted-foreground"
+                data-testid={`poll-option-suggested-by-${option.id}`}
+              >
+                {t('detailLovable.suggestedBy', { name: option.suggestedBy.name })}
+              </p>
+            )}
           </div>
         </div>
 

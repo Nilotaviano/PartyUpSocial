@@ -57,6 +57,11 @@ export type PollOptionT = {
   availableVoters: Voter[]
   maybeVoters: Voter[]
   unavailableVoters: Voter[]
+  /**
+   * D-196: who suggested this option, masked through the identical assigner pass as the voter
+   * lists (`resolveIdentity`) — `null` for an organizer-created option (no attribution).
+   */
+  suggestedBy: { name: string; masked: boolean } | null
 }
 
 export function optionDate(option: PollOptionT) {
@@ -300,6 +305,17 @@ function mapOption(
     availableVoters: option.availableVoters.map((entry) => mapRosterEntry(entry, labels)),
     maybeVoters: option.maybeVoters.map((entry) => mapRosterEntry(entry, labels)),
     unavailableVoters: option.unavailableVoters.map((entry) => mapRosterEntry(entry, labels)),
+    suggestedBy: option.suggester
+      ? {
+          name: resolveIdentity(
+            option.suggester.participationId,
+            option.suggester.displayName,
+            option.suggester.avatar,
+            labels,
+          ).name,
+          masked: option.suggester.displayName == null,
+        }
+      : null,
   }
 }
 

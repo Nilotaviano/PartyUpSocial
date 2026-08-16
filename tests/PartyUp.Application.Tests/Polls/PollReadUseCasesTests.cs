@@ -222,6 +222,103 @@ public sealed class PollReadUseCasesTests
         Assert.False(guestVoter.MaskedForViewer);
     }
 
+    /// <summary>D-196: the initial poll-creation options are organizer-suggested, so they carry no attribution.</summary>
+    [Fact]
+    public async Task GetPollDetail_OptionAttribution_NullForOrganizerCreatedOption_D196()
+    {
+        FakePollRepository polls = new();
+        FakePollReadRepository reads = new();
+        FakeFriendshipRepository friendships = new();
+        FakeBlockRepository blocks = new();
+        FakeNotificationMuteRepository mutes = new();
+        MutableClock clock = new(Instant.FromUtc(2026, 3, 2, 12, 0));
+
+        User organizer = FriendTestData.Active($"o{Guid.NewGuid():N}"[..12], "Organizer");
+        User invitee = FriendTestData.Active($"i{Guid.NewGuid():N}"[..12], "Invitee");
+        reads.Nameplates[organizer.Id.Value] = new UserNameplate(organizer.DisplayName, organizer.Avatar);
+        reads.Nameplates[invitee.Id.Value] = new UserNameplate(invitee.DisplayName, invitee.Avatar);
+
+        Poll poll = NewPoll(organizer.Id, [invitee.Id], clock);
+        _ = poll.DequeueEvents();
+        polls.Add(poll);
+
+        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, mutes);
+
+        PollDetail? detail = await useCase.GetPollDetailAsync(poll.Id, organizer.Id, default);
+
+        Assert.NotNull(detail);
+        Assert.All(detail!.Options, option => Assert.Null(option.SuggestedByEntry));
+    }
+
+    /// <summary>D-196: a non-organizer suggestion resolves attribution through the same roster row the voter lists use.</summary>
+    [Fact]
+    public async Task GetPollDetail_OptionAttribution_PresentForNonOrganizerSuggester_D196()
+    {
+        FakePollRepository polls = new();
+        FakePollReadRepository reads = new();
+        FakeFriendshipRepository friendships = new();
+        FakeBlockRepository blocks = new();
+        FakeNotificationMuteRepository mutes = new();
+        MutableClock clock = new(Instant.FromUtc(2026, 3, 2, 12, 0));
+
+        User organizer = FriendTestData.Active($"o{Guid.NewGuid():N}"[..12], "Organizer");
+        User invitee = FriendTestData.Active($"i{Guid.NewGuid():N}"[..12], "Invitee");
+        reads.Nameplates[organizer.Id.Value] = new UserNameplate(organizer.DisplayName, organizer.Avatar);
+        reads.Nameplates[invitee.Id.Value] = new UserNameplate(invitee.DisplayName, invitee.Avatar);
+
+        Poll poll = NewPoll(organizer.Id, [invitee.Id], clock);
+        PollOption suggested = poll.SuggestOption(
+            ParticipantRef.ForUser(invitee.Id), clock.GetCurrentInstant() + Duration.FromHours(7), clock);
+        _ = poll.DequeueEvents();
+        polls.Add(poll);
+
+        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, mutes);
+
+        PollDetail? detail = await useCase.GetPollDetailAsync(poll.Id, organizer.Id, default);
+
+        Assert.NotNull(detail);
+        PollOptionGridEntry option = detail!.Options.Single(o => o.Id == suggested.Id);
+        Assert.NotNull(option.SuggestedByEntry);
+        Assert.Equal(invitee.Id, option.SuggestedByEntry!.Participant.UserId);
+        Assert.Equal("Invitee", option.SuggestedByEntry.DisplayName?.Value);
+        Assert.False(option.SuggestedByEntry.MaskedForViewer);
+    }
+
+    /// <summary>D-196: a blocked-pair suggester's attribution masks identically to their roster/voter-list row.</summary>
+    [Fact]
+    public async Task GetPollDetail_OptionAttribution_MaskedForBlockedPairSuggester_D196()
+    {
+        FakePollRepository polls = new();
+        FakePollReadRepository reads = new();
+        FakeFriendshipRepository friendships = new();
+        FakeBlockRepository blocks = new();
+        FakeNotificationMuteRepository mutes = new();
+        MutableClock clock = new(Instant.FromUtc(2026, 3, 2, 12, 0));
+
+        User viewer = FriendTestData.Active($"v{Guid.NewGuid():N}"[..12], "Viewer");
+        User blockedSuggester = FriendTestData.Active($"x{Guid.NewGuid():N}"[..12], "Blocked Suggester");
+        reads.Nameplates[viewer.Id.Value] = new UserNameplate(viewer.DisplayName, viewer.Avatar);
+        reads.Nameplates[blockedSuggester.Id.Value] = new UserNameplate(blockedSuggester.DisplayName, blockedSuggester.Avatar);
+
+        blocks.Items.Add(Block.Create(viewer.Id, blockedSuggester.Id, blockedSuggester.Username!.Value, clock));
+
+        Poll poll = NewPoll(viewer.Id, [blockedSuggester.Id], clock);
+        PollOption suggested = poll.SuggestOption(
+            ParticipantRef.ForUser(blockedSuggester.Id), clock.GetCurrentInstant() + Duration.FromHours(7), clock);
+        _ = poll.DequeueEvents();
+        polls.Add(poll);
+
+        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, mutes);
+
+        PollDetail? detail = await useCase.GetPollDetailAsync(poll.Id, viewer.Id, default);
+
+        Assert.NotNull(detail);
+        PollOptionGridEntry option = detail!.Options.Single(o => o.Id == suggested.Id);
+        Assert.NotNull(option.SuggestedByEntry);
+        Assert.True(option.SuggestedByEntry!.MaskedForViewer);
+        Assert.Null(option.SuggestedByEntry.DisplayName);
+    }
+
     private static Poll NewPoll(UserId organizerId, IReadOnlyList<UserId> inviteeIds, MutableClock clock) =>
         Poll.Create(
             organizerId,

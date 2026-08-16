@@ -2659,6 +2659,7 @@ export interface components {
             availableVoters: components["schemas"]["PollRosterEntryResponse"][];
             maybeVoters: components["schemas"]["PollRosterEntryResponse"][];
             unavailableVoters: components["schemas"]["PollRosterEntryResponse"][];
+            suggester: null | components["schemas"]["PollRosterEntryResponse"];
         };
         PollRosterEntryResponse: {
             /** Format: uuid */

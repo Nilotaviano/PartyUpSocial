@@ -137,7 +137,10 @@ public sealed record PollOptionResponse(
     // every option list -- there is no second masking pass here (D-076).
     IReadOnlyList<PollRosterEntryResponse> AvailableVoters,
     IReadOnlyList<PollRosterEntryResponse> MaybeVoters,
-    IReadOnlyList<PollRosterEntryResponse> UnavailableVoters)
+    IReadOnlyList<PollRosterEntryResponse> UnavailableVoters,
+    // D-196: the resolved suggester, through the same PollRosterEntryResponse shape and masking the
+    // roster/voter lists use — absent for an organizer-created option (no attribution).
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PollRosterEntryResponse? Suggester)
 {
     public static PollOptionResponse From(PollOptionGridEntry entry) =>
         new(
@@ -153,7 +156,8 @@ public sealed record PollOptionResponse(
             entry.ViewerVote is { } choice ? PollWireFormat.VoteChoice(choice) : null,
             entry.AvailableVoters.Select(PollRosterEntryResponse.From).ToArray(),
             entry.MaybeVoters.Select(PollRosterEntryResponse.From).ToArray(),
-            entry.UnavailableVoters.Select(PollRosterEntryResponse.From).ToArray());
+            entry.UnavailableVoters.Select(PollRosterEntryResponse.From).ToArray(),
+            entry.SuggestedByEntry is { } suggester ? PollRosterEntryResponse.From(suggester) : null);
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
