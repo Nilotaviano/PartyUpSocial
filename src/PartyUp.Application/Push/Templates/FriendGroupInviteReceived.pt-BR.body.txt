@@ -1,1 +1,1 @@
-{{ActorName}} convidou você para o grupo de amigos dele.
+{{ActorName}} convidou você para um grupo de amigos.
