@@ -1,4 +1,5 @@
 using NodaTime;
+using PartyUp.Application.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Polls;
@@ -142,6 +143,8 @@ public sealed record PollDetail(
     SessionId? CreatedSessionId,
     IReadOnlyList<PollOptionGridEntry> Options,
     IReadOnlyList<PollRosterEntry> Roster,
+    ContentVisibility Visibility,
+    GroupProvenance? ViaGroup,
     // PHASE7_DESIGN.md §4: on a Finalized poll this reads through the re-parented row, resolved by
     // CreatedSessionId (Session.OriginPollId's linkage from the other side) — never a second, inert
     // poll-keyed row.
@@ -163,7 +166,9 @@ public sealed record PollSummary(
     Instant Deadline,
     Instant SelectionWindowEndsAt,
     Instant CreatedAt,
-    int OptionCount);
+    int OptionCount,
+    ContentVisibility Visibility = ContentVisibility.Public,
+    GroupProvenance? ViaGroup = null);
 
 // ---- PHASE6_DESIGN.md §4 "GET /{id}/finalization-preview" ---------------------------------------
 

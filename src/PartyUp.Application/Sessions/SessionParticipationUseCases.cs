@@ -16,6 +16,7 @@ public sealed class SessionParticipationUseCases(
     ISessionLockRepository sessionLocks,
     IFriendshipRepository friendships,
     IBlockRepository blocks,
+    IFriendGroupRepository groups,
     ISessionNotificationMaterializer materializer,
     ISessionReminderHandoffWriter reminders,
     IUnitOfWork unitOfWork,
@@ -36,6 +37,7 @@ public sealed class SessionParticipationUseCases(
                     sessionLocks,
                     friendships,
                     blocks,
+                    groups,
                     ct);
                 if (forUpdate is null)
                 {

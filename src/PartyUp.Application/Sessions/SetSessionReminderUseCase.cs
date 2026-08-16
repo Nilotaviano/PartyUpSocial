@@ -24,6 +24,7 @@ public sealed class SetSessionReminderUseCase(
     ISessionLockRepository sessionLocks,
     IFriendshipRepository friendships,
     IBlockRepository blocks,
+    IFriendGroupRepository groups,
     ISessionReminderHandoffWriter reminders,
     IUnitOfWork unitOfWork,
     IClock clock)
@@ -43,6 +44,7 @@ public sealed class SetSessionReminderUseCase(
                     sessionLocks,
                     friendships,
                     blocks,
+                    groups,
                     ct);
                 if (forUpdate is null)
                 {

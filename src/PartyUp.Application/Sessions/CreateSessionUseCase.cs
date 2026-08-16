@@ -1,6 +1,7 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Email;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
@@ -18,6 +19,7 @@ public sealed class CreateSessionUseCase(
     ISessionLockRepository sessionLocks,
     IFriendshipRepository friendships,
     IBlockRepository blocks,
+    IFriendGroupRepository groups,
     ISessionNotificationMaterializer materializer,
     ISessionReminderHandoffWriter reminders,
     IUnitOfWork unitOfWork,
@@ -38,6 +40,10 @@ public sealed class CreateSessionUseCase(
 
         List<UserId> invitees = [.. (command.InviteeUserIds ?? []).Distinct()];
         int guestLinkCount = command.GuestLinkCount ?? 0;
+        ContentVisibility visibility = command.Visibility ?? ContentVisibility.Public;
+        List<FriendGroupId> audienceGroupIds = visibility == ContentVisibility.Groups
+            ? [.. (command.AudienceGroupIds ?? []).Distinct()]
+            : [];
 
         if (invitees.Count > MaxInviteeCount || guestLinkCount is < 0 or > MaxGuestLinkCount)
         {
@@ -75,6 +81,19 @@ public sealed class CreateSessionUseCase(
                     }
                 }
 
+                // D-201 targeting authority, fail-closed: the organizer must own or hold Accepted
+                // membership in every requested group. A group they are not in is answered exactly like
+                // one that does not exist — non-membership must not be distinguishable (D-199).
+                if (audienceGroupIds.Count > 0)
+                {
+                    IReadOnlyCollection<FriendGroupId> authorized =
+                        await groups.LockViewerGroupIdsAsync(command.OrganizerId, audienceGroupIds, ct);
+                    if (authorized.Count != audienceGroupIds.Count)
+                    {
+                        return CreateSessionResult.Failed("group_not_found");
+                    }
+                }
+
                 SessionDetails details = new(
                     SessionTitle.Create(command.Title),
                     command.StartTime,
@@ -84,9 +103,9 @@ public sealed class CreateSessionUseCase(
                     SessionNotes.Create(command.Notes),
                     command.MinAttendance ?? DefaultMinAttendance,
                     command.MaxCapacity ?? DefaultMaxCapacity,
-                    command.IsPrivate ?? false ? ContentVisibility.Private : ContentVisibility.Public);
+                    visibility);
 
-                Session session = Session.Create(command.OrganizerId, details, invitees, clock);
+                Session session = Session.Create(command.OrganizerId, details, invitees, clock, audienceGroupIds);
                 sessions.Add(session);
 
                 List<CreatedGuestLink> guestLinks = [];
@@ -129,7 +148,10 @@ public sealed record CreateSessionCommand(
     string? Notes,
     int? MinAttendance,
     int? MaxCapacity,
-    bool? IsPrivate,
+    /// <summary>D-129: absent means <see cref="ContentVisibility.Public"/>.</summary>
+    ContentVisibility? Visibility,
+    /// <summary>D-201: ignored unless <see cref="Visibility"/> is <see cref="ContentVisibility.Groups"/>.</summary>
+    IReadOnlyList<FriendGroupId>? AudienceGroupIds,
     IReadOnlyList<UserId>? InviteeUserIds,
     int? GuestLinkCount);
 

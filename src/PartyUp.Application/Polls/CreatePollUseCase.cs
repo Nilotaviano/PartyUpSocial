@@ -2,6 +2,7 @@ using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Email;
 using PartyUp.Application.Sessions;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
@@ -23,6 +24,7 @@ public sealed class CreatePollUseCase(
     IPollLockRepository pollLocks,
     IFriendshipRepository friendships,
     IBlockRepository blocks,
+    IFriendGroupRepository groups,
     IPollNotificationMaterializer materializer,
     IUnitOfWork unitOfWork,
     IClock clock,
@@ -41,6 +43,10 @@ public sealed class CreatePollUseCase(
 
         List<UserId> invitees = [.. (command.InviteeUserIds ?? []).Distinct()];
         int guestLinkCount = command.GuestLinkCount ?? 0;
+        ContentVisibility visibility = command.Visibility ?? ContentVisibility.Public;
+        List<FriendGroupId> audienceGroupIds = visibility == ContentVisibility.Groups
+            ? [.. (command.AudienceGroupIds ?? []).Distinct()]
+            : [];
 
         if (invitees.Count > MaxInviteeCount || guestLinkCount is < 0 or > MaxGuestLinkCount)
         {
@@ -78,6 +84,18 @@ public sealed class CreatePollUseCase(
                     }
                 }
 
+                // D-201 targeting authority, fail-closed: non-membership is answered exactly like a
+                // group that does not exist (D-199).
+                if (audienceGroupIds.Count > 0)
+                {
+                    IReadOnlyCollection<FriendGroupId> authorized =
+                        await groups.LockViewerGroupIdsAsync(command.OrganizerId, audienceGroupIds, ct);
+                    if (authorized.Count != audienceGroupIds.Count)
+                    {
+                        return CreatePollResult.Failed("group_not_found");
+                    }
+                }
+
                 PollDetails details = new(
                     SessionTitle.Create(command.Title),
                     Duration15.FromMinutes(command.DurationMinutes ?? CreateSessionUseCase.DefaultDurationMinutes),
@@ -86,7 +104,7 @@ public sealed class CreatePollUseCase(
                     SessionNotes.Create(command.Notes),
                     command.MinAttendance ?? DefaultMinAttendance,
                     command.MaxCapacity,
-                    command.IsPrivate ?? false ? ContentVisibility.Private : ContentVisibility.Public);
+                    visibility);
 
                 Poll poll;
                 try
@@ -97,7 +115,8 @@ public sealed class CreatePollUseCase(
                         command.DeadlineChoice ?? DefaultDeadlineChoice,
                         command.OptionStartTimes ?? [],
                         invitees,
-                        clock);
+                        clock,
+                        audienceGroupIds);
                 }
                 catch (DomainException exception)
                 {
@@ -144,7 +163,10 @@ public sealed record CreatePollCommand(
     string? Notes,
     int? MinAttendance,
     int? MaxCapacity,
-    bool? IsPrivate,
+    /// <summary>D-129: absent means <see cref="ContentVisibility.Public"/>.</summary>
+    ContentVisibility? Visibility,
+    /// <summary>D-201: ignored unless <see cref="Visibility"/> is <see cref="ContentVisibility.Groups"/>.</summary>
+    IReadOnlyList<FriendGroupId>? AudienceGroupIds,
     IReadOnlyList<Instant>? OptionStartTimes,
     PollDeadlineChoice? DeadlineChoice,
     IReadOnlyList<UserId>? InviteeUserIds,

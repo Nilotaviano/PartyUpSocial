@@ -2,9 +2,11 @@ using System.Runtime.CompilerServices;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.FriendGroups;
 using PartyUp.Application.Availability;
 using PartyUp.Application.Polls;
 using PartyUp.Application.Sessions;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
 using PartyUp.Domain.Users;
@@ -76,7 +78,7 @@ public sealed class PollReadRepository(AppDbContext context) : IPollReadReposito
                 .ToListAsync(cancellationToken);
 
         List<Poll> polls = await HydratePollsInOrderAsync(ids, cancellationToken);
-        return ToSummaryPage(polls, pageSize, SessionListScope.PollsInvolved);
+        return await ToSummaryPageAsync(polls, pageSize, SessionListScope.PollsInvolved, viewerId, cancellationToken);
     }
 
     /// <summary>
@@ -126,7 +128,7 @@ public sealed class PollReadRepository(AppDbContext context) : IPollReadReposito
                 .ToListAsync(cancellationToken);
 
         List<Poll> polls = await HydratePollsInOrderAsync(ids, cancellationToken);
-        return ToSummaryPage(polls, pageSize, SessionListScope.PollsDiscoverable);
+        return await ToSummaryPageAsync(polls, pageSize, SessionListScope.PollsDiscoverable, viewerId, cancellationToken);
     }
 
     /// <summary>
@@ -202,8 +204,22 @@ public sealed class PollReadRepository(AppDbContext context) : IPollReadReposito
         return [.. orderedIds.Select(id => byId[id])];
     }
 
-    private static SessionPage<PollSummary> ToSummaryPage(List<Poll> polls, int pageSize, SessionListScope scope)
+    private async Task<SessionPage<PollSummary>> ToSummaryPageAsync(
+        List<Poll> polls,
+        int pageSize,
+        SessionListScope scope,
+        UserId viewerId,
+        CancellationToken cancellationToken)
     {
+        // D-206: one batched query for the whole page, over the union of Groups-level audiences only.
+        List<(Guid TargetId, IReadOnlyCollection<FriendGroupId> Audience)> audiences =
+            [.. polls
+                .Where(poll => poll.Visibility == ContentVisibility.Groups)
+                .Select(poll => (poll.Id.Value, poll.AudienceGroupIds))];
+        IReadOnlyDictionary<Guid, GroupProvenance> provenance = audiences.Count == 0
+            ? new Dictionary<Guid, GroupProvenance>()
+            : await GroupProvenanceReader.ResolveAsync(context, audiences, viewerId, cancellationToken);
+
         List<PollSummary> summaries = [.. polls.Select(poll => new PollSummary(
             poll.Id,
             poll.OrganizerId,
@@ -213,7 +229,9 @@ public sealed class PollReadRepository(AppDbContext context) : IPollReadReposito
             poll.Deadline,
             poll.SelectionWindowEndsAt,
             poll.CreatedAt,
-            poll.Options.Count))];
+            poll.Options.Count,
+            poll.Visibility,
+            provenance.GetValueOrDefault(poll.Id.Value)))];
 
         string? nextCursor = summaries.Count == pageSize && summaries.Count > 0
             ? new SessionListCursor(summaries[^1].Deadline, summaries[^1].Id.Value, scope).Encode()

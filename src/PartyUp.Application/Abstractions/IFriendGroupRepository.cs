@@ -32,6 +32,23 @@ public interface IFriendGroupRepository
         IReadOnlyCollection<FriendGroupId> candidateGroupIds,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The read-path twin of <see cref="LockViewerGroupIdsAsync"/>: the same membership answer with no
+    /// row locks, because a GET must take none (PHASE5 F6). Safe there precisely because a read
+    /// resolves and returns in one shot — nothing is committed against the answer.
+    /// </summary>
+    Task<IReadOnlyCollection<FriendGroupId>> GetViewerGroupIdsAsync(
+        UserId viewerId,
+        IReadOnlyCollection<FriendGroupId> candidateGroupIds,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// D-206: the live name of a group whose membership the caller has ALREADY established for the
+    /// viewer (the engine's <c>VisibilityGrant.Group</c> result). Reading the name is not itself an
+    /// authorization — callers must not reach here for a group the viewer is not in.
+    /// </summary>
+    Task<GroupName?> FindNameAsync(FriendGroupId id, CancellationToken cancellationToken);
+
     /// <summary>Every group the user owns or holds a row in — <c>Invited</c> rows included.</summary>
     Task<IReadOnlyCollection<FriendGroup>> ListInvolvingAsync(UserId userId, CancellationToken cancellationToken);
 

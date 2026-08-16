@@ -1,4 +1,5 @@
 using PartyUp.Application.Abstractions;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
@@ -24,6 +25,7 @@ internal static class PollActorVisibilityGate
         IPollLockRepository pollLocks,
         IFriendshipRepository friendships,
         IBlockRepository blocks,
+        IFriendGroupRepository groups,
         CancellationToken cancellationToken)
     {
         // Step 1: resolve without locking arbitrary ids -- a genuinely missing poll costs nothing.
@@ -67,10 +69,18 @@ internal static class PollActorVisibilityGate
             ? []
             : await blocks.LockPairsAsync(actorId, freshCounterparts, cancellationToken);
 
-        Viewer viewer = Viewer.From(
-            actorId,
-            [.. probedFriendships, .. extraFriendships],
-            [.. probedBlocks, .. extraBlocks]);
+        // Step 6: rule 2g's membership answer, read only now — under the parent lock the audience
+        // cannot move underneath it (D-198; a probe-time intersection would be stale here).
+        IReadOnlyCollection<FriendGroupId> audience = poll.AudienceGroupIds;
+        IReadOnlyCollection<FriendGroupId> viewerGroupIds = await ViewerGroups.LockGrantingAsync(
+            groups, actorId, poll.Visibility, audience, cancellationToken);
+
+        Viewer viewer = ViewerGroups.With(
+            Viewer.From(
+                actorId,
+                [.. probedFriendships, .. extraFriendships],
+                [.. probedBlocks, .. extraBlocks]),
+            viewerGroupIds);
 
         return VisibilityEngine.ResolvePoll(poll, viewer).IsVisible ? forUpdate : null;
     }

@@ -1,4 +1,5 @@
 using NodaTime;
+using PartyUp.Application.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Sessions;
@@ -45,7 +46,9 @@ public sealed record SessionSummary(
     int? MaxCapacity,
     int ActiveOccupancy,
     DisplayName? OrganizerDisplayName = null,
-    ViewerRelation ViewerRelation = ViewerRelation.Inherited);
+    ViewerRelation ViewerRelation = ViewerRelation.Inherited,
+    ContentVisibility Visibility = ContentVisibility.Public,
+    GroupProvenance? ViaGroup = null);
 
 /// <summary>
 /// One roster row as a detail/roster read renders it — never the bearer token or link id.
@@ -87,7 +90,9 @@ public sealed record SessionDetail(
     Instant CreatedAt,
     IReadOnlyList<RosterEntry> Roster,
     uint ConcurrencyToken,
-    bool Muted = false);
+    bool Muted = false,
+    ContentVisibility Visibility = ContentVisibility.Public,
+    GroupProvenance? ViaGroup = null);
 
 public sealed record JoinRequestSummary(
     JoinRequestId Id,

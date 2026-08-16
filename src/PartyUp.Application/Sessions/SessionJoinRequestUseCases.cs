@@ -1,6 +1,7 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Email;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
@@ -50,6 +51,7 @@ public sealed class SessionJoinRequestUseCases(
     ISessionLockRepository sessionLocks,
     IFriendshipRepository friendships,
     IBlockRepository blocks,
+    IFriendGroupRepository groups,
     ISessionNotificationMaterializer materializer,
     ISessionReminderHandoffWriter reminders,
     IUnitOfWork unitOfWork,
@@ -124,10 +126,17 @@ public sealed class SessionJoinRequestUseCases(
                 // Recompute visibility with the SAME VisibilityEngine rules the read side uses -- no
                 // hand-rolled subset. A block with the organizer yields NotFound (rule 4); a block with
                 // one extender only removes that extender from consideration while others still count.
-                Viewer viewer = Viewer.From(
-                    requesterId,
-                    [.. lockedFriendships, .. extenderFriendships],
-                    [.. lockedBlocks, .. extenderBlocks]);
+                // Rule 2g (D-198) resolves only here, under the parent lock: an audience edit racing
+                // this request must not be able to make the membership answer stale before commit.
+                IReadOnlyCollection<FriendGroupId> viewerGroupIds = await ViewerGroups.LockGrantingAsync(
+                    groups, requesterId, session.Visibility, session.AudienceGroupIds, ct);
+
+                Viewer viewer = ViewerGroups.With(
+                    Viewer.From(
+                        requesterId,
+                        [.. lockedFriendships, .. extenderFriendships],
+                        [.. lockedBlocks, .. extenderBlocks]),
+                    viewerGroupIds);
                 if (!VisibilityEngine.ResolveSession(session, viewer).IsVisible)
                 {
                     return JoinRequestCommandResult.Failed("session_not_found");
@@ -444,9 +453,12 @@ public sealed class SessionJoinRequestUseCases(
 
         counterparts.Remove(viewerId);
 
+        IReadOnlyCollection<FriendGroupId> viewerGroupIds = await ViewerGroups.GrantingAsync(
+            groups, viewerId, session.Visibility, session.AudienceGroupIds, cancellationToken);
+
         if (counterparts.Count == 0)
         {
-            return Viewer.Create(viewerId);
+            return Viewer.Create(viewerId, null, null, viewerGroupIds);
         }
 
         IReadOnlyList<Friendship> pairFriendships = await friendships.FindPairsAmongAsync(viewerId, counterparts, cancellationToken);
@@ -455,7 +467,7 @@ public sealed class SessionJoinRequestUseCases(
         List<UserId> friendIds = [.. pairFriendships.Where(f => f.IsAccepted).Select(f => f.Counterpart(viewerId))];
         List<UserId> blockedIds = [.. pairBlocks.Select(b => b.BlockerId == viewerId ? b.BlockedId : b.BlockerId)];
 
-        return Viewer.Create(viewerId, friendIds, blockedIds);
+        return Viewer.Create(viewerId, friendIds, blockedIds, viewerGroupIds);
     }
 
     private static Participation RequireParticipation(Session session, ParticipationId participationId) =>

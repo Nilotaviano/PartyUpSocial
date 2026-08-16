@@ -22,6 +22,17 @@ namespace PartyUp.Api.Endpoints;
 /// </summary>
 public static class SessionEndpoints
 {
+    /// <summary>
+    /// Bridges the shipped <c>isPrivate</c> wire field onto the internal three-level command until the
+    /// contract itself carries <c>visibility</c>. Absent stays absent — on edit that means "unchanged".
+    /// </summary>
+    private static ContentVisibility? VisibilityOf(bool? isPrivate) => isPrivate switch
+    {
+        true => ContentVisibility.Private,
+        false => ContentVisibility.Public,
+        null => null,
+    };
+
     private const int PageSize = 20;
 
     public static RouteGroupBuilder MapSessionEndpoints(this RouteGroupBuilder api)
@@ -257,7 +268,8 @@ public static class SessionEndpoints
             request.Notes,
             request.MinAttendance,
             request.MaxCapacity,
-            request.IsPrivate,
+            VisibilityOf(request.IsPrivate),
+            null,
             invitees,
             request.GuestLinkCount);
 
@@ -445,7 +457,8 @@ public static class SessionEndpoints
             request.Notes,
             request.MinAttendance,
             request.MaxCapacity,
-            request.IsPrivate,
+            VisibilityOf(request.IsPrivate),
+            null,
             clear,
             request.IfMatch);
 

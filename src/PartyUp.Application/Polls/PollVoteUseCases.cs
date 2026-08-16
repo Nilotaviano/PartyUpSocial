@@ -25,6 +25,7 @@ public sealed class PollVoteUseCases(
     IPollLockRepository pollLocks,
     IFriendshipRepository friendships,
     IBlockRepository blocks,
+    IFriendGroupRepository groups,
     IPollNotificationMaterializer materializer,
     IUnitOfWork unitOfWork,
     IClock clock)
@@ -39,7 +40,7 @@ public sealed class PollVoteUseCases(
             async ct =>
             {
                 PollForUpdate? forUpdate = await PollActorVisibilityGate.LoadVisibleForUpdateAsync(
-                    pollId, actorId, polls, pollLocks, friendships, blocks, ct);
+                    pollId, actorId, polls, pollLocks, friendships, blocks, groups, ct);
                 if (forUpdate is null)
                 {
                     return PollCommandResult.Failed("poll_not_found");
@@ -79,7 +80,7 @@ public sealed class PollVoteUseCases(
             async ct =>
             {
                 PollForUpdate? forUpdate = await PollActorVisibilityGate.LoadVisibleForUpdateAsync(
-                    pollId, actorId, polls, pollLocks, friendships, blocks, ct);
+                    pollId, actorId, polls, pollLocks, friendships, blocks, groups, ct);
                 if (forUpdate is null)
                 {
                     return PollCommandResult.Failed("poll_not_found");

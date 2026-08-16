@@ -72,7 +72,21 @@ public sealed class NotificationReadUseCases(
 
         counterparts.Remove(recipientId);
 
-        Viewer viewer = await BuildViewerAsync(recipientId, counterparts, cancellationToken);
+        // §7 rule 2g (D-198): the union of both refs' audiences, resolved in one unlocked read (a GET
+        // takes no row locks). One viewer serves both resolves below — a group id only ever grants on
+        // the target that actually targets it.
+        HashSet<FriendGroupId> audience = [];
+        if (session is { Visibility: ContentVisibility.Groups })
+        {
+            audience.UnionWith(session.AudienceGroupIds);
+        }
+
+        if (poll is { Visibility: ContentVisibility.Groups })
+        {
+            audience.UnionWith(poll.AudienceGroupIds);
+        }
+
+        Viewer viewer = await BuildViewerAsync(recipientId, counterparts, audience, cancellationToken);
 
         // The session ref is the primary target; a both-ref row falls back to the poll only when the
         // session is unreachable — e.g. a voter who is Unavailable on the winning option is dropped
@@ -244,11 +258,16 @@ public sealed class NotificationReadUseCases(
     private async Task<Viewer> BuildViewerAsync(
         UserId viewerId,
         HashSet<UserId> counterparts,
+        HashSet<FriendGroupId> audienceGroupIds,
         CancellationToken cancellationToken)
     {
+        IReadOnlyCollection<FriendGroupId> viewerGroupIds = audienceGroupIds.Count == 0
+            ? []
+            : await groups.GetViewerGroupIdsAsync(viewerId, audienceGroupIds, cancellationToken);
+
         if (counterparts.Count == 0)
         {
-            return Viewer.Create(viewerId);
+            return Viewer.Create(viewerId, null, null, viewerGroupIds);
         }
 
         IReadOnlyList<Friendship> pairFriendships =
@@ -259,6 +278,6 @@ public sealed class NotificationReadUseCases(
         List<UserId> friendIds = [.. pairFriendships.Where(f => f.IsAccepted).Select(f => f.Counterpart(viewerId))];
         List<UserId> blockedIds = [.. pairBlocks.Select(b => b.BlockerId == viewerId ? b.BlockedId : b.BlockerId)];
 
-        return Viewer.Create(viewerId, friendIds, blockedIds);
+        return Viewer.Create(viewerId, friendIds, blockedIds, viewerGroupIds);
     }
 }

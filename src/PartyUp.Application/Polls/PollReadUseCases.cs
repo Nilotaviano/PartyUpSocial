@@ -1,4 +1,6 @@
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.FriendGroups;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
@@ -18,6 +20,7 @@ public sealed class PollReadUseCases(
     IPollReadRepository reads,
     IFriendshipRepository friendships,
     IBlockRepository blocks,
+    IFriendGroupRepository groups,
     INotificationMuteRepository mutes)
 {
     public async Task<PollDetail?> GetPollDetailAsync(
@@ -162,7 +165,26 @@ public sealed class PollReadUseCases(
             poll.CreatedSessionId,
             options,
             roster,
+            poll.Visibility,
+            await ResolveProvenanceAsync(visibility, cancellationToken),
             muted);
+    }
+
+    /// <summary>
+    /// D-206's poll twin of <c>SessionReadUseCases.ResolveProvenanceAsync</c>: only a
+    /// <see cref="VisibilityGrant.Group"/> result carries a group id, so no other viewer learns a name.
+    /// </summary>
+    private async Task<GroupProvenance?> ResolveProvenanceAsync(
+        VisibilityResult visibility,
+        CancellationToken cancellationToken)
+    {
+        if (visibility.Grant != VisibilityGrant.Group || visibility.GroupId is not { } groupId)
+        {
+            return null;
+        }
+
+        GroupName? name = await groups.FindNameAsync(groupId, cancellationToken);
+        return name is null ? null : new GroupProvenance(groupId, name);
     }
 
     /// <summary>Mirrors <c>SessionReadUseCases.BuildViewerAsync</c>'s poll analogue: no row lock, a GET.</summary>
@@ -179,9 +201,14 @@ public sealed class PollReadUseCases(
 
         counterparts.Remove(viewerId);
 
+        // §7 rule 2g (D-198): the audience subset this viewer is in. Unlocked — a GET takes no row
+        // locks and nothing is committed against the answer.
+        IReadOnlyCollection<FriendGroupId> viewerGroupIds = await ViewerGroups.GrantingAsync(
+            groups, viewerId, poll.Visibility, poll.AudienceGroupIds, cancellationToken);
+
         if (counterparts.Count == 0)
         {
-            return Viewer.Create(viewerId);
+            return Viewer.Create(viewerId, null, null, viewerGroupIds);
         }
 
         IReadOnlyList<Friendship> pairFriendships =
@@ -192,6 +219,6 @@ public sealed class PollReadUseCases(
         List<UserId> friendIds = [.. pairFriendships.Where(f => f.IsAccepted).Select(f => f.Counterpart(viewerId))];
         List<UserId> blockedIds = [.. pairBlocks.Select(b => b.BlockerId == viewerId ? b.BlockedId : b.BlockerId)];
 
-        return Viewer.Create(viewerId, friendIds, blockedIds);
+        return Viewer.Create(viewerId, friendIds, blockedIds, viewerGroupIds);
     }
 }

@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Notifications;
@@ -31,6 +32,7 @@ public sealed class SetNotificationMuteUseCase(
     IPollRepository polls,
     IFriendshipRepository friendships,
     IBlockRepository blocks,
+    IFriendGroupRepository groups,
     INotificationMuteRepository mutes,
     IUnitOfWork unitOfWork,
     IClock clock)
@@ -129,7 +131,8 @@ public sealed class SetNotificationMuteUseCase(
             }
         }
 
-        Viewer viewer = await BuildViewerAsync(viewerId, counterparts, cancellationToken);
+        Viewer viewer = await BuildViewerAsync(
+            viewerId, counterparts, session.Visibility, session.AudienceGroupIds, cancellationToken);
         return VisibilityEngine.ResolveSession(session, viewer).IsVisible;
     }
 
@@ -144,19 +147,28 @@ public sealed class SetNotificationMuteUseCase(
             }
         }
 
-        Viewer viewer = await BuildViewerAsync(viewerId, counterparts, cancellationToken);
+        Viewer viewer = await BuildViewerAsync(
+            viewerId, counterparts, poll.Visibility, poll.AudienceGroupIds, cancellationToken);
         return VisibilityEngine.ResolvePoll(poll, viewer).IsVisible;
     }
 
     private async Task<Viewer> BuildViewerAsync(
         UserId viewerId,
         HashSet<UserId> counterparts,
+        ContentVisibility visibility,
+        IReadOnlyCollection<FriendGroupId> audienceGroupIds,
         CancellationToken cancellationToken)
     {
         counterparts.Remove(viewerId);
+
+        // §7 rule 2g (D-198). The mute write touches only the actor's own mute row, so this resolve
+        // needs no group-row lock — it is the read side's answer, used to fail closed.
+        IReadOnlyCollection<FriendGroupId> viewerGroupIds = await ViewerGroups.GrantingAsync(
+            groups, viewerId, visibility, audienceGroupIds, cancellationToken);
+
         if (counterparts.Count == 0)
         {
-            return Viewer.Create(viewerId);
+            return Viewer.Create(viewerId, null, null, viewerGroupIds);
         }
 
         IReadOnlyList<Friendship> pairFriendships =
@@ -167,6 +179,6 @@ public sealed class SetNotificationMuteUseCase(
         List<UserId> friendIds = [.. pairFriendships.Where(f => f.IsAccepted).Select(f => f.Counterpart(viewerId))];
         List<UserId> blockedIds = [.. pairBlocks.Select(b => b.BlockerId == viewerId ? b.BlockedId : b.BlockerId)];
 
-        return Viewer.Create(viewerId, friendIds, blockedIds);
+        return Viewer.Create(viewerId, friendIds, blockedIds, viewerGroupIds);
     }
 }

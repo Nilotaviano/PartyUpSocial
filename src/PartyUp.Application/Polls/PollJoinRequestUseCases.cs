@@ -1,6 +1,7 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Email;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
@@ -36,6 +37,7 @@ public sealed class PollJoinRequestUseCases(
     IPollLockRepository pollLocks,
     IFriendshipRepository friendships,
     IBlockRepository blocks,
+    IFriendGroupRepository groups,
     IPollNotificationMaterializer materializer,
     IUnitOfWork unitOfWork,
     IClock clock,
@@ -104,10 +106,17 @@ public sealed class PollJoinRequestUseCases(
                     ? []
                     : await blocks.LockPairsAsync(requesterId, extenderIds, ct);
 
-                Viewer viewer = Viewer.From(
-                    requesterId,
-                    [.. lockedFriendships, .. extenderFriendships],
-                    [.. lockedBlocks, .. extenderBlocks]);
+                // Rule 2g (D-198) resolves only here, under the parent lock: an audience edit racing
+                // this request must not be able to make the membership answer stale before commit.
+                IReadOnlyCollection<FriendGroupId> viewerGroupIds = await ViewerGroups.LockGrantingAsync(
+                    groups, requesterId, poll.Visibility, poll.AudienceGroupIds, ct);
+
+                Viewer viewer = ViewerGroups.With(
+                    Viewer.From(
+                        requesterId,
+                        [.. lockedFriendships, .. extenderFriendships],
+                        [.. lockedBlocks, .. extenderBlocks]),
+                    viewerGroupIds);
                 if (!VisibilityEngine.ResolvePoll(poll, viewer).IsVisible)
                 {
                     return PollJoinRequestCommandResult.Failed("poll_not_found");
@@ -143,7 +152,7 @@ public sealed class PollJoinRequestUseCases(
             async ct =>
             {
                 PollForUpdate? forUpdate = await PollActorVisibilityGate.LoadVisibleForUpdateAsync(
-                    pollId, requesterId, polls, pollLocks, friendships, blocks, ct);
+                    pollId, requesterId, polls, pollLocks, friendships, blocks, groups, ct);
                 if (forUpdate is null)
                 {
                     return PollJoinRequestCommandResult.Failed("poll_not_found");
@@ -341,9 +350,12 @@ public sealed class PollJoinRequestUseCases(
 
         counterparts.Remove(viewerId);
 
+        IReadOnlyCollection<FriendGroupId> viewerGroupIds = await ViewerGroups.GrantingAsync(
+            groups, viewerId, poll.Visibility, poll.AudienceGroupIds, cancellationToken);
+
         if (counterparts.Count == 0)
         {
-            return Viewer.Create(viewerId);
+            return Viewer.Create(viewerId, null, null, viewerGroupIds);
         }
 
         IReadOnlyList<Friendship> pairFriendships = await friendships.FindPairsAmongAsync(viewerId, counterparts, cancellationToken);
@@ -352,6 +364,6 @@ public sealed class PollJoinRequestUseCases(
         List<UserId> friendIds = [.. pairFriendships.Where(f => f.IsAccepted).Select(f => f.Counterpart(viewerId))];
         List<UserId> blockedIds = [.. pairBlocks.Select(b => b.BlockerId == viewerId ? b.BlockedId : b.BlockerId)];
 
-        return Viewer.Create(viewerId, friendIds, blockedIds);
+        return Viewer.Create(viewerId, friendIds, blockedIds, viewerGroupIds);
     }
 }

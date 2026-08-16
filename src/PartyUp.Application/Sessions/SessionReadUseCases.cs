@@ -1,4 +1,6 @@
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.FriendGroups;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
@@ -18,6 +20,7 @@ public sealed class SessionReadUseCases(
     ISessionReadRepository reads,
     IFriendshipRepository friendships,
     IBlockRepository blocks,
+    IFriendGroupRepository groups,
     INotificationMuteRepository mutes)
 {
     public async Task<SessionDetail?> GetSessionDetailAsync(
@@ -45,7 +48,32 @@ public sealed class SessionReadUseCases(
         }
 
         bool muted = await mutes.ExistsForTargetAsync(viewerId, sessionId, null, cancellationToken);
-        return MaskBlockedPairRoster(detail, viewer) with { Muted = muted };
+        GroupProvenance? viaGroup = await ResolveProvenanceAsync(visibility, cancellationToken);
+
+        return MaskBlockedPairRoster(detail, viewer) with
+        {
+            Muted = muted,
+            Visibility = session.Visibility,
+            ViaGroup = viaGroup,
+        };
+    }
+
+    /// <summary>
+    /// D-206: the "via &lt;group&gt;" label's source. Only a <see cref="VisibilityGrant.Group"/> result
+    /// carries a group id, so a viewer reached by any other rule never learns a group name — the
+    /// neutral "shared with a group" the API derives from <c>Visibility</c> alone covers them.
+    /// </summary>
+    private async Task<GroupProvenance?> ResolveProvenanceAsync(
+        VisibilityResult visibility,
+        CancellationToken cancellationToken)
+    {
+        if (visibility.Grant != VisibilityGrant.Group || visibility.GroupId is not { } groupId)
+        {
+            return null;
+        }
+
+        GroupName? name = await groups.FindNameAsync(groupId, cancellationToken);
+        return name is null ? null : new GroupProvenance(groupId, name);
     }
 
     /// <summary>
@@ -110,9 +138,14 @@ public sealed class SessionReadUseCases(
 
         counterparts.Remove(viewerId);
 
+        // §7 rule 2g (D-198): the audience subset this viewer is in. Unlocked — a GET takes no row
+        // locks (F6) and nothing is committed against the answer.
+        IReadOnlyCollection<FriendGroupId> viewerGroupIds = await ViewerGroups.GrantingAsync(
+            groups, viewerId, session.Visibility, session.AudienceGroupIds, cancellationToken);
+
         if (counterparts.Count == 0)
         {
-            return Viewer.Create(viewerId);
+            return Viewer.Create(viewerId, null, null, viewerGroupIds);
         }
 
         IReadOnlyList<Friendship> pairFriendships = await friendships.FindPairsAmongAsync(viewerId, counterparts, cancellationToken);
@@ -121,6 +154,6 @@ public sealed class SessionReadUseCases(
         List<UserId> friendIds = [.. pairFriendships.Where(f => f.IsAccepted).Select(f => f.Counterpart(viewerId))];
         List<UserId> blockedIds = [.. pairBlocks.Select(b => b.BlockerId == viewerId ? b.BlockedId : b.BlockerId)];
 
-        return Viewer.Create(viewerId, friendIds, blockedIds);
+        return Viewer.Create(viewerId, friendIds, blockedIds, viewerGroupIds);
     }
 }

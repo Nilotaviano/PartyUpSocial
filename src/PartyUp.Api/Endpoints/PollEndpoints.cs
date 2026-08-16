@@ -24,6 +24,17 @@ namespace PartyUp.Api.Endpoints;
 /// </summary>
 public static class PollEndpoints
 {
+    /// <summary>
+    /// Bridges the shipped <c>isPrivate</c> wire field onto the internal three-level command until the
+    /// contract itself carries <c>visibility</c>. Absent stays absent — on edit that means "unchanged".
+    /// </summary>
+    private static ContentVisibility? VisibilityOf(bool? isPrivate) => isPrivate switch
+    {
+        true => ContentVisibility.Private,
+        false => ContentVisibility.Public,
+        null => null,
+    };
+
     private const int PollJoinRequestPageSize = 20;
     private const int PollListPageSize = 20;
 
@@ -272,7 +283,8 @@ public static class PollEndpoints
             request.Notes,
             request.MinAttendance,
             request.MaxCapacity,
-            request.IsPrivate,
+            VisibilityOf(request.IsPrivate),
+            null,
             optionStartTimes,
             deadlineChoice,
             (request.InviteeUserIds ?? []).Select(UserId.From).ToArray(),

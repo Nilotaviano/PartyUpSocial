@@ -2,8 +2,10 @@ using System.Runtime.CompilerServices;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.FriendGroups;
 using PartyUp.Application.Polls;
 using PartyUp.Application.Sessions;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
 using PartyUp.Domain.Users;
@@ -474,7 +476,8 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
             session.Status,
             session.CreatedAt,
             roster,
-            xmin);
+            xmin,
+            Visibility: session.Visibility);
     }
 
     /// <summary>
@@ -488,6 +491,15 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
     {
         Dictionary<Guid, DisplayName?> organizerNames = await FetchDisplayNamesAsync(
             [.. sessions.Select(s => s.OrganizerId)], cancellationToken);
+
+        // D-206: one batched query for the whole page, over the union of Groups-level audiences only.
+        List<(Guid TargetId, IReadOnlyCollection<FriendGroupId> Audience)> audiences =
+            [.. sessions
+                .Where(session => session.Visibility == ContentVisibility.Groups)
+                .Select(session => (session.Id.Value, session.AudienceGroupIds))];
+        IReadOnlyDictionary<Guid, GroupProvenance> provenance = audiences.Count == 0
+            ? new Dictionary<Guid, GroupProvenance>()
+            : await GroupProvenanceReader.ResolveAsync(context, audiences, viewerId, cancellationToken);
 
         List<SessionSummary> summaries = [];
         foreach (Session session in sessions)
@@ -505,7 +517,9 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
                 session.MaxCapacity,
                 session.ActiveOccupancy,
                 organizerNames.GetValueOrDefault(session.OrganizerId.Value),
-                ResolveViewerRelation(session, viewerId)));
+                ResolveViewerRelation(session, viewerId),
+                session.Visibility,
+                provenance.GetValueOrDefault(session.Id.Value)));
         }
 
         return summaries;

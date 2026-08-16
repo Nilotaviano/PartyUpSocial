@@ -70,6 +70,27 @@ public sealed class FriendGroupRepository(AppDbContext context) : IFriendGroupRe
             FOR UPDATE
             """, cancellationToken);
 
+        return await GrantingGroupIdsAsync(viewerId, candidates, cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<FriendGroupId>> GetViewerGroupIdsAsync(
+        UserId viewerId,
+        IReadOnlyCollection<FriendGroupId> candidateGroupIds,
+        CancellationToken cancellationToken)
+    {
+        if (candidateGroupIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await GrantingGroupIdsAsync(viewerId, [.. candidateGroupIds], cancellationToken);
+    }
+
+    private async Task<IReadOnlyCollection<FriendGroupId>> GrantingGroupIdsAsync(
+        UserId viewerId,
+        FriendGroupId[] candidates,
+        CancellationToken cancellationToken)
+    {
         List<FriendGroupId> granted = await context.FriendGroups
             .AsNoTracking()
             .Where(group =>
@@ -82,6 +103,13 @@ public sealed class FriendGroupRepository(AppDbContext context) : IFriendGroupRe
 
         return granted;
     }
+
+    public Task<GroupName?> FindNameAsync(FriendGroupId id, CancellationToken cancellationToken) =>
+        context.FriendGroups
+            .AsNoTracking()
+            .Where(group => group.Id == id)
+            .Select(group => group.Name)
+            .SingleOrDefaultAsync(cancellationToken);
 
     public async Task<IReadOnlyCollection<FriendGroup>> ListInvolvingAsync(
         UserId userId,

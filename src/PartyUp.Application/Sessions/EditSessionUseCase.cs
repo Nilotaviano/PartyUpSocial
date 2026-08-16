@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
 
@@ -24,7 +25,10 @@ public sealed record EditSessionCommand(
     string? Notes,
     int? MinAttendance,
     int? MaxCapacity,
-    bool? IsPrivate,
+    /// <summary>Absent leaves the level untouched; present always re-applies it (D-203).</summary>
+    ContentVisibility? Visibility,
+    /// <summary>D-201/D-203: the complete new audience. Must be empty unless <see cref="Visibility"/> is Groups.</summary>
+    IReadOnlyCollection<FriendGroupId>? AudienceGroupIds,
     IReadOnlyCollection<SessionEditClearField>? Clear,
     /// <summary>
     /// A-071's opaque <c>version</c> token, already format-validated by the endpoint's
@@ -48,6 +52,7 @@ public sealed record EditSessionResult(bool Succeeded, string? Code, Session? Se
 public sealed class EditSessionUseCase(
     ISessionRepository sessions,
     ISessionLockRepository sessionLocks,
+    IFriendGroupRepository groups,
     ISessionNotificationMaterializer materializer,
     ISessionReminderHandoffWriter reminders,
     IUnitOfWork unitOfWork,
@@ -144,12 +149,30 @@ public sealed class EditSessionUseCase(
                     session.ChangeNotes(SessionNotes.Create(notes), clock);
                 }
 
-                if (command.IsPrivate is { } isPrivate)
+                if (command.Visibility is { } visibility)
                 {
-                    session.ChangeVisibility(
-                        isPrivate ? ContentVisibility.Private : ContentVisibility.Public,
-                        [],
-                        clock);
+                    List<FriendGroupId> audience = visibility == ContentVisibility.Groups
+                        ? [.. (command.AudienceGroupIds ?? []).Distinct()]
+                        : [];
+
+                    // D-201: authority is re-checked for NEWLY added groups only — an organizer who has
+                    // since left an already-targeted group can still edit the session without being
+                    // forced to drop it. Fail-closed and uniform with a nonexistent group (D-199).
+                    HashSet<FriendGroupId> current = [.. session.AudienceGroupIds];
+                    List<FriendGroupId> added = [.. audience.Where(id => !current.Contains(id))];
+                    if (added.Count > 0)
+                    {
+                        IReadOnlyCollection<FriendGroupId> authorized =
+                            await groups.LockViewerGroupIdsAsync(command.ActorId, added, ct);
+                        if (authorized.Count != added.Count)
+                        {
+                            return EditSessionResult.Failed("group_not_found");
+                        }
+                    }
+
+                    // Leaving the Groups level passes an empty audience; the aggregate clears the
+                    // junction rows (D-203) — flipping back requires re-picking.
+                    session.ChangeVisibility(visibility, audience, clock);
                 }
 
                 IReadOnlyList<IDomainEvent> events = session.DequeueEvents();

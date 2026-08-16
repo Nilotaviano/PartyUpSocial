@@ -139,6 +139,10 @@ public sealed class GuestPollReadUseCases(IPollRepository polls, IPollReadReposi
             poll.CreatedSessionId,
             options,
             roster,
+            poll.Visibility,
+            // D-206: a guest-link holder is never a group member, so they get the neutral
+            // "shared with a group" the null provenance stands for — never a group name.
+            ViaGroup: null,
             // D-167: a guest credential holds no channel at any layer, so this surface never mutes.
             Muted: false);
 
