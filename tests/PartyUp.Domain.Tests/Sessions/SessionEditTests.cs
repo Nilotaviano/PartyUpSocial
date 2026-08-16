@@ -1,5 +1,6 @@
 using NodaTime;
 using NodaTime.Testing;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
 
@@ -7,6 +8,36 @@ namespace PartyUp.Domain.Tests.Sessions;
 
 public class SessionEditTests
 {
+    [Fact]
+    public void ChangeVisibility_ClearsTheAudienceWhenLeavingGroups_D203()
+    {
+        FakeClock clock = TestSessions.Clock();
+        FriendGroupId groupId = FriendGroupId.New();
+        SessionUnderTest fixture = TestSessions.New(clock, visibility: ContentVisibility.Groups, audienceGroups: [groupId]);
+
+        fixture.Session.ChangeVisibility(ContentVisibility.Public, [], clock);
+
+        Assert.Equal(ContentVisibility.Public, fixture.Session.Visibility);
+        Assert.Empty(fixture.Session.AudienceGroupIds);
+    }
+
+    [Fact]
+    public void ChangeVisibility_ReplacesTheAudience_D203()
+    {
+        FakeClock clock = TestSessions.Clock();
+        FriendGroupId originalGroup = FriendGroupId.New();
+        FriendGroupId replacementGroup = FriendGroupId.New();
+        SessionUnderTest fixture = TestSessions.New(
+            clock,
+            visibility: ContentVisibility.Groups,
+            audienceGroups: [originalGroup]);
+
+        fixture.Session.ChangeVisibility(ContentVisibility.Groups, [replacementGroup], clock);
+
+        Assert.Equal(ContentVisibility.Groups, fixture.Session.Visibility);
+        Assert.Equal([replacementGroup], fixture.Session.AudienceGroupIds);
+    }
+
     [Fact]
     public void ChangeStartTime_ReturnsEveryParticipantToPending_D063()
     {

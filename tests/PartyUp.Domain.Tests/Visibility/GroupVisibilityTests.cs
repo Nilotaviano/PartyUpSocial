@@ -103,6 +103,25 @@ public class GroupVisibilityTests
         Assert.Equal(VisibilityGrant.None, VisibilityEngine.Resolve(target, TestViewers.FriendOf(organizer)).Grant);
     }
 
+    // ---- fail-closed on an out-of-range level -------------------------------------------------
+
+    [Fact]
+    public void Resolve_FailsClosedOnAnUnknownVisibilityLevel_D198()
+    {
+        UserId organizer = UserId.New();
+        VisibilityTarget target = VisibilityTarget.Create(
+            organizer,
+            (ContentVisibility)7,
+            [],
+            [],
+            []);
+
+        VisibilityResult result = VisibilityEngine.Resolve(target, TestViewers.FriendOf(organizer));
+
+        Assert.Equal(VisibilityGrant.None, result.Grant);
+        Assert.False(result.IsVisible);
+    }
+
     // ---- the two pre-existing levels, now enum-valued --------------------------------------------
 
     [Fact]

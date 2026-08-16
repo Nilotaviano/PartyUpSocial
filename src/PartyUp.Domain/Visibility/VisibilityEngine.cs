@@ -61,6 +61,14 @@ public static class VisibilityEngine
             return VisibilityResult.NotFound;
         }
 
+        // Exhaustiveness: only Public reaches rule 2. Any level outside the three defined values
+        // (an EF-hydrated smallint or an unvalidated VisibilityTarget.Create call) fails closed
+        // rather than falling through to inheritance (D-198).
+        if (target.Visibility != ContentVisibility.Public)
+        {
+            return VisibilityResult.NotFound;
+        }
+
         // Rule 2: inherited access. The organizer extends regardless of their own attendance (D-085).
         if (viewer.IsFriendOf(target.OrganizerId))
         {

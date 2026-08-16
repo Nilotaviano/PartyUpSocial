@@ -1,5 +1,6 @@
 using NodaTime;
 using NodaTime.Testing;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
 
@@ -7,6 +8,25 @@ namespace PartyUp.Domain.Tests.Polls;
 
 public class PollCreationTests
 {
+    [Fact]
+    public void Create_RequiresATargetedGroupForAGroupsPoll_D201()
+    {
+        FakeClock clock = TestPolls.Clock();
+        PollDetails details = TestPolls.Details(visibility: ContentVisibility.Groups);
+
+        DomainException error = Assert.Throws<DomainException>(
+            () => Poll.Create(
+                UserId.New(),
+                details,
+                PollDeadlineChoice.Hours24,
+                [TestPolls.Hours(72), TestPolls.Hours(96)],
+                [],
+                clock,
+                audienceGroupIds: []));
+
+        Assert.Equal(DomainError.ValidationFailed, error.Error);
+    }
+
     [Fact]
     public void Create_StartsPollingWithTheOrganizerAsAParticipant_D155()
     {

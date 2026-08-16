@@ -1,5 +1,6 @@
 using NodaTime;
 using NodaTime.Testing;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
@@ -10,6 +11,29 @@ public class PollFinalizationTests
 {
     /// <summary>Inside the selection window [Deadline, Deadline + 48 h) for the default 24-hour poll.</summary>
     private static FakeClock SelectionTime => TestPolls.At(TestPolls.Hours(25));
+
+    [Fact]
+    public void Finalize_CopiesTheAudienceOntoTheMintedSession_D204()
+    {
+        FakeClock clock = TestPolls.Clock();
+        FriendGroupId groupA = FriendGroupId.New();
+        FriendGroupId groupB = FriendGroupId.New();
+        Poll poll = Poll.Create(
+            UserId.New(),
+            TestPolls.Details(minAttendance: 1, visibility: ContentVisibility.Groups),
+            PollDeadlineChoice.Hours24,
+            [TestPolls.Hours(72), TestPolls.Hours(96)],
+            [],
+            clock,
+            audienceGroupIds: [groupA, groupB]);
+
+        Session session = poll.Finalize(poll.Options[0].Id, SelectionTime).Session;
+
+        Assert.Equal(ContentVisibility.Groups, session.Visibility);
+        Assert.Equal(
+            new HashSet<FriendGroupId> { groupA, groupB },
+            new HashSet<FriendGroupId>(session.AudienceGroupIds));
+    }
 
     [Fact]
     public void Finalize_MapsVotesOnTheSelectedOption_D051()

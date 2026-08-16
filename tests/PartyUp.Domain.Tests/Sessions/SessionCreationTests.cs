@@ -1,5 +1,6 @@
 using NodaTime;
 using NodaTime.Testing;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
 
@@ -44,6 +45,35 @@ public class SessionCreationTests
         Assert.Equal(45, session.Duration.TotalMinutes);
         Assert.Equal(Platform.Steam, session.Platform);
         Assert.Equal(ContentVisibility.Private, session.Visibility);
+    }
+
+    [Fact]
+    public void Create_RequiresATargetedGroupForAGroupsSession_D201()
+    {
+        FakeClock clock = TestSessions.Clock();
+        SessionDetails details = TestSessions.Details(visibility: ContentVisibility.Groups);
+
+        DomainException error = Assert.Throws<DomainException>(
+            () => Session.Create(UserId.New(), details, [], clock, audienceGroupIds: []));
+
+        Assert.Equal(DomainError.ValidationFailed, error.Error);
+    }
+
+    [Fact]
+    public void Create_RejectsAnAudienceOnANonGroupsSession_D201()
+    {
+        FakeClock clock = TestSessions.Clock();
+        SessionDetails details = TestSessions.Details(visibility: ContentVisibility.Public);
+
+        DomainException error = Assert.Throws<DomainException>(
+            () => Session.Create(
+                UserId.New(),
+                details,
+                [UserId.New()],
+                clock,
+                audienceGroupIds: [FriendGroupId.New()]));
+
+        Assert.Equal(DomainError.ValidationFailed, error.Error);
     }
 
     [Fact]
