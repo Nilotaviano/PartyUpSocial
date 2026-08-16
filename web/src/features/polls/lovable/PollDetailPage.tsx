@@ -216,6 +216,7 @@ function OptionCard({
   isOrganizer,
   formatters,
   pendingOptionId,
+  previewPending,
   onVote,
   onPreview,
   onDelete,
@@ -229,6 +230,7 @@ function OptionCard({
   isOrganizer: boolean
   formatters: PollFormatters
   pendingOptionId: string | null
+  previewPending: boolean
   onVote: (choice: VoteValue) => void
   onPreview: () => void
   onDelete: () => void
@@ -301,8 +303,10 @@ function OptionCard({
         {isOrganizer && !poll.selectedOptionId && (
           <div className="flex items-center gap-1.5">
             <Button
+              aria-busy={previewPending}
               className="h-11 rounded-xl text-[13px] font-bold"
               data-testid={`finalize-option-${option.id}`}
+              disabled={previewPending}
               type="button"
               variant="neutral"
               onClick={onPreview}
@@ -567,11 +571,13 @@ function SeatRow({
 /* ------------------------------------------------------------------ */
 
 function SuggestDialog({
+  error,
   open,
   pending,
   onClose,
   onAdd,
 }: {
+  error: string | null
   open: boolean
   pending: boolean
   onClose: () => void
@@ -619,6 +625,12 @@ function SuggestDialog({
             <CalendarClock className="size-4 shrink-0" />
             {t('detailLovable.nudgeNotice')}
           </p>
+
+          {error && (
+            <p className="mt-3" role="alert">
+              {error}
+            </p>
+          )}
 
           <div className="mt-6 flex flex-wrap justify-end gap-2">
             <button
@@ -1123,7 +1135,13 @@ export function PollDetailPage() {
     onError: (error) => {
       if (isApiError(error) && error.code === 'poll_option_cap') {
         setSuggestError(t('suggest.optionCap'))
+        return
       }
+      setSuggestError(
+        t(isApiError(error) ? `errors.codes.${error.code}` : 'errors.generic', {
+          defaultValue: t('errors.generic'),
+        }),
+      )
     },
   })
 
@@ -1221,7 +1239,8 @@ export function PollDetailPage() {
     guestPanelError ??
     otherError ??
     leave.error ??
-    mute.error
+    mute.error ??
+    preview.error
 
   const previewOption = previewOptionId
     ? (mappedPreviewOptions.find((option) => option.optionId === previewOptionId) ?? null)
@@ -1457,10 +1476,6 @@ export function PollDetailPage() {
               </Button>
             </div>
 
-            {suggestError && (
-              <p role="alert">{suggestError}</p>
-            )}
-
             <ul className="space-y-3">
               {ranked.map((optionId, index) => {
                 const option = poll.options.find((candidate) => candidate.id === optionId)
@@ -1479,6 +1494,7 @@ export function PollDetailPage() {
                       pendingOptionId={pendingOptionId}
                       poll={poll}
                       rank={index + 1}
+                      previewPending={preview.isPending}
                       onDelete={() => setDeleteOptionId(optionId)}
                       onPreview={() => setPreviewOptionId(optionId)}
                       onVote={(choice) => handleVote(optionId, choice)}
@@ -1501,8 +1517,10 @@ export function PollDetailPage() {
                 : t('detailLovable.countdown.votingClosesIn', { time: formatCountdown(deadlineLeftMin) })}
             </p>
             <Button
+              aria-busy={preview.isPending}
               className="h-11 rounded-xl font-display font-extrabold"
               data-testid="finalize-trigger"
+              disabled={preview.isPending}
               type="button"
               variant="primary"
               onClick={() => setPreviewOptionId(viableEarly[0]?.optionId ?? leaderId)}
@@ -1527,9 +1545,13 @@ export function PollDetailPage() {
       )}
 
       <SuggestDialog
+        error={suggestError}
         open={suggestOpen}
         pending={suggest.isPending}
-        onClose={() => setSuggestOpen(false)}
+        onClose={() => {
+          setSuggestOpen(false)
+          setSuggestError(null)
+        }}
         onAdd={handleSuggest}
       />
 

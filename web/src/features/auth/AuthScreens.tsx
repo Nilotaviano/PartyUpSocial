@@ -453,6 +453,9 @@ export function Login() {
   const [passwordMissing, setPasswordMissing] = useState(false)
   const [error, setError] = useState<unknown>()
   const [sent, setSent] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [magicPending, setMagicPending] = useState(false)
+  const [externalPending, setExternalPending] = useState<string | null>(null)
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -463,6 +466,7 @@ export function Login() {
     setEmailError(emailValidation)
     setPasswordMissing(missingPassword)
     if (emailValidation || missingPassword) return
+    setSubmitting(true)
     try {
       const { data } = await client.POST('/api/v1/auth/login', {
         params: { header: { 'X-CSRF-TOKEN': '' } },
@@ -473,6 +477,8 @@ export function Login() {
       navigate(destination(data, authNext), { replace: true })
     } catch (caught) {
       setError(caught)
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -481,6 +487,7 @@ export function Login() {
     const emailValidation = validateEmailField(email.trim())
     setEmailError(emailValidation)
     if (emailValidation) return
+    setMagicPending(true)
     try {
       await client.POST('/api/v1/auth/magic-link', {
         params: { header: { 'X-CSRF-TOKEN': '' } },
@@ -493,11 +500,14 @@ export function Login() {
       setSent(true)
     } catch (caught) {
       setError(caught)
+    } finally {
+      setMagicPending(false)
     }
   }
 
   async function external(provider: string) {
     setError(undefined)
+    setExternalPending(provider)
     try {
       await startExternalProviderWithRetry(
         async () => {
@@ -526,6 +536,8 @@ export function Login() {
       )
     } catch (caught) {
       setError(caught)
+    } finally {
+      setExternalPending(null)
     }
   }
 
@@ -577,7 +589,12 @@ export function Login() {
               )}
             </div>
           </div>
-          <button className={primaryCtaClasses} type="submit">
+          <button
+            aria-busy={submitting}
+            className={primaryCtaClasses}
+            disabled={submitting}
+            type="submit"
+          >
             {t('actions.signIn')}
           </button>
           <Link className={quietAuthLinkClasses} to="/forgot-password">
@@ -587,16 +604,34 @@ export function Login() {
       </div>
       <div className="flex flex-col gap-3">
         <div className="surface flex flex-col gap-3 p-4">
-          <button className={authRowOutlineClasses} type="button" onClick={() => void magic()}>
+          <button
+            aria-busy={magicPending}
+            className={authRowOutlineClasses}
+            disabled={magicPending}
+            type="button"
+            onClick={() => void magic()}
+          >
             {t('actions.emailLink')}
           </button>
           {session?.providers.includes('google') && (
-            <button className={authRowOutlineClasses} type="button" onClick={() => void external('google')}>
+            <button
+              aria-busy={externalPending === 'google'}
+              className={authRowOutlineClasses}
+              disabled={externalPending === 'google'}
+              type="button"
+              onClick={() => void external('google')}
+            >
               {t('providers.google')}
             </button>
           )}
           {session?.providers.includes('steam') && (
-            <button className={authRowOutlineClasses} type="button" onClick={() => void external('steam')}>
+            <button
+              aria-busy={externalPending === 'steam'}
+              className={authRowOutlineClasses}
+              disabled={externalPending === 'steam'}
+              type="button"
+              onClick={() => void external('steam')}
+            >
               {t('providers.steam')}
             </button>
           )}
@@ -628,12 +663,14 @@ export function Register() {
   const [emailError, setEmailError] = useState<EmailFieldError>(null)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<unknown>()
+  const [submitting, setSubmitting] = useState(false)
 
   async function register(
     targetEmail: string,
     targetContinuation: string | undefined,
   ) {
     setError(undefined)
+    setSubmitting(true)
     try {
       await client.POST('/api/v1/auth/register', {
         params: { header: { 'X-CSRF-TOKEN': '' } },
@@ -647,6 +684,8 @@ export function Register() {
       setSent(true)
     } catch (caught) {
       setError(caught)
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -718,7 +757,12 @@ export function Register() {
             <p className="font-body text-[13px] text-muted-foreground">
               {t('register.explainer')}
             </p>
-            <button className={primaryCtaClasses} type="submit">
+            <button
+              aria-busy={submitting}
+              className={primaryCtaClasses}
+              disabled={submitting}
+              type="submit"
+            >
               {t('actions.createAccount')}
             </button>
           </form>

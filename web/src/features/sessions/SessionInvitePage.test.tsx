@@ -155,6 +155,79 @@ describe('SessionInvitePage', () => {
     expect(await screen.findByText('That user could not be found.')).toBeInTheDocument()
   })
 
+  it('distinguishes loading, failed, and empty friends-checklist states (Wave 6)', async () => {
+    let resolveFriends: (() => void) | undefined
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/sessions/{sessionId}') {
+        return Promise.resolve({
+          data: {
+            id: 'session-1',
+            organizerId: 'organizer-1',
+            title: 'Raid night',
+            startTime: '2030-09-01T18:00:00Z',
+            durationMinutes: 120,
+            platform: 'Steam',
+            game: null,
+            notes: '',
+            minAttendance: 4,
+            maxCapacity: 8,
+            isPrivate: false,
+            status: 'unconfirmed',
+            createdAt: '2030-08-01T00:00:00Z',
+            roster: [],
+            version: 'v1',
+          },
+        })
+      }
+      if (path === '/api/v1/friends') {
+        return new Promise((resolve) => {
+          resolveFriends = () => resolve({ data: { items: [] } })
+        })
+      }
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    renderPage()
+
+    expect(await screen.findByText('Loading...')).toBeInTheDocument()
+
+    resolveFriends?.()
+    expect(await screen.findByText('You have no friends to invite yet.')).toBeInTheDocument()
+  })
+
+  it('surfaces a friends-list load failure in the page error banner (Wave 6)', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/sessions/{sessionId}') {
+        return Promise.resolve({
+          data: {
+            id: 'session-1',
+            organizerId: 'organizer-1',
+            title: 'Raid night',
+            startTime: '2030-09-01T18:00:00Z',
+            durationMinutes: 120,
+            platform: 'Steam',
+            game: null,
+            notes: '',
+            minAttendance: 4,
+            maxCapacity: 8,
+            isPrivate: false,
+            status: 'unconfirmed',
+            createdAt: '2030-08-01T00:00:00Z',
+            roster: [],
+            version: 'v1',
+          },
+        })
+      }
+      if (path === '/api/v1/friends') {
+        return Promise.reject(new ApiError(500, 'unknown'))
+      }
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    renderPage()
+
+    expect(await screen.findByText("Couldn't load your friends list.")).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+  })
+
   it('requires confirmation in a focused dialog before revoking a guest link_H7', async () => {
     api.post.mockResolvedValue({
       data: [{ guestLinkId: 'link-1', url: 'https://partyup.test/g/token' }],

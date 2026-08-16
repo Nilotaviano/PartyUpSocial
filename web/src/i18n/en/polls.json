@@ -150,7 +150,9 @@
   },
   "invite": {
     "heading": "Invite",
-    "registered": "Invite friends"
+    "registered": "Invite friends",
+    "noFriends": "You have no friends to invite yet.",
+    "friendsLoadFailed": "Couldn't load your friends list."
   },
   "cancel": {
     "action": "Cancel poll",

@@ -51,6 +51,20 @@ describe('EmailUnsubscribePage (D189_DESIGN.md §3)', () => {
     ).toBeInTheDocument()
   })
 
+  it('disables the Unsubscribe button while the request is in flight, preventing a double-post (Wave 6)', () => {
+    const token = 'raw-unsubscribe-token'
+    window.history.replaceState({}, '', `/email-unsubscribe#token=${token}`)
+    api.post.mockImplementation(() => new Promise(() => {}))
+
+    render(<EmailUnsubscribePage />)
+    const button = screen.getByRole('button', { name: 'Unsubscribe' })
+    fireEvent.click(button)
+
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('aria-busy', 'true')
+    expect(api.post).toHaveBeenCalledTimes(1)
+  })
+
   it('shows an invalid-link message and no button when there is no token', () => {
     render(<EmailUnsubscribePage />)
 

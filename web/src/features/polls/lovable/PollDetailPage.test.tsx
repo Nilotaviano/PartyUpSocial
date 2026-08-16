@@ -528,6 +528,28 @@ describe('PollDetailPage (lovable)', () => {
         await screen.findByText('This poll already has 12 candidate times — the most it can hold.'),
       ).toBeInTheDocument()
     })
+
+    it('routes a non-cap suggest error into the still-open dialog, visible above the scrim (Wave 6)', async () => {
+      const ApiErrorClass = class extends Error {
+        status = 500
+        code = 'unknown'
+      }
+      mockGet()
+      api.post.mockRejectedValue(new ApiErrorClass())
+      renderPage()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Suggest a time' }))
+      fireEvent.change(await screen.findByLabelText('Suggest a time'), {
+        target: { value: '2099-03-01T10:00' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Suggest' }))
+
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByRole('alert')).toBeInTheDocument()
+      // Still open — the error did not silently fall through to a hidden
+      // page-level banner behind the dialog's scrim.
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
   })
 
   describe('delete option (new real capability behind D-131/171 scope)', () => {
@@ -707,13 +729,55 @@ describe('PollDetailPage (lovable)', () => {
       renderPage()
 
       const option = await screen.findByTestId('poll-option-option-1')
-      fireEvent.click(within(option).getByRole('button', { name: 'Preview seats' }))
+      const previewButton = within(option).getByRole('button', { name: 'Preview seats' })
+      await waitFor(() => expect(previewButton).not.toBeDisabled())
+      fireEvent.click(previewButton)
 
       const dialog = await screen.findByRole('dialog')
       expect(within(dialog).getByText('Organizer One')).toBeInTheDocument()
       expect(within(dialog).getByText('Voter Two')).toBeInTheDocument()
       expect(within(dialog).getByText(/Seated/)).toBeInTheDocument()
       expect(within(dialog).getByText(/Waitlist/)).toBeInTheDocument()
+    })
+
+    it('surfaces a finalization-preview fetch failure in the page error banner (Wave 6)', async () => {
+      const ApiErrorClass = class extends Error {
+        status = 500
+        code = 'unknown'
+      }
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: 'UTC' } })
+        if (path.includes('finalization-preview')) return Promise.reject(new ApiErrorClass())
+        return Promise.resolve({ data: awaitingSelectionPoll() })
+      })
+      renderPage()
+
+      expect(await screen.findByText('Something went wrong.')).toBeInTheDocument()
+    })
+
+    it('disables the preview-seats and finalize-trigger buttons while the preview query is pending (Wave 6)', async () => {
+      let resolvePreview: (() => void) | undefined
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: 'UTC' } })
+        if (path.includes('finalization-preview'))
+          return new Promise((resolve) => {
+            resolvePreview = () => resolve({ data: previewResponse() })
+          })
+        return Promise.resolve({ data: awaitingSelectionPoll() })
+      })
+      renderPage()
+
+      const option = await screen.findByTestId('poll-option-option-1')
+      const previewButton = within(option).getByRole('button', { name: 'Preview seats' })
+      expect(previewButton).toBeDisabled()
+      expect(previewButton).toHaveAttribute('aria-busy', 'true')
+
+      const finalizeTrigger = screen.queryByTestId('finalize-trigger')
+      if (finalizeTrigger) {
+        expect(finalizeTrigger).toBeDisabled()
+      }
+
+      resolvePreview?.()
     })
 
     it('offers no early finalization sticky bar while no option is viable_D187', async () => {
@@ -761,7 +825,9 @@ describe('PollDetailPage (lovable)', () => {
       renderPage()
 
       const option = await screen.findByTestId('poll-option-option-1')
-      fireEvent.click(within(option).getByRole('button', { name: 'Preview seats' }))
+      const previewButton = within(option).getByRole('button', { name: 'Preview seats' })
+      await waitFor(() => expect(previewButton).not.toBeDisabled())
+      fireEvent.click(previewButton)
 
       const dialog = await screen.findByRole('dialog')
       const discs = within(dialog).getAllByText('🦄')

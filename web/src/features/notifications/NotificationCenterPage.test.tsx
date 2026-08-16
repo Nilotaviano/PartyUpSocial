@@ -385,6 +385,50 @@ describe('NotificationCenterPage — mark read / mark all read', () => {
     const button = await screen.findByRole('button', { name: 'Mark all read' })
     await waitFor(() => expect(button).not.toBeDisabled())
   })
+
+  it('falls open (Mark all read stays enabled) when the unread-count query fails (Wave 6)', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/notifications/unread-count') {
+        return Promise.reject(new Error('boom'))
+      }
+      return Promise.resolve({
+        data: {
+          items: [notification({ id: 'n1', unread: false, readAt: '2099-01-01T00:00:00Z' })],
+          nextCursor: null,
+        },
+      })
+    })
+
+    renderPage()
+
+    await screen.findByText('Session invite')
+    const button = await screen.findByRole('button', { name: 'Mark all read' })
+    await waitFor(() => expect(button).not.toBeDisabled())
+  })
+})
+
+describe('NotificationCenterPage — list error recovery (Wave 6)', () => {
+  it('shows a retry action on a failed list load and refetches on click', async () => {
+    let listShouldFail = true
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/notifications/unread-count') {
+        return Promise.resolve({ data: { count: 0 } })
+      }
+      if (listShouldFail) return Promise.reject(new Error('boom'))
+      return Promise.resolve({ data: { items: [], nextCursor: null } })
+    })
+
+    renderPage()
+
+    const banner = await screen.findByRole('alert')
+    expect(within(banner).getByText('Something went wrong.')).toBeInTheDocument()
+    const retry = screen.getByRole('button', { name: 'Try again' })
+
+    listShouldFail = false
+    fireEvent.click(retry)
+
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+  })
 })
 
 describe('NotificationCenterPage — empty states and scope toggle', () => {

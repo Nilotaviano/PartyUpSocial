@@ -359,7 +359,8 @@ export function SessionDetailPage() {
     removeGuestParticipant.error ??
     cancel.error ??
     reminder.error ??
-    mute.error
+    mute.error ??
+    joinRequests.error
 
   const data = detail.data
   const going = data?.roster.filter((r) => r.status === 'going' && !r.isWaitlisted) ?? []
@@ -582,6 +583,8 @@ export function SessionDetailPage() {
                           isOrganizer ? (
                             <>
                               <Button
+                                aria-busy={promote.isPending}
+                                disabled={promote.isPending}
                                 type="button"
                                 variant="ghost"
                                 onClick={() => promote.mutate(entry.participationId)}
@@ -589,6 +592,8 @@ export function SessionDetailPage() {
                                 {t('waitlist.promote')}
                               </Button>
                               <Button
+                                aria-busy={rejectWaitlist.isPending}
+                                disabled={rejectWaitlist.isPending}
                                 type="button"
                                 variant="ghost"
                                 onClick={() => rejectWaitlist.mutate(entry.participationId)}
@@ -618,44 +623,77 @@ export function SessionDetailPage() {
               </section>
             )}
 
-            {isOrganizer && joinRequests.data && joinRequests.data.items.length > 0 && (
-              <section className="order-4 surface p-4">
+            {isOrganizer && joinRequests.isError && (
+              <section className="order-4 surface p-4" data-testid="join-requests-error">
                 <h2
                   className="font-display text-base font-extrabold"
                   id="join-requests-heading"
                 >
-                  {t('detail.joinRequests')} ({joinRequests.data.items.length})
+                  {t('detail.joinRequests')}
                 </h2>
-                <ul className="mt-2 space-y-1.5">
-                  {joinRequests.data.items.map((request) => (
-                    <li
-                      key={request.id}
-                      className="flex flex-wrap items-center justify-between gap-2 border-t border-border py-2 first:border-t-0"
+                <StatusBanner
+                  actions={
+                    <button
+                      className={neutralCtaClasses}
+                      type="button"
+                      onClick={() => joinRequests.refetch()}
                     >
-                      <span className="text-[13px] font-semibold">
-                        {request.requester?.displayName ?? t('detail.anonymous')}
-                      </span>
-                      <span className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => approve.mutate(request.id)}
-                        >
-                          {t('join.approve')}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => reject.mutate(request.id)}
-                        >
-                          {t('join.reject')}
-                        </Button>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                      {t('actions.retry', { ns: 'common' })}
+                    </button>
+                  }
+                  role="alert"
+                  variant="danger"
+                >
+                  {t('errors.generic', { ns: 'errors' })}
+                </StatusBanner>
               </section>
             )}
+
+            {isOrganizer &&
+              !joinRequests.isError &&
+              joinRequests.data &&
+              joinRequests.data.items.length > 0 && (
+                <section className="order-4 surface p-4">
+                  <h2
+                    className="font-display text-base font-extrabold"
+                    id="join-requests-heading"
+                  >
+                    {t('detail.joinRequests')} ({joinRequests.data.items.length})
+                  </h2>
+                  <ul className="mt-2 space-y-1.5">
+                    {joinRequests.data.items.map((request) => (
+                      <li
+                        key={request.id}
+                        className="flex flex-wrap items-center justify-between gap-2 border-t border-border py-2 first:border-t-0"
+                      >
+                        <span className="text-[13px] font-semibold">
+                          {request.requester?.displayName ?? t('detail.anonymous')}
+                        </span>
+                        <span className="flex gap-2">
+                          <Button
+                            aria-busy={approve.isPending}
+                            disabled={approve.isPending}
+                            type="button"
+                            variant="ghost"
+                            onClick={() => approve.mutate(request.id)}
+                          >
+                            {t('join.approve')}
+                          </Button>
+                          <Button
+                            aria-busy={reject.isPending}
+                            disabled={reject.isPending}
+                            type="button"
+                            variant="ghost"
+                            onClick={() => reject.mutate(request.id)}
+                          >
+                            {t('join.reject')}
+                          </Button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
 
             <section className="order-6 surface p-4">
               <h2 className="font-display text-base font-extrabold">

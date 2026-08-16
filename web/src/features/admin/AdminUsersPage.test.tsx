@@ -126,6 +126,44 @@ describe('AdminUsersPage — D-179 list rendering', () => {
   })
 })
 
+describe('AdminUsersPage — placeholderData across page changes (Wave 6)', () => {
+  it('keeps the roster and pagination nav mounted while the next page loads instead of repainting from scratch', async () => {
+    let resolvePage2: (() => void) | undefined
+    api.get.mockImplementation((_path: string, options: { params: { query: { page: number } } }) => {
+      if (options.params.query.page === 2) {
+        return new Promise((resolve) => {
+          resolvePage2 = () =>
+            resolve({
+              data: {
+                users: [adminUser({ id: '0198c2f0-0000-7000-8000-000000000002', displayName: 'Page Two' })],
+                page: 2,
+                pageSize: 1,
+                total: 2,
+              },
+            })
+        })
+      }
+      return Promise.resolve({
+        data: { users: [adminUser()], page: 1, pageSize: 1, total: 2 },
+      })
+    })
+
+    renderPage()
+
+    await screen.findByText('Ellen Ripley')
+    const nav = screen.getByRole('navigation')
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }))
+
+    // Still showing page 1's row and the pagination nav — neither unmounted
+    // while page 2 is in flight.
+    expect(screen.getByText('Ellen Ripley')).toBeInTheDocument()
+    expect(nav).toBeInTheDocument()
+
+    resolvePage2?.()
+    expect(await screen.findByText('Page Two')).toBeInTheDocument()
+  })
+})
+
 describe('AdminUsersPage — D-177 fail-closed parity', () => {
   it('renders a role=alert not-found message on a 404 and names no admin surface_D177', async () => {
     api.get.mockRejectedValue(new TestApiError(404, 'not_found'))

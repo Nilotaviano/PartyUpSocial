@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
@@ -92,6 +92,7 @@ export function AdminUsersPage() {
   const users = useQuery({
     queryKey: adminKeys.users(query, page),
     queryFn: () => getAdminUsers(query, page),
+    placeholderData: keepPreviousData,
     retry: false,
   })
 

@@ -97,6 +97,26 @@ describe('BlockedUsersPageTests', () => {
     expect(disc?.querySelector('img')).toBeNull()
   })
 
+  it('scopes the unblock pending state to the row clicked, not every row (Wave 6)', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        items: [
+          { blockId: 'block-1', username: 'alpha.one', createdAt: '2026-08-01T12:00:00Z' },
+          { blockId: 'block-2', username: 'beta.two', createdAt: '2026-08-02T12:00:00Z' },
+        ],
+      },
+    })
+    api.delete.mockImplementation(() => new Promise(() => {}))
+    renderPage()
+
+    const alphaButton = await screen.findByRole('button', { name: 'Unblock @alpha.one' })
+    const betaButton = await screen.findByRole('button', { name: 'Unblock @beta.two' })
+    fireEvent.click(alphaButton)
+
+    await waitFor(() => expect(alphaButton).toBeDisabled())
+    expect(betaButton).not.toBeDisabled()
+  })
+
   it('renders the outbound-management empty state', async () => {
     api.get.mockResolvedValue({ data: { items: [] } })
     renderPage()

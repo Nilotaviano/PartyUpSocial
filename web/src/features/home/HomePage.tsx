@@ -345,19 +345,24 @@ export function HomePage() {
                           </Link>
                           <div className="mt-2 flex flex-wrap items-center gap-2 pl-12">
                             <SessionStatusChip status={session.status} />
-                            {(['Going', 'Maybe', 'Declined'] as const).map((choice) => (
-                              <Button
-                                key={choice}
-                                disabled={respond.isPending}
-                                type="button"
-                                variant="neutral"
-                                onClick={() =>
-                                  respond.mutate({ sessionId: session.id, response: choice })
-                                }
-                              >
-                                {t(`rsvp.${choice.toLowerCase()}`, { ns: 'sessions' })}
-                              </Button>
-                            ))}
+                            {(['Going', 'Maybe', 'Declined'] as const).map((choice) => {
+                              const rowPending =
+                                respond.isPending && respond.variables?.sessionId === session.id
+                              return (
+                                <Button
+                                  key={choice}
+                                  aria-busy={rowPending}
+                                  disabled={rowPending}
+                                  type="button"
+                                  variant="neutral"
+                                  onClick={() =>
+                                    respond.mutate({ sessionId: session.id, response: choice })
+                                  }
+                                >
+                                  {t(`rsvp.${choice.toLowerCase()}`, { ns: 'sessions' })}
+                                </Button>
+                              )
+                            })}
                           </div>
                         </li>
                       ))}
@@ -396,7 +401,14 @@ export function HomePage() {
                           <div className="mt-2 flex flex-wrap items-center gap-2 pl-12">
                             <SessionStatusChip status={request.session.status} />
                             <Button
-                              disabled={approve.isPending}
+                              aria-busy={
+                                approve.isPending &&
+                                approve.variables?.requestId === request.joinRequestId
+                              }
+                              disabled={
+                                approve.isPending &&
+                                approve.variables?.requestId === request.joinRequestId
+                              }
                               type="button"
                               variant="neutral"
                               onClick={() =>
@@ -409,7 +421,14 @@ export function HomePage() {
                               {t('join.approve', { ns: 'sessions' })}
                             </Button>
                             <Button
-                              disabled={reject.isPending}
+                              aria-busy={
+                                reject.isPending &&
+                                reject.variables?.requestId === request.joinRequestId
+                              }
+                              disabled={
+                                reject.isPending &&
+                                reject.variables?.requestId === request.joinRequestId
+                              }
                               type="button"
                               variant="neutral"
                               onClick={() =>

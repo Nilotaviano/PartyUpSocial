@@ -164,6 +164,42 @@ describe('PollCreatePage (lovable)', () => {
     expect(checkbox).not.toBeChecked()
   })
 
+  it('distinguishes loading, failed, and empty invitee-checklist states (Wave 6)', async () => {
+    let resolveFriends: (() => void) | undefined
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/steam-catalog') {
+        return Promise.resolve({ data: { catalogAvailable: false, results: [] } })
+      }
+      if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: 'UTC' } })
+      if (path === '/api/v1/calendar') return Promise.resolve({ data: emptyCalendarView })
+      return new Promise((resolve) => {
+        resolveFriends = () => resolve({ data: { items: [] } })
+      })
+    })
+    renderPage()
+
+    expect(await screen.findByText('Loading...')).toBeInTheDocument()
+
+    resolveFriends?.()
+    expect(await screen.findByText('You have no friends to invite yet.')).toBeInTheDocument()
+  })
+
+  it('surfaces a friends-list load failure distinctly from an empty checklist (Wave 6)', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/steam-catalog') {
+        return Promise.resolve({ data: { catalogAvailable: false, results: [] } })
+      }
+      if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: 'UTC' } })
+      if (path === '/api/v1/calendar') return Promise.resolve({ data: emptyCalendarView })
+      if (path === '/api/v1/friends') return Promise.reject(new Error('boom'))
+      return Promise.resolve({ data: { items: [] } })
+    })
+    renderPage()
+
+    expect(await screen.findByText("Couldn't load your friends list.")).toBeInTheDocument()
+    expect(screen.queryByText('You have no friends to invite yet.')).not.toBeInTheDocument()
+  })
+
   it('never produces a duplicate option nor a validation error for the same candidate slot twice_D080', async () => {
     mockGet()
     renderPage()

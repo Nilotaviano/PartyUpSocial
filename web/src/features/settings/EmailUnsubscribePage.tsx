@@ -18,6 +18,7 @@ export function EmailUnsubscribePage() {
   const [token] = useState(readTokenFromHash)
   const [confirmed, setConfirmed] = useState(false)
   const [error, setError] = useState<unknown>()
+  const [submitting, setSubmitting] = useState(false)
 
   async function confirmUnsubscribe() {
     if (!token) {
@@ -25,6 +26,7 @@ export function EmailUnsubscribePage() {
     }
 
     setError(undefined)
+    setSubmitting(true)
 
     try {
       await client.POST('/api/v1/email-notifications/unsubscribe', {
@@ -34,6 +36,8 @@ export function EmailUnsubscribePage() {
       setConfirmed(true)
     } catch (caught) {
       setError(caught)
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -58,7 +62,9 @@ export function EmailUnsubscribePage() {
             <p>{t('emailUnsubscribe.confirmDescription')}</p>
             <div className="flex">
               <Button
+                aria-busy={submitting}
                 className="ml-auto"
+                disabled={submitting}
                 variant="danger"
                 onClick={() => void confirmUnsubscribe()}
               >

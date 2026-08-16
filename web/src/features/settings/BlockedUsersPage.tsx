@@ -96,9 +96,17 @@ export function BlockedUsersPage() {
                     <IdentityRow
                       actions={
                         <Button
-                          aria-busy={unblock.isPending}
+                          aria-busy={
+                            unblock.isPending &&
+                            unblock.variables?.kind === 'unblock' &&
+                            unblock.variables.blockId === blocked.blockId
+                          }
                           aria-label={`${t('actions.unblock')} @${blocked.username}`}
-                          disabled={unblock.isPending}
+                          disabled={
+                            unblock.isPending &&
+                            unblock.variables?.kind === 'unblock' &&
+                            unblock.variables.blockId === blocked.blockId
+                          }
                           variant="neutral"
                           onClick={() =>
                             unblock.mutate({

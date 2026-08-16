@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -177,6 +177,41 @@ describe('HomePage', () => {
     expect(
       await within(actionable).findByText('Requested by Ada Requester'),
     ).toBeInTheDocument()
+  })
+
+  it('scopes RSVP pending state to the row being responded to, not every invitation row (Wave 6)', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/me/actionable') {
+        return Promise.resolve({
+          data: actionableInbox({
+            invitations: [
+              {
+                session: summary({ id: 'session-a', title: 'Party A', viewerRelation: 'invitee' }),
+                invitedAt: '2030-08-01T00:00:00Z',
+              },
+              {
+                session: summary({ id: 'session-b', title: 'Party B', viewerRelation: 'invitee' }),
+                invitedAt: '2030-08-01T00:00:00Z',
+              },
+            ],
+          }),
+        })
+      }
+      return defaultGetHandler(path)
+    })
+    api.put.mockImplementation(() => new Promise(() => {}))
+    renderPage()
+
+    const actionable = await screen.findByTestId('home-region-actionable')
+    const rowA = (await within(actionable).findByText('Party A')).closest('li')!
+    const rowB = within(actionable).getByText('Party B').closest('li')!
+
+    fireEvent.click(within(rowA).getByRole('button', { name: 'Going' }))
+
+    await waitFor(() =>
+      expect(within(rowA).getByRole('button', { name: 'Going' })).toBeDisabled(),
+    )
+    expect(within(rowB).getByRole('button', { name: 'Going' })).not.toBeDisabled()
   })
 
   it('computes the eyebrow as today plus its locale week range, Sunday-first for en_D103', async () => {

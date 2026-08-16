@@ -83,6 +83,25 @@ describe('external login', () => {
     )
   })
 
+  it('disables the Steam button and marks it aria-busy while the intent request is in flight (Wave 6)', async () => {
+    session.useSession.mockReturnValue({
+      data: { providers: ['google', 'steam'] },
+      isPending: false,
+    })
+    api.post.mockImplementation(() => new Promise(() => {}))
+    renderLogin()
+
+    const steamButton = screen.getByRole('button', { name: 'Continue with Steam' })
+    fireEvent.click(steamButton)
+
+    await waitFor(() => expect(steamButton).toBeDisabled())
+    expect(steamButton).toHaveAttribute('aria-busy', 'true')
+    // The Google row is a separate pending flag — it isn't disabled by Steam's request.
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }),
+    ).not.toBeDisabled()
+  })
+
   it('carries an age-gate attestation and continuation into a relaunched login intent_D083', async () => {
     sessionStorage.setItem('partyup.age-gate-attested', 'true')
     session.useSession.mockReturnValue({

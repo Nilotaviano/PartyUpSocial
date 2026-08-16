@@ -45,4 +45,18 @@ describe('PublicDeletionPage', () => {
       body: { token },
     })
   })
+
+  it('disables the confirm button while the request is in flight, preventing a double-post (Wave 6)', async () => {
+    const token = 'raw-deletion-token'
+    window.history.replaceState({}, '', `/account-deletion/confirm#token=${token}`)
+    api.post.mockImplementation(() => new Promise(() => {}))
+
+    render(<PublicDeletionConfirmPage />)
+    const button = screen.getByRole('button', { name: 'Confirm account deletion' })
+    fireEvent.click(button)
+
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('aria-busy', 'true')
+    expect(api.post).toHaveBeenCalledTimes(1)
+  })
 })

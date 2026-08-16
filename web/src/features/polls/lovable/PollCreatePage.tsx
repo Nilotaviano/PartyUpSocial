@@ -779,34 +779,47 @@ export function PollCreatePage() {
                   {t('create.invitees')}
                 </legend>
                 {fieldErrors.inviteeUserIds && <p role="alert">{fieldErrors.inviteeUserIds}</p>}
-                <ul className="flex flex-col gap-2">
-                  {(friends.data ?? []).map((friend) => (
-                    <li key={friend.friendshipId}>
-                      <label className={controlRowClasses}>
-                        <input
-                          checked={form.inviteeUserIds.includes(friend.userId)}
-                          type="checkbox"
-                          onChange={(event) => {
-                            const checked = event.target.checked
-                            update(
-                              'inviteeUserIds',
-                              checked
-                                ? [...form.inviteeUserIds, friend.userId]
-                                : form.inviteeUserIds.filter((id) => id !== friend.userId),
-                            )
-                          }}
-                        />
-                        <AvatarDisc
-                          emoji={friend.avatar.emoji}
-                          imgUrl={avatarImgUrl(friend.avatar)}
-                          seed={friend.userId}
-                          size="xs"
-                        />
-                        {friend.displayName} (@{friend.username})
-                      </label>
-                    </li>
-                  ))}
-                </ul>
+                {friends.isPending && (
+                  <p className="motion-safe:animate-pulse text-ink-soft" role="status">
+                    {t('common.loading', { ns: 'common' })}
+                  </p>
+                )}
+                {friends.isError && (
+                  <p className="text-ink-soft">{t('invite.friendsLoadFailed')}</p>
+                )}
+                {friends.data && friends.data.length === 0 && (
+                  <p className="text-ink-soft">{t('invite.noFriends')}</p>
+                )}
+                {friends.data && friends.data.length > 0 && (
+                  <ul className="flex flex-col gap-2">
+                    {friends.data.map((friend) => (
+                      <li key={friend.friendshipId}>
+                        <label className={controlRowClasses}>
+                          <input
+                            checked={form.inviteeUserIds.includes(friend.userId)}
+                            type="checkbox"
+                            onChange={(event) => {
+                              const checked = event.target.checked
+                              update(
+                                'inviteeUserIds',
+                                checked
+                                  ? [...form.inviteeUserIds, friend.userId]
+                                  : form.inviteeUserIds.filter((id) => id !== friend.userId),
+                              )
+                            }}
+                          />
+                          <AvatarDisc
+                            emoji={friend.avatar.emoji}
+                            imgUrl={avatarImgUrl(friend.avatar)}
+                            seed={friend.userId}
+                            size="xs"
+                          />
+                          {friend.displayName} (@{friend.username})
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </fieldset>
 
               <label className="block" htmlFor="field-guest-links">

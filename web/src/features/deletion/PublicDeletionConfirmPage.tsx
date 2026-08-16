@@ -18,6 +18,7 @@ export function PublicDeletionConfirmPage() {
   const [token] = useState(readTokenFromHash)
   const [confirmed, setConfirmed] = useState(false)
   const [error, setError] = useState<unknown>()
+  const [submitting, setSubmitting] = useState(false)
 
   async function confirmDeletion() {
     if (!token) {
@@ -25,6 +26,7 @@ export function PublicDeletionConfirmPage() {
     }
 
     setError(undefined)
+    setSubmitting(true)
 
     try {
       await client.POST('/api/v1/account-deletion-requests/confirm', {
@@ -34,6 +36,8 @@ export function PublicDeletionConfirmPage() {
       setConfirmed(true)
     } catch (caught) {
       setError(caught)
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -58,7 +62,9 @@ export function PublicDeletionConfirmPage() {
             <p>{t('publicDeletion.confirmDescription')}</p>
             <div className="flex">
               <Button
+                aria-busy={submitting}
                 className="ml-auto"
+                disabled={submitting}
                 variant="danger"
                 onClick={() => void confirmDeletion()}
               >

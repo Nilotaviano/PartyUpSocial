@@ -140,6 +140,37 @@ describe('PollInvitePage', () => {
     expect(screen.getByRole('button', { name: 'Invite friends' })).toBeDisabled()
   })
 
+  it('distinguishes loading, failed, and empty friends-checklist states (Wave 6)', async () => {
+    let resolveFriends: (() => void) | undefined
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/polls/{pollId}') return Promise.resolve({ data: pollDetail() })
+      if (path === '/api/v1/friends') {
+        return new Promise((resolve) => {
+          resolveFriends = () => resolve({ data: { items: [] } })
+        })
+      }
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    renderPage()
+
+    expect(await screen.findByText('Loading...')).toBeInTheDocument()
+
+    resolveFriends?.()
+    expect(await screen.findByText('You have no friends to invite yet.')).toBeInTheDocument()
+  })
+
+  it('surfaces a friends-list load failure distinctly from an empty list (Wave 6)', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/polls/{pollId}') return Promise.resolve({ data: pollDetail() })
+      if (path === '/api/v1/friends') return Promise.reject(new ApiError(500, 'unknown'))
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    renderPage()
+
+    expect(await screen.findByText("Couldn't load your friends list.")).toBeInTheDocument()
+    expect(screen.queryByText('You have no friends to invite yet.')).not.toBeInTheDocument()
+  })
+
   it('shows a single uniform failure message for an unusable invitee_D193', async () => {
     api.post.mockRejectedValue(new ApiError(404, 'user_not_found'))
     renderPage()

@@ -120,7 +120,9 @@
     "removeGuest": "Quitar invitado",
     "removeGuestConfirm": "¿Quitar a este invitado de la sesión? Perderá el acceso de inmediato.",
     "revokeConfirm": "¿Revocar este enlace de invitado? Dejará de funcionar de inmediato.",
-    "copySuccess": "Enlace copiado."
+    "copySuccess": "Enlace copiado.",
+    "noFriends": "Aún no tienes amigos para invitar.",
+    "friendsLoadFailed": "No se pudo cargar tu lista de amigos."
   },
   "cancel": {
     "action": "Cancelar sesión",

@@ -150,7 +150,9 @@
   },
   "invite": {
     "heading": "Convidar",
-    "registered": "Convidar amigos"
+    "registered": "Convidar amigos",
+    "noFriends": "Você ainda não tem amigos para convidar.",
+    "friendsLoadFailed": "Não foi possível carregar sua lista de amigos."
   },
   "cancel": {
     "action": "Cancelar enquete",

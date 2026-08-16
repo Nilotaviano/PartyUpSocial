@@ -150,7 +150,7 @@ export function SessionInvitePage() {
     return <Navigate replace to="/welcome" />
   }
 
-  const anyError = invite.error ?? createLinks.error ?? revoke.error
+  const anyError = invite.error ?? createLinks.error ?? revoke.error ?? friends.error
 
   return (
     <main data-testid="screen-session-invite">
@@ -187,33 +187,46 @@ export function SessionInvitePage() {
           title={t('invite.registered')}
           titleId="invite-registered-heading"
         >
-          <ul className="flex flex-col gap-2">
-            {(friends.data ?? []).map((friend) => (
-              <li key={friend.friendshipId}>
-                <label className={`${controlRowClasses} text-ink`}>
-                  <input
-                    checked={selected.includes(friend.userId)}
-                    type="checkbox"
-                    onChange={(event) => {
-                      const checked = event.target.checked
-                      setSelected((current) =>
-                        checked
-                          ? [...current, friend.userId]
-                          : current.filter((id) => id !== friend.userId),
-                      )
-                    }}
-                  />
-                  <AvatarDisc
-                    emoji={friend.avatar.emoji}
-                    imgUrl={avatarImgUrl(friend.avatar)}
-                    seed={friend.userId}
-                    size="xs"
-                  />
-                  {friend.displayName} (@{friend.username})
-                </label>
-              </li>
-            ))}
-          </ul>
+          {friends.isPending && (
+            <p className="motion-safe:animate-pulse text-ink-soft" role="status">
+              {t('common.loading', { ns: 'common' })}
+            </p>
+          )}
+          {friends.isError && (
+            <p className="text-ink-soft">{t('invite.friendsLoadFailed')}</p>
+          )}
+          {friends.data && friends.data.length === 0 && (
+            <p className="text-ink-soft">{t('invite.noFriends')}</p>
+          )}
+          {friends.data && friends.data.length > 0 && (
+            <ul className="flex flex-col gap-2">
+              {friends.data.map((friend) => (
+                <li key={friend.friendshipId}>
+                  <label className={`${controlRowClasses} text-ink`}>
+                    <input
+                      checked={selected.includes(friend.userId)}
+                      type="checkbox"
+                      onChange={(event) => {
+                        const checked = event.target.checked
+                        setSelected((current) =>
+                          checked
+                            ? [...current, friend.userId]
+                            : current.filter((id) => id !== friend.userId),
+                        )
+                      }}
+                    />
+                    <AvatarDisc
+                      emoji={friend.avatar.emoji}
+                      imgUrl={avatarImgUrl(friend.avatar)}
+                      seed={friend.userId}
+                      size="xs"
+                    />
+                    {friend.displayName} (@{friend.username})
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
         </Section>
 
         <SectionCard title={t('invite.guest')} titleId="invite-guest-heading">

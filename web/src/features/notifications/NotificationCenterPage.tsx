@@ -5,7 +5,11 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
-import { segmentItemClasses, segmentStripClasses } from '../../components/ui/classes'
+import {
+  neutralCtaClasses,
+  segmentItemClasses,
+  segmentStripClasses,
+} from '../../components/ui/classes'
 import { EmptyState } from '../../components/shell/SectionCard'
 import { PageHeader } from '../../components/shell/PageHeader'
 import { PageScaffold, PageSlot } from '../../components/ui/pageScaffold'
@@ -67,6 +71,7 @@ function useNotificationScope(scope: NotificationScope) {
     nextCursor,
     isFetchingNextPage,
     loadMore: () => setCursors((current) => [...current, nextCursor as string]),
+    refetch: () => pages.forEach((page) => void page.refetch()),
   }
 }
 
@@ -182,7 +187,7 @@ export function NotificationCenterPage() {
   const [scope, setScope] = useState<NotificationScope>('all')
   const queryClient = useQueryClient()
   const toast = useToast()
-  const { items, isPending, error, nextCursor, isFetchingNextPage, loadMore } =
+  const { items, isPending, error, nextCursor, isFetchingNextPage, loadMore, refetch } =
     useNotificationScope(scope)
 
   // Ruling 1: opening the center is a read-only GET — neither an effect nor
@@ -212,7 +217,12 @@ export function NotificationCenterPage() {
     queryKey: notificationKeys.unreadCount,
     queryFn: getUnreadNotificationCount,
   })
-  const hasUnread = (unreadCountQuery.data ?? 0) > 0
+  // A failed count fetch falls OPEN, not closed: "Mark all read" staying
+  // enabled on an unknown count is recoverable (a no-op reload at worst);
+  // falling closed would silently hide real unread work behind a
+  // legitimate-looking disabled control.
+  const hasUnread = unreadCountQuery.isError || (unreadCountQuery.data ?? 0) > 0
+  const anyError = error ?? unreadCountQuery.error
 
   return (
     <main data-testid="screen-notifications">
@@ -255,9 +265,24 @@ export function NotificationCenterPage() {
           </p>
         )}
 
-        {error && (
-          <StatusBanner role="alert" variant="danger">
-            {t(isApiError(error) ? `errors.codes.${error.code}` : 'errors.generic', {
+        {anyError && (
+          <StatusBanner
+            actions={
+              <button
+                className={neutralCtaClasses}
+                type="button"
+                onClick={() => {
+                  refetch()
+                  void unreadCountQuery.refetch()
+                }}
+              >
+                {t('actions.retry', { ns: 'common' })}
+              </button>
+            }
+            role="alert"
+            variant="danger"
+          >
+            {t(isApiError(anyError) ? `errors.codes.${anyError.code}` : 'errors.generic', {
               defaultValue: t('errors.generic'),
             })}
           </StatusBanner>

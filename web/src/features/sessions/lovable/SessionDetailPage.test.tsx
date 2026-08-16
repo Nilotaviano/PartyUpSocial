@@ -834,6 +834,71 @@ describe('SessionDetailPage (lovable)', () => {
     })
   })
 
+  describe('pending/error state sweep (frontend audit 2026-08-15 Wave 6)', () => {
+    it('surfaces a join-requests fetch failure with a retry action instead of vanishing the section', async () => {
+      const { ApiError } = await import('../../../api/client')
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/sessions/{sessionId}')
+          return Promise.resolve({ data: detail() })
+        if (path === '/api/v1/sessions/{sessionId}/join-requests')
+          return Promise.reject(new ApiError(500, 'unknown'))
+        if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+        throw new Error(`Unexpected GET ${path}`)
+      })
+      renderPage()
+
+      expect(await screen.findByTestId('join-requests-error')).toBeInTheDocument()
+      const retry = within(await screen.findByTestId('join-requests-error')).getByRole(
+        'button',
+        { name: 'Try again' },
+      )
+
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/sessions/{sessionId}')
+          return Promise.resolve({ data: detail() })
+        if (path === '/api/v1/sessions/{sessionId}/join-requests')
+          return Promise.resolve({ data: { items: [], nextCursor: null } })
+        if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+        throw new Error(`Unexpected GET ${path}`)
+      })
+      fireEvent.click(retry)
+
+      await waitFor(() =>
+        expect(screen.queryByTestId('join-requests-error')).not.toBeInTheDocument(),
+      )
+    })
+
+    it('disables Promote while the promote mutation is in flight_D084', async () => {
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/sessions/{sessionId}') {
+          const data = detail()
+          data.roster[0].isWaitlisted = true
+          return Promise.resolve({ data })
+        }
+        if (path === '/api/v1/sessions/{sessionId}/join-requests')
+          return Promise.resolve({ data: { items: [], nextCursor: null } })
+        if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+        throw new Error(`Unexpected GET ${path}`)
+      })
+      let resolvePost: (() => void) | undefined
+      api.post.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolvePost = () => resolve({ data: {} })
+          }),
+      )
+      renderPage()
+
+      const promoteButton = await screen.findByRole('button', { name: 'Promote' })
+      fireEvent.click(promoteButton)
+
+      await waitFor(() => expect(promoteButton).toBeDisabled())
+      expect(promoteButton).toHaveAttribute('aria-busy', 'true')
+
+      resolvePost?.()
+    })
+  })
+
   describe('mobile sidebar stacking order (S3)', () => {
     it('gives every sidebar card its own order class, in the intended below-lg stacking order', async () => {
       api.get.mockImplementation((path: string) => {

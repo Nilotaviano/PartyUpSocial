@@ -120,7 +120,9 @@
     "removeGuest": "Remove guest",
     "removeGuestConfirm": "Remove this guest from the session? They will lose access immediately.",
     "revokeConfirm": "Revoke this guest link? It will stop working immediately.",
-    "copySuccess": "Link copied."
+    "copySuccess": "Link copied.",
+    "noFriends": "You have no friends to invite yet.",
+    "friendsLoadFailed": "Couldn't load your friends list."
   },
   "cancel": {
     "action": "Cancel session",
