@@ -87,12 +87,25 @@ public static class NotificationTypeExtensions
     /// The friend-graph rows (D-105) name a person and nothing else: the requester, or the matched
     /// Steam friend (§12-32). Carrying a session or poll ref on one of them is a shape error. The two
     /// friend-group membership rows (D-207) follow the identical shape: the counterpart in the invite
-    /// (the owner who sent it, or the invitee who accepted it) and nothing else — <c>AudienceGroupDeleted</c>
-    /// carries no ref at all, since the group that would be named is the very thing that is gone.
+    /// (the owner who sent it, or the invitee who accepted it) and nothing else, plus the group ref
+    /// <see cref="NeedsGroupRef"/> requires separately. <c>AudienceGroupDeleted</c> names no person —
+    /// only the group ref, which is the very thing that is gone.
     /// </summary>
     public static bool NeedsActorRef(this NotificationType type) =>
         type is NotificationType.FriendRequestReceived
             or NotificationType.SteamImportMatch
             or NotificationType.FriendGroupInviteReceived
             or NotificationType.FriendGroupInviteAccepted;
+
+    /// <summary>
+    /// D-207: the three friend-group rows all carry the group they are about. For the invite pair the
+    /// ref stays live (the group still exists at send time); for <c>AudienceGroupDeleted</c> the ref
+    /// dangles by construction — the group is hard-deleted in the very transaction that raises the row
+    /// (D-199) — which is what makes the read-side masking non-vacuous rather than a rule with no case
+    /// that ever exercises it.
+    /// </summary>
+    public static bool NeedsGroupRef(this NotificationType type) =>
+        type is NotificationType.FriendGroupInviteReceived
+            or NotificationType.FriendGroupInviteAccepted
+            or NotificationType.AudienceGroupDeleted;
 }

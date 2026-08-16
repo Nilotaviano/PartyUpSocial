@@ -18,7 +18,7 @@ public sealed class PushPayloadFactory(IPushTemplateRenderer renderer)
         Dictionary<string, string> model = [];
         if (row.SubjectTitle is { } subjectTitle)
         {
-            model["SubjectTitle"] = subjectTitle.Value;
+            model["SubjectTitle"] = subjectTitle;
         }
 
         if (row.OptionStartTime is { } optionStart)
@@ -41,19 +41,42 @@ public sealed class PushPayloadFactory(IPushTemplateRenderer renderer)
     }
 
     /// <summary>
-    /// Ruling 2's <c>"{session|poll|friend}:{subjectId}"</c>. A friend-graph row (types 23/24) has no
-    /// subject ref at all, so it keys on the actor instead; when even the actor id is absent (a
+    /// Ruling 2's <c>"{session|poll|group|friend}:{subjectId}"</c>. A friend-graph row (types 23/24)
+    /// has no subject ref at all, so it keys on the actor instead; when even the actor id is absent (a
     /// blocked-pair-masked actor, §4's wire rule) the row's own notification id stands in — the tag
-    /// still needs to exist and be stable, even though there is no "subject" left to name.
+    /// still needs to exist and be stable, even though there is no "subject" left to name. The three
+    /// D-207 group rows deep-link to <c>/groups/{id}</c> once the ref resolves and fall back to the
+    /// plain <c>/groups</c> list otherwise — keyed on <see cref="NotificationReadModel.Type"/> rather
+    /// than the generic friend fallback, since none of the three carry an actor-based destination.
     /// </summary>
-    private static (string Tag, string Url) BuildTagAndUrl(NotificationReadModel row) => row.SubjectKind switch
+    private static (string Tag, string Url) BuildTagAndUrl(NotificationReadModel row)
     {
-        NotificationSubjectKind.Session => ($"session:{row.SubjectId}", $"/sessions/{row.SubjectId}"),
-        NotificationSubjectKind.Poll => ($"poll:{row.SubjectId}", $"/polls/{row.SubjectId}"),
-        _ => row.ActorUserId is { } actorId
+        if (row.SubjectKind == NotificationSubjectKind.Session)
+        {
+            return ($"session:{row.SubjectId}", $"/sessions/{row.SubjectId}");
+        }
+
+        if (row.SubjectKind == NotificationSubjectKind.Poll)
+        {
+            return ($"poll:{row.SubjectId}", $"/polls/{row.SubjectId}");
+        }
+
+        if (row.SubjectKind == NotificationSubjectKind.Group)
+        {
+            return ($"group:{row.SubjectId}", $"/groups/{row.SubjectId}");
+        }
+
+        if (row.Type is NotificationType.FriendGroupInviteReceived
+            or NotificationType.FriendGroupInviteAccepted
+            or NotificationType.AudienceGroupDeleted)
+        {
+            return ($"group:{row.Id.Value}", "/groups");
+        }
+
+        return row.ActorUserId is { } actorId
             ? ($"friend:{actorId}", "/friends")
-            : ($"friend:{row.Id.Value}", "/friends"),
-    };
+            : ($"friend:{row.Id.Value}", "/friends");
+    }
 
     /// <summary>
     /// A structural three-word fallback, not long-form content — kept in code rather than as a

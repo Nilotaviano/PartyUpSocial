@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Polls;
@@ -21,12 +22,25 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
         {
             table.HasCheckConstraint(
                 "ck_notifications_type",
-                "type BETWEEN 0 AND 24");
+                "type BETWEEN 0 AND 27");
+            // 23/24 are the friend-graph rows (D-105); 25/26 are the D-207 group-invite pair, which
+            // shares the identical actor-only shape plus its own group_id requirement below.
             table.HasCheckConstraint(
                 "ck_notifications_friend_shape",
-                "type NOT IN (23, 24) OR " +
+                "type NOT IN (23, 24, 25, 26) OR " +
                 "(actor_user_id IS NOT NULL AND session_id IS NULL AND poll_id IS NULL " +
                 "AND option_start_time IS NULL)");
+            // D-207: all three friend-group rows carry the group they are about. 27
+            // (AudienceGroupDeleted) additionally names no actor — the group that would be named is
+            // the very thing the row exists to report as gone.
+            table.HasCheckConstraint(
+                "ck_notifications_group_shape",
+                "type NOT IN (25, 26, 27) OR " +
+                "(session_id IS NULL AND poll_id IS NULL AND option_start_time IS NULL " +
+                "AND group_id IS NOT NULL)");
+            table.HasCheckConstraint(
+                "ck_notifications_audience_group_deleted_shape",
+                "type <> 27 OR actor_user_id IS NULL");
         });
         builder.HasKey(notification => notification.Id);
 
@@ -44,6 +58,12 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
             .HasConversion(new TypedIdConverter<PollId>());
         builder.Property(notification => notification.ActorUserId)
             .HasConversion(new TypedIdConverter<UserId>());
+        // D-207: deliberately no HasOne/foreign key — a friend group is hard-deleted (D-199), and this
+        // ref is meant to dangle at that point rather than block the delete or cascade the notification
+        // history away. NotificationReadUseCases resolves it defensively (group row missing == masked).
+        builder.Property(notification => notification.FriendGroupId)
+            .HasConversion(new TypedIdConverter<FriendGroupId>())
+            .HasColumnName("group_id");
         builder.Property(notification => notification.OptionStartTime)
             .HasColumnType("timestamp with time zone");
         builder.Property(notification => notification.CreatedAt)

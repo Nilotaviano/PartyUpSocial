@@ -142,10 +142,17 @@ public sealed class FriendGroupUseCases(
                     await groups.ListDistinctOrganizersTargetingAsync(groupId, ct);
                 foreach (UserId organizerId in organizerIds)
                 {
+                    // The deleting owner already knows they deleted their own group — only the other
+                    // organizers whose audience it named need telling.
+                    if (organizerId == actorId)
+                    {
+                        continue;
+                    }
+
                     notifications.Add(Notification.Create(
                         organizerId,
                         NotificationType.AudienceGroupDeleted,
-                        NotificationSubject.Create(null, null),
+                        NotificationSubject.ForFriendGroupDeleted(groupId),
                         clock));
                 }
 
@@ -157,12 +164,21 @@ public sealed class FriendGroupUseCases(
 
     /// <summary>
     /// D-201/D-202: per invitee, resolves the friendship + block state between the *owner* and the
-    /// invitee (targeting authority belongs to the owner, not the inviting actor — an Accepted member
-    /// can invite, D-198's "any owner/Accepted member" targeting rule, but the friendship gate is the
-    /// owner's graph) and collapses both "not a friend" and "blocked" into the single
+    /// invitee (targeting authority belongs to the owner, not the inviting actor — only the owner can
+    /// invite, <see cref="FriendGroup.Invite"/>'s <c>RequireOwner</c> guard — but the friendship gate is
+    /// the owner's graph) and collapses both "not a friend" and "blocked" into the single
     /// <c>isAcceptedFriendOfOwner: false</c> input the aggregate turns into one indistinguishable
     /// <c>NotFound</c> (D-202 — no block-detection oracle).
     /// </summary>
+    /// <remarks>
+    /// The whole batch is pre-validated against <see cref="FriendGroup.MaxMembers"/> before a single
+    /// <see cref="FriendGroup.Invite"/> call mutates anything: <see cref="IUnitOfWork.ExecuteAsync{T}"/>
+    /// commits whatever the delegate leaves behind when it returns normally, so a mid-loop
+    /// <c>Failed("group_member_limit_reached")</c> after some invitees had already been added would
+    /// otherwise commit that partial roster with no notification for any of it. A mid-loop aggregate
+    /// exception (Duplicate/NotFound/etc.) is not similarly pre-checked — it propagates out of the
+    /// delegate and rolls the whole transaction back, which is the correct outcome for those.
+    /// </remarks>
     public Task<FriendGroupCommandResult> InviteAsync(
         UserId actorId,
         FriendGroupId groupId,
@@ -186,20 +202,33 @@ public sealed class FriendGroupUseCases(
                     return FriendGroupCommandResult.Failed("group_not_found");
                 }
 
+                Dictionary<UserId, bool> isAcceptedFriendOfOwner = new(invitees.Count);
+                int newRowCount = 0;
                 foreach (UserId inviteeId in invitees)
                 {
                     Friendship? friendship = await friendships.FindPairAsync(group.OwnerId, inviteeId, ct);
                     IReadOnlyList<Block> pairBlocks = await blocks.FindPairAsync(group.OwnerId, inviteeId, ct);
-                    bool isAcceptedFriendOfOwner = friendship is { IsAccepted: true } && pairBlocks.Count == 0;
+                    bool isFriend = friendship is { IsAccepted: true } && pairBlocks.Count == 0;
+                    isAcceptedFriendOfOwner[inviteeId] = isFriend;
 
-                    try
+                    // Only count invitees that would actually add a new row: an already-present member
+                    // or the owner themself fails before the aggregate ever reaches its cap check.
+                    if (isFriend
+                        && inviteeId != group.OwnerId
+                        && !group.Members.Any(member => member.UserId == inviteeId))
                     {
-                        group.Invite(actorId, inviteeId, isAcceptedFriendOfOwner, clock);
+                        newRowCount++;
                     }
-                    catch (DomainException exception) when (exception.Error == DomainError.LimitExceeded)
-                    {
-                        return FriendGroupCommandResult.Failed("group_member_limit_reached");
-                    }
+                }
+
+                if (group.Members.Count + newRowCount > FriendGroup.MaxMembers)
+                {
+                    return FriendGroupCommandResult.Failed("group_member_limit_reached");
+                }
+
+                foreach (UserId inviteeId in invitees)
+                {
+                    group.Invite(actorId, inviteeId, isAcceptedFriendOfOwner[inviteeId], clock);
                 }
 
                 MaterializeNotifications(group);

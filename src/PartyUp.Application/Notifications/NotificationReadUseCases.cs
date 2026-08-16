@@ -1,6 +1,7 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Email;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Notifications;
@@ -20,13 +21,20 @@ namespace PartyUp.Application.Notifications;
 /// lapsed inherited access — §7 rule 4 and its D-076 sibling) must not leak the subject's current
 /// title or a deep link. <see cref="ProjectAsync"/> is per-row and touches no HTTP context, so S3's
 /// dispatch job can call it at send time and get the same reachability answer the center renders.
+/// A friend-group ref (D-207) resolves through <see cref="FriendGroup.Involves"/> instead — no
+/// visibility engine involvement, group access is the literal roster — and, unlike the session/poll
+/// refs, never forces the whole row to <see cref="Minimal"/>: the group's name is masked but the row
+/// (actor, other fields) still renders, because an <c>AudienceGroupDeleted</c> ref dangles by
+/// construction (the group is hard-deleted in the same transaction that raises the row) and must not
+/// suppress the notification itself.
 /// </summary>
 public sealed class NotificationReadUseCases(
     ISessionRepository sessions,
     IPollRepository polls,
     IUserRepository users,
     IFriendshipRepository friendships,
-    IBlockRepository blocks)
+    IBlockRepository blocks,
+    IFriendGroupRepository groups)
 {
     /// <summary>Resolves one notification row for the recipient who owns it (the only legal viewer, D-086).</summary>
     public async Task<NotificationReadModel> ProjectAsync(
@@ -49,6 +57,9 @@ public sealed class NotificationReadUseCases(
         Poll? poll = notification.PollId is { } pollId
             ? await polls.FindNoTrackingAsync(pollId, cancellationToken)
             : null;
+        FriendGroup? group = notification.FriendGroupId is { } groupId
+            ? await groups.FindNoTrackingAsync(groupId, cancellationToken)
+            : null;
 
         HashSet<UserId> counterparts = [];
         AddRosterCounterparts(counterparts, session);
@@ -70,12 +81,18 @@ public sealed class NotificationReadUseCases(
         // subject ref with no aggregate found is unreachable, same as one the engine refuses outright.
         bool sessionReachable = session is not null && VisibilityEngine.ResolveSession(session, viewer).IsVisible;
         bool pollReachable = poll is not null && VisibilityEngine.ResolvePoll(poll, viewer).IsVisible;
+        // D-207: literal group membership, not the visibility engine — and, deliberately, never part of
+        // `hasSubjectRef` above, so an unresolved group only masks the subject fields below rather than
+        // collapsing the whole row to Minimal (AudienceGroupDeleted must still notify).
+        bool groupReachable = group is not null && group.Involves(recipientId);
 
         NotificationSubjectKind kind = notification.SessionId is not null && sessionReachable
             ? NotificationSubjectKind.Session
             : notification.PollId is not null && pollReachable
                 ? NotificationSubjectKind.Poll
-                : NotificationSubjectKind.None;
+                : notification.FriendGroupId is not null && groupReachable
+                    ? NotificationSubjectKind.Group
+                    : NotificationSubjectKind.None;
 
         bool reachable = !hasSubjectRef || kind != NotificationSubjectKind.None;
 
@@ -103,13 +120,15 @@ public sealed class NotificationReadUseCases(
         {
             NotificationSubjectKind.Session => session!.Id.Value,
             NotificationSubjectKind.Poll => poll!.Id.Value,
+            NotificationSubjectKind.Group => group!.Id.Value,
             _ => null,
         };
 
-        SessionTitle? subjectTitle = kind switch
+        string? subjectTitle = kind switch
         {
-            NotificationSubjectKind.Session => session!.Title,
-            NotificationSubjectKind.Poll => poll!.Title,
+            NotificationSubjectKind.Session => session!.Title.Value,
+            NotificationSubjectKind.Poll => poll!.Title.Value,
+            NotificationSubjectKind.Group => group!.Name.Value,
             _ => null,
         };
 

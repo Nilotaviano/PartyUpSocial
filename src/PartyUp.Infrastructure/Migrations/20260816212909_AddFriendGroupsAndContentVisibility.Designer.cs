@@ -447,6 +447,10 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasDefaultValue((short)0)
                         .HasColumnName("dispatch_state");
 
+                    b.Property<Guid?>("FriendGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("group_id");
+
                     b.Property<Instant?>("OptionStartTime")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("option_start_time");
@@ -508,9 +512,13 @@ namespace PartyUp.Infrastructure.Migrations
 
                     b.ToTable("notifications", null, t =>
                         {
-                            t.HasCheckConstraint("ck_notifications_friend_shape", "type NOT IN (23, 24) OR (actor_user_id IS NOT NULL AND session_id IS NULL AND poll_id IS NULL AND option_start_time IS NULL)");
+                            t.HasCheckConstraint("ck_notifications_audience_group_deleted_shape", "type <> 27 OR actor_user_id IS NULL");
 
-                            t.HasCheckConstraint("ck_notifications_type", "type BETWEEN 0 AND 24");
+                            t.HasCheckConstraint("ck_notifications_friend_shape", "type NOT IN (23, 24, 25, 26) OR (actor_user_id IS NOT NULL AND session_id IS NULL AND poll_id IS NULL AND option_start_time IS NULL)");
+
+                            t.HasCheckConstraint("ck_notifications_group_shape", "type NOT IN (25, 26, 27) OR (session_id IS NULL AND poll_id IS NULL AND option_start_time IS NULL AND group_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_notifications_type", "type BETWEEN 0 AND 27");
                         });
                 });
 

@@ -1,6 +1,7 @@
 using System.Reflection;
 using NodaTime;
 using NodaTime.Testing;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Notifications;
 
@@ -199,10 +200,110 @@ public class NotificationRecordTests
                 type.NeedsSessionRef() ||
                 type.NeedsPollRef() ||
                 type.NeedsActorRef() ||
-                // D-205: an AudienceGroupDeleted row carries no ref at all -- the group that would be
-                // named is the very thing that is gone, and it is one row per organizer, not per
-                // affected session/poll.
-                type == NotificationType.AudienceGroupDeleted));
+                // D-205/D-207: an AudienceGroupDeleted row names no person, only the group ref
+                // NeedsGroupRef requires -- it is one row per organizer, not per affected session/poll.
+                type.NeedsGroupRef()));
+    }
+
+    // ---- D-207: the friend-group ref shape ---------------------------------------------------------
+
+    [Fact]
+    public void Create_RejectsAGroupInviteRowWithoutItsGroup_D207()
+    {
+        FakeClock clock = Clock();
+
+        DomainException error = Assert.Throws<DomainException>(() => Notification.Create(
+            UserId.New(),
+            NotificationType.FriendGroupInviteReceived,
+            NotificationSubject.ForActor(UserId.New()),
+            clock));
+
+        Assert.Equal(DomainError.ValidationFailed, error.Error);
+    }
+
+    [Fact]
+    public void Create_RejectsAGroupInviteAcceptedRowWithoutItsGroup_D207()
+    {
+        FakeClock clock = Clock();
+
+        Assert.Throws<DomainException>(() => Notification.Create(
+            UserId.New(),
+            NotificationType.FriendGroupInviteAccepted,
+            NotificationSubject.ForActor(UserId.New()),
+            clock));
+    }
+
+    [Fact]
+    public void Create_RejectsAnAudienceGroupDeletedRowWithoutItsGroup_D207()
+    {
+        FakeClock clock = Clock();
+
+        DomainException error = Assert.Throws<DomainException>(() => Notification.Create(
+            UserId.New(),
+            NotificationType.AudienceGroupDeleted,
+            NotificationSubject.Create(null, null),
+            clock));
+
+        Assert.Equal(DomainError.ValidationFailed, error.Error);
+    }
+
+    [Fact]
+    public void Create_AcceptsAGroupInviteRowCarryingItsGroup_D207()
+    {
+        FakeClock clock = Clock();
+        FriendGroupId groupId = FriendGroupId.New();
+        UserId owner = UserId.New();
+
+        Notification notification = Notification.Create(
+            UserId.New(),
+            NotificationType.FriendGroupInviteReceived,
+            NotificationSubject.ForFriendGroupInvite(groupId, owner),
+            clock);
+
+        Assert.Equal(groupId, notification.FriendGroupId);
+        Assert.Equal(owner, notification.ActorUserId);
+    }
+
+    [Fact]
+    public void Create_AcceptsAnAudienceGroupDeletedRowCarryingItsGroup_D207()
+    {
+        FakeClock clock = Clock();
+        FriendGroupId groupId = FriendGroupId.New();
+
+        Notification notification = Notification.Create(
+            UserId.New(),
+            NotificationType.AudienceGroupDeleted,
+            NotificationSubject.ForFriendGroupDeleted(groupId),
+            clock);
+
+        Assert.Equal(groupId, notification.FriendGroupId);
+        Assert.Null(notification.ActorUserId);
+    }
+
+    /// <summary>
+    /// The primitive the read-side D-207 masking decision is built on
+    /// (<c>NotificationReadUseCases.ProjectAsync</c> resolves a group's live name only when
+    /// <see cref="FriendGroup.Involves"/> the recipient) — "owner/member/invited" all count, matching
+    /// the finding's masking rule exactly: the owner and every membership row regardless of status.
+    /// </summary>
+    [Fact]
+    public void FriendGroup_InvolvesIsTheOwnerOrAnyMemberRowRegardlessOfStatus_D207()
+    {
+        FakeClock clock = Clock();
+        UserId owner = UserId.New();
+        UserId invitedMember = UserId.New();
+        UserId acceptedMember = UserId.New();
+        UserId stranger = UserId.New();
+
+        FriendGroup group = FriendGroup.Create(owner, GroupName.Create("Squad"), clock);
+        group.Invite(owner, invitedMember, isAcceptedFriendOfOwner: true, clock);
+        group.Invite(owner, acceptedMember, isAcceptedFriendOfOwner: true, clock);
+        group.AcceptInvite(acceptedMember, clock);
+
+        Assert.True(group.Involves(owner));
+        Assert.True(group.Involves(invitedMember));
+        Assert.True(group.Involves(acceptedMember));
+        Assert.False(group.Involves(stranger));
     }
 
     // ---- NotificationMute ------------------------------------------------------------------------

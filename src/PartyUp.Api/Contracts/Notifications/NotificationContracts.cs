@@ -61,7 +61,7 @@ public sealed record NotificationResponse(
             row.Actor is { Avatar: { } actorAvatar } ? AvatarResponse.From(actorAvatar) : null,
             row.HasSubject ? NotificationWireFormat.SubjectKind(row.SubjectKind) : null,
             row.SubjectId,
-            row.SubjectTitle?.Value,
+            row.SubjectTitle,
             row.OptionStartTime is { } optionStartTime ? SessionWireFormat.Format(optionStartTime) : null,
             row.IsUnread);
 }
@@ -98,6 +98,9 @@ public static class NotificationWireFormat
         NotificationType.PollCanceled => "pollCanceled",
         NotificationType.FriendRequestReceived => "friendRequestReceived",
         NotificationType.SteamImportMatch => "steamImportMatch",
+        NotificationType.FriendGroupInviteReceived => "friendGroupInviteReceived",
+        NotificationType.FriendGroupInviteAccepted => "friendGroupInviteAccepted",
+        NotificationType.AudienceGroupDeleted => "audienceGroupDeleted",
         _ => type.ToString(),
     };
 
@@ -105,6 +108,7 @@ public static class NotificationWireFormat
     {
         Application.Notifications.NotificationSubjectKind.Session => "session",
         Application.Notifications.NotificationSubjectKind.Poll => "poll",
+        Application.Notifications.NotificationSubjectKind.Group => "group",
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 }

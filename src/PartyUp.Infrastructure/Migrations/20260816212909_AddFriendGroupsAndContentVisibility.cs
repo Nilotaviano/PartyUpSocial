@@ -162,11 +162,77 @@ namespace PartyUp.Infrastructure.Migrations
             // so the unique index is raw SQL (same treatment as ix_steam_apps_name_trgm).
             migrationBuilder.Sql(
                 "CREATE UNIQUE INDEX ux_friend_groups_owner_name ON friend_groups (owner_user_id, lower(name));");
+
+            // D-207: the three friend-group notification rows (25/26/27) carry their group ref.
+            // ck_notifications_type widens from 24 to 27 for the same three values.
+            migrationBuilder.DropCheckConstraint(
+                name: "ck_notifications_friend_shape",
+                table: "notifications");
+
+            migrationBuilder.DropCheckConstraint(
+                name: "ck_notifications_type",
+                table: "notifications");
+
+            migrationBuilder.AddColumn<Guid>(
+                name: "group_id",
+                table: "notifications",
+                type: "uuid",
+                nullable: true);
+
+            migrationBuilder.AddCheckConstraint(
+                name: "ck_notifications_audience_group_deleted_shape",
+                table: "notifications",
+                sql: "type <> 27 OR actor_user_id IS NULL");
+
+            migrationBuilder.AddCheckConstraint(
+                name: "ck_notifications_friend_shape",
+                table: "notifications",
+                sql: "type NOT IN (23, 24, 25, 26) OR (actor_user_id IS NOT NULL AND session_id IS NULL AND poll_id IS NULL AND option_start_time IS NULL)");
+
+            migrationBuilder.AddCheckConstraint(
+                name: "ck_notifications_group_shape",
+                table: "notifications",
+                sql: "type NOT IN (25, 26, 27) OR (session_id IS NULL AND poll_id IS NULL AND option_start_time IS NULL AND group_id IS NOT NULL)");
+
+            migrationBuilder.AddCheckConstraint(
+                name: "ck_notifications_type",
+                table: "notifications",
+                sql: "type BETWEEN 0 AND 27");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropCheckConstraint(
+                name: "ck_notifications_audience_group_deleted_shape",
+                table: "notifications");
+
+            migrationBuilder.DropCheckConstraint(
+                name: "ck_notifications_friend_shape",
+                table: "notifications");
+
+            migrationBuilder.DropCheckConstraint(
+                name: "ck_notifications_group_shape",
+                table: "notifications");
+
+            migrationBuilder.DropCheckConstraint(
+                name: "ck_notifications_type",
+                table: "notifications");
+
+            migrationBuilder.DropColumn(
+                name: "group_id",
+                table: "notifications");
+
+            migrationBuilder.AddCheckConstraint(
+                name: "ck_notifications_friend_shape",
+                table: "notifications",
+                sql: "type NOT IN (23, 24) OR (actor_user_id IS NOT NULL AND session_id IS NULL AND poll_id IS NULL AND option_start_time IS NULL)");
+
+            migrationBuilder.AddCheckConstraint(
+                name: "ck_notifications_type",
+                table: "notifications",
+                sql: "type BETWEEN 0 AND 24");
+
             migrationBuilder.DropTable(
                 name: "friend_group_members");
 

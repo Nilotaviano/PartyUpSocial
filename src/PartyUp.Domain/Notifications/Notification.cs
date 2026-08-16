@@ -1,4 +1,5 @@
 using NodaTime;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 
 namespace PartyUp.Domain.Notifications;
@@ -34,6 +35,7 @@ public sealed class Notification
         PollId = subject.PollId;
         ActorUserId = subject.ActorUserId;
         OptionStartTime = subject.OptionStartTime;
+        FriendGroupId = subject.FriendGroupId;
         CreatedAt = createdAt;
     }
 
@@ -51,6 +53,9 @@ public sealed class Notification
 
     public Instant? OptionStartTime { get; private set; }
 
+    /// <summary>D-207: the group a friend-group row is about. Deliberately dangles once the group is hard-deleted.</summary>
+    public FriendGroupId? FriendGroupId { get; private set; }
+
     public Instant CreatedAt { get; private set; }
 
     public Instant? ReadAt { get; private set; }
@@ -58,7 +63,7 @@ public sealed class Notification
     public bool IsRead => ReadAt.HasValue;
 
     public NotificationSubject Subject =>
-        NotificationSubject.Create(SessionId, PollId, ActorUserId, OptionStartTime);
+        NotificationSubject.Create(SessionId, PollId, ActorUserId, OptionStartTime, FriendGroupId);
 
     public static Notification Create(
         UserId recipientUserId,
@@ -104,6 +109,13 @@ public sealed class Notification
                     DomainError.ValidationFailed,
                     FormattableString.Invariant($"A '{type}' notification names a person only (D-105)."));
             }
+        }
+
+        if (type.NeedsGroupRef() && subject.FriendGroupId is null)
+        {
+            throw new DomainException(
+                DomainError.ValidationFailed,
+                FormattableString.Invariant($"A '{type}' notification must carry the group it is about (D-207)."));
         }
 
         return new Notification(

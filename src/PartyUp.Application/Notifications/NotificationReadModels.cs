@@ -11,6 +11,9 @@ public enum NotificationSubjectKind
     None = 0,
     Session = 1,
     Poll = 2,
+
+    /// <summary>D-207: a friend group, resolved only while the viewer still involves it (§9-masking).</summary>
+    Group = 3,
 }
 
 /// <summary>
@@ -34,7 +37,7 @@ public sealed record NotificationReadModel(
     Guid? ActorUserId,
     NotificationSubjectKind SubjectKind,
     Guid? SubjectId,
-    SessionTitle? SubjectTitle,
+    string? SubjectTitle,
     Instant? OptionStartTime,
     string RecipientLocale,
     DateTimeZone RecipientZone)

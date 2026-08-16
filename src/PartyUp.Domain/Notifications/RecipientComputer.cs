@@ -523,7 +523,7 @@ public static class RecipientComputer
         return ExplicitTarget(
             domainEvent.InviteeId,
             NotificationType.FriendGroupInviteReceived,
-            NotificationSubject.ForActor(domainEvent.OwnerId),
+            NotificationSubject.ForFriendGroupInvite(domainEvent.FriendGroupId, domainEvent.OwnerId),
             filter);
     }
 
@@ -537,7 +537,7 @@ public static class RecipientComputer
         return ExplicitTarget(
             domainEvent.OwnerId,
             NotificationType.FriendGroupInviteAccepted,
-            NotificationSubject.ForActor(domainEvent.InviteeId),
+            NotificationSubject.ForFriendGroupInvite(domainEvent.FriendGroupId, domainEvent.InviteeId),
             filter);
     }
 
