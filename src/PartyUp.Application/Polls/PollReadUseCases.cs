@@ -155,7 +155,6 @@ public sealed class PollReadUseCases(
             poll.Notes,
             poll.MinAttendance,
             poll.MaxCapacity,
-            poll.Visibility == ContentVisibility.Private,
             poll.DeadlineChoice,
             poll.Deadline,
             poll.SelectionWindowEndsAt,

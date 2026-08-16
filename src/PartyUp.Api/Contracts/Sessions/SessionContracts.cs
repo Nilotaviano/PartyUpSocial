@@ -100,6 +100,25 @@ public static class SessionWireFormat
         _ => throw new ArgumentOutOfRangeException(nameof(choice)),
     };
 
+    /// <summary>D-198's three-level audience, camelCase on the wire.</summary>
+    public static string Visibility(ContentVisibility visibility) => visibility switch
+    {
+        Domain.Kernel.ContentVisibility.Private => "private",
+        Domain.Kernel.ContentVisibility.Groups => "groups",
+        Domain.Kernel.ContentVisibility.Public => "public",
+        _ => throw new ArgumentOutOfRangeException(nameof(visibility)),
+    };
+
+    /// <summary>Throws on an unrecognized token — the caller's own try/catch maps that to 400.</summary>
+    public static ContentVisibility? ParseVisibility(string? value) => value switch
+    {
+        null => null,
+        "private" => Domain.Kernel.ContentVisibility.Private,
+        "groups" => Domain.Kernel.ContentVisibility.Groups,
+        "public" => Domain.Kernel.ContentVisibility.Public,
+        _ => throw new FormatException($"Unknown visibility '{value}'."),
+    };
+
     /// <summary>PHASE5_DESIGN.md §5.1's precedence-ordered viewer relation, camelCase on the wire.</summary>
     public static string ViewerRelation(Application.Sessions.ViewerRelation relation) => relation switch
     {
@@ -172,6 +191,18 @@ public sealed record GameResponse(string Name, long? SteamAppId)
 }
 
 /// <summary>
+/// D-206: the live group name a session/poll was shared through, populated ONLY when the viewer's
+/// own engine grant for this target is the <c>Group</c> path — never surfaced to a viewer holding
+/// broader (rule-1/rule-2) access to the same Groups-level target.
+/// </summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record GroupProvenanceResponse(Guid Id, string Name)
+{
+    public static GroupProvenanceResponse From(Application.FriendGroups.GroupProvenance provenance) =>
+        new(provenance.GroupId.Value, provenance.Name.Value);
+}
+
+/// <summary>
 /// Applies <see cref="JsonNamingPolicy.CamelCase"/> to an enum's string representation via
 /// <see cref="JsonStringEnumConverter{TEnum}"/> — that generic converter's own parameterless
 /// constructor (the only one <see cref="JsonConverterAttribute"/> can invoke) has no naming-policy
@@ -205,7 +236,8 @@ public sealed record CreateSessionRequest(
     string? Notes,
     int? MinAttendance,
     int? MaxCapacity,
-    bool? IsPrivate,
+    string? Visibility,
+    IReadOnlyList<Guid>? AudienceGroupIds,
     IReadOnlyList<Guid>? InviteeUserIds,
     int? GuestLinkCount);
 
@@ -219,7 +251,8 @@ public sealed record EditSessionRequest(
     string? Notes,
     int? MinAttendance,
     int? MaxCapacity,
-    bool? IsPrivate,
+    string? Visibility,
+    IReadOnlyList<Guid>? AudienceGroupIds,
     IReadOnlyList<ClearFieldRequest>? Clear,
     string? IfMatch);
 
@@ -286,7 +319,9 @@ public sealed record SessionDetailResponse(
     string Notes,
     int MinAttendance,
     int? MaxCapacity,
-    bool IsPrivate,
+    string Visibility,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] GroupProvenanceResponse? ViaGroup,
+    bool SharedWithGroup,
     string Status,
     string CreatedAt,
     IReadOnlyList<RosterEntryResponse> Roster,
@@ -305,7 +340,9 @@ public sealed record SessionDetailResponse(
             detail.Notes.Value,
             detail.MinAttendance,
             detail.MaxCapacity,
-            detail.IsPrivate,
+            SessionWireFormat.Visibility(detail.Visibility),
+            detail.ViaGroup is { } viaGroup ? GroupProvenanceResponse.From(viaGroup) : null,
+            detail.Visibility == ContentVisibility.Groups && detail.ViaGroup is null,
             SessionWireFormat.Status(detail.Status),
             SessionWireFormat.Format(detail.CreatedAt),
             detail.Roster.Select(RosterEntryResponse.From).ToArray(),
@@ -326,11 +363,13 @@ public sealed record SessionSummaryResponse(
     string Platform,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] GameResponse? Game,
     string Status,
-    bool IsPrivate,
     int? MaxCapacity,
     int ActiveOccupancy,
     MaskedParticipant Organizer,
-    string ViewerRelation)
+    string ViewerRelation,
+    string Visibility,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] GroupProvenanceResponse? ViaGroup,
+    bool SharedWithGroup)
 {
     // The organizer's MaskedParticipant comes from a per-response MaskedParticipantAssigner shared
     // across every summary/entry a response composes — two distinct organizers in one page (or in
@@ -348,11 +387,13 @@ public sealed record SessionSummaryResponse(
             SessionWireFormat.Platform(summary.Platform),
             summary.Game is { } game ? GameResponse.From(game) : null,
             SessionWireFormat.Status(summary.Status),
-            summary.IsPrivate,
             summary.MaxCapacity,
             summary.ActiveOccupancy,
             ordinals.For(summary.OrganizerId, summary.OrganizerDisplayName),
-            SessionWireFormat.ViewerRelation(summary.ViewerRelation));
+            SessionWireFormat.ViewerRelation(summary.ViewerRelation),
+            SessionWireFormat.Visibility(summary.Visibility),
+            summary.ViaGroup is { } viaGroup ? GroupProvenanceResponse.From(viaGroup) : null,
+            summary.Visibility == ContentVisibility.Groups && summary.ViaGroup is null);
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

@@ -8,6 +8,7 @@ using PartyUp.Api.ErrorHandling;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Notifications;
 using PartyUp.Application.Sessions;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
 
@@ -22,17 +23,6 @@ namespace PartyUp.Api.Endpoints;
 /// </summary>
 public static class SessionEndpoints
 {
-    /// <summary>
-    /// Bridges the shipped <c>isPrivate</c> wire field onto the internal three-level command until the
-    /// contract itself carries <c>visibility</c>. Absent stays absent — on edit that means "unchanged".
-    /// </summary>
-    private static ContentVisibility? VisibilityOf(bool? isPrivate) => isPrivate switch
-    {
-        true => ContentVisibility.Private,
-        false => ContentVisibility.Public,
-        null => null,
-    };
-
     private const int PageSize = 20;
 
     public static RouteGroupBuilder MapSessionEndpoints(this RouteGroupBuilder api)
@@ -242,10 +232,12 @@ public static class SessionEndpoints
 
         Domain.Kernel.Platform? platform;
         SessionGame? game;
+        ContentVisibility? visibility;
         try
         {
             platform = SessionWireFormat.ParsePlatform(request.Platform);
             game = request.Game is { } gameRequest ? gameRequest.ToDomain() : null;
+            visibility = SessionWireFormat.ParseVisibility(request.Visibility);
             if (request.Game is not null && game is null)
             {
                 return Problem(context, StatusCodes.Status400BadRequest, "session_validation");
@@ -257,6 +249,7 @@ public static class SessionEndpoints
         }
 
         List<UserId> invitees = (request.InviteeUserIds ?? []).Select(UserId.From).ToList();
+        List<FriendGroupId> audienceGroupIds = (request.AudienceGroupIds ?? []).Select(FriendGroupId.From).ToList();
 
         CreateSessionCommand command = new(
             actorId.Value,
@@ -268,8 +261,8 @@ public static class SessionEndpoints
             request.Notes,
             request.MinAttendance,
             request.MaxCapacity,
-            VisibilityOf(request.IsPrivate),
-            null,
+            visibility,
+            audienceGroupIds,
             invitees,
             request.GuestLinkCount);
 
@@ -287,7 +280,7 @@ public static class SessionEndpoints
 
         if (!result.Succeeded)
         {
-            int status = result.Code == "user_not_found"
+            int status = result.Code is "user_not_found" or "group_not_found"
                 ? StatusCodes.Status404NotFound
                 : StatusCodes.Status400BadRequest;
             return Problem(context, status, result.Code!);
@@ -422,10 +415,12 @@ public static class SessionEndpoints
 
         Domain.Kernel.Platform? platform;
         SessionGame? game;
+        ContentVisibility? visibility;
         try
         {
             platform = SessionWireFormat.ParsePlatform(request.Platform);
             game = request.Game is { } gameRequest ? gameRequest.ToDomain() : null;
+            visibility = SessionWireFormat.ParseVisibility(request.Visibility);
             if (request.Game is not null && game is null)
             {
                 return Problem(context, StatusCodes.Status400BadRequest, "session_validation");
@@ -446,6 +441,10 @@ public static class SessionEndpoints
             })
             .ToArray();
 
+        IReadOnlyCollection<FriendGroupId>? audienceGroupIds = request.AudienceGroupIds?
+            .Select(FriendGroupId.From)
+            .ToArray();
+
         EditSessionCommand command = new(
             id,
             actorId.Value,
@@ -457,8 +456,8 @@ public static class SessionEndpoints
             request.Notes,
             request.MinAttendance,
             request.MaxCapacity,
-            VisibilityOf(request.IsPrivate),
-            null,
+            visibility,
+            audienceGroupIds,
             clear,
             request.IfMatch);
 
@@ -476,7 +475,7 @@ public static class SessionEndpoints
         {
             int status = result.Code switch
             {
-                "session_not_found" => StatusCodes.Status404NotFound,
+                "session_not_found" or "group_not_found" => StatusCodes.Status404NotFound,
                 "session_conflict" => StatusCodes.Status409Conflict,
                 _ => StatusCodes.Status400BadRequest,
             };

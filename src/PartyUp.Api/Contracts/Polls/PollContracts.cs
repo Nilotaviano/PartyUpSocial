@@ -97,7 +97,8 @@ public sealed record CreatePollRequest(
     string? Notes,
     int? MinAttendance,
     int? MaxCapacity,
-    bool? IsPrivate,
+    string? Visibility,
+    IReadOnlyList<Guid>? AudienceGroupIds,
     IReadOnlyList<string>? OptionStartTimes,
     string? DeadlineChoice,
     IReadOnlyList<Guid>? InviteeUserIds,
@@ -195,7 +196,9 @@ public sealed record PollDetailResponse(
     string Notes,
     int MinAttendance,
     int? MaxCapacity,
-    bool IsPrivate,
+    string Visibility,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] GroupProvenanceResponse? ViaGroup,
+    bool SharedWithGroup,
     string DeadlineChoice,
     string Deadline,
     string SelectionWindowEndsAt,
@@ -218,7 +221,9 @@ public sealed record PollDetailResponse(
             detail.Notes.Value,
             detail.MinAttendance,
             detail.MaxCapacity,
-            detail.IsPrivate,
+            SessionWireFormat.Visibility(detail.Visibility),
+            detail.ViaGroup is { } viaGroup ? GroupProvenanceResponse.From(viaGroup) : null,
+            detail.Visibility == ContentVisibility.Groups && detail.ViaGroup is null,
             PollWireFormat.DeadlineChoice(detail.DeadlineChoice),
             SessionWireFormat.Format(detail.Deadline),
             SessionWireFormat.Format(detail.SelectionWindowEndsAt),
@@ -262,11 +267,13 @@ public sealed record PollSummaryResponse(
     Guid OrganizerId,
     string Title,
     string Status,
-    bool IsPrivate,
     string Deadline,
     string SelectionWindowEndsAt,
     string CreatedAt,
-    int OptionCount)
+    int OptionCount,
+    string Visibility,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] GroupProvenanceResponse? ViaGroup,
+    bool SharedWithGroup)
 {
     public static PollSummaryResponse From(PollSummary summary) =>
         new(
@@ -274,11 +281,13 @@ public sealed record PollSummaryResponse(
             summary.OrganizerId.Value,
             summary.Title.Value,
             PollWireFormat.Status(summary.Status),
-            summary.IsPrivate,
             SessionWireFormat.Format(summary.Deadline),
             SessionWireFormat.Format(summary.SelectionWindowEndsAt),
             SessionWireFormat.Format(summary.CreatedAt),
-            summary.OptionCount);
+            summary.OptionCount,
+            SessionWireFormat.Visibility(summary.Visibility),
+            summary.ViaGroup is { } viaGroup ? GroupProvenanceResponse.From(viaGroup) : null,
+            summary.Visibility == ContentVisibility.Groups && summary.ViaGroup is null);
 }
 
 // ---- PHASE6_DESIGN.md §4 "GET /{id}/finalization-preview" -----------------------------------------

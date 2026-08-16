@@ -46,6 +46,17 @@ public static class ApiOperationIds
     public const string UnblockUser = "UnblockUser";
     public const string ImportSteamFriends = "ImportSteamFriends";
 
+    // D-198/D-199: the friend group HTTP surface, relative to /api/v1.
+    public const string ListFriendGroups = "ListFriendGroups";
+    public const string CreateFriendGroup = "CreateFriendGroup";
+    public const string GetFriendGroup = "GetFriendGroup";
+    public const string RenameFriendGroup = "RenameFriendGroup";
+    public const string DeleteFriendGroup = "DeleteFriendGroup";
+    public const string InviteFriendGroupMembers = "InviteFriendGroupMembers";
+    public const string RemoveFriendGroupMember = "RemoveFriendGroupMember";
+    public const string AcceptFriendGroupInvitation = "AcceptFriendGroupInvitation";
+    public const string DeclineFriendGroupInvitation = "DeclineFriendGroupInvitation";
+
     // PHASE4_DESIGN.md §8: session HTTP surface, relative to the /api/v1 group.
     public const string CreateSession = "CreateSession";
     public const string ListSessions = "ListSessions";

@@ -7,6 +7,7 @@ using PartyUp.Application.Abstractions;
 using PartyUp.Application.Notifications;
 using PartyUp.Application.Polls;
 using PartyUp.Application.Sessions;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
@@ -24,17 +25,6 @@ namespace PartyUp.Api.Endpoints;
 /// </summary>
 public static class PollEndpoints
 {
-    /// <summary>
-    /// Bridges the shipped <c>isPrivate</c> wire field onto the internal three-level command until the
-    /// contract itself carries <c>visibility</c>. Absent stays absent — on edit that means "unchanged".
-    /// </summary>
-    private static ContentVisibility? VisibilityOf(bool? isPrivate) => isPrivate switch
-    {
-        true => ContentVisibility.Private,
-        false => ContentVisibility.Public,
-        null => null,
-    };
-
     private const int PollJoinRequestPageSize = 20;
     private const int PollListPageSize = 20;
 
@@ -248,11 +238,13 @@ public static class PollEndpoints
         Domain.Kernel.Platform? platform;
         SessionGame? game;
         PollDeadlineChoice? deadlineChoice;
+        ContentVisibility? visibility;
         try
         {
             platform = SessionWireFormat.ParsePlatform(request.Platform);
             game = request.Game is { } gameRequest ? gameRequest.ToDomain() : null;
             deadlineChoice = PollWireFormat.ParseDeadlineChoice(request.DeadlineChoice);
+            visibility = SessionWireFormat.ParseVisibility(request.Visibility);
             if (request.Game is not null && game is null)
             {
                 return Problem(context, StatusCodes.Status400BadRequest, "poll_validation");
@@ -274,6 +266,8 @@ public static class PollEndpoints
             optionStartTimes.Add(parsed);
         }
 
+        List<FriendGroupId> audienceGroupIds = (request.AudienceGroupIds ?? []).Select(FriendGroupId.From).ToList();
+
         CreatePollCommand command = new(
             actorId.Value,
             request.Title ?? string.Empty,
@@ -283,8 +277,8 @@ public static class PollEndpoints
             request.Notes,
             request.MinAttendance,
             request.MaxCapacity,
-            VisibilityOf(request.IsPrivate),
-            null,
+            visibility,
+            audienceGroupIds,
             optionStartTimes,
             deadlineChoice,
             (request.InviteeUserIds ?? []).Select(UserId.From).ToArray(),
@@ -304,7 +298,7 @@ public static class PollEndpoints
         {
             int status = result.Code switch
             {
-                "user_not_found" => StatusCodes.Status404NotFound,
+                "user_not_found" or "group_not_found" => StatusCodes.Status404NotFound,
                 "poll_option_cap" => StatusCodes.Status422UnprocessableEntity,
                 _ => StatusCodes.Status400BadRequest,
             };

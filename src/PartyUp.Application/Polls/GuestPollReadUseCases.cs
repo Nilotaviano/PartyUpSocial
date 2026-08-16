@@ -129,7 +129,6 @@ public sealed class GuestPollReadUseCases(IPollRepository polls, IPollReadReposi
             poll.Notes,
             poll.MinAttendance,
             poll.MaxCapacity,
-            poll.Visibility == ContentVisibility.Private,
             poll.DeadlineChoice,
             poll.Deadline,
             poll.SelectionWindowEndsAt,

@@ -22,6 +22,7 @@ using PartyUp.Application.Accounts;
 using PartyUp.Application.Admin;
 using PartyUp.Application.Deletion;
 using PartyUp.Application.Friends;
+using PartyUp.Application.FriendGroups;
 using PartyUp.Application.Onboarding;
 using PartyUp.Application.Profile;
 using PartyUp.Application.Sessions;
@@ -123,6 +124,8 @@ builder.Services.AddScoped<ResolveFriendCodeUseCase>();
 builder.Services.AddScoped<ListFriendsUseCase>();
 builder.Services.AddScoped<ListFriendRequestsUseCase>();
 builder.Services.AddScoped<ListBlockedUsersUseCase>();
+builder.Services.AddScoped<FriendGroupUseCases>();
+builder.Services.AddScoped<FriendGroupReadUseCases>();
 builder.Services.AddSingleton<ExternalAuthOriginOptions>();
 builder.Services.AddSingleton(new AccountEmailOptions(
     builder.Configuration["PublicBaseUrl"] ?? "http://localhost:5173"));
@@ -383,6 +386,7 @@ api.MapAccountDeletionEndpoints(
 api.MapOnboardingEndpoints();
 api.MapMeEndpoints();
 api.MapFriendEndpoints();
+api.MapFriendGroupEndpoints();
 api.MapAdminMaintenanceEndpoints();
 api.MapSessionEndpoints();
 api.MapGuestSessionEndpoints();
