@@ -59,14 +59,13 @@ public sealed class SessionReadUseCases(
     }
 
     /// <summary>
-    /// D-206: the "via &lt;group&gt;" label's source, membership-based (foreman ruling) — the tag
-    /// answers "which targeted group is this viewer in", independent of which rule actually resolved
-    /// the viewer's access. <see cref="Viewer.GroupIds"/> is already the intersection of the viewer's
-    /// owned/Accepted groups with this target's audience (<c>ViewerGroups.GrantingAsync</c>), so any
-    /// id in it already carries the membership proof; the first one in the target's own audience order
-    /// is the answer, matching the list page's <c>GroupProvenanceReader</c> tie-break. A member who also
-    /// resolves via rule 1 (organizer/participant) still gets the tag here, unlike the old grant-based
-    /// read.
+    /// D-206: the "via &lt;group&gt;" label's source is membership, not the resolved grant — the tag
+    /// answers "which targeted group is this viewer in", so a member who also resolves via rule 1
+    /// (organizer/participant) still gets it. <see cref="Viewer.GroupIds"/> is already the
+    /// intersection of the viewer's owned/Accepted groups with this target's audience
+    /// (<c>ViewerGroups.GrantingAsync</c>), so any id in it carries the membership proof; the first
+    /// one in the target's own audience order is the answer, matching the list page's
+    /// <c>GroupProvenanceReader</c> tie-break.
     /// </summary>
     private async Task<GroupProvenance?> ResolveProvenanceAsync(
         Session session,

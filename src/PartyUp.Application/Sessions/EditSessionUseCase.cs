@@ -98,11 +98,11 @@ public sealed class EditSessionUseCase(
 
                 // D-201: authority is re-checked for NEWLY added groups only — an organizer who has
                 // since left an already-targeted group can still edit the session without being
-                // forced to drop it. Fail-closed and uniform with a nonexistent group (D-199). Hoisted
-                // above every mutation below: LoadForUpdateAsync's tracked session commits on any
-                // normal return from ExecuteAsync (only a thrown exception rolls back), so a shortfall
-                // discovered after ChangeStartTime/ChangeVisibility/etc. would commit a partially
-                // applied edit while still failing the request.
+                // forced to drop it. Fail-closed and uniform with a nonexistent group (D-199). This
+                // check must stay above every mutation below: LoadForUpdateAsync's tracked session
+                // commits on any normal return from ExecuteAsync (only a thrown exception rolls
+                // back), so a shortfall discovered after ChangeStartTime/ChangeVisibility/etc. would
+                // commit a partially applied edit while still failing the request.
                 List<FriendGroupId>? requestedAudience = null;
                 if (command.Visibility is { } requestedVisibility)
                 {

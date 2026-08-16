@@ -171,9 +171,9 @@ public sealed class PollReadUseCases(
     }
 
     /// <summary>
-    /// D-206's poll twin of <c>SessionReadUseCases.ResolveProvenanceAsync</c>: membership-based
-    /// (foreman ruling) — the tag answers "which targeted group is this viewer in", independent of
-    /// which rule resolved access. <see cref="Viewer.GroupIds"/> is already the intersection of the
+    /// D-206's poll twin of <c>SessionReadUseCases.ResolveProvenanceAsync</c>: membership-based —
+    /// the tag answers "which targeted group is this viewer in", independent of which rule resolved
+    /// access. <see cref="Viewer.GroupIds"/> is already the intersection of the
     /// viewer's owned/Accepted groups with this poll's audience; the first id in the poll's own
     /// audience order is the answer, matching the list page's <c>GroupProvenanceReader</c> tie-break.
     /// </summary>
