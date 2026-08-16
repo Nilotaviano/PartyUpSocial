@@ -162,9 +162,14 @@
     "heading": "Enlaces de invitado",
     "mint": "Crear enlace",
     "copyLink": "Copiar enlace",
+    "linkLabel": "Enlace de invitado",
     "revoke": "Revocar",
     "remove": "Quitar invitado",
-    "removeConfirm": "Esto elimina sus votos y revoca su enlace. Esta acción no se puede deshacer."
+    "removeConfirm": "Esto elimina sus votos y revoca su enlace. Esta acción no se puede deshacer.",
+    "justCreatedHint": "Estos enlaces se acaban de crear. Guárdalos ahora — no volverán a mostrarse después de salir de esta página."
+  },
+  "live": {
+    "copied": "{{label}} copiado."
   },
   "guestPoll": {
     "claimHeading": "Unirse a esta encuesta",

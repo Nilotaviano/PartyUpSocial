@@ -162,9 +162,14 @@
     "heading": "Guest links",
     "mint": "Create link",
     "copyLink": "Copy link",
+    "linkLabel": "Guest link",
     "revoke": "Revoke",
     "remove": "Remove guest",
-    "removeConfirm": "This removes their votes and revokes their link. This cannot be undone."
+    "removeConfirm": "This removes their votes and revokes their link. This cannot be undone.",
+    "justCreatedHint": "These links were just created. Save them now — they can't be shown again after you leave this page."
+  },
+  "live": {
+    "copied": "{{label}} copied."
   },
   "guestPoll": {
     "claimHeading": "Join this poll",

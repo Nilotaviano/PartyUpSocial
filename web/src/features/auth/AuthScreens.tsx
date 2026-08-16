@@ -580,6 +580,9 @@ export function Login() {
           <button className={primaryCtaClasses} type="submit">
             {t('actions.signIn')}
           </button>
+          <Link className={quietAuthLinkClasses} to="/forgot-password">
+            {t('pages.forgotPassword')}
+          </Link>
         </form>
       </div>
       <div className="flex flex-col gap-3">
@@ -717,6 +720,87 @@ export function Register() {
             </p>
             <button className={primaryCtaClasses} type="submit">
               {t('actions.createAccount')}
+            </button>
+          </form>
+        </div>
+      )}
+      {!sent && (
+        <Link className={quietAuthLinkClasses} to="/login">
+          {t('pages.login')}
+        </Link>
+      )}
+      <ErrorAlert error={error} />
+    </AuthScreen>
+  )
+}
+
+// D-067 ("email supports recovery"): the request leg of password recovery —
+// the API endpoint (`/api/v1/auth/password/reset`, consumed by `ResetPassword`
+// below) and its routed token-consumption screen both already existed with no
+// way to reach them. Mirrors `Register`'s enumeration-safe shape (a plain
+// email field, an unconditional "check your inbox" state) rather than
+// revealing whether the address has an account.
+export function ForgotPassword() {
+  const { t } = useTranslation('auth')
+  const [email, setEmail] = useState('')
+  const [emailError, setEmailError] = useState<EmailFieldError>(null)
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState<unknown>()
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    setError(undefined)
+    const trimmedEmail = email.trim()
+    const emailValidation = validateEmailField(trimmedEmail)
+    setEmailError(emailValidation)
+    if (emailValidation) return
+    try {
+      await client.POST('/api/v1/auth/password/forgot', {
+        params: { header: { 'X-CSRF-TOKEN': '' } },
+        body: { email: trimmedEmail },
+      })
+      setSent(true)
+    } catch (caught) {
+      setError(caught)
+    }
+  }
+
+  return (
+    <AuthScreen testId="screen-forgot-password" title={t('pages.forgotPassword')}>
+      {sent ? (
+        <StatusBanner role="status" variant="success">
+          {t('messages.checkInbox')}
+        </StatusBanner>
+      ) : (
+        <div className="surface flex flex-col gap-4 p-5">
+          <form className="flex flex-col gap-4" noValidate onSubmit={submit}>
+            <div className="flex flex-col gap-1.5">
+              <label className={authFieldLabelClasses} htmlFor="forgot-password-email">
+                {t('fields.email')}
+              </label>
+              <input
+                className={authFieldClasses}
+                id="forgot-password-email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                aria-invalid={emailError ? true : undefined}
+                aria-describedby={emailError ? 'forgot-password-email-error' : undefined}
+                required
+              />
+              <div className="min-h-[1.03125rem]">
+                {emailError && (
+                  <p className="font-body text-[12px] leading-snug text-danger" id="forgot-password-email-error" role="alert">
+                    {t(emailError === 'required' ? 'fields.emailRequired' : 'fields.emailInvalid')}
+                  </p>
+                )}
+              </div>
+            </div>
+            <p className="font-body text-[13px] text-muted-foreground">
+              {t('forgotPassword.explainer')}
+            </p>
+            <button className={primaryCtaClasses} type="submit">
+              {t('actions.sendResetLink')}
             </button>
           </form>
         </div>

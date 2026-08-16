@@ -162,9 +162,14 @@
     "heading": "Links de convidado",
     "mint": "Criar link",
     "copyLink": "Copiar link",
+    "linkLabel": "Link de convidado",
     "revoke": "Revogar",
     "remove": "Remover convidado",
-    "removeConfirm": "Isso remove os votos dele e revoga o link. Esta ação não pode ser desfeita."
+    "removeConfirm": "Isso remove os votos dele e revoga o link. Esta ação não pode ser desfeita.",
+    "justCreatedHint": "Esses links acabaram de ser criados. Salve-os agora — eles não aparecerão novamente depois que você sair desta página."
+  },
+  "live": {
+    "copied": "{{label}} copiado."
   },
   "guestPoll": {
     "claimHeading": "Entrar nesta enquete",

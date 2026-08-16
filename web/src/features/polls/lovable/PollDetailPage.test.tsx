@@ -99,12 +99,14 @@ function mockGet({
   })
 }
 
-function renderPage(pollId = 'poll-1') {
+function renderPage(pollId = 'poll-1', state?: unknown) {
   return render(
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <MemoryRouter initialEntries={[`/polls/${pollId}`]}>
+      <MemoryRouter
+        initialEntries={[{ pathname: `/polls/${pollId}`, state }]}
+      >
         <Routes>
           <Route element={<PollDetailPage />} path="/polls/:pollId" />
           <Route element={<div data-testid="navigated-to-polls" />} path="/polls" />
@@ -561,6 +563,21 @@ describe('PollDetailPage (lovable)', () => {
   })
 
   describe('organizer guest panel (D-044)', () => {
+    it('surfaces guest links minted at poll creation, handed off via one-shot router state', async () => {
+      mockGet({ detail: pollDetail({ organizerId: 'viewer-1' }) })
+      renderPage('poll-1', {
+        mintedGuestLinks: [{ guestLinkId: 'link-1', url: 'https://partyup.social/g/abc' }],
+      })
+
+      expect(await screen.findByText('https://partyup.social/g/abc')).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          "These links were just created. Save them now — they can't be shown again after you leave this page.",
+        ),
+      ).toBeInTheDocument()
+      expect(api.post).not.toHaveBeenCalled()
+    })
+
     it('mints a guest link, shows it plaintext-once, and lets the organizer revoke it', async () => {
       mockGet({ detail: pollDetail({ organizerId: 'viewer-1' }) })
       api.post.mockResolvedValue({

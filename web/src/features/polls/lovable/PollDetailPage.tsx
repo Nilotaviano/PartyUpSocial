@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, Navigate, useNavigate, useParams } from 'react-router'
+import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router'
 import {
   Ban,
   CalendarClock,
@@ -21,6 +21,7 @@ import { fieldControlClasses, neutralCtaClasses, raisedInteractiveClasses } from
 import { Dialog } from '../../../components/ui/dialog'
 import { PageHeader } from '../../../components/shell/PageHeader'
 import { StatusBanner } from '../../../components/ui/statusBanner'
+import { useToast } from '../../../components/ui/toastStore'
 import { AvatarDisc } from '../../friends/AvatarDisc'
 import { getViewerProfile, viewerProfileKey } from '../../sessions/sessionQueries'
 import { cn } from '../../availability/lovable/utils'
@@ -845,17 +846,28 @@ function GuestLinksPanel({
   canMint,
   onError,
   clearError,
+  initialLinks,
 }: {
   pollId: string
   roster: PollDetailResponse['roster']
   canMint: boolean
   onError: (error: unknown) => void
   clearError: () => void
+  initialLinks?: GuestLinkInvitation[]
 }) {
   const { t } = useTranslation('polls')
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [linkCount, setLinkCount] = useState('1')
-  const [guestLinks, setGuestLinks] = useState<GuestLinkInvitation[]>([])
+  const [guestLinks, setGuestLinks] = useState<GuestLinkInvitation[]>(
+    () => initialLinks ?? [],
+  )
+  // One-shot: `initialLinks` only ever arrives as router state from the create
+  // flow's own navigation, so this banner is true for exactly the render(s)
+  // right after minting and never again after a refresh (router state does
+  // not survive one).
+  const [showJustCreatedHint] = useState(() => Boolean(initialLinks?.length))
+  const [announcement, setAnnouncement] = useState('')
 
   const mint = useMutation({
     mutationFn: () => createPollGuestLinks(pollId, Number(linkCount)),
@@ -865,6 +877,17 @@ function GuestLinksPanel({
     },
     onError,
   })
+
+  async function copy(url: string) {
+    const label = t('guests.linkLabel')
+    try {
+      await navigator.clipboard.writeText(url)
+      setAnnouncement(t('live.copied', { label }))
+      toast({ message: t('live.copied', { label }) })
+    } catch (caught) {
+      onError(caught)
+    }
+  }
 
   const revoke = useMutation({
     mutationFn: (guestLinkId: string) => revokePollGuestLink(pollId, guestLinkId),
@@ -883,10 +906,6 @@ function GuestLinksPanel({
     },
     onError,
   })
-
-  async function copy(url: string) {
-    await navigator.clipboard.writeText(url)
-  }
 
   const claimedGuests = roster.filter((entry) => entry.guestIdentityId && entry.isActive)
 
@@ -923,6 +942,12 @@ function GuestLinksPanel({
         </div>
       )}
 
+      {showJustCreatedHint && (
+        <StatusBanner className="mt-3" role="status" variant="success">
+          {t('guests.justCreatedHint')}
+        </StatusBanner>
+      )}
+
       {guestLinks.length > 0 && (
         <ul className="mt-2 space-y-1.5">
           {guestLinks.map((link) => (
@@ -953,6 +978,10 @@ function GuestLinksPanel({
           ))}
         </ul>
       )}
+
+      <p aria-live="polite" className="sr-only">
+        {announcement}
+      </p>
 
       {claimedGuests.length > 0 && (
         <ul className="mt-2 space-y-1.5">
@@ -985,7 +1014,16 @@ export function PollDetailPage() {
   const { data: session } = useSession()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const location = useLocation()
   const now = useNowTicker()
+
+  // One-shot handoff from `PollCreatePage`'s create mutation (router state,
+  // not a query) — the only place the minted guest links are ever returned;
+  // captured once so a later in-page navigation never resurfaces it.
+  const [mintedGuestLinks] = useState(
+    () => (location.state as { mintedGuestLinks?: GuestLinkInvitation[] } | null)
+      ?.mintedGuestLinks,
+  )
 
   const [announcement, setAnnouncement] = useState('')
   const [pendingOptionId, setPendingOptionId] = useState<string | null>(null)
@@ -1351,6 +1389,7 @@ export function PollDetailPage() {
               <GuestLinksPanel
                 canMint={isPolling}
                 clearError={() => setGuestPanelError(null)}
+                initialLinks={mintedGuestLinks}
                 pollId={pollId}
                 roster={detail.data?.roster ?? []}
                 onError={setGuestPanelError}

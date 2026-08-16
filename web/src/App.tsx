@@ -16,6 +16,7 @@ import {
   AuthCallback,
   ConfirmIdentity,
   EmailChange,
+  ForgotPassword,
   Login,
   MagicLink,
   Register,
@@ -129,6 +130,7 @@ function App() {
         <Route path="/welcome" element={<Welcome />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/account-deletion" element={<PublicDeletionRequestPage />} />
         <Route
           path="/account-deletion/confirm"

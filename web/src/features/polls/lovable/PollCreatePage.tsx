@@ -296,7 +296,18 @@ export function PollCreatePage() {
     mutationFn: (body: CreatePollRequest) => createPoll(body),
     onSuccess: async (response) => {
       await queryClient.invalidateQueries({ queryKey: ['polls'] })
-      navigate(`/polls/${response.poll.id}`)
+      // The mint response's guest links are only ever returned here — tokens are
+      // stored hashed server-side and there is no GET to re-list them, so they
+      // are handed to the detail page as one-shot router state rather than
+      // dropped. `GuestLinksPanel` renders them once and warns that a refresh
+      // loses them.
+      if (response.guestLinks.length > 0) {
+        navigate(`/polls/${response.poll.id}`, {
+          state: { mintedGuestLinks: response.guestLinks },
+        })
+      } else {
+        navigate(`/polls/${response.poll.id}`)
+      }
     },
   })
 
