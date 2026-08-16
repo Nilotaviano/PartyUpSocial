@@ -223,6 +223,7 @@ public interface IFriendGroupRepository
 
 - Consumes: Tasks 2–4 domain types.
 
+- [ ] **Step 0 (added by verifier finding): CHECK constraints** `ck_sessions_visibility CHECK (visibility IN (0, 1, 2))` on sessions and `ck_polls_visibility` on polls — the engine fails closed on an unknown level, the DB must never store one.
 - [ ] **Step 1: EF configs.** `FriendGroupConfiguration` follows `FriendshipConfiguration` verbatim patterns: snake_case names, `TypedIdConverter<FriendGroupId>`, `PropertyAccessMode.Field`, `HasConversion<short>()` for status, `timestamp with time zone`, `xmin` row version, Restrict FK to users, check constraints `ck_friend_group_members_status IN (0,1)` and `ck_friend_group_members_accept_time` mirroring the friendship accept-time check. Members map as owned collection (`OwnsMany` → table `friend_group_members`). `SessionConfiguration`: rename the `is_private` property mapping to `Visibility` (`HasConversion<short>()`, column `visibility`); map `_audienceGroupIds` as a `List<FriendGroupId>` join table via `builder.OwnsMany` or a keyless owned entity — use the same idiom the Session already uses for its simplest owned collection; Poll mirrors.
 - [ ] **Step 2: Migration.** `dotnet dotnet-ef migrations add AddFriendGroupsAndContentVisibility --project src/PartyUp.Infrastructure --startup-project src/PartyUp.Api` (local codegen, no DB). Then hand-edit `Up()` so the column change is a conversion, not drop/add:
 
