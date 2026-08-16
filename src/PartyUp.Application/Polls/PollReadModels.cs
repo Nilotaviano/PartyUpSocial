@@ -47,7 +47,7 @@ public sealed record PollRosterEntry(
 /// <see cref="SuggestedByEntry"/> (D-196) is the resolved, already-masked attribution: the SAME
 /// <see cref="PollRosterEntry"/> row the roster and the voter lists carry for that participant --
 /// never a second masking pass -- and is null when the suggester is the poll organizer (DOMAIN_MODEL
-/// §12-38: organizer-created options carry no attribution).
+/// §12-48: organizer-created options carry no attribution).
 /// Per-category voter lists reuse the same <see cref="PollRosterEntry"/> rows the roster itself
 /// carries (looked up by the vote's <see cref="ParticipantRef"/>) rather than recomputing masking:
 /// a voter's <see cref="PollRosterEntry.MaskedForViewer"/> and <see cref="PollRosterEntry.ParticipationId"/>

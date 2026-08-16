@@ -49,11 +49,12 @@ function setBrowserTimeZone(zone: string) {
 
 function renderDialog() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
+  const result = render(
     <QueryClientProvider client={queryClient}>
       <TimezoneMismatchDialog />
     </QueryClientProvider>,
   )
+  return { ...result, queryClient }
 }
 
 beforeEach(() => {
@@ -143,7 +144,8 @@ describe('TimezoneMismatchDialog (D-197)', () => {
     mockSession({ timeZone: 'America/Sao_Paulo' })
     setBrowserTimeZone('America/New_York')
 
-    renderDialog()
+    const { queryClient } = renderDialog()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
     fireEvent.click(await screen.findByRole('button', { name: 'Update to America/New_York' }))
 
     await waitFor(() =>
@@ -156,5 +158,7 @@ describe('TimezoneMismatchDialog (D-197)', () => {
     expect(JSON.parse(localStorage.getItem(DISMISSED_PAIRS_KEY) ?? '[]')).toEqual([
       'America/Sao_Paulo|America/New_York',
     ])
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['session'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['my-profile'] })
   })
 })

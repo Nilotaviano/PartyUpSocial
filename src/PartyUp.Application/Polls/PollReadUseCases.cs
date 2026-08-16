@@ -122,7 +122,7 @@ public sealed class PollReadUseCases(
 
             bool suggesterMasked = option.SuggestedBy.UserId is { } suggesterId && maskedUserIds.Contains(suggesterId);
 
-            // D-196: an organizer-created option carries no attribution (DOMAIN_MODEL §12-38);
+            // D-196: an organizer-created option carries no attribution (DOMAIN_MODEL §12-48);
             // otherwise the suggester renders through the identical roster row the voter lists use,
             // so its masking agrees with the roster without a second masking pass.
             PollRosterEntry? suggestedByEntry = option.SuggestedBy.UserId == poll.OrganizerId

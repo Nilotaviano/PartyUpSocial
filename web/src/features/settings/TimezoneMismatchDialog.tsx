@@ -74,7 +74,10 @@ export function TimezoneMismatchDialog() {
     },
     onSuccess: async (_data, timeZone) => {
       if (profileZone) markTimezoneMismatchDismissed(profileZone, timeZone)
-      await queryClient.invalidateQueries({ queryKey: sessionQueryKey })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: sessionQueryKey }),
+        queryClient.invalidateQueries({ queryKey: ['my-profile'] }),
+      ])
       setClosed(true)
       showToast({ message: t('timezoneMismatch.updated', { zone: timeZone }) })
     },
