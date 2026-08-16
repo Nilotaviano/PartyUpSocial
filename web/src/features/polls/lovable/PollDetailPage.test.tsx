@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn() }))
@@ -598,6 +598,51 @@ describe('PollDetailPage (lovable)', () => {
         ),
       ).toBeInTheDocument()
       expect(api.post).not.toHaveBeenCalled()
+    })
+
+    it('clears the router history state after intaking mintedGuestLinks, so refresh/session-restore cannot resurface the tokens_F1', async () => {
+      mockGet({ detail: pollDetail({ organizerId: 'viewer-1' }) })
+
+      let latestLocationState: unknown = 'not-yet-observed'
+      function LocationProbe() {
+        latestLocationState = useLocation().state
+        return null
+      }
+
+      render(
+        <QueryClientProvider
+          client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+        >
+          <MemoryRouter
+            initialEntries={[
+              {
+                pathname: '/polls/poll-1',
+                state: {
+                  mintedGuestLinks: [{ guestLinkId: 'link-1', url: 'https://partyup.social/g/abc' }],
+                },
+              },
+            ]}
+          >
+            <Routes>
+              <Route
+                element={
+                  <>
+                    <PollDetailPage />
+                    <LocationProbe />
+                  </>
+                }
+                path="/polls/:pollId"
+              />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      )
+
+      // The links still surface from the captured component state...
+      expect(await screen.findByText('https://partyup.social/g/abc')).toBeInTheDocument()
+      // ...but the history entry's own state is replaced with null so a
+      // refresh/session-restore cannot resurface the minted tokens.
+      await waitFor(() => expect(latestLocationState).toBeNull())
     })
 
     it('mints a guest link, shows it plaintext-once, and lets the organizer revoke it', async () => {

@@ -441,6 +441,19 @@ describe('legal routes and footer_S5', () => {
   })
 })
 
+// The genuine document-order proof (F7): all natively-focusable elements in
+// the rendered shell, in DOM order. If `SkipLink` were ever moved below
+// `TopBar` (or `AppFooter`'s markup somehow rendered first), this would
+// return a brand-mark/nav/account-menu control at index 0 instead of the
+// skip link — a `.focus()` + `toHaveFocus()` check alone would not catch
+// that regression, since an isolated `.focus()` call succeeds regardless of
+// tab order.
+function firstFocusableElement(): Element | null {
+  return document.body.querySelector(
+    'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])',
+  )
+}
+
 describe('skip-to-main-content link_D139', () => {
   it('is the first tab stop in the authenticated shell and moves focus into the main content region on activation', async () => {
     setSession(session({ authenticated: true, state: 'active', userId: 'u1' }))
@@ -450,6 +463,10 @@ describe('skip-to-main-content link_D139', () => {
       name: 'Skip to main content',
     })
     expect(skipLink).toHaveAttribute('href', '#main-content')
+    // Document-order proof, not just a focus-ability check: the skip link is
+    // the very first focusable element under the shell root, ahead of
+    // `TopBar`'s brand link/nav/account-menu controls.
+    expect(firstFocusableElement()).toBe(skipLink)
 
     skipLink.focus()
     expect(skipLink).toHaveFocus()
@@ -469,5 +486,8 @@ describe('skip-to-main-content link_D139', () => {
     })
     expect(skipLink).toHaveAttribute('href', '#main-content')
     expect(document.getElementById('main-content')).toBeInTheDocument()
+    // Document-order proof (F7): the public shell also renders `SkipLink`
+    // ahead of any of `Welcome`'s own login/register controls.
+    expect(firstFocusableElement()).toBe(skipLink)
   })
 })

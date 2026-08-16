@@ -61,7 +61,11 @@ function useNotificationScope(scope: NotificationScope) {
   const isPending = pages[0]?.isPending ?? true
   const error = pages.find((page) => page.error)?.error
   const lastPage = pages[pages.length - 1]
-  const nextCursor = lastPage?.data?.nextCursor ?? undefined
+  // Derive from the last page that actually loaded, not the raw last page —
+  // otherwise a failed load-more page (data undefined) permanently hides
+  // Load-more even though the last successful page still has a next cursor.
+  const lastSuccessfulPage = [...pages].reverse().find((page) => page.data)
+  const nextCursor = lastSuccessfulPage?.data?.nextCursor ?? undefined
   const isFetchingNextPage = pages.length > 1 && (lastPage?.isFetching ?? false)
 
   return {

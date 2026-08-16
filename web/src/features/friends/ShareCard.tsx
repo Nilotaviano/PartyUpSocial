@@ -8,12 +8,13 @@ import { Button } from '../../components/ui/button'
 import { SectionCard } from '../../components/shell/SectionCard'
 import { useToast } from '../../components/ui/toastStore'
 
-// PHASE5_1_DESIGN.md §1/§3: QR modules always render --color-qr-ink on a
-// --color-qr chip in both themes (scannability; the pair is theme-invariant
-// and never overridden under [data-theme=dark]) — hardcoded here since
-// react-qr-code needs literal hex, not CSS var references.
+// PHASE5_1_DESIGN.md §1/§3: QR modules always render a dark module ink on a
+// light --color-qr chip in both themes (scannability; --color-qr is
+// theme-invariant and never overridden under [data-theme=dark]) — both are
+// hardcoded literal hex here since react-qr-code needs literal color values,
+// not CSS var references, and the module ink has no --color-qr-ink token.
 const QR_CHIP_COLOR = '#FFFDF5' // --color-qr
-const QR_MODULE_COLOR = '#1B2408' // --color-qr-ink
+const QR_MODULE_COLOR = '#1B2408'
 
 async function getFriendShare() {
   const { data } = await client.GET('/api/v1/friend-share')

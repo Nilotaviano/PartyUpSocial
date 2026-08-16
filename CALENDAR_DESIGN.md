@@ -13,11 +13,11 @@ Investigation found two of those are **spec violations already shipped**, not pr
 - **Recurring availability cannot be created.** `WeekGridPage.tsx:366`'s `handleCreateBlock`
   always calls `createAvailabilityBlock`; `createAvailabilitySeries` is called from nowhere in the
   UI. Contradicts **D-009** ("one-time *and recurring*") and §7 ("then choosing one-time or weekly
-  recurrence"). *(Corrected 2026-08-15: `WeekGridPage.tsx` no longer exists — the §9 Lovable port
-  renamed it to `CalendarShell.tsx`, where both mutations are wired today: `createBlock`
-  (`:238`, `mutationFn: createAvailabilityBlock`) and `createSeries` (`:242`,
-  `mutationFn: createAvailabilitySeries`). This bullet is historical — the bug it describes was
-  fixed by this doc's own §4/§6.)*
+  recurrence"). *(Corrected 2026-08-15, re-verified after W5: `WeekGridPage.tsx` no longer exists —
+  the §9 Lovable port renamed it to `CalendarShell.tsx`, where both mutations are wired today: the
+  `createBlock` mutation (`mutationFn: createAvailabilityBlock`) and the `createSeries` mutation
+  (`mutationFn: createAvailabilitySeries`), both declared back-to-back in `CalendarShell.tsx`. This
+  bullet is historical — the bug it describes was fixed by this doc's own §4/§6.)*
 - **A series cannot be deleted.** `deleteAvailabilitySeries` (`availabilityQueries.ts:114`) is
   likewise uncalled; only single occurrences can be removed. Contradicts **D-025** ("supports
   removing one occurrence or the entire series").
@@ -43,7 +43,7 @@ month/day views and navigation chrome — are out of scope.
 ## 3. Viewport (fixes "too big a scroll area", "time orientation")
 
 `WeekGrid` renders `startHour = 0` to `endHour = 24` at `SLOT_MINUTES = 15` — **96 rows**, and
-`WeekGridPage` overrides neither.
+`CalendarShell` (the §9 Lovable-port rename of `WeekGridPage`) overrides neither.
 
 - *Superseded 2026-08-13 (owner ruling, styling overhaul): the grid is no longer an internal
   scrollport — it renders at natural height and the document scrolls.* Default range
@@ -74,8 +74,9 @@ its one job.
 So **`MyAvailabilityLayer` gains a `Series` list, surfaced on `MyAvailabilityLayerResponse`**. That
 one addition serves both endpoints: `GetCalendarViewUseCase` *calls* `ReadMyAvailabilityUseCase`
 rather than re-implementing it, and the calendar page is the consumer that matters here — it queries
-`getCalendarView`, not `getMyAvailability` (`CalendarShell.tsx:157`, renamed from
-`WeekGridPage.tsx` by the §9 port — corrected 2026-08-15). The data is already in hand:
+`getCalendarView`, not `getMyAvailability` (`CalendarShell.tsx`'s `queryFn: () => getCalendarView(from, to)`,
+renamed from `WeekGridPage.tsx` by the §9 port — corrected 2026-08-15, re-verified after W5). The
+data is already in hand:
 `ReadMyAvailabilityUseCase` holds `data.Series` and passes it to the projection today, so no new
 query is added. `AvailabilitySeriesView` already carries `dayOfWeek`, `startTime`,
 `durationMinutes`, `zoneId`, `effectiveFrom`, `effectiveUntil`.
@@ -155,32 +156,39 @@ only as the ceiling on which tokens exist to paint with.)*
 
 - **Bands, not stacks.** Band metadata (start/middle/end per entry span) computes in `WeekGrid`
   via `useMemo` keyed on the entry-array prop identities plus `weekStart`, `startHour`,
-  `endHour`; `WeekGridPage` memoizes the derived arrays it passes so those identities are
-  stable. Band geometry follows `resizePreview` during a drag (the fill already does,
-  WeekGrid.tsx:677-681 - shape must not disagree with fill). Spans **clamp to the visible slot
-  range** exactly like the resize handles do (WeekGrid.tsx:695-704): the first/last visible slot
-  acts as band start/end for label and rounding, and a clamped edge renders flat (rounded = true
-  end, flat = continues past the viewport - the continuation affordance). Start cells render the
-  label once; middle/end cells suppress the label and the internal 15-minute horizontal border;
-  the 60-minute line keeps a stronger border token than the 15-minute line (the uniform border
-  grid is most of the "wall of lines" read). When a block is **selected**, the full-cell resize
-  handles occupy the start/end cells (WeekGrid.tsx:789,803), so the label shifts to the second
-  cell of a multi-slot band; single-slot bands accept occlusion - the editor dialog is the
-  information surface there. The same memo replaces the per-cell linear scans with an indexed
-  lookup. No DOM restructuring, no ARIA change; each cell keeps its per-slot accessible name.
+  `endHour`; `CalendarShell` (the §9 rename of `WeekGridPage`) memoizes the derived arrays it
+  passes so those identities are stable. Band geometry follows the drag preview (the fill already
+  does — `Band`'s `live` fallback in `WeekGrid.tsx`, e.g. `const start = live ? live.start : band.start`
+  — shape must not disagree with fill; re-verified after W5, was `WeekGrid.tsx:677-681`). Spans
+  **clamp to the visible slot range** exactly like the resize handles do (the `clamp(…, rangeStart,
+  rangeEnd)` calls in `WeekGrid.tsx`'s resize/nudge handlers, e.g. `onNudge`'s `clamp(start,
+  rangeStart, rangeEnd)`; re-verified after W5, was `WeekGrid.tsx:695-704`): the first/last visible
+  slot acts as band start/end for label and rounding, and a clamped edge renders flat (rounded =
+  true end, flat = continues past the viewport - the continuation affordance). Start cells render
+  the label once; middle/end cells suppress the label and the internal 15-minute horizontal
+  border; the 60-minute line keeps a stronger border token than the 15-minute line (the uniform
+  border grid is most of the "wall of lines" read). When a block is **selected**, the full-cell
+  resize handles occupy the start/end cells (`WeekGrid.tsx`'s `<Handle position="top">`/
+  `<Handle position="bottom">` pair; re-verified after W5, was `WeekGrid.tsx:789,803`), so the
+  label shifts to the second cell of a multi-slot band; single-slot bands accept occlusion - the
+  editor dialog is the information surface there. The same memo replaces the per-cell linear scans
+  with an indexed lookup. No DOM restructuring, no ARIA change; each cell keeps its per-slot
+  accessible name.
 - **Precedence, stated.** The **merged** layer owns the cell fill (`busy`, as today - an own
   occurrence never paints separately from its merged projection; merged spans compute in
-  `calendarData.ts:128-205` and reach the grid via `CalendarShell.tsx:827`
-  (`merged={mapped.merged}`), consumed at `WeekGrid.tsx:331` — corrected 2026-08-15, citation
-  was `WeekGridPage.tsx:304-309`. *As shipped, "owns the cell fill" no longer means a visible
-  busy background: `busy` is carried only as `data-state`/`aria-label` on the transparent ARIA
-  layer (`WeekGrid.tsx:735`), with no bg-* paint of its own; the only painted fills are the
-  `free`/`maybe` band (`WeekGrid.tsx:799-801`) and the session/poll pills. The precedence rule
-  (merged wins, no double-paint) still holds; only the "background" half of the sentence is
-  stale.*
+  `calendarData.ts`'s `const merged: MergedSpan[] = …` (line 123) and reach the grid via
+  `CalendarShell.tsx`'s `merged={mapped.merged}`
+  prop (re-verified after W5, was `CalendarShell.tsx:827`), consumed at `WeekGrid.tsx:331` —
+  corrected 2026-08-15, citation was `WeekGridPage.tsx:304-309`. *As shipped, "owns the cell fill"
+  no longer means a visible busy background: `busy` is carried only as `data-state`/`aria-label`
+  on the transparent ARIA layer (`WeekGrid.tsx:735`), with no bg-* paint of its own; the only
+  painted fills are the `free`/`maybe` band (`WeekGrid.tsx:799-801`) and the session/poll pills.
+  The precedence rule (merged wins, no double-paint) still holds; only the "background" half of
+  the sentence is stale.*
   Sessions/poll options keep their existing inline spans but render titles at span start only.
-  The friend layer keeps the existing single-glyph collapse (WeekGrid.tsx:820-828) - **no
-  per-friend hues** (the disc-seed palette is three *fills*, two of which are the grid's own
+  The friend layer keeps the existing single-glyph collapse (`WeekGrid.tsx`'s friend-chips
+  `buckets`/`rest` cap, `{rest > 0 && …}`; re-verified after W5, was `WeekGrid.tsx:820-828`) -
+  **no per-friend hues** (the disc-seed palette is three *fills*, two of which are the grid's own
   backgrounds, and masked friends share one label by design) - but the glyph row renders at
   friend-span start only, with the current collapse as the N>1 cap. Stacking order in a cell
   stays today's DOM order: fill, friend glyph row, session/poll spans, busy dot.

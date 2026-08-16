@@ -420,9 +420,6 @@ export function SessionDetailPage() {
       }).format(instantToFakeLocal(data.startTime, viewerTimeZone))
     : ''
 
-  // HIGH finding 1.1 (frontend audit 2026-08-15): `durationMinutes` was
-  // fetched but never rendered anywhere, so no surface ever showed when a
-  // session ends.
   const endText = data
     ? new Intl.DateTimeFormat(i18n.language, {
         timeStyle: 'short',
@@ -612,8 +609,14 @@ export function SessionDetailPage() {
                           isOrganizer ? (
                             <>
                               <Button
-                                aria-busy={promote.isPending}
-                                disabled={promote.isPending}
+                                aria-busy={
+                                  promote.isPending &&
+                                  promote.variables === entry.participationId
+                                }
+                                disabled={
+                                  promote.isPending &&
+                                  promote.variables === entry.participationId
+                                }
                                 type="button"
                                 variant="ghost"
                                 onClick={() => promote.mutate(entry.participationId)}
@@ -621,8 +624,14 @@ export function SessionDetailPage() {
                                 {t('waitlist.promote')}
                               </Button>
                               <Button
-                                aria-busy={rejectWaitlist.isPending}
-                                disabled={rejectWaitlist.isPending}
+                                aria-busy={
+                                  rejectWaitlist.isPending &&
+                                  rejectWaitlist.variables === entry.participationId
+                                }
+                                disabled={
+                                  rejectWaitlist.isPending &&
+                                  rejectWaitlist.variables === entry.participationId
+                                }
                                 type="button"
                                 variant="ghost"
                                 onClick={() => rejectWaitlist.mutate(entry.participationId)}
@@ -700,8 +709,8 @@ export function SessionDetailPage() {
                         </span>
                         <span className="flex gap-2">
                           <Button
-                            aria-busy={approve.isPending}
-                            disabled={approve.isPending}
+                            aria-busy={approve.isPending && approve.variables === request.id}
+                            disabled={approve.isPending && approve.variables === request.id}
                             type="button"
                             variant="ghost"
                             onClick={() => approve.mutate(request.id)}
@@ -709,8 +718,8 @@ export function SessionDetailPage() {
                             {t('join.approve')}
                           </Button>
                           <Button
-                            aria-busy={reject.isPending}
-                            disabled={reject.isPending}
+                            aria-busy={reject.isPending && reject.variables === request.id}
+                            disabled={reject.isPending && reject.variables === request.id}
                             type="button"
                             variant="ghost"
                             onClick={() => reject.mutate(request.id)}

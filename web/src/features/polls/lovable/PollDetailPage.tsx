@@ -1030,12 +1030,22 @@ export function PollDetailPage() {
   const now = useNowTicker()
 
   // One-shot handoff from `PollCreatePage`'s create mutation (router state,
-  // not a query) — the only place the minted guest links are ever returned;
-  // captured once so a later in-page navigation never resurfaces it.
+  // not a query) — the only place the minted guest links are ever returned.
+  // react-router persists `history.state.usr` across refresh/session-restore
+  // (it is not one-shot on its own), so once the tokens are captured into
+  // component state we replace the history entry with null state to keep
+  // them out of browser history going forward.
   const [mintedGuestLinks] = useState(
     () => (location.state as { mintedGuestLinks?: GuestLinkInvitation[] } | null)
       ?.mintedGuestLinks,
   )
+
+  useEffect(() => {
+    if (location.state) {
+      navigate('.', { replace: true, state: null })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const [announcement, setAnnouncement] = useState('')
   const [pendingOptionId, setPendingOptionId] = useState<string | null>(null)

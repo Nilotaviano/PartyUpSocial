@@ -13,13 +13,12 @@ import {
 import { isSessionInProgress } from './sessionQueries'
 
 /**
- * The card markup `SessionListPage` originally hand-rolled, extracted so
- * Home's upcoming/discover regions and `DiscoverPage` render the same
- * game/platform/occupancy fields off the identical `SessionSummaryResponse`
- * (frontend audit 2026-08-15, finding 1.4) instead of a thinner title/status/
- * startTime-only card. `showInProgress` stays a caller choice — Home and
- * Discover's card lists don't carry `SessionListPage`'s upcoming-vs-history
- * `scope`, so the in-progress badge is opt-in rather than inferred here.
+ * Shared card markup so Home's upcoming/discover regions, `DiscoverPage`,
+ * and `SessionListPage` render the same game/platform/occupancy fields off
+ * the identical `SessionSummaryResponse`. `showInProgress` stays a caller
+ * choice — Home and Discover's card lists don't carry `SessionListPage`'s
+ * upcoming-vs-history `scope`, so the in-progress badge is opt-in rather
+ * than inferred here.
  *
  * `timeZone` defaults to the browser zone: callers that already fetch the
  * viewer profile (`SessionListPage`) pass its D-038/D-046 zone through;

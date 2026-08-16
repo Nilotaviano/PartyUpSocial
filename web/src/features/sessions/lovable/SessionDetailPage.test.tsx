@@ -952,6 +952,64 @@ describe('SessionDetailPage (lovable)', () => {
 
       resolvePost?.()
     })
+
+    it('scopes Promote/Reject pending state to the clicked row, leaving other waitlisted rows enabled_F6', async () => {
+      api.get.mockImplementation((path: string) => {
+        if (path === '/api/v1/sessions/{sessionId}') {
+          const data = detail({
+            roster: [
+              {
+                participationId: 'p-wait-1',
+                userId: 'user-wait-1',
+                guestIdentityId: null,
+                displayName: 'Wait One',
+                status: 'going',
+                isWaitlisted: true,
+                origin: 'invited',
+                reminderChoice: null,
+              },
+              {
+                participationId: 'p-wait-2',
+                userId: 'user-wait-2',
+                guestIdentityId: null,
+                displayName: 'Wait Two',
+                status: 'going',
+                isWaitlisted: true,
+                origin: 'invited',
+                reminderChoice: null,
+              },
+            ],
+          })
+          return Promise.resolve({ data })
+        }
+        if (path === '/api/v1/sessions/{sessionId}/join-requests')
+          return Promise.resolve({ data: { items: [], nextCursor: null } })
+        if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+        throw new Error(`Unexpected GET ${path}`)
+      })
+      let resolvePost: (() => void) | undefined
+      api.post.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolvePost = () => resolve({ data: {} })
+          }),
+      )
+      renderPage()
+
+      const promoteButtons = await screen.findAllByRole('button', { name: 'Promote' })
+      expect(promoteButtons).toHaveLength(2)
+      fireEvent.click(promoteButtons[0])
+
+      await waitFor(() => expect(promoteButtons[0]).toBeDisabled())
+      expect(promoteButtons[0]).toHaveAttribute('aria-busy', 'true')
+      // The other waitlisted row's Promote control must stay usable — pending
+      // state is scoped per-row via `mutation.variables`, not the mutation's
+      // page-wide `isPending`.
+      expect(promoteButtons[1]).not.toBeDisabled()
+      expect(promoteButtons[1]).toHaveAttribute('aria-busy', 'false')
+
+      resolvePost?.()
+    })
   })
 
   describe('mobile sidebar stacking order (S3)', () => {

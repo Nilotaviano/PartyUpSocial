@@ -407,6 +407,35 @@ describe('NotificationCenterPage — mark read / mark all read', () => {
   })
 })
 
+describe('NotificationCenterPage — load-more cursor survives a failed page (F3)', () => {
+  it('keeps the Load-more control visible after a failed load-more fetch instead of hiding it permanently', async () => {
+    api.get.mockImplementation((path: string, options?: { params?: { query?: { cursor?: string } } }) => {
+      if (path === '/api/v1/notifications/unread-count') {
+        return Promise.resolve({ data: { count: 0 } })
+      }
+      const cursor = options?.params?.query?.cursor
+      if (!cursor) {
+        return Promise.resolve({
+          data: { items: [notification({ id: 'n1' })], nextCursor: 'cursor-2' },
+        })
+      }
+      // The second page (cursor-2) always fails.
+      return Promise.reject(new Error('boom'))
+    })
+
+    renderPage()
+
+    const loadMore = await screen.findByRole('button', { name: 'Load more' })
+    fireEvent.click(loadMore)
+
+    // The failed page surfaces the error banner...
+    await screen.findByRole('alert')
+    // ...but Load-more must still be present, deriving its cursor from the
+    // last SUCCESSFUL page rather than the failed one.
+    expect(screen.getByRole('button', { name: 'Load more' })).toBeInTheDocument()
+  })
+})
+
 describe('NotificationCenterPage — list error recovery (Wave 6)', () => {
   it('shows a retry action on a failed list load and refetches on click', async () => {
     let listShouldFail = true
