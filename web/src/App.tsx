@@ -51,6 +51,7 @@ import { AccountSettingsPage } from './features/settings/AccountSettingsPage'
 import { BlockedUsersPage } from './features/settings/BlockedUsersPage'
 import { EmailUnsubscribePage } from './features/settings/EmailUnsubscribePage'
 import { NotificationSettingsPage } from './features/settings/NotificationSettingsPage'
+import { TimezoneMismatchDialog } from './features/settings/TimezoneMismatchDialog'
 import { GuestSessionPage } from './features/sessions/GuestSessionPage'
 import { SessionInvitePage } from './features/sessions/SessionInvitePage'
 import { SessionCreatePage } from './features/sessions/lovable/SessionCreatePage'
@@ -100,6 +101,7 @@ function AuthenticatedShell() {
       <ToastHost>
         <PageSlotProvider>
           <PushEnableCard />
+          <TimezoneMismatchDialog />
           <TourOverlay />
           <ShellContent>
             <Outlet />

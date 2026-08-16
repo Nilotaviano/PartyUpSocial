@@ -120,6 +120,14 @@
     "confirmed": "You have been unsubscribed from email notifications.",
     "invalidLink": "This unsubscribe link is invalid or expired."
   },
+  "timezoneMismatch": {
+    "dialogLabel": "Time zone changed",
+    "title": "Your time zone looks different",
+    "body": "Your profile is set to {{profileZone}}, but this browser is currently in {{browserZone}}.",
+    "update": "Update to {{zone}}",
+    "keep": "Keep {{zone}}",
+    "updated": "Time zone updated to {{zone}}."
+  },
   "publicDeletion": {
     "requestTitle": "Delete your account",
     "requestDescription": "Request account deletion without signing in.",

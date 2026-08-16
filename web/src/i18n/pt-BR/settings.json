@@ -120,6 +120,14 @@
     "confirmed": "Você cancelou a inscrição das notificações por e-mail.",
     "invalidLink": "Este link de cancelamento de inscrição é inválido ou expirou."
   },
+  "timezoneMismatch": {
+    "dialogLabel": "Fuso horário alterado",
+    "title": "Seu fuso horário parece diferente",
+    "body": "Seu perfil está definido para {{profileZone}}, mas este navegador está atualmente em {{browserZone}}.",
+    "update": "Atualizar para {{zone}}",
+    "keep": "Manter {{zone}}",
+    "updated": "Fuso horário atualizado para {{zone}}."
+  },
   "publicDeletion": {
     "requestTitle": "Excluir sua conta",
     "requestDescription": "Solicite a exclusão da conta sem entrar.",

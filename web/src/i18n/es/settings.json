@@ -120,6 +120,14 @@
     "confirmed": "Has cancelado la suscripción a las notificaciones por correo electrónico.",
     "invalidLink": "Este enlace para cancelar la suscripción no es válido o ha caducado."
   },
+  "timezoneMismatch": {
+    "dialogLabel": "Zona horaria diferente",
+    "title": "Tu zona horaria parece diferente",
+    "body": "Tu perfil está configurado en {{profileZone}}, pero este navegador está actualmente en {{browserZone}}.",
+    "update": "Actualizar a {{zone}}",
+    "keep": "Mantener {{zone}}",
+    "updated": "Zona horaria actualizada a {{zone}}."
+  },
   "publicDeletion": {
     "requestTitle": "Eliminar tu cuenta",
     "requestDescription": "Solicita la eliminación de tu cuenta sin iniciar sesión.",
