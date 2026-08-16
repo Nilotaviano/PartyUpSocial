@@ -46,7 +46,9 @@ public sealed class BrowserEngineLaneTests(PlaywrightFixture fixture)
         IPage page = await context.NewPageAsync();
 
         await page.GotoAsync(PlaywrightFixture.WebBaseUrl + "/welcome");
-        ILocator continueLink = page.GetByRole(AriaRole.Link).First;
+        // Not `.First` over all links: the shell's first link is the sr-only skip link,
+        // which is invisible until focused and therefore never tappable/clickable here.
+        ILocator continueLink = page.GetByRole(AriaRole.Link, new() { Name = "Create account" }).First;
         await continueLink.WaitForAsync();
         await continueLink.ClickAsync();
         await page.WaitForURLAsync(url => !url.EndsWith("/welcome", StringComparison.Ordinal));
