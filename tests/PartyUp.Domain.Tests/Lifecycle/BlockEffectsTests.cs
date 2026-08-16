@@ -1,5 +1,6 @@
 using NodaTime;
 using NodaTime.Testing;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
@@ -26,7 +27,7 @@ public class BlockEffectsTests
         Friendship accepted = FriendshipBetween(Blocked, Third, clock, accept: true);
         Block block = CreateBlock(clock);
 
-        BlockEffectResult result = BlockEffects.Apply(block, [pending, accepted], [], [], clock);
+        BlockEffectResult result = BlockEffects.Apply(block, [pending, accepted], [], [], [], clock);
 
         Assert.Same(pending, Assert.Single(result.DeletedFriendships));
     }
@@ -38,7 +39,7 @@ public class BlockEffectsTests
         Friendship accepted = FriendshipBetween(Blocker, Blocked, clock, accept: true);
         Block block = CreateBlock(clock);
 
-        BlockEffectResult result = BlockEffects.Apply(block, [accepted], [], [], clock);
+        BlockEffectResult result = BlockEffects.Apply(block, [accepted], [], [], [], clock);
 
         Assert.Same(accepted, Assert.Single(result.DeletedFriendships));
     }
@@ -52,7 +53,7 @@ public class BlockEffectsTests
         session.DequeueEvents();
         Block block = CreateBlock(clock);
 
-        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], clock);
+        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], [], clock);
 
         Assert.Equal(ParticipationStatus.Removed, LifecycleFixtures.RowOf(session, Blocked).Status);
         Assert.Equal(session.Id, Assert.Single(result.RemovedFromSessions));
@@ -68,7 +69,7 @@ public class BlockEffectsTests
         session.DequeueEvents();
         Block block = CreateBlock(clock);
 
-        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], clock);
+        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], [], clock);
 
         Assert.Equal(ParticipationStatus.Removed, LifecycleFixtures.RowOf(session, Blocker).Status);
         Assert.Equal(session.Id, Assert.Single(result.RemovedFromSessions));
@@ -83,7 +84,7 @@ public class BlockEffectsTests
         session.DequeueEvents();
         Block block = CreateBlock(clock);
 
-        BlockEffects.Apply(block, [], [session], [], clock);
+        BlockEffects.Apply(block, [], [session], [], [], clock);
 
         Assert.Equal(ParticipationStatus.Removed, LifecycleFixtures.RowOf(session, Blocked).Status);
     }
@@ -96,7 +97,7 @@ public class BlockEffectsTests
         session.DequeueEvents();
         Block block = CreateBlock(clock);
 
-        BlockEffects.Apply(block, [], [session], [], clock);
+        BlockEffects.Apply(block, [], [session], [], [], clock);
 
         Assert.Equal(ParticipationStatus.Removed, LifecycleFixtures.RowOf(session, Blocked).Status);
         Assert.Empty(session.DequeueEvents());
@@ -112,7 +113,7 @@ public class BlockEffectsTests
         session.DequeueEvents();
         Block block = CreateBlock(clock);
 
-        BlockEffects.Apply(block, [], [session], [], clock);
+        BlockEffects.Apply(block, [], [session], [], [], clock);
 
         Assert.Equal(SessionStatus.Unconfirmed, session.Status);
         Assert.Single(session.DequeueEvents().OfType<SessionUnconfirmed>());
@@ -136,7 +137,7 @@ public class BlockEffectsTests
         session.DequeueEvents();
         Block block = CreateBlock(clock);
 
-        BlockEffects.Apply(block, [], [session], [], clock);
+        BlockEffects.Apply(block, [], [session], [], [], clock);
 
         Assert.Equal(SessionStatus.Confirmed, session.Status);
         Assert.Single(session.DequeueEvents().OfType<SessionWaitlistVacancy>());
@@ -150,7 +151,7 @@ public class BlockEffectsTests
         session.Rsvp(BlockedRef, ParticipationStatus.Going, clock);
         Block block = CreateBlock(clock);
 
-        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], clock);
+        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], [], clock);
 
         SessionReminderCanceled canceled = Assert.Single(result.CanceledReminders);
         Assert.Equal(session.Id, canceled.SessionId);
@@ -166,7 +167,7 @@ public class BlockEffectsTests
         FakeClock inProgress = LifecycleFixtures.At(LifecycleFixtures.Hours(25));
         Block block = CreateBlock(inProgress);
 
-        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], inProgress);
+        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], [], inProgress);
 
         Assert.Equal(ParticipationStatus.Removed, LifecycleFixtures.RowOf(session, Blocked).Status);
         Assert.Single(result.RemovedFromSessions);
@@ -183,7 +184,7 @@ public class BlockEffectsTests
         Assert.Equal(SessionStatus.Completed, session.Status);
         Block block = CreateBlock(after);
 
-        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], after);
+        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], [], after);
 
         Assert.Equal(ParticipationStatus.Going, LifecycleFixtures.RowOf(session, Blocked).Status);
         Assert.Empty(result.RemovedFromSessions);
@@ -198,7 +199,7 @@ public class BlockEffectsTests
         FakeClock after = LifecycleFixtures.At(LifecycleFixtures.Hours(30));
         Block block = CreateBlock(after);
 
-        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], after);
+        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], [], after);
 
         Assert.Equal(ParticipationStatus.Going, LifecycleFixtures.RowOf(session, Blocked).Status);
         Assert.Empty(result.RemovedFromSessions);
@@ -213,7 +214,7 @@ public class BlockEffectsTests
         session.Rsvp(BlockedRef, ParticipationStatus.Going, clock);
         Block block = CreateBlock(clock);
 
-        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], clock);
+        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], [], clock);
 
         Assert.Equal(ParticipationStatus.Going, LifecycleFixtures.RowOf(session, Blocker).Status);
         Assert.Equal(ParticipationStatus.Going, LifecycleFixtures.RowOf(session, Blocked).Status);
@@ -228,7 +229,7 @@ public class BlockEffectsTests
         JoinRequest request = session.OpenJoinRequest(Blocked, clock);
         Block block = CreateBlock(clock);
 
-        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], clock);
+        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], [], clock);
 
         Assert.Equal(JoinRequestStatus.Lapsed, request.Status);
         Assert.Equal(request.Id, Assert.Single(result.LapsedJoinRequests));
@@ -242,7 +243,7 @@ public class BlockEffectsTests
         JoinRequest request = session.OpenJoinRequest(Third, clock);
         Block block = CreateBlock(clock);
 
-        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], clock);
+        BlockEffectResult result = BlockEffects.Apply(block, [], [session], [], [], clock);
 
         Assert.True(request.IsPending);
         Assert.Empty(result.LapsedJoinRequests);
@@ -256,7 +257,7 @@ public class BlockEffectsTests
         JoinRequest request = poll.OpenJoinRequest(Blocked, clock);
         Block block = CreateBlock(clock);
 
-        BlockEffectResult result = BlockEffects.Apply(block, [], [], [poll], clock);
+        BlockEffectResult result = BlockEffects.Apply(block, [], [], [poll], [], clock);
 
         Assert.Equal(JoinRequestStatus.Lapsed, request.Status);
         Assert.Equal(request.Id, Assert.Single(result.LapsedJoinRequests));
@@ -270,7 +271,7 @@ public class BlockEffectsTests
         poll.Vote(BlockedRef, poll.Options[0].Id, VoteChoice.Available, clock);
         Block block = CreateBlock(clock);
 
-        BlockEffectResult result = BlockEffects.Apply(block, [], [], [poll], clock);
+        BlockEffectResult result = BlockEffects.Apply(block, [], [], [poll], [], clock);
 
         Assert.True(LifecycleFixtures.RowOf(poll, Blocked).IsRemoved);
         Assert.Equal(poll.Id, Assert.Single(result.RemovedFromPolls));
@@ -288,7 +289,7 @@ public class BlockEffectsTests
             minAttendance: 1);
         poll.Vote(BlockedRef, poll.Options[0].Id, VoteChoice.Available, clock);
         Block block = CreateBlock(clock);
-        BlockEffects.Apply(block, [], [], [poll], clock);
+        BlockEffects.Apply(block, [], [], [poll], [], clock);
 
         PollFinalizationResult finalized = poll.Finalize(poll.Options[0].Id, LifecycleFixtures.At(LifecycleFixtures.Hours(25)));
 
@@ -311,7 +312,7 @@ public class BlockEffectsTests
         poll.Finalize(poll.Options[0].Id, atSelection);
         Block block = CreateBlock(atSelection);
 
-        BlockEffectResult result = BlockEffects.Apply(block, [], [], [poll], atSelection);
+        BlockEffectResult result = BlockEffects.Apply(block, [], [], [poll], [], atSelection);
 
         Assert.True(LifecycleFixtures.RowOf(poll, Blocked).IsActive);
         Assert.Empty(result.RemovedFromPolls);
@@ -327,11 +328,11 @@ public class BlockEffectsTests
         JoinRequest request = poll.OpenJoinRequest(Third, clock);
         Block block = CreateBlock(clock);
 
-        BlockEffects.Apply(block, [], [session], [poll], clock);
+        BlockEffects.Apply(block, [], [session], [poll], [], clock);
         session.DequeueEvents();
         poll.DequeueEvents();
 
-        BlockEffectResult second = BlockEffects.Apply(block, [], [session], [poll], clock);
+        BlockEffectResult second = BlockEffects.Apply(block, [], [session], [poll], [], clock);
 
         Assert.Empty(second.RemovedFromSessions);
         Assert.Empty(second.RemovedFromPolls);
@@ -343,6 +344,68 @@ public class BlockEffectsTests
     }
 
     [Fact]
+    public void Apply_OwnerBlocksAnAcceptedMember_DeletesTheMembershipRow_D202()
+    {
+        FakeClock clock = LifecycleFixtures.Clock();
+        FriendGroup group = FriendGroup.Create(Blocker, GroupName.Create("Crew"), clock);
+        group.Invite(Blocker, Blocked, isAcceptedFriendOfOwner: true, clock);
+        group.AcceptInvite(Blocked, clock);
+        Block block = CreateBlock(clock);
+
+        BlockEffectResult result = BlockEffects.Apply(block, [], [], [], [group], clock);
+
+        Assert.DoesNotContain(group.Members, m => m.UserId == Blocked);
+        Assert.Equal(group.Id, Assert.Single(result.GroupsWithRemovedMembership));
+    }
+
+    [Fact]
+    public void Apply_OwnerBlocksAnInvitedMember_DeletesTheMembershipRow_D202()
+    {
+        FakeClock clock = LifecycleFixtures.Clock();
+        FriendGroup group = FriendGroup.Create(Blocker, GroupName.Create("Crew"), clock);
+        group.Invite(Blocker, Blocked, isAcceptedFriendOfOwner: true, clock);
+        Block block = CreateBlock(clock);
+
+        BlockEffectResult result = BlockEffects.Apply(block, [], [], [], [group], clock);
+
+        Assert.DoesNotContain(group.Members, m => m.UserId == Blocked);
+        Assert.Equal(group.Id, Assert.Single(result.GroupsWithRemovedMembership));
+    }
+
+    [Fact]
+    public void Apply_MemberBlocksTheOwner_DeletesTheMembershipRow_D202()
+    {
+        FakeClock clock = LifecycleFixtures.Clock();
+        FriendGroup group = FriendGroup.Create(Blocked, GroupName.Create("Crew"), clock);
+        group.Invite(Blocked, Blocker, isAcceptedFriendOfOwner: true, clock);
+        group.AcceptInvite(Blocker, clock);
+        Block block = CreateBlock(clock);
+
+        BlockEffectResult result = BlockEffects.Apply(block, [], [], [], [group], clock);
+
+        Assert.DoesNotContain(group.Members, m => m.UserId == Blocker);
+        Assert.Equal(group.Id, Assert.Single(result.GroupsWithRemovedMembership));
+    }
+
+    [Fact]
+    public void Apply_TwoNonOwnerMembersBlockEachOther_LeavesTheGroupUntouched_D202()
+    {
+        FakeClock clock = LifecycleFixtures.Clock();
+        FriendGroup group = FriendGroup.Create(Third, GroupName.Create("Crew"), clock);
+        group.Invite(Third, Blocker, isAcceptedFriendOfOwner: true, clock);
+        group.AcceptInvite(Blocker, clock);
+        group.Invite(Third, Blocked, isAcceptedFriendOfOwner: true, clock);
+        group.AcceptInvite(Blocked, clock);
+        Block block = CreateBlock(clock);
+
+        BlockEffectResult result = BlockEffects.Apply(block, [], [], [], [group], clock);
+
+        Assert.Contains(group.Members, m => m.UserId == Blocker);
+        Assert.Contains(group.Members, m => m.UserId == Blocked);
+        Assert.Empty(result.GroupsWithRemovedMembership);
+    }
+
+    [Fact]
     public void Unblock_RestoresNothing_D065()
     {
         FakeClock clock = LifecycleFixtures.Clock();
@@ -350,7 +413,7 @@ public class BlockEffectsTests
         session.Rsvp(BlockedRef, ParticipationStatus.Going, clock);
         Friendship friendship = FriendshipBetween(Blocker, Blocked, clock, accept: true);
         Block block = CreateBlock(clock);
-        BlockEffects.Apply(block, [friendship], [session], [], clock);
+        BlockEffects.Apply(block, [friendship], [session], [], [], clock);
         session.DequeueEvents();
 
         BlockEffectResult result = BlockEffects.Unblock(block);
@@ -367,7 +430,7 @@ public class BlockEffectsTests
         FakeClock clock = LifecycleFixtures.Clock();
         Session session = LifecycleFixtures.NewSession(Blocker, [Blocked], LifecycleFixtures.Hours(24), clock, minAttendance: 1);
         Block block = CreateBlock(clock);
-        BlockEffects.Apply(block, [], [session], [], clock);
+        BlockEffects.Apply(block, [], [session], [], [], clock);
         BlockEffects.Unblock(block);
 
         DomainException error = Assert.Throws<DomainException>(() => session.Invite(Blocked, clock));

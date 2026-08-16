@@ -1,5 +1,6 @@
 using NodaTime;
 using NodaTime.Testing;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
@@ -210,6 +211,27 @@ public class DeletionExecutorTests
 
         Assert.Same(world.OwnFriendship, Assert.Single(result.DeletedFriendships));
         Assert.Same(world.BlockAgainstSubject, Assert.Single(result.DeletedBlocks));
+    }
+
+    [Fact]
+    public void Execute_ListsTheSubjectsOwnedGroupInDeletedGroups_D209()
+    {
+        DeletionWorld world = DeletionWorld.Build();
+
+        DeletionExecutionResult result = world.Execute();
+
+        Assert.Equal(world.OwnedGroup.Id, Assert.Single(result.DeletedGroups));
+    }
+
+    [Fact]
+    public void Execute_RemovesTheSubjectsMembershipRowInAnotherOwnersGroup_D209()
+    {
+        DeletionWorld world = DeletionWorld.Build();
+        Assert.Contains(world.MemberOfGroup.Members, m => m.UserId == world.Subject.Id);
+
+        world.Execute();
+
+        Assert.DoesNotContain(world.MemberOfGroup.Members, m => m.UserId == world.Subject.Id);
     }
 
     [Fact]
@@ -442,14 +464,18 @@ public class DeletionExecutorTests
         Friendship UnrelatedFriendship,
         Block BlockAgainstSubject,
         Block UnrelatedBlock,
-        UsernameRegistryEntry UsernameEntry)
+        UsernameRegistryEntry UsernameEntry,
+        FriendGroup OwnedGroup,
+        FriendGroup MemberOfGroup)
     {
         internal DeletionScope Scope => new(
             [OwnedFuture, OwnedInProgress, OwnedCompleted, OthersFuture, OthersFull, OthersInProgress, OthersRequested],
             [OwnedPoll, OthersPoll],
             [OwnFriendship, UnrelatedFriendship],
             [BlockAgainstSubject, UnrelatedBlock],
-            UsernameEntry);
+            UsernameEntry,
+            [OwnedGroup],
+            [MemberOfGroup]);
 
         internal static DeletionWorld Build()
         {
@@ -536,6 +562,13 @@ public class DeletionExecutorTests
             UsernameRegistryEntry usernameEntry = UsernameRegistry.Claim(
                 null, subject.Username!.Value, me, clock);
 
+            FriendGroup ownedGroup = FriendGroup.Create(me, GroupName.Create("Subject's crew"), clock);
+
+            FriendGroup memberOfGroup = FriendGroup.Create(friend, GroupName.Create("Friend's crew"), clock);
+            memberOfGroup.Invite(friend, me, isAcceptedFriendOfOwner: true, clock);
+            memberOfGroup.AcceptInvite(me, clock);
+            memberOfGroup.DequeueEvents();
+
             DeletionWorld world = new(
                 subject,
                 ownedFuture,
@@ -555,7 +588,9 @@ public class DeletionExecutorTests
                 unrelated,
                 blockAgainstSubject,
                 unrelatedBlock,
-                usernameEntry);
+                usernameEntry,
+                ownedGroup,
+                memberOfGroup);
 
             world.DrainEvents();
             return world;

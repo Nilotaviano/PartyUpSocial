@@ -1,4 +1,5 @@
 using NodaTime;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
@@ -24,9 +25,10 @@ public sealed record BlockEffectResult(
     IReadOnlyList<SessionId> RemovedFromSessions,
     IReadOnlyList<PollId> RemovedFromPolls,
     IReadOnlyList<JoinRequestId> LapsedJoinRequests,
-    IReadOnlyList<SessionReminderCanceled> CanceledReminders)
+    IReadOnlyList<SessionReminderCanceled> CanceledReminders,
+    IReadOnlyList<FriendGroupId> GroupsWithRemovedMembership)
 {
-    public static BlockEffectResult None { get; } = new([], [], [], [], []);
+    public static BlockEffectResult None { get; } = new([], [], [], [], [], []);
 }
 
 /// <summary>
@@ -43,19 +45,24 @@ public static class BlockEffects
     /// row becomes <c>Removed</c> — capacity freed, confirmation re-evaluated by the session itself,
     /// the pending reminder canceled (D-077/D-074, §9); and every open join request between the pair
     /// lapses, so the organizer can never approve a blocked counterpart. Completed rosters are frozen
-    /// (D-095): in history the pair coexists, masked (D-076).
+    /// (D-095): in history the pair coexists, masked (D-076). Where <em>either</em> party owns a
+    /// <see cref="FriendGroup"/> the other party <see cref="FriendGroup.Involves"/>, that membership
+    /// row — <c>Invited</c> or <c>Accepted</c> — is deleted (D-202); groups where neither party owns
+    /// are untouched (member↔member is mask-only, not a deletion, D-202/D-076).
     /// </summary>
     public static BlockEffectResult Apply(
         Block block,
         IEnumerable<Friendship> friendships,
         IEnumerable<Session> sessions,
         IEnumerable<Poll> polls,
+        IReadOnlyCollection<FriendGroup> groups,
         IClock clock)
     {
         ArgumentNullException.ThrowIfNull(block);
         ArgumentNullException.ThrowIfNull(friendships);
         ArgumentNullException.ThrowIfNull(sessions);
         ArgumentNullException.ThrowIfNull(polls);
+        ArgumentNullException.ThrowIfNull(groups);
         ArgumentNullException.ThrowIfNull(clock);
 
         Instant now = clock.GetCurrentInstant();
@@ -65,6 +72,7 @@ public static class BlockEffects
         List<PollId> removedFromPolls = [];
         List<JoinRequestId> lapsedJoinRequests = [];
         List<SessionReminderCanceled> canceledReminders = [];
+        List<FriendGroupId> groupsWithRemovedMembership = [];
 
         foreach (Friendship friendship in friendships)
         {
@@ -129,12 +137,24 @@ public static class BlockEffects
             removedFromPolls.Add(poll.Id);
         }
 
+        foreach (FriendGroup group in groups)
+        {
+            if (!TryCounterpartOf(block, group.OwnerId, out UserId counterpart) || !group.Involves(counterpart))
+            {
+                continue;
+            }
+
+            group.RemoveCounterpartOf(group.OwnerId, counterpart);
+            groupsWithRemovedMembership.Add(group.Id);
+        }
+
         return new BlockEffectResult(
             deletedFriendships,
             removedFromSessions,
             removedFromPolls,
             lapsedJoinRequests,
-            canceledReminders);
+            canceledReminders,
+            groupsWithRemovedMembership);
     }
 
     /// <summary>

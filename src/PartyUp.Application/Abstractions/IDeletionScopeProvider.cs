@@ -27,6 +27,12 @@ public sealed record AvailabilityDeletionScope(
 /// </summary>
 public interface IDeletionScopeProvider
 {
+    /// <summary>
+    /// D-209: <see cref="DeletionScope.OwnedGroups"/> and <see cref="DeletionScope.MemberOfGroups"/>
+    /// must be populated alongside every other collection here — every <c>FriendGroup</c> the subject
+    /// owns, and every group owned by someone else where the subject holds a membership row (Invited
+    /// or Accepted). Implemented in Infrastructure (Task 5).
+    /// </summary>
     Task<DeletionScope> LoadAsync(UserId id, CancellationToken cancellationToken);
 
     /// <summary>

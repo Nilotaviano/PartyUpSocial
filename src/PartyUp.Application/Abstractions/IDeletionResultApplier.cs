@@ -6,6 +6,13 @@ namespace PartyUp.Application.Abstractions;
 
 public interface IDeletionResultApplier
 {
+    /// <summary>
+    /// D-209: <see cref="DeletionExecutionResult.DeletedGroups"/> must be hard-deleted here too — the
+    /// subject's own membership rows in others' groups are already removed on the tracked
+    /// <c>FriendGroup</c> aggregates the executor mutated (the same pattern sessions/polls use), so
+    /// only the owned groups named in <see cref="DeletionExecutionResult.DeletedGroups"/> need an
+    /// explicit delete. Implemented in Infrastructure (Task 5).
+    /// </summary>
     Task ApplyAsync(
         DeletionExecutionResult result,
         UserId subject,

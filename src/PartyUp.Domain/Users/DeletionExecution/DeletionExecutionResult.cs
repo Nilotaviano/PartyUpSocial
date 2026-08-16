@@ -1,4 +1,5 @@
 using NodaTime;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 
@@ -34,10 +35,13 @@ public sealed record DeletionJournalEntry(UserId UserId, Instant ExecutedAt);
 
 /// <summary>
 /// What one deletion execution did (DOMAIN_MODEL §11). Sessions, polls and join requests are already
-/// mutated on the aggregates that were passed in; friendships, blocks and
-/// <see cref="PurgedData"/> leave as instructions, because deleting rows is the caller's job.
-/// Re-running over a tombstone reports empty change lists and the <em>same</em>
-/// <see cref="Journal"/> — the original execution instant, never a fresh one.
+/// mutated on the aggregates that were passed in; friendships, blocks,
+/// <see cref="DeletedGroups"/> and <see cref="PurgedData"/> leave as instructions, because deleting
+/// rows is the caller's job. The subject's own membership rows in others' groups (D-209) are already
+/// removed on the <see cref="FriendGroup"/> aggregates the caller passed in — the same pattern
+/// sessions/polls use — so there is no separate list for those; only the owned groups the caller must
+/// hard-delete are named here. Re-running over a tombstone reports empty change lists and the
+/// <em>same</em> <see cref="Journal"/> — the original execution instant, never a fresh one.
 /// </summary>
 public sealed record DeletionExecutionResult(
     IReadOnlyList<SessionId> CanceledSessions,
@@ -50,7 +54,8 @@ public sealed record DeletionExecutionResult(
     IReadOnlyList<Block> DeletedBlocks,
     IReadOnlyList<UserDataScope> PurgedData,
     UsernameRegistryEntry? ReservedUsername,
-    DeletionJournalEntry Journal)
+    DeletionJournalEntry Journal,
+    IReadOnlyList<FriendGroupId> DeletedGroups)
 {
     /// <summary>
     /// The §11 steps 1–3 half of this result, in the shape the D-180 content-removal action produces

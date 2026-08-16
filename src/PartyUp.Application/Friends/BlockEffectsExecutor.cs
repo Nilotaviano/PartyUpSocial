@@ -31,6 +31,7 @@ public sealed class BlockEffectsExecutor(
             pairFriendships,
             scope.Sessions,
             scope.Polls,
+            scope.Groups,
             clock);
 
         foreach (Friendship friendship in result.DeletedFriendships)

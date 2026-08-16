@@ -1,4 +1,5 @@
 using NodaTime;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 
@@ -56,6 +57,24 @@ public static class DeletionExecutor
             }
         }
 
+        // Also (D-209): hard-delete every FriendGroup the user owns (full cascade — membership rows
+        // and every session/poll audience junction row that targeted it, D-199), and delete every
+        // membership row — Invited or Accepted — the user holds in groups owned by others. Silent:
+        // no notifications for either effect (D-207).
+        List<FriendGroupId> deletedGroups = [];
+        foreach (FriendGroup group in scope.OwnedGroups)
+        {
+            deletedGroups.Add(group.Id);
+        }
+
+        foreach (FriendGroup group in scope.MemberOfGroups)
+        {
+            if (group.Involves(subject))
+            {
+                group.Leave(subject);
+            }
+        }
+
         // 6. Tombstone: the username enters its thirty-day, owner-less reservation (D-145, §12-36)
         //    and the User row nulls its PII while staying FK-stable.
         UsernameRegistryEntry? reservedUsername = null;
@@ -81,7 +100,8 @@ public static class DeletionExecutor
             deletedBlocks,
             AllDataScopes,
             reservedUsername,
-            journal);
+            journal,
+            deletedGroups);
     }
 
     /// <summary>
