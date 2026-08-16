@@ -170,7 +170,7 @@ public class SessionVisibilityTests
         Viewer inheritedOnly = TestViewers.FriendOf(s.Organizer);
         Assert.Equal(VisibilityGrant.Inherited, VisibilityEngine.ResolveSession(s.Session, inheritedOnly).Grant);
 
-        s.Session.ChangePrivacy(isPrivate: true, clock);
+        s.Session.ChangeVisibility(ContentVisibility.Private, [], clock);
 
         Assert.Equal(VisibilityGrant.Direct, VisibilityEngine.ResolveSession(s.Session, TestViewers.Of(s.Organizer)).Grant);
         Assert.Equal(VisibilityGrant.Direct, VisibilityEngine.ResolveSession(s.Session, TestViewers.Of(s.Invitee(0))).Grant);
@@ -187,7 +187,7 @@ public class SessionVisibilityTests
     public void Resolve_HidesAPrivateSessionFromAFriendOfAnExtender_D019()
     {
         FakeClock clock = TestSessions.Clock();
-        SessionUnderTest s = TestSessions.New(clock, isPrivate: true);
+        SessionUnderTest s = TestSessions.New(clock, visibility: ContentVisibility.Private);
 
         Assert.False(VisibilityEngine.ResolveSession(s.Session, TestViewers.FriendOf(s.Organizer)).IsVisible);
         Assert.False(VisibilityEngine.ResolveSession(s.Session, TestViewers.FriendOf(s.Invitee(0))).IsVisible);
@@ -200,10 +200,10 @@ public class SessionVisibilityTests
         SessionUnderTest s = TestSessions.New(clock);
         Viewer friendOfOrganizer = TestViewers.FriendOf(s.Organizer);
 
-        s.Session.ChangePrivacy(isPrivate: true, clock);
+        s.Session.ChangeVisibility(ContentVisibility.Private, [], clock);
         Assert.False(VisibilityEngine.ResolveSession(s.Session, friendOfOrganizer).IsVisible);
 
-        s.Session.ChangePrivacy(isPrivate: false, clock);
+        s.Session.ChangeVisibility(ContentVisibility.Public, [], clock);
         Assert.Equal(VisibilityGrant.Inherited, VisibilityEngine.ResolveSession(s.Session, friendOfOrganizer).Grant);
     }
 
@@ -380,7 +380,7 @@ public class SessionVisibilityTests
     public void Require_ReportsAnInvisibleSessionAsNotFound_D019()
     {
         FakeClock clock = TestSessions.Clock();
-        SessionUnderTest s = TestSessions.New(clock, isPrivate: true);
+        SessionUnderTest s = TestSessions.New(clock, visibility: ContentVisibility.Private);
 
         DomainException error = Assert.Throws<DomainException>(
             () => VisibilityEngine.RequireSession(s.Session, TestViewers.Stranger()));

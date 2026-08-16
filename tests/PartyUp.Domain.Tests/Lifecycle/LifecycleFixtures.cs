@@ -36,10 +36,10 @@ internal static class LifecycleFixtures
         int minAttendance = 2,
         int? maxCapacity = null,
         int durationMinutes = 120,
-        bool isPrivate = false) =>
+        ContentVisibility visibility = ContentVisibility.Public) =>
         Session.Create(
             organizer,
-            TestSessions.Details(startTime, minAttendance, maxCapacity, durationMinutes, isPrivate),
+            TestSessions.Details(startTime, minAttendance, maxCapacity, durationMinutes, visibility),
             invitees,
             clock);
 

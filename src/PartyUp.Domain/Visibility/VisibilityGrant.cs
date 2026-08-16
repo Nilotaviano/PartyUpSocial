@@ -13,6 +13,9 @@ public enum VisibilityGrant
     /// <summary>§7 rule 1 — organizer, a retained participation, or a Pending join request.</summary>
     Direct = 1,
 
-    /// <summary>§7 rule 2 — an Accepted friendship with an extender on a non-private target.</summary>
+    /// <summary>§7 rule 2 — an Accepted friendship with an extender on a public target.</summary>
     Inherited = 2,
+
+    /// <summary>§7 rule 2g — ownership or Accepted membership in a targeted friend group (D-198).</summary>
+    Group = 3,
 }

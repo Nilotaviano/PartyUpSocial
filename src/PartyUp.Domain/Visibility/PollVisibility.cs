@@ -57,6 +57,11 @@ public static class PollVisibility
             }
         }
 
-        return VisibilityTarget.Create(poll.OrganizerId, poll.IsPrivate, members, requesters);
+        return VisibilityTarget.Create(
+            poll.OrganizerId,
+            poll.Visibility,
+            poll.AudienceGroupIds,
+            members,
+            requesters);
     }
 }

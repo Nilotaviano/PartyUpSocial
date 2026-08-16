@@ -19,7 +19,7 @@ public sealed record PollDetails
         SessionNotes notes,
         int minAttendance,
         int? maxCapacity,
-        bool isPrivate)
+        ContentVisibility visibility)
     {
         // The field rules live in SessionDetails — a poll carries exactly the session's details
         // (§6.1) — and the start time belongs to the option (D-154), so validation runs against a
@@ -33,7 +33,7 @@ public sealed record PollDetails
             notes,
             minAttendance,
             maxCapacity,
-            isPrivate);
+            visibility);
 
         Title = validated.Title;
         Duration = validated.Duration;
@@ -42,7 +42,7 @@ public sealed record PollDetails
         Notes = validated.Notes;
         MinAttendance = validated.MinAttendance;
         MaxCapacity = validated.MaxCapacity;
-        IsPrivate = validated.IsPrivate;
+        Visibility = validated.Visibility;
     }
 
     public SessionTitle Title { get; }
@@ -61,9 +61,9 @@ public sealed record PollDetails
     /// <summary>D-091: null means unlimited attendance, so finalization waitlists nobody.</summary>
     public int? MaxCapacity { get; }
 
-    public bool IsPrivate { get; }
+    public ContentVisibility Visibility { get; }
 
     /// <summary>§6.4-2: the selected option's instant becomes the session's fixed start time.</summary>
     public SessionDetails ForStartTime(Instant startTime) =>
-        new(Title, startTime, Duration, Platform, Game, Notes, MinAttendance, MaxCapacity, IsPrivate);
+        new(Title, startTime, Duration, Platform, Game, Notes, MinAttendance, MaxCapacity, Visibility);
 }

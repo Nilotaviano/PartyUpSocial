@@ -1,3 +1,4 @@
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
@@ -7,8 +8,8 @@ namespace PartyUp.Domain.Visibility;
 /// <summary>
 /// The security boundary (DOMAIN_MODEL §7): every session/poll read <em>and</em> write by a
 /// registered viewer resolves here and fails closed — no match is reported as not found, never as
-/// forbidden. The four rules are applied in their stated order, with the block filter taking
-/// precedence over the other three.
+/// forbidden. The canonical order is rule 4 → rule 1 → level gate → the inheritance rule that level
+/// admits (rule 2g for Groups, rule 2 for Public); the rule numbers are stable identifiers.
 /// </summary>
 /// <remarks>
 /// Guest link resolution is the §5.4 exception and deliberately does not come through here: a
@@ -39,9 +40,24 @@ public static class VisibilityEngine
             return VisibilityResult.Direct;
         }
 
-        // Rule 3: a private target is rule 1 only — the privacy-flip retained set (D-043/D-047).
-        if (target.IsPrivate)
+        // §7 level gate: Private is rule 1 only (D-043/D-047); Groups admits only
+        // owners/Accepted members of a targeted group (rule 2g, D-198) — rule-2
+        // inheritance is Public-only.
+        if (target.Visibility == ContentVisibility.Private)
         {
+            return VisibilityResult.NotFound;
+        }
+
+        if (target.Visibility == ContentVisibility.Groups)
+        {
+            foreach (FriendGroupId groupId in target.AudienceGroupIds)
+            {
+                if (viewer.IsInGroup(groupId))
+                {
+                    return VisibilityResult.Group(groupId);
+                }
+            }
+
             return VisibilityResult.NotFound;
         }
 

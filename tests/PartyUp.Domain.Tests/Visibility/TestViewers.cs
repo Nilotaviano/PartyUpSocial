@@ -1,3 +1,4 @@
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Visibility;
 
@@ -11,6 +12,10 @@ internal static class TestViewers
     /// <summary>A brand-new viewer who is an Accepted friend of everyone listed.</summary>
     internal static Viewer FriendOf(params UserId[] friends) => Viewer.Create(UserId.New(), friends);
 
-    internal static Viewer Of(UserId id, IEnumerable<UserId>? friends = null, IEnumerable<UserId>? blocked = null) =>
-        Viewer.Create(id, friends, blocked);
+    internal static Viewer Of(
+        UserId id,
+        IEnumerable<UserId>? friends = null,
+        IEnumerable<UserId>? blocked = null,
+        IEnumerable<FriendGroupId>? groupIds = null) =>
+        Viewer.Create(id, friends, blocked, groupIds);
 }

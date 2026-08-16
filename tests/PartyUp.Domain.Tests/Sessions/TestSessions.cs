@@ -1,5 +1,6 @@
 using NodaTime;
 using NodaTime.Testing;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
 
@@ -36,7 +37,7 @@ internal static class TestSessions
         int minAttendance = 2,
         int? maxCapacity = null,
         int durationMinutes = DefaultDurationMinutes,
-        bool isPrivate = false,
+        ContentVisibility visibility = ContentVisibility.Public,
         Platform platform = Platform.NotApplicable,
         string title = "Raid night",
         string? game = null,
@@ -50,26 +51,28 @@ internal static class TestSessions
             notes is null ? SessionNotes.Empty : SessionNotes.Create(notes),
             minAttendance,
             maxCapacity,
-            isPrivate);
+            visibility);
 
-    /// <summary>A non-private session with the organizer Going plus <paramref name="inviteeCount"/> Pending invitees.</summary>
+    /// <summary>A public session with the organizer Going plus <paramref name="inviteeCount"/> Pending invitees.</summary>
     internal static SessionUnderTest New(
         IClock clock,
         int inviteeCount = 2,
         int minAttendance = 2,
         int? maxCapacity = null,
         int durationMinutes = DefaultDurationMinutes,
-        bool isPrivate = false,
-        Instant? startTime = null)
+        ContentVisibility visibility = ContentVisibility.Public,
+        Instant? startTime = null,
+        IReadOnlyCollection<FriendGroupId>? audienceGroups = null)
     {
         UserId organizer = UserId.New();
         UserId[] invitees = [.. Enumerable.Range(0, inviteeCount).Select(_ => UserId.New())];
 
         Session session = Session.Create(
             organizer,
-            Details(startTime, minAttendance, maxCapacity, durationMinutes, isPrivate),
+            Details(startTime, minAttendance, maxCapacity, durationMinutes, visibility),
             invitees,
-            clock);
+            clock,
+            audienceGroups);
 
         return new SessionUnderTest(session, organizer, invitees);
     }
@@ -84,7 +87,7 @@ internal static class TestSessions
         UserId organizer = UserId.New();
         Session session = Session.Create(
             organizer,
-            Details(startTime, minAttendance, maxCapacity, isPrivate: true),
+            Details(startTime, minAttendance, maxCapacity, visibility: ContentVisibility.Private),
             [],
             clock);
 

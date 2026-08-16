@@ -197,7 +197,7 @@ public class PollCreationTests
         DomainException error = Assert.Throws<DomainException>(
             () => Poll.Create(
                 UserId.New(),
-                TestPolls.Details(isPrivate: false),
+                TestPolls.Details(visibility: ContentVisibility.Public),
                 PollDeadlineChoice.Hours24,
                 [TestPolls.Hours(72), TestPolls.Hours(96)],
                 [],
@@ -213,7 +213,7 @@ public class PollCreationTests
 
         PollUnderTest fixture = TestPolls.GuestOnly(clock);
 
-        Assert.True(fixture.Poll.IsPrivate);
+        Assert.Equal(ContentVisibility.Private, fixture.Poll.Visibility);
         Assert.Single(fixture.Poll.Participants);
     }
 

@@ -34,7 +34,7 @@ public class DiscoveryAccessTests
         SessionUnderTest s = TestSessions.New(clock, inviteeCount: 1);
         Viewer friend = TestViewers.FriendOf(s.Organizer);
 
-        s.Session.ChangePrivacy(isPrivate: true, clock);
+        s.Session.ChangeVisibility(ContentVisibility.Private, [], clock);
 
         Assert.False(VisibilityEngine.ResolveSession(s.Session, friend).IsVisible);
     }

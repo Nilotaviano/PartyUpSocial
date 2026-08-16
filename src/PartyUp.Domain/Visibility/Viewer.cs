@@ -1,23 +1,31 @@
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 
 namespace PartyUp.Domain.Visibility;
 
 /// <summary>
-/// A registered viewer plus the two relation sets every §7 rule reads: their Accepted friendships
-/// and their block pairs in either direction. The application layer feeds these from query results;
-/// the engine itself touches no repository.
+/// A registered viewer plus the relation sets every §7 rule reads: their Accepted friendships,
+/// their block pairs in either direction, and the friend groups they own or hold Accepted
+/// membership in. The application layer feeds these from query results; the engine itself touches
+/// no repository.
 /// </summary>
 public sealed class Viewer
 {
     private readonly HashSet<UserId> _acceptedFriendIds;
     private readonly HashSet<UserId> _blockedCounterpartIds;
+    private readonly HashSet<FriendGroupId> _groupIds;
 
-    private Viewer(UserId id, HashSet<UserId> acceptedFriendIds, HashSet<UserId> blockedCounterpartIds)
+    private Viewer(
+        UserId id,
+        HashSet<UserId> acceptedFriendIds,
+        HashSet<UserId> blockedCounterpartIds,
+        HashSet<FriendGroupId> groupIds)
     {
         Id = id;
         _acceptedFriendIds = acceptedFriendIds;
         _blockedCounterpartIds = blockedCounterpartIds;
+        _groupIds = groupIds;
     }
 
     public UserId Id { get; }
@@ -27,15 +35,20 @@ public sealed class Viewer
     /// <summary>Both directions: blocking is mutually invisible, so who blocked whom never matters (D-065).</summary>
     public IReadOnlyCollection<UserId> BlockedCounterpartIds => _blockedCounterpartIds;
 
+    /// <summary>§7 rule 2g: the groups the viewer owns or holds Accepted membership in (D-198).</summary>
+    public IReadOnlyCollection<FriendGroupId> GroupIds => _groupIds;
+
     public static Viewer Create(
         UserId id,
         IEnumerable<UserId>? acceptedFriendIds = null,
-        IEnumerable<UserId>? blockedCounterpartIds = null)
+        IEnumerable<UserId>? blockedCounterpartIds = null,
+        IEnumerable<FriendGroupId>? groupIds = null)
     {
         HashSet<UserId> friends = Collect(id, acceptedFriendIds, "a friend of");
         HashSet<UserId> blocked = Collect(id, blockedCounterpartIds, "blocked with");
+        HashSet<FriendGroupId> groups = groupIds is null ? [] : [.. groupIds];
 
-        return new Viewer(id, friends, blocked);
+        return new Viewer(id, friends, blocked, groups);
     }
 
     /// <summary>
@@ -66,12 +79,14 @@ public sealed class Viewer
             }
         }
 
-        return new Viewer(id, friends, blocked);
+        return new Viewer(id, friends, blocked, []);
     }
 
     public bool IsFriendOf(UserId other) => _acceptedFriendIds.Contains(other);
 
     public bool IsBlockedWith(UserId other) => _blockedCounterpartIds.Contains(other);
+
+    public bool IsInGroup(FriendGroupId groupId) => _groupIds.Contains(groupId);
 
     private static HashSet<UserId> Collect(UserId id, IEnumerable<UserId>? candidates, string relation)
     {

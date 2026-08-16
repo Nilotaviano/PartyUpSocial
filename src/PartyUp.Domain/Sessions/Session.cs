@@ -1,4 +1,5 @@
 using NodaTime;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 
 namespace PartyUp.Domain.Sessions;
@@ -19,6 +20,7 @@ public sealed class Session : AggregateRoot
     private readonly List<JoinRequest> _joinRequests = [];
     private readonly List<GuestIdentity> _guestIdentities = [];
     private readonly List<GuestLink> _guestLinks = [];
+    private readonly List<FriendGroupId> _audienceGroupIds = [];
 
     private Session()
     {
@@ -28,6 +30,7 @@ public sealed class Session : AggregateRoot
         SessionId id,
         UserId organizerId,
         SessionDetails details,
+        IReadOnlyCollection<FriendGroupId> audienceGroupIds,
         PollId? originPollId,
         SessionStatus status,
         Instant createdAt)
@@ -42,8 +45,9 @@ public sealed class Session : AggregateRoot
         Notes = details.Notes;
         MinAttendance = details.MinAttendance;
         MaxCapacity = details.MaxCapacity;
-        IsPrivate = details.IsPrivate;
+        Visibility = details.Visibility;
         OriginPollId = originPollId;
+        _audienceGroupIds.AddRange(audienceGroupIds);
         Status = status;
         CreatedAt = createdAt;
     }
@@ -70,7 +74,10 @@ public sealed class Session : AggregateRoot
 
     public int? MaxCapacity { get; private set; }
 
-    public bool IsPrivate { get; private set; }
+    public ContentVisibility Visibility { get; private set; }
+
+    /// <summary>D-201: the friend groups a <c>Groups</c> session is shared with; empty otherwise.</summary>
+    public IReadOnlyCollection<FriendGroupId> AudienceGroupIds => _audienceGroupIds;
 
     /// <summary>Set by poll finalization — D-160's poll→session success linkage.</summary>
     public PollId? OriginPollId { get; private set; }
@@ -125,31 +132,49 @@ public sealed class Session : AggregateRoot
 
     /// <summary>
     /// Direct creation (spec §7.1). The start is validated against the D-130 window, the organizer
-    /// starts Going (D-075), and a non-private session needs at least one directly invited
-    /// registered friend (D-099) — friendship itself is an application-layer check. A private
-    /// session may be created with guest links only (D-125), hence an empty invitee set.
+    /// starts Going (D-075), a public session needs at least one directly invited registered friend
+    /// (D-099) and a Groups session at least one targeted friend group (D-201) — friendship and
+    /// group authority are application-layer checks. A private session may be created with guest
+    /// links only (D-125), hence an empty invitee set.
     /// </summary>
     public static Session Create(
         UserId organizerId,
         SessionDetails details,
         IReadOnlyCollection<UserId> invitees,
-        IClock clock)
+        IClock clock,
+        IReadOnlyCollection<FriendGroupId>? audienceGroupIds = null)
     {
         ArgumentNullException.ThrowIfNull(details);
         ArgumentNullException.ThrowIfNull(invitees);
         ArgumentNullException.ThrowIfNull(clock);
 
+        IReadOnlyCollection<FriendGroupId> audience = audienceGroupIds ?? [];
+
         Instant now = clock.GetCurrentInstant();
         SessionStartWindow.Require(details.StartTime, now);
 
-        if (!details.IsPrivate && invitees.Count == 0)
+        switch (details.Visibility)
+        {
+            case ContentVisibility.Public when invitees.Count == 0:
+                throw new DomainException(
+                    DomainError.ValidationFailed,
+                    "A public session requires at least one directly invited registered friend at creation (D-099).");
+            case ContentVisibility.Groups when audience.Count == 0:
+                throw new DomainException(
+                    DomainError.ValidationFailed,
+                    "A Groups session requires at least one targeted friend group at creation (D-201).");
+            default:
+                break;
+        }
+
+        if (details.Visibility != ContentVisibility.Groups && audience.Count > 0)
         {
             throw new DomainException(
                 DomainError.ValidationFailed,
-                "A non-private session requires at least one directly invited registered friend at creation (D-099).");
+                "Only a Groups session targets friend groups (D-201).");
         }
 
-        Session session = new(SessionId.New(), organizerId, details, null, SessionStatus.Unconfirmed, now);
+        Session session = new(SessionId.New(), organizerId, details, audience, null, SessionStatus.Unconfirmed, now);
         session._participations.Add(Participation.Organizer(session.Id, organizerId, now));
 
         foreach (UserId invitee in invitees)
@@ -185,7 +210,8 @@ public sealed class Session : AggregateRoot
         SessionDetails details,
         IEnumerable<FinalizedParticipation> roster,
         SessionStatus initialStatus,
-        IClock clock)
+        IClock clock,
+        IReadOnlyCollection<FriendGroupId>? audienceGroupIds = null)
     {
         ArgumentNullException.ThrowIfNull(details);
         ArgumentNullException.ThrowIfNull(roster);
@@ -200,7 +226,14 @@ public sealed class Session : AggregateRoot
         }
 
         Instant now = clock.GetCurrentInstant();
-        Session session = new(SessionId.New(), organizerId, details, originPollId, initialStatus, now);
+        Session session = new(
+            SessionId.New(),
+            organizerId,
+            details,
+            audienceGroupIds ?? [],
+            originPollId,
+            initialStatus,
+            now);
 
         foreach (FinalizedParticipation entry in roster)
         {
@@ -824,15 +857,47 @@ public sealed class Session : AggregateRoot
     }
 
     /// <summary>
-    /// D-123/§12-7: silent in both directions. The retained set on a flip to private <em>is</em> §7
+    /// D-123/§12-7: silent in every direction. The retained set on a narrowing flip <em>is</em> §7
     /// rule 1 (Origin = Invited rows, active participants, Pending requests), so no roster surgery
     /// happens here. D-099's invited-friend rule is creation-time only — a guest-only session may be
-    /// flipped public and is then discoverable through its organizer (D-085).
+    /// flipped public and is then discoverable through its organizer (D-085). Leaving the Groups
+    /// level deletes the audience junction rows (D-203); the authority to target a newly added group
+    /// is an application-layer check (D-201).
     /// </summary>
-    public void ChangePrivacy(bool isPrivate, IClock clock)
+    public void ChangeVisibility(
+        ContentVisibility visibility,
+        IReadOnlyCollection<FriendGroupId> audienceGroupIds,
+        IClock clock)
     {
-        RequireEditable(clock, "change the privacy");
-        IsPrivate = isPrivate;
+        ArgumentNullException.ThrowIfNull(audienceGroupIds);
+        RequireEditable(clock, "change the visibility");
+
+        if (!Enum.IsDefined(visibility))
+        {
+            throw new DomainException(
+                DomainError.ValidationFailed,
+                FormattableString.Invariant($"Unknown visibility '{visibility}' (D-198)."));
+        }
+
+        if (visibility == ContentVisibility.Groups)
+        {
+            if (audienceGroupIds.Count == 0)
+            {
+                throw new DomainException(
+                    DomainError.ValidationFailed,
+                    "A Groups session targets at least one friend group (D-201).");
+            }
+        }
+        else if (audienceGroupIds.Count > 0)
+        {
+            throw new DomainException(
+                DomainError.ValidationFailed,
+                "Only a Groups session targets friend groups (D-201).");
+        }
+
+        Visibility = visibility;
+        _audienceGroupIds.Clear();
+        _audienceGroupIds.AddRange(audienceGroupIds);
     }
 
     /// <summary>D-082: a per-session override of the account reminder default; registered only.</summary>

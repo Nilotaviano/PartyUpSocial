@@ -321,26 +321,26 @@ public class SessionEditTests
         fixture.Session.ChangeTitle(SessionTitle.Create("Ranked grind"), clock);
         fixture.Session.ChangeGame(Platform.Steam, SessionGame.FreeText(GameName.Create("Deep Rock Galactic")), clock);
         fixture.Session.ChangeNotes(SessionNotes.Create("Bring beers"), clock);
-        fixture.Session.ChangePrivacy(true, clock);
+        fixture.Session.ChangeVisibility(ContentVisibility.Private, [], clock);
 
         Assert.Equal("Ranked grind", fixture.Session.Title.Value);
         Assert.Equal(Platform.Steam, fixture.Session.Platform);
         Assert.Equal("Deep Rock Galactic", fixture.Session.Game!.Name.Value);
         Assert.Equal("Bring beers", fixture.Session.Notes.Value);
-        Assert.True(fixture.Session.IsPrivate);
+        Assert.Equal(ContentVisibility.Private, fixture.Session.Visibility);
         Assert.Empty(fixture.Drain());
     }
 
     [Fact]
-    public void ChangePrivacy_ToNonPrivateIsAllowedForAGuestOnlySession_D123()
+    public void ChangeVisibility_ToPublicIsAllowedForAGuestOnlySession_D123()
     {
         // §12-7: D-099's invited-friend rule is creation-time only.
         FakeClock clock = TestSessions.Clock();
         SessionUnderTest fixture = TestSessions.GuestOnly(clock);
 
-        fixture.Session.ChangePrivacy(false, clock);
+        fixture.Session.ChangeVisibility(ContentVisibility.Public, [], clock);
 
-        Assert.False(fixture.Session.IsPrivate);
+        Assert.Equal(ContentVisibility.Public, fixture.Session.Visibility);
     }
 
     [Fact]
@@ -362,6 +362,7 @@ public class SessionEditTests
                 () => fixture.Session.ChangeStartTime(TestSessions.Origin + Duration.FromDays(2), clock)).Error);
         Assert.Equal(
             DomainError.TerminalState,
-            Assert.Throws<DomainException>(() => fixture.Session.ChangePrivacy(true, clock)).Error);
+            Assert.Throws<DomainException>(
+                () => fixture.Session.ChangeVisibility(ContentVisibility.Private, [], clock)).Error);
     }
 }

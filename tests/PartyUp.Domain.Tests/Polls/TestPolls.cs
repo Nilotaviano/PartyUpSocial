@@ -57,7 +57,7 @@ internal static class TestPolls
         int minAttendance = 2,
         int? maxCapacity = null,
         int durationMinutes = DefaultDurationMinutes,
-        bool isPrivate = false,
+        ContentVisibility visibility = ContentVisibility.Public,
         string title = "Raid night",
         Platform platform = Platform.NotApplicable,
         string? game = null,
@@ -70,7 +70,7 @@ internal static class TestPolls
             notes is null ? SessionNotes.Empty : SessionNotes.Create(notes),
             minAttendance,
             maxCapacity,
-            isPrivate);
+            visibility);
 
     /// <summary>A non-private poll: the organizer plus <paramref name="inviteeCount"/> Active invitees.</summary>
     internal static PollUnderTest New(
@@ -107,7 +107,7 @@ internal static class TestPolls
 
         Poll poll = Poll.Create(
             organizer,
-            Details(minAttendance, maxCapacity, isPrivate: true),
+            Details(minAttendance, maxCapacity, visibility: ContentVisibility.Private),
             PollDeadlineChoice.Hours24,
             optionStartTimes ?? [Hours(72), Hours(96)],
             [],

@@ -166,7 +166,7 @@ public class SessionCoreDecisionTests
             SessionNotes.Empty,
             2,
             null,
-            false);
+            ContentVisibility.Public);
 
     [Fact]
     public void CreateGuestLink_SharesTheInvitationByLink_D012()
@@ -178,7 +178,7 @@ public class SessionCoreDecisionTests
         GuestIdentity guest = fixture.Session.ClaimGuestLink(
             link.Id, DisplayName.Create("Robin"), ParticipationStatus.Going, clock);
 
-        Assert.False(fixture.Session.IsPrivate);
+        Assert.Equal(ContentVisibility.Public, fixture.Session.Visibility);
         Assert.Same(link, fixture.Session.FindLinkByToken(token));
         Assert.Equal(ParticipationOrigin.GuestLink, fixture.Row(guest.Participant).Origin);
         Assert.Equal(ParticipationStatus.Going, fixture.Row(guest.Participant).Status);
@@ -212,7 +212,7 @@ public class SessionCoreDecisionTests
         fixture.Session.ChangeNotes(SessionNotes.Create("Voice chat on."), clock);
         fixture.Session.ChangeMaxCapacity(6, clock);
         fixture.Session.ChangeDuration(Duration15.FromMinutes(180), clock);
-        fixture.Session.ChangePrivacy(isPrivate: true, clock);
+        fixture.Session.ChangeVisibility(ContentVisibility.Private, [], clock);
 
         Assert.Equal(ParticipationStatus.Going, fixture.Row(0).Status);
 

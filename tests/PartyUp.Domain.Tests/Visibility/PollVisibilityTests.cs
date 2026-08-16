@@ -16,7 +16,7 @@ public class PollVisibilityTests
 
         Poll poll = Poll.Create(
             organizer,
-            TestPolls.Details(isPrivate: true),
+            TestPolls.Details(visibility: ContentVisibility.Private),
             PollDeadlineChoice.Hours24,
             [TestPolls.Hours(72), TestPolls.Hours(96)],
             invitees,

@@ -66,6 +66,11 @@ public static class SessionVisibility
             }
         }
 
-        return VisibilityTarget.Create(session.OrganizerId, session.IsPrivate, members, requesters);
+        return VisibilityTarget.Create(
+            session.OrganizerId,
+            session.Visibility,
+            session.AudienceGroupIds,
+            members,
+            requesters);
     }
 }

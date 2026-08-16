@@ -32,7 +32,7 @@ public class SessionCreationTests
                 minAttendance: 2,
                 maxCapacity: 6,
                 durationMinutes: 45,
-                isPrivate: true,
+                visibility: ContentVisibility.Private,
                 platform: Platform.Steam),
             [],
             clock);
@@ -43,7 +43,7 @@ public class SessionCreationTests
         Assert.Equal(6, session.MaxCapacity);
         Assert.Equal(45, session.Duration.TotalMinutes);
         Assert.Equal(Platform.Steam, session.Platform);
-        Assert.True(session.IsPrivate);
+        Assert.Equal(ContentVisibility.Private, session.Visibility);
     }
 
     [Fact]
@@ -148,7 +148,7 @@ public class SessionCreationTests
     public void Create_RejectsANonPrivateSessionWithoutAnInvitedFriend_D099()
     {
         FakeClock clock = TestSessions.Clock();
-        SessionDetails details = TestSessions.Details(isPrivate: false);
+        SessionDetails details = TestSessions.Details(visibility: ContentVisibility.Public);
 
         DomainException error = Assert.Throws<DomainException>(
             () => Session.Create(UserId.New(), details, [], clock));
@@ -163,7 +163,7 @@ public class SessionCreationTests
 
         SessionUnderTest fixture = TestSessions.GuestOnly(clock);
 
-        Assert.True(fixture.Session.IsPrivate);
+        Assert.Equal(ContentVisibility.Private, fixture.Session.Visibility);
         Assert.Single(fixture.Session.Participations);
     }
 
@@ -249,7 +249,7 @@ public class SessionCreationTests
                 SessionNotes.Empty,
                 2,
                 null,
-                false));
+                ContentVisibility.Public));
 
         Assert.Equal(DomainError.ValidationFailed, error.Error);
     }

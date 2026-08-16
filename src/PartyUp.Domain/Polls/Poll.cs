@@ -1,4 +1,5 @@
 using NodaTime;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
 
@@ -30,12 +31,19 @@ public sealed class Poll : AggregateRoot
     private readonly List<JoinRequest> _joinRequests = [];
     private readonly List<GuestIdentity> _guestIdentities = [];
     private readonly List<GuestLink> _guestLinks = [];
+    private readonly List<FriendGroupId> _audienceGroupIds = [];
 
     private Poll()
     {
     }
 
-    private Poll(PollId id, UserId organizerId, PollDetails details, PollDeadlineChoice deadlineChoice, Instant createdAt)
+    private Poll(
+        PollId id,
+        UserId organizerId,
+        PollDetails details,
+        IReadOnlyCollection<FriendGroupId> audienceGroupIds,
+        PollDeadlineChoice deadlineChoice,
+        Instant createdAt)
     {
         Id = id;
         OrganizerId = organizerId;
@@ -46,8 +54,9 @@ public sealed class Poll : AggregateRoot
         Notes = details.Notes;
         MinAttendance = details.MinAttendance;
         MaxCapacity = details.MaxCapacity;
-        IsPrivate = details.IsPrivate;
+        Visibility = details.Visibility;
         DeadlineChoice = deadlineChoice;
+        _audienceGroupIds.AddRange(audienceGroupIds);
         Deadline = deadlineChoice.DeadlineFrom(createdAt);
         Status = PollStatus.Polling;
         CreatedAt = createdAt;
@@ -71,7 +80,10 @@ public sealed class Poll : AggregateRoot
 
     public int? MaxCapacity { get; private set; }
 
-    public bool IsPrivate { get; private set; }
+    public ContentVisibility Visibility { get; private set; }
+
+    /// <summary>D-201: the friend groups a <c>Groups</c> poll is shared with; empty otherwise.</summary>
+    public IReadOnlyCollection<FriendGroupId> AudienceGroupIds => _audienceGroupIds;
 
     /// <summary>D-070: 6, 12, 24 or 48 hours; 24 is the D-131 default, applied by the application layer.</summary>
     public PollDeadlineChoice DeadlineChoice { get; private set; }
@@ -99,7 +111,7 @@ public sealed class Poll : AggregateRoot
     public bool IsRetainedInHistory => Status == PollStatus.Finalized;
 
     public PollDetails Details =>
-        new(Title, Duration, Platform, Game, Notes, MinAttendance, MaxCapacity, IsPrivate);
+        new(Title, Duration, Platform, Game, Notes, MinAttendance, MaxCapacity, Visibility);
 
     public IReadOnlyList<PollOption> Options => _options;
 
@@ -125,8 +137,9 @@ public sealed class Poll : AggregateRoot
 
     /// <summary>
     /// Creation (spec §7.3). At least two distinct candidate instants are required (D-131) and
-    /// identical ones merge on the way in (D-080); a non-private poll needs at least one directly
-    /// invited registered friend (D-125) — the friendship check itself is application-layer — while
+    /// identical ones merge on the way in (D-080); a public poll needs at least one directly
+    /// invited registered friend (D-125) and a Groups poll at least one targeted friend group
+    /// (D-201) — the friendship and group-authority checks themselves are application-layer — while
     /// a private poll may be guest-only. The organizer holds a participant row from creation (§6.1).
     /// </summary>
     public static Poll Create(
@@ -135,7 +148,8 @@ public sealed class Poll : AggregateRoot
         PollDeadlineChoice deadlineChoice,
         IReadOnlyCollection<Instant> optionStartTimes,
         IReadOnlyCollection<UserId> invitees,
-        IClock clock)
+        IClock clock,
+        IReadOnlyCollection<FriendGroupId>? audienceGroupIds = null)
     {
         ArgumentNullException.ThrowIfNull(details);
         ArgumentNullException.ThrowIfNull(optionStartTimes);
@@ -149,15 +163,31 @@ public sealed class Poll : AggregateRoot
                 FormattableString.Invariant($"Unknown poll deadline choice '{deadlineChoice}' (D-070)."));
         }
 
-        if (!details.IsPrivate && invitees.Count == 0)
+        IReadOnlyCollection<FriendGroupId> audience = audienceGroupIds ?? [];
+
+        switch (details.Visibility)
+        {
+            case ContentVisibility.Public when invitees.Count == 0:
+                throw new DomainException(
+                    DomainError.ValidationFailed,
+                    "A public poll requires at least one directly invited registered friend at creation (D-125).");
+            case ContentVisibility.Groups when audience.Count == 0:
+                throw new DomainException(
+                    DomainError.ValidationFailed,
+                    "A Groups poll requires at least one targeted friend group at creation (D-201).");
+            default:
+                break;
+        }
+
+        if (details.Visibility != ContentVisibility.Groups && audience.Count > 0)
         {
             throw new DomainException(
                 DomainError.ValidationFailed,
-                "A non-private poll requires at least one directly invited registered friend at creation (D-125).");
+                "Only a Groups poll targets friend groups (D-201).");
         }
 
         Instant now = clock.GetCurrentInstant();
-        Poll poll = new(PollId.New(), organizerId, details, deadlineChoice, now);
+        Poll poll = new(PollId.New(), organizerId, details, audience, deadlineChoice, now);
         ParticipantRef organizer = ParticipantRef.ForUser(organizerId);
 
         poll._participants.Add(PollParticipant.Organizer(poll.Id, organizerId, now));
@@ -658,7 +688,8 @@ public sealed class Poll : AggregateRoot
             Details.ForStartTime(option.StartTime),
             roster,
             initialStatus,
-            clock);
+            clock,
+            [.. _audienceGroupIds]);
 
         foreach (GuestIdentity identity in _guestIdentities)
         {

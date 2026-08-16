@@ -6,7 +6,7 @@ namespace PartyUp.Domain.Sessions;
 /// <summary>
 /// The scheduling payload a session is built from (DOMAIN_MODEL §5.1) and the shape a poll carries
 /// as "every eventual session detail" (§6.1). Every field is required: the D-129 creation defaults
-/// (minimum 4, maximum 4, two hours, platform N/A, non-private) are application-layer, so nothing
+/// (minimum 4, maximum 4, two hours, platform N/A, public) are application-layer, so nothing
 /// here may silently substitute one.
 /// </summary>
 public sealed record SessionDetails
@@ -20,7 +20,7 @@ public sealed record SessionDetails
         SessionNotes notes,
         int minAttendance,
         int? maxCapacity,
-        bool isPrivate)
+        ContentVisibility visibility)
     {
         if (title.Value.Length < SessionTitle.MinLength)
         {
@@ -40,6 +40,13 @@ public sealed record SessionDetails
             throw new DomainException(
                 DomainError.ValidationFailed,
                 FormattableString.Invariant($"Unknown platform '{platform}'."));
+        }
+
+        if (!Enum.IsDefined(visibility))
+        {
+            throw new DomainException(
+                DomainError.ValidationFailed,
+                FormattableString.Invariant($"Unknown visibility '{visibility}' (D-198)."));
         }
 
         game?.EnsureAllowedOn(platform);
@@ -67,7 +74,7 @@ public sealed record SessionDetails
         Notes = notes;
         MinAttendance = minAttendance;
         MaxCapacity = maxCapacity;
-        IsPrivate = isPrivate;
+        Visibility = visibility;
     }
 
     public SessionTitle Title { get; }
@@ -89,7 +96,7 @@ public sealed record SessionDetails
     /// <summary>D-091: null means unlimited attendance and therefore no waitlist can exist.</summary>
     public int? MaxCapacity { get; }
 
-    public bool IsPrivate { get; }
+    public ContentVisibility Visibility { get; }
 
     /// <summary>The half-open span the session occupies; <c>EndTime</c> is derived, never stored (§1).</summary>
     public TimeRange Window => TimeRange.FromDuration(StartTime, Duration.Value);
