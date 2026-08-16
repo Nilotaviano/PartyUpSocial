@@ -279,27 +279,6 @@ public sealed class FriendGroupUseCases(
             cancellationToken);
 
     /// <summary>D-207: silent — no notification.</summary>
-    public Task<FriendGroupCommandResult> RevokeInviteAsync(
-        UserId actorId,
-        FriendGroupId groupId,
-        UserId inviteeId,
-        CancellationToken cancellationToken) =>
-        unitOfWork.ExecuteAsync(
-            async ct =>
-            {
-                FriendGroup? group = await groups.LoadForUpdateAsync(groupId, ct);
-                if (group is null || !group.Involves(actorId))
-                {
-                    return FriendGroupCommandResult.Failed("group_not_found");
-                }
-
-                group.RevokeInvite(actorId, inviteeId);
-
-                return FriendGroupCommandResult.Ok();
-            },
-            cancellationToken);
-
-    /// <summary>D-207: silent — no notification.</summary>
     public Task<FriendGroupCommandResult> RemoveMemberAsync(
         UserId actorId,
         FriendGroupId groupId,

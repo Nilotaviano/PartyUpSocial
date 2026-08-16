@@ -235,7 +235,7 @@ public sealed class DiscoverReadTests : IAsyncLifetime, IDisposable
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
+            visibility: ContentVisibility.Public);
 
         Session session = Session.Create(organizerId, details, [filler], _factory.Clock);
         _ = session.DequeueEvents();

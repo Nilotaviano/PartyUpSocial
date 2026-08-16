@@ -246,7 +246,7 @@ public sealed class FriendBlockConcurrencyTests : IAsyncLifetime
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
+            visibility: ContentVisibility.Private);
         Session session = Session.Create(organizerId, details, [], clock);
         _ = session.DequeueEvents();
         return session;

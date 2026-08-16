@@ -213,7 +213,7 @@ public static class SessionEndpoints
         CreateSessionRequest request,
         ICurrentUserAccessor currentUser,
         CreateSessionUseCase useCase,
-        ISessionReadRepository reads,
+        SessionReadUseCases reads,
         ISessionVersionStamp versionStamp,
         IConfiguration configuration,
         HttpContext context,
@@ -286,8 +286,10 @@ public static class SessionEndpoints
             return Problem(context, status, result.Code!);
         }
 
-        SessionDetailResponse detail = await BuildDetailResponseAsync(
-            reads, versionStamp, result.Session!.Id, cancellationToken);
+        SessionDetail sessionDetail = (await reads.GetSessionDetailAsync(
+            result.Session!.Id, actorId.Value, cancellationToken))!;
+        string detailVersion = versionStamp.Issue(sessionDetail.Id, sessionDetail.ConcurrencyToken);
+        SessionDetailResponse detail = SessionDetailResponse.From(sessionDetail, detailVersion);
         var guestLinks = result.GuestLinks!
             .Select(link => new GuestLinkInvitationResponse(
                 link.GuestLinkId.Value,
@@ -1023,17 +1025,6 @@ public static class SessionEndpoints
     }
 
     // ---- shared helpers -----------------------------------------------------------------------
-
-    private static async Task<SessionDetailResponse> BuildDetailResponseAsync(
-        ISessionReadRepository reads,
-        ISessionVersionStamp versionStamp,
-        SessionId sessionId,
-        CancellationToken cancellationToken)
-    {
-        SessionDetail detail = (await reads.FindDetailAsync(sessionId, cancellationToken))!;
-        string version = versionStamp.Issue(sessionId, detail.ConcurrencyToken);
-        return SessionDetailResponse.From(detail, version);
-    }
 
     private static string BuildGuestUrl(IConfiguration configuration, string token)
     {

@@ -428,7 +428,7 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
+            visibility: ContentVisibility.Public);
         Session session = Session.Create(organizerId, details, [invitedFriendId], _factory.Clock);
         _ = session.DequeueEvents();
         SessionId sessionId = session.Id;
@@ -528,7 +528,7 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
         SessionNotes.Empty,
         minAttendance: 1,
         maxCapacity: null,
-        visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
+        visibility: ContentVisibility.Private);
 }
 
 internal sealed class AttemptGate

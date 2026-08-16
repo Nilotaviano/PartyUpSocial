@@ -305,7 +305,7 @@ public sealed class PollGuestTests : IAsyncLifetime, IDisposable
                 Notes: null,
                 MinAttendance: 1,
                 MaxCapacity: null,
-                Visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public),
+                Visibility: ContentVisibility.Private,
             AudienceGroupIds: null,
                 OptionStartTimes: [startTime, startTime + Duration.FromHours(1)],
                 DeadlineChoice: deadlineChoice,

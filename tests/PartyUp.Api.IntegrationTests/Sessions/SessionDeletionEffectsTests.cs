@@ -237,7 +237,7 @@ public sealed class SessionDeletionEffectsTests : IAsyncLifetime, IDisposable
         SessionNotes.Empty,
         minAttendance: 1,
         maxCapacity: null,
-        visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
+        visibility: ContentVisibility.Private);
 }
 
 internal sealed class DiscoveryCallCounter
@@ -312,7 +312,7 @@ internal sealed class ChangedSetOnceDeletionScopeProvider(
                 SessionNotes.Empty,
                 minAttendance: 1,
                 maxCapacity: null,
-                visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
+                visibility: ContentVisibility.Private);
             Session surpriseSession = Session.Create(surpriseOrganizerId, details, [], clock);
             surpriseSession.Invite(id, clock);
             surpriseSession.Rsvp(ParticipantRef.ForUser(id), ParticipationStatus.Going, clock);
@@ -375,7 +375,7 @@ internal sealed class AlwaysChangingDeletionScopeProvider(
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
+            visibility: ContentVisibility.Private);
         Session session = Session.Create(newOrganizer.Id, details, [], clock);
         session.Invite(id, clock);
         session.Rsvp(ParticipantRef.ForUser(id), ParticipationStatus.Going, clock);

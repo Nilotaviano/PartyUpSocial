@@ -94,6 +94,12 @@ public sealed class PartyUpOpenApiTransformer :
         // PHASE8_DESIGN.md §3 S2 (D-180): the ban-and-remove-content route's §6.2 bounded-retry
         // outcome, surfaced as a 409 alongside the admin routes' existing "not_found".
         "scope_contended",
+
+        // D-198/D-199: the FriendGroup HTTP surface's own codes (FriendGroupEndpoints.StatusFor).
+        "group_not_found",
+        "group_limit_reached",
+        "group_member_limit_reached",
+        "group_name_taken",
     ];
 
     private static readonly HashSet<string> FriendOperationIds =

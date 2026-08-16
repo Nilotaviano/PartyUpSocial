@@ -346,7 +346,7 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
                 Notes: null,
                 MinAttendance: 1,
                 MaxCapacity: null,
-                Visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public),
+                Visibility: ContentVisibility.Private,
             AudienceGroupIds: null,
                 InviteeUserIds: [higherId, lowerId],
                 GuestLinkCount: 0),
@@ -677,7 +677,7 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
         SessionNotes.Empty,
         minAttendance: 1,
         maxCapacity: null,
-        visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
+        visibility: ContentVisibility.Private);
 
     public enum AttachmentCommand
     {

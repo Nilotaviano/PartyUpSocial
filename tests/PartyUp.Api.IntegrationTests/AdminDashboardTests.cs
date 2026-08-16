@@ -287,7 +287,7 @@ public sealed class AdminDashboardTests : IAsyncLifetime, IDisposable
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
+            visibility: ContentVisibility.Private);
 
     private static PollDetails PollDetails(string title) =>
         new(
@@ -298,7 +298,7 @@ public sealed class AdminDashboardTests : IAsyncLifetime, IDisposable
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
+            visibility: ContentVisibility.Private);
 
     private static Task<int> SetUserCreatedAtAsync(AppDbContext context, UserId id, Instant at) =>
         context.Database.ExecuteSqlInterpolatedAsync(

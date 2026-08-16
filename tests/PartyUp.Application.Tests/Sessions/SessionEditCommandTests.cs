@@ -17,12 +17,22 @@ public sealed class SessionEditCommandTests
 
         // D-130 still applies to a reschedule, not just to creation.
         await Assert.ThrowsAsync<DomainException>(() => useCase.ExecuteAsync(
-            new EditSessionCommand(session.Id, fixture.OrganizerId, null, SessionTestFixture.Origin + Duration.FromDays(400), null, null, null, null, null, null, null, null, null),
+            new EditSessionCommand(
+                session.Id,
+                fixture.OrganizerId,
+                null,
+                SessionTestFixture.Origin + Duration.FromDays(400),
+                null, null, null, null, null, null, null, null, null),
             default));
 
         fixture.Clock.Advance(SessionTestFixture.DefaultStart - SessionTestFixture.Origin + Duration.FromMinutes(1));
         await Assert.ThrowsAsync<DomainException>(() => useCase.ExecuteAsync(
-            new EditSessionCommand(session.Id, fixture.OrganizerId, null, fixture.Clock.GetCurrentInstant() + Duration.FromDays(2), null, null, null, null, null, null, null, null, null),
+            new EditSessionCommand(
+                session.Id,
+                fixture.OrganizerId,
+                null,
+                fixture.Clock.GetCurrentInstant() + Duration.FromDays(2),
+                null, null, null, null, null, null, null, null, null),
             default));
     }
 
@@ -92,12 +102,17 @@ public sealed class SessionEditCommandTests
 
         // D-091/§12-1: clearing to unlimited is rejected while the waitlist is non-empty.
         await Assert.ThrowsAsync<DomainException>(() => useCase.ExecuteAsync(
-            new EditSessionCommand(session.Id, fixture.OrganizerId, null, null, null, null, null, null, null, null, null, null, [SessionEditClearField.MaxCapacity]),
+            new EditSessionCommand(
+                session.Id,
+                fixture.OrganizerId,
+                null, null, null, null, null, null, null, null, null, null,
+                [SessionEditClearField.MaxCapacity]),
             default));
 
         // D-121: cannot drop the maximum below current active occupancy.
         await Assert.ThrowsAsync<DomainException>(() => useCase.ExecuteAsync(
-            new EditSessionCommand(session.Id, fixture.OrganizerId, null, null, null, null, null, null, null, 0, null, null, null),
+            new EditSessionCommand(
+                session.Id, fixture.OrganizerId, null, null, null, null, null, null, null, 0, null, null, null),
             default));
     }
 
@@ -109,7 +124,15 @@ public sealed class SessionEditCommandTests
         EditSessionUseCase useCase = fixture.EditUseCase();
 
         await useCase.ExecuteAsync(
-            new EditSessionCommand(session.Id, fixture.OrganizerId, "New title", null, null, null, null, "New notes", null, null, ContentVisibility.Private, null, null),
+            new EditSessionCommand(
+                session.Id,
+                fixture.OrganizerId,
+                "New title",
+                null, null, null, null,
+                "New notes",
+                null, null,
+                ContentVisibility.Private,
+                null, null),
             default);
 
         Assert.Empty(fixture.Materializer.Calls[^1].Events);
@@ -131,7 +154,9 @@ public sealed class SessionEditCommandTests
         fixture.VersionStamp.MatchesFunc = (_, _) => false;
 
         EditSessionResult result = await useCase.ExecuteAsync(
-            new EditSessionCommand(session.Id, fixture.OrganizerId, "New title", null, null, null, null, null, null, null, null, null, null, IfMatch: "stale-token"),
+            new EditSessionCommand(
+                session.Id, fixture.OrganizerId, "New title", null, null, null, null, null, null, null, null, null, null,
+                IfMatch: "stale-token"),
             default);
 
         Assert.False(result.Succeeded);
@@ -150,7 +175,9 @@ public sealed class SessionEditCommandTests
             lockedSession.Id == session.Id && token == "current-token";
 
         EditSessionResult result = await useCase.ExecuteAsync(
-            new EditSessionCommand(session.Id, fixture.OrganizerId, "New title", null, null, null, null, null, null, null, null, null, null, IfMatch: "current-token"),
+            new EditSessionCommand(
+                session.Id, fixture.OrganizerId, "New title", null, null, null, null, null, null, null, null, null, null,
+                IfMatch: "current-token"),
             default);
 
         Assert.True(result.Succeeded, result.Code);

@@ -231,5 +231,5 @@ public sealed class SessionJoinRequestInheritedAccessTests : IAsyncLifetime, IDi
         SessionNotes.Empty,
         minAttendance: 1,
         maxCapacity: null,
-        visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
+        visibility: ContentVisibility.Public);
 }

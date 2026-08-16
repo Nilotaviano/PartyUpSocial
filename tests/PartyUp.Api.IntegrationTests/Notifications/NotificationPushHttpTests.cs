@@ -547,7 +547,7 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
                 Notes: null,
                 MinAttendance: 1,
                 MaxCapacity: null,
-                Visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public),
+                Visibility: ContentVisibility.Public,
             AudienceGroupIds: null,
                 OptionStartTimes: [now + Duration.FromDays(2), now + Duration.FromDays(3)],
                 DeadlineChoice: PollDeadlineChoice.Hours6,

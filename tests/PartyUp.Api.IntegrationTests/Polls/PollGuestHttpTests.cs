@@ -464,7 +464,7 @@ public sealed class PollGuestHttpTests : IAsyncLifetime, IDisposable
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
+            visibility: ContentVisibility.Private);
         Session session = Session.Create(organizerId, details, [], _factory.Clock);
         (GuestLink _, string token) = session.CreateGuestLink(_factory.Clock);
         _ = session.DequeueEvents();

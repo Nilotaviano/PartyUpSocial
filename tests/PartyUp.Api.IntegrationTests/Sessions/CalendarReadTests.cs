@@ -124,7 +124,7 @@ public sealed class CalendarReadTests : IAsyncLifetime, IDisposable
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
+            visibility: ContentVisibility.Public);
 
         // D-099: a non-private session needs at least one directly invited registered friend at
         // creation — fixtures that want an empty roster otherwise draw in an unrelated filler invitee.

@@ -223,7 +223,7 @@ public sealed class SessionBlockScopeTests : IAsyncLifetime, IDisposable
                     Notes: null,
                     MinAttendance: 1,
                     MaxCapacity: null,
-                    Visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public),
+                    Visibility: ContentVisibility.Public,
             AudienceGroupIds: null,
                     OptionStartTimes: [now + Duration.FromHours(72), now + Duration.FromHours(96)],
                     DeadlineChoice: PollDeadlineChoice.Hours24,
@@ -282,7 +282,7 @@ public sealed class SessionBlockScopeTests : IAsyncLifetime, IDisposable
                     Notes: null,
                     MinAttendance: 1,
                     MaxCapacity: null,
-                    Visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public),
+                    Visibility: ContentVisibility.Public,
             AudienceGroupIds: null,
                     OptionStartTimes: [now + Duration.FromHours(72), now + Duration.FromHours(96)],
                     DeadlineChoice: PollDeadlineChoice.Hours24,
@@ -348,7 +348,7 @@ public sealed class SessionBlockScopeTests : IAsyncLifetime, IDisposable
                     Notes: null,
                     MinAttendance: 1,
                     MaxCapacity: null,
-                    Visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public),
+                    Visibility: ContentVisibility.Public,
             AudienceGroupIds: null,
                     OptionStartTimes: [now + Duration.FromHours(72), now + Duration.FromHours(96)],
                     DeadlineChoice: PollDeadlineChoice.Hours24,
@@ -428,7 +428,7 @@ public sealed class SessionBlockScopeTests : IAsyncLifetime, IDisposable
         SessionNotes.Empty,
         minAttendance: 1,
         maxCapacity: null,
-        visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
+        visibility: ContentVisibility.Private);
 }
 
 internal sealed class ScopeLoadCounts

@@ -678,7 +678,7 @@ public sealed class DeletionCompletenessE2ETests : IAsyncLifetime, IDisposable
                 Notes: null,
                 MinAttendance: 1,
                 MaxCapacity: null,
-                Visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public),
+                Visibility: ContentVisibility.Public,
             AudienceGroupIds: null,
                 OptionStartTimes: [now + Duration.FromDays(6), now + Duration.FromDays(7)],
                 DeadlineChoice: PollDeadlineChoice.Hours48,
@@ -701,7 +701,7 @@ public sealed class DeletionCompletenessE2ETests : IAsyncLifetime, IDisposable
         SessionNotes.Empty,
         minAttendance: 1,
         maxCapacity: null,
-        visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
+        visibility: ContentVisibility.Private);
 }
 
 internal sealed record DeletionCompletenessSeed(
