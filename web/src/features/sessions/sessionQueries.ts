@@ -33,7 +33,9 @@ export const sessionKeys = {
     ['sessions', scope, cursor ?? null] as const,
   listFamily: (scope: SessionScope) => ['sessions', scope] as const,
   detail: (sessionId: string) => ['session', sessionId] as const,
-  joinRequests: (sessionId: string) =>
+  joinRequests: (sessionId: string, cursor?: string) =>
+    ['session', 'join-requests', sessionId, cursor ?? null] as const,
+  joinRequestsFamily: (sessionId: string) =>
     ['session', 'join-requests', sessionId] as const,
 }
 
@@ -69,10 +71,10 @@ export async function getSessionDetail(sessionId: string) {
   return data
 }
 
-export async function getJoinRequests(sessionId: string) {
+export async function getJoinRequests(sessionId: string, cursor?: string) {
   const { data } = await client.GET(
     '/api/v1/sessions/{sessionId}/join-requests',
-    { params: { path: { sessionId } } },
+    { params: { path: { sessionId }, query: { cursor } } },
   )
   if (!data) throw new Error('Join request list response was empty.')
   return data
@@ -314,8 +316,7 @@ export async function invalidateSessionQueries(
   if (includeJoinRequests) {
     invalidations.push(
       queryClient.invalidateQueries({
-        queryKey: sessionKeys.joinRequests(sessionId),
-        exact: true,
+        queryKey: sessionKeys.joinRequestsFamily(sessionId),
       }),
     )
   }

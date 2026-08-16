@@ -868,6 +868,61 @@ describe('SessionDetailPage (lovable)', () => {
       )
     })
 
+    it('threads the join-requests cursor and reveals a Load more control instead of stranding the organizer on page one (frontend audit 2026-08-15 Wave 7)', async () => {
+      api.get.mockImplementation(
+        (path: string, options?: { params?: { query?: { cursor?: string } } }) => {
+          if (path === '/api/v1/sessions/{sessionId}')
+            return Promise.resolve({ data: detail() })
+          if (path === '/api/v1/sessions/{sessionId}/join-requests') {
+            const cursor = options?.params?.query?.cursor
+            if (!cursor) {
+              return Promise.resolve({
+                data: {
+                  items: [
+                    {
+                      id: 'jr-1',
+                      requesterId: '11111111-1111-1111-1111-111111111111',
+                      status: 'pending',
+                      createdAt: '2030-08-01T00:00:00Z',
+                      requester: { ordinal: 0, displayName: 'Page One Requester' },
+                    },
+                  ],
+                  nextCursor: 'cursor-2',
+                },
+              })
+            }
+            return Promise.resolve({
+              data: {
+                items: [
+                  {
+                    id: 'jr-2',
+                    requesterId: '22222222-2222-2222-2222-222222222222',
+                    status: 'pending',
+                    createdAt: '2030-08-02T00:00:00Z',
+                    requester: { ordinal: 0, displayName: 'Page Two Requester' },
+                  },
+                ],
+                nextCursor: null,
+              },
+            })
+          }
+          if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: null } })
+          throw new Error(`Unexpected GET ${path}`)
+        },
+      )
+      renderPage()
+
+      expect(await screen.findByText('Page One Requester')).toBeInTheDocument()
+      expect(screen.queryByText('Page Two Requester')).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+
+      expect(await screen.findByText('Page Two Requester')).toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: 'Load more' }),
+      ).not.toBeInTheDocument()
+    })
+
     it('disables Promote while the promote mutation is in flight_D084', async () => {
       api.get.mockImplementation((path: string) => {
         if (path === '/api/v1/sessions/{sessionId}') {

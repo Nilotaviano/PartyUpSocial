@@ -96,6 +96,39 @@ afterEach(() => {
 })
 
 describe('SessionInvitePage', () => {
+  it('shows the game and platform in the header so the invitee knows which session_D115', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/sessions/{sessionId}') {
+        return Promise.resolve({
+          data: {
+            id: 'session-1',
+            organizerId: 'organizer-1',
+            title: 'Raid night',
+            startTime: '2030-09-01T18:00:00Z',
+            durationMinutes: 120,
+            platform: 'steam',
+            game: { name: 'Deep Rock Galactic', steamAppId: 548430 },
+            notes: '',
+            minAttendance: 4,
+            maxCapacity: 8,
+            isPrivate: false,
+            status: 'unconfirmed',
+            createdAt: '2030-08-01T00:00:00Z',
+            roster: [],
+            version: 'v1',
+          },
+        })
+      }
+      if (path === '/api/v1/friends') {
+        return Promise.resolve({ data: { items: [] } })
+      }
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    renderPage()
+
+    expect(await screen.findByText('Deep Rock Galactic · Steam')).toBeInTheDocument()
+  })
+
   it('invites the selected friends_D115', async () => {
     renderPage()
 

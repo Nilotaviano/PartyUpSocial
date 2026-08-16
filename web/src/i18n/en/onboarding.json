@@ -4,7 +4,7 @@
     "displayName": "Choose a display name",
     "avatar": "Choose an avatar",
     "timeZone": "Choose your time zone",
-    "linkPlatforms": "Link platforms",
+    "linkPlatforms": "Platforms",
     "friends": "Find friends"
   },
   "fields": {
@@ -18,7 +18,8 @@
     "finish": "Finish setup"
   },
   "messages": {
-    "platformLinksOptional": "Platform linking is optional."
+    "platformLinksOptional": "Platform linking is optional.",
+    "platformLinksInfo": "Signing in with Steam links that account to your profile automatically. There's nothing to do on this step — continue whenever you're ready."
   },
   "progress": "Step {{current}} of {{total}}: {{step}}",
   "onboarding": {

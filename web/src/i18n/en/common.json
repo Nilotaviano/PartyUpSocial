@@ -12,7 +12,8 @@
     "tabBarLabel": "Section tabs",
     "home": "Home",
     "friends": "Friends",
-    "settings": "Settings"
+    "settings": "Settings",
+    "skipToContent": "Skip to main content"
   },
   "brand": {
     "ariaLabel": "PartyUp home"

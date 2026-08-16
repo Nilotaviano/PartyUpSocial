@@ -26,6 +26,7 @@ import {
   sessionKeys,
   type GuestLinkInvitation,
 } from './sessionQueries'
+import { sessionPlatformLabel } from './lovable/sessionData'
 
 type RevokeGuestLinkDialogProps = {
   pending: boolean
@@ -157,6 +158,11 @@ export function SessionInvitePage() {
       <PageScaffold width="form">
         <PageHeader
           back={{ to: `/sessions/${sessionId}`, label: t('actions.back', { ns: 'common' }) }}
+          description={
+            detail.data
+              ? `${detail.data.game ? `${detail.data.game.name} · ` : ''}${sessionPlatformLabel(detail.data.platform, t)}`
+              : undefined
+          }
           title={t('invite.heading')}
         />
 

@@ -305,7 +305,12 @@ export function SteamImportPage() {
               result.state === 'private_profile' ||
               result.state === 'upstream_failure') && (
               <div className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-card border-2 border-ink bg-card p-4 shadow-offset-card">
-                <p className="truncate text-ink-soft">{result.invitationUrl}</p>
+                <a
+                  className="flex min-h-11 min-w-0 items-center truncate rounded-control text-ink underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                  href={result.invitationUrl}
+                >
+                  <span className="truncate">{result.invitationUrl}</span>
+                </a>
                 <Button
                   variant="neutral"
                   onClick={() => void copyInvitation(result.invitationUrl)}

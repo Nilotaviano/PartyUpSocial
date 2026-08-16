@@ -512,6 +512,7 @@ export function OnboardingWizard() {
       {current === 'link-platforms' && (
         <div className="flex flex-col gap-5">
           <p>{t('messages.platformLinksOptional')}</p>
+          <p className="text-ink-soft">{t('messages.platformLinksInfo')}</p>
           {complete.error && (
             <StatusBanner role="alert" variant="danger">
               {errorText(complete.error, (key, options) =>

@@ -493,7 +493,16 @@ export function AccountSettingsPage() {
         >
           {t('delete.start')}
         </Button>
-        {graceEndsAt && <p className="text-ink" role="status">{t('delete.scheduled', { graceEndsAt })}</p>}
+        {graceEndsAt && (
+          <p className="text-ink" role="status">
+            {t('delete.scheduled', {
+              graceEndsAt: new Intl.DateTimeFormat(i18n.language, {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              }).format(new Date(graceEndsAt)),
+            })}
+          </p>
+        )}
       </SectionCard>
       {errorMessage && <StatusBanner role="alert" variant="danger">{errorMessage}</StatusBanner>}
       <ReauthPrompt

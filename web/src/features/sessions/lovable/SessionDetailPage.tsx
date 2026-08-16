@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CalendarClock, Users } from 'lucide-react'
@@ -255,11 +255,40 @@ export function SessionDetailPage() {
   const isOrganizer =
     Boolean(detail.data) && detail.data?.organizerId === session?.userId
 
-  const joinRequests = useQuery({
-    queryKey: sessionKeys.joinRequests(sessionId),
-    queryFn: () => getJoinRequests(sessionId),
-    enabled: Boolean(sessionId) && isOrganizer,
+  // Mirrors `useSessionScope` in `SessionListPage.tsx`: one query per cursor
+  // page, appended to as the organizer asks for more, rather than a single
+  // fixed-size fetch that silently hides everything past page one.
+  const [joinRequestCursors, setJoinRequestCursors] = useState<
+    (string | undefined)[]
+  >([undefined])
+  const joinRequestPages = useQueries({
+    queries: joinRequestCursors.map((cursor) => ({
+      queryKey: sessionKeys.joinRequests(sessionId, cursor),
+      queryFn: () => getJoinRequests(sessionId, cursor),
+      enabled: Boolean(sessionId) && isOrganizer,
+    })),
   })
+  const joinRequestItems = joinRequestPages.flatMap(
+    (page) => page.data?.items ?? [],
+  )
+  const joinRequestsLastPage = joinRequestPages[joinRequestPages.length - 1]
+  const joinRequestsNextCursor =
+    joinRequestsLastPage?.data?.nextCursor ?? undefined
+  const joinRequestsFetchingMore =
+    joinRequestPages.length > 1 && (joinRequestsLastPage?.isFetching ?? false)
+  const joinRequests = {
+    isError: joinRequestPages.some((page) => page.error),
+    isPending: joinRequestPages[0]?.isPending ?? true,
+    data:
+      joinRequestPages[0]?.data === undefined
+        ? undefined
+        : { items: joinRequestItems, nextCursor: joinRequestsNextCursor },
+    error: joinRequestPages.find((page) => page.error)?.error,
+    refetch: () => {
+      setJoinRequestCursors([undefined])
+      return joinRequestPages[0]?.refetch()
+    },
+  }
 
   async function afterMutation(message: string, options?: { removeDetail?: boolean }) {
     setAnnouncement(message)
@@ -692,6 +721,22 @@ export function SessionDetailPage() {
                       </li>
                     ))}
                   </ul>
+                  {joinRequestsNextCursor && (
+                    <Button
+                      aria-busy={joinRequestsFetchingMore}
+                      className="mt-2"
+                      disabled={joinRequestsFetchingMore}
+                      variant="neutral"
+                      onClick={() =>
+                        setJoinRequestCursors((current) => [
+                          ...current,
+                          joinRequestsNextCursor,
+                        ])
+                      }
+                    >
+                      {t('list.loadMore')}
+                    </Button>
+                  )}
                 </section>
               )}
 

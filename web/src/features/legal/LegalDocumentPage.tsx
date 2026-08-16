@@ -47,7 +47,6 @@ export function LegalDocumentPage({
           className="rounded-card border-2 border-ink bg-accent p-4 font-display font-semibold text-accent-ink dark:border-accent-ink"
           data-testid="legal-draft-banner"
           role="note"
-          aria-label={t('draft.label')}
         >
           {t('draft.banner')}
         </p>

@@ -12,7 +12,8 @@
     "tabBarLabel": "Pestañas de secciones",
     "home": "Inicio",
     "friends": "Amistades",
-    "settings": "Configuración"
+    "settings": "Configuración",
+    "skipToContent": "Saltar al contenido principal"
   },
   "brand": {
     "ariaLabel": "Inicio de PartyUp"

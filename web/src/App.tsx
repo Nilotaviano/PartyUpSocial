@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Navigate, Outlet, Route, Routes } from 'react-router'
 import { RequireAuth } from './auth/RequireAuth'
 import { RequireOnboarded } from './auth/RequireOnboarded'
@@ -62,15 +63,39 @@ import { SessionListPage } from './features/sessions/lovable/SessionListPage'
  * page under this shell already renders its own single `<main>` landmark
  * (`pageScaffold.tsx`'s own contract: "Shells own the chrome and pin the
  * footer; pages keep their own `<main>`") — wrapping `Outlet` in a second one
- * here would nest two `main` landmarks, which HTML disallows.
+ * here would nest two `main` landmarks, which HTML disallows. It still carries
+ * `id="main-content"` + `tabIndex={-1}` so the skip link below has a single
+ * stable target on every route without touching each page's own `<main>`.
  */
 function ShellContent({ children }: { children: ReactNode }) {
-  return <div className="flex w-full flex-1 flex-col">{children}</div>
+  return (
+    <div className="flex w-full flex-1 flex-col" id="main-content" tabIndex={-1}>
+      {children}
+    </div>
+  )
+}
+
+/**
+ * WCAG 2.4.1 Bypass Blocks: visually hidden until keyboard-focused, then
+ * jumps past the shell chrome (brand link, section nav, notification bell,
+ * account menu) straight to the routed page's content.
+ */
+function SkipLink() {
+  const { t } = useTranslation('common')
+  return (
+    <a
+      className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-xl focus:bg-primary focus:px-4 focus:py-2 focus:font-display focus:text-sm focus:font-bold focus:text-primary-foreground focus:outline-2 focus:outline-offset-2 focus:outline-focus"
+      href="#main-content"
+    >
+      {t('navigation.skipToContent')}
+    </a>
+  )
 }
 
 function AuthenticatedShell() {
   return (
     <div className="flex min-h-dvh flex-col bg-page text-ink pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
+      <SkipLink />
       <TopBar />
       <ToastHost>
         <PageSlotProvider>
@@ -96,7 +121,8 @@ function AuthenticatedShell() {
 function PublicShell() {
   return (
     <div className="flex min-h-dvh flex-col bg-page text-ink">
-      <div className="flex flex-1 flex-col">
+      <SkipLink />
+      <div className="flex flex-1 flex-col" id="main-content" tabIndex={-1}>
         <Outlet />
       </div>
       <AppFooter />

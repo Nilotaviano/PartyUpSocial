@@ -4,7 +4,7 @@
     "displayName": "Escolha um nome de exibição",
     "avatar": "Escolha um avatar",
     "timeZone": "Escolha seu fuso horário",
-    "linkPlatforms": "Vincule plataformas",
+    "linkPlatforms": "Plataformas",
     "friends": "Encontre amigos"
   },
   "fields": {
@@ -18,7 +18,8 @@
     "finish": "Concluir configuração"
   },
   "messages": {
-    "platformLinksOptional": "A vinculação de plataformas é opcional."
+    "platformLinksOptional": "A vinculação de plataformas é opcional.",
+    "platformLinksInfo": "Entrar com o Steam vincula essa conta ao seu perfil automaticamente. Não há nada para fazer nesta etapa — continue quando estiver pronto."
   },
   "progress": "Etapa {{current}} de {{total}}: {{step}}",
   "onboarding": {

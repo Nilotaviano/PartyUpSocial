@@ -173,6 +173,16 @@ describe('draft banner', () => {
     expect(screen.getByText((_, node) => node?.textContent === `Última atualização: ${expected}`)).toBeInTheDocument()
   })
 
+  it('no longer overrides the disclaimer note with a truncating aria-label', () => {
+    renderWithRouter(<PrivacyPolicyPage />)
+
+    const banner = screen.getByTestId('legal-draft-banner')
+    expect(banner).not.toHaveAttribute('aria-label')
+    // Before the fix this queried successfully — the aria-label shadowed the
+    // full disclaimer text with just "Draft" as the accessible name.
+    expect(screen.queryByRole('note', { name: 'Draft' })).not.toBeInTheDocument()
+  })
+
   it('marks every locale variant as a draft too', async () => {
     for (const locale of ['pt-BR', 'es'] as const) {
       await i18n.changeLanguage(locale)

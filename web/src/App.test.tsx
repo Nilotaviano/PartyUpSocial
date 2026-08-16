@@ -440,3 +440,34 @@ describe('legal routes and footer_S5', () => {
     ).toBeInTheDocument()
   })
 })
+
+describe('skip-to-main-content link_D139', () => {
+  it('is the first tab stop in the authenticated shell and moves focus into the main content region on activation', async () => {
+    setSession(session({ authenticated: true, state: 'active', userId: 'u1' }))
+    renderRoute('/app')
+
+    const skipLink = await screen.findByRole('link', {
+      name: 'Skip to main content',
+    })
+    expect(skipLink).toHaveAttribute('href', '#main-content')
+
+    skipLink.focus()
+    expect(skipLink).toHaveFocus()
+
+    fireEvent.click(skipLink)
+    const target = document.getElementById('main-content')
+    expect(target).toBeInTheDocument()
+    expect(await screen.findByTestId('screen-app')).toBeInTheDocument()
+  })
+
+  it('is the first tab stop in the public shell and targets its main content region', async () => {
+    setSession(session())
+    renderRoute('/welcome')
+
+    const skipLink = await screen.findByRole('link', {
+      name: 'Skip to main content',
+    })
+    expect(skipLink).toHaveAttribute('href', '#main-content')
+    expect(document.getElementById('main-content')).toBeInTheDocument()
+  })
+})

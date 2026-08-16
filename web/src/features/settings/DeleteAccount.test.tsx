@@ -46,7 +46,11 @@ describe('DeleteAccount', () => {
 
     expect(api.post).toHaveBeenCalledTimes(1)
     expect(api.post).toHaveBeenCalledWith('/api/v1/me/deletion', expect.objectContaining({ body: { currentPassword: null, reauthToken: 'proof-from-callback' } }))
-    expect(await screen.findByRole('status')).toHaveTextContent('2026-08-08T00:00:00Z')
+    const expected = new Intl.DateTimeFormat('en', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date('2026-08-08T00:00:00Z'))
+    expect(await screen.findByRole('status')).toHaveTextContent(expected)
     await waitFor(() => expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['session'] }))
     expect(getPendingSettingsAction()).toBeNull()
   })

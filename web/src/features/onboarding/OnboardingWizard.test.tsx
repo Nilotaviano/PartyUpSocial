@@ -217,10 +217,19 @@ describe('OnboardingWizard', () => {
     fireEvent.submit(
       screen.getByRole('button', { name: 'Continue' }).closest('form')!,
     )
-    await expectHeading('Link platforms')
+    await expectHeading('Platforms')
     expect(screen.getByTestId('location')).toHaveTextContent(
       'next=%2Fu%2Ffriend.one',
     )
+    // Wave 7 (frontend audit 2026-08-15): this step has no linking action, so
+    // its copy must not promise one — it explains Steam links automatically
+    // on sign-in and that there's nothing to do here.
+    expect(
+      screen.getByText(/nothing to do on this step/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /steam|google/i }),
+    ).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
     await expectHeading('Find friends')
@@ -281,7 +290,7 @@ describe('OnboardingWizard', () => {
     sessionStorage.setItem(storageKey, JSON.stringify(completeDraft))
     renderWizard('/onboarding/link-platforms')
 
-    await expectHeading('Link platforms')
+    await expectHeading('Platforms')
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
     await expectHeading('Find friends')
     await screen.findByRole('button', { name: 'Finish setup' })
@@ -350,7 +359,7 @@ describe('OnboardingWizard', () => {
     fireEvent.submit(
       screen.getByRole('button', { name: 'Continue' }).closest('form')!,
     )
-    await expectHeading('Link platforms')
+    await expectHeading('Platforms')
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
     await screen.findByRole('button', { name: 'Finish setup' })

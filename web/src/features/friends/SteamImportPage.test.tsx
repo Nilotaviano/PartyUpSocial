@@ -111,6 +111,19 @@ describe('SteamImportPageTests', () => {
     },
   )
 
+  it('renders the invitation-link fallback as an openable anchor, not inert text', async () => {
+    api.post.mockResolvedValueOnce({ data: result('zero_matches') })
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Find Steam friends' }))
+
+    expect(await screen.findByRole('heading', { name: 'No PartyUp matches yet' })).toBeInTheDocument()
+    const link = screen.getByRole('link', {
+      name: 'https://links.test/add/23456789AB',
+    })
+    expect(link).toHaveAttribute('href', 'https://links.test/add/23456789AB')
+  })
+
   it('HiddenLocalCandidate_IsNeverLabeledAsRegistered_D065', async () => {
     api.post.mockResolvedValueOnce({
       data: {
