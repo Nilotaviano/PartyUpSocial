@@ -48,7 +48,7 @@ public sealed class SessionReadUseCases(
         }
 
         bool muted = await mutes.ExistsForTargetAsync(viewerId, sessionId, null, cancellationToken);
-        GroupProvenance? viaGroup = await ResolveProvenanceAsync(visibility, cancellationToken);
+        GroupProvenance? viaGroup = await ResolveProvenanceAsync(session, viewer, cancellationToken);
 
         return MaskBlockedPairRoster(detail, viewer) with
         {
@@ -59,21 +59,44 @@ public sealed class SessionReadUseCases(
     }
 
     /// <summary>
-    /// D-206: the "via &lt;group&gt;" label's source. Only a <see cref="VisibilityGrant.Group"/> result
-    /// carries a group id, so a viewer reached by any other rule never learns a group name — the
-    /// neutral "shared with a group" the API derives from <c>Visibility</c> alone covers them.
+    /// D-206: the "via &lt;group&gt;" label's source, membership-based (foreman ruling) — the tag
+    /// answers "which targeted group is this viewer in", independent of which rule actually resolved
+    /// the viewer's access. <see cref="Viewer.GroupIds"/> is already the intersection of the viewer's
+    /// owned/Accepted groups with this target's audience (<c>ViewerGroups.GrantingAsync</c>), so any
+    /// id in it already carries the membership proof; the first one in the target's own audience order
+    /// is the answer, matching the list page's <c>GroupProvenanceReader</c> tie-break. A member who also
+    /// resolves via rule 1 (organizer/participant) still gets the tag here, unlike the old grant-based
+    /// read.
     /// </summary>
     private async Task<GroupProvenance?> ResolveProvenanceAsync(
-        VisibilityResult visibility,
+        Session session,
+        Viewer viewer,
         CancellationToken cancellationToken)
     {
-        if (visibility.Grant != VisibilityGrant.Group || visibility.GroupId is not { } groupId)
+        if (viewer.GroupIds.Count == 0)
         {
             return null;
         }
 
-        GroupName? name = await groups.FindNameAsync(groupId, cancellationToken);
-        return name is null ? null : new GroupProvenance(groupId, name);
+        bool found = false;
+        FriendGroupId resolvedGroupId = default;
+        foreach (FriendGroupId candidate in session.AudienceGroupIds)
+        {
+            if (viewer.GroupIds.Contains(candidate))
+            {
+                resolvedGroupId = candidate;
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            return null;
+        }
+
+        GroupName? name = await groups.FindNameAsync(resolvedGroupId, cancellationToken);
+        return name is null ? null : new GroupProvenance(resolvedGroupId, name);
     }
 
     /// <summary>

@@ -96,6 +96,33 @@ public sealed class EditSessionUseCase(
                     return EditSessionResult.Failed("session_conflict");
                 }
 
+                // D-201: authority is re-checked for NEWLY added groups only — an organizer who has
+                // since left an already-targeted group can still edit the session without being
+                // forced to drop it. Fail-closed and uniform with a nonexistent group (D-199). Hoisted
+                // above every mutation below: LoadForUpdateAsync's tracked session commits on any
+                // normal return from ExecuteAsync (only a thrown exception rolls back), so a shortfall
+                // discovered after ChangeStartTime/ChangeVisibility/etc. would commit a partially
+                // applied edit while still failing the request.
+                List<FriendGroupId>? requestedAudience = null;
+                if (command.Visibility is { } requestedVisibility)
+                {
+                    requestedAudience = requestedVisibility == ContentVisibility.Groups
+                        ? [.. (command.AudienceGroupIds ?? []).Distinct()]
+                        : [];
+
+                    HashSet<FriendGroupId> current = [.. session.AudienceGroupIds];
+                    List<FriendGroupId> added = [.. requestedAudience.Where(id => !current.Contains(id))];
+                    if (added.Count > 0)
+                    {
+                        IReadOnlyCollection<FriendGroupId> authorized =
+                            await groups.LockViewerGroupIdsAsync(command.ActorId, added, ct);
+                        if (authorized.Count != added.Count)
+                        {
+                            return EditSessionResult.Failed("group_not_found");
+                        }
+                    }
+                }
+
                 bool reschedule = false;
 
                 if (command.StartTime is { } startTime && startTime != session.StartTime)
@@ -151,28 +178,10 @@ public sealed class EditSessionUseCase(
 
                 if (command.Visibility is { } visibility)
                 {
-                    List<FriendGroupId> audience = visibility == ContentVisibility.Groups
-                        ? [.. (command.AudienceGroupIds ?? []).Distinct()]
-                        : [];
-
-                    // D-201: authority is re-checked for NEWLY added groups only — an organizer who has
-                    // since left an already-targeted group can still edit the session without being
-                    // forced to drop it. Fail-closed and uniform with a nonexistent group (D-199).
-                    HashSet<FriendGroupId> current = [.. session.AudienceGroupIds];
-                    List<FriendGroupId> added = [.. audience.Where(id => !current.Contains(id))];
-                    if (added.Count > 0)
-                    {
-                        IReadOnlyCollection<FriendGroupId> authorized =
-                            await groups.LockViewerGroupIdsAsync(command.ActorId, added, ct);
-                        if (authorized.Count != added.Count)
-                        {
-                            return EditSessionResult.Failed("group_not_found");
-                        }
-                    }
-
                     // Leaving the Groups level passes an empty audience; the aggregate clears the
-                    // junction rows (D-203) — flipping back requires re-picking.
-                    session.ChangeVisibility(visibility, audience, clock);
+                    // junction rows (D-203) — flipping back requires re-picking. requestedAudience is
+                    // always set here: it is computed above from this same command.Visibility check.
+                    session.ChangeVisibility(visibility, requestedAudience!, clock);
                 }
 
                 IReadOnlyList<IDomainEvent> events = session.DequeueEvents();

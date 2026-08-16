@@ -166,25 +166,46 @@ public sealed class PollReadUseCases(
             options,
             roster,
             poll.Visibility,
-            await ResolveProvenanceAsync(visibility, cancellationToken),
+            await ResolveProvenanceAsync(poll, viewer, cancellationToken),
             muted);
     }
 
     /// <summary>
-    /// D-206's poll twin of <c>SessionReadUseCases.ResolveProvenanceAsync</c>: only a
-    /// <see cref="VisibilityGrant.Group"/> result carries a group id, so no other viewer learns a name.
+    /// D-206's poll twin of <c>SessionReadUseCases.ResolveProvenanceAsync</c>: membership-based
+    /// (foreman ruling) — the tag answers "which targeted group is this viewer in", independent of
+    /// which rule resolved access. <see cref="Viewer.GroupIds"/> is already the intersection of the
+    /// viewer's owned/Accepted groups with this poll's audience; the first id in the poll's own
+    /// audience order is the answer, matching the list page's <c>GroupProvenanceReader</c> tie-break.
     /// </summary>
     private async Task<GroupProvenance?> ResolveProvenanceAsync(
-        VisibilityResult visibility,
+        Poll poll,
+        Viewer viewer,
         CancellationToken cancellationToken)
     {
-        if (visibility.Grant != VisibilityGrant.Group || visibility.GroupId is not { } groupId)
+        if (viewer.GroupIds.Count == 0)
         {
             return null;
         }
 
-        GroupName? name = await groups.FindNameAsync(groupId, cancellationToken);
-        return name is null ? null : new GroupProvenance(groupId, name);
+        bool found = false;
+        FriendGroupId resolvedGroupId = default;
+        foreach (FriendGroupId candidate in poll.AudienceGroupIds)
+        {
+            if (viewer.GroupIds.Contains(candidate))
+            {
+                resolvedGroupId = candidate;
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            return null;
+        }
+
+        GroupName? name = await groups.FindNameAsync(resolvedGroupId, cancellationToken);
+        return name is null ? null : new GroupProvenance(resolvedGroupId, name);
     }
 
     /// <summary>Mirrors <c>SessionReadUseCases.BuildViewerAsync</c>'s poll analogue: no row lock, a GET.</summary>
