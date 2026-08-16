@@ -32,8 +32,7 @@
   "discover": {
     "heading": "Discover",
     "empty": "Nothing open to join right now.",
-    "loadMore": "Load more",
-    "organizedBy": "Organized by {{name}}"
+    "loadMore": "Load more"
   },
   "emptyState": {
     "home": {

@@ -32,8 +32,7 @@
   "discover": {
     "heading": "Descubrir",
     "empty": "No hay nada abierto para unirse ahora.",
-    "loadMore": "Cargar más",
-    "organizedBy": "Organizado por {{name}}"
+    "loadMore": "Cargar más"
   },
   "emptyState": {
     "home": {
