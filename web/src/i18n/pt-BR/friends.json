@@ -47,7 +47,7 @@
   },
   "status": {
     "loading": "Carregando…",
-    "none": "Sem conexão",
+    "none": "Não são amigos",
     "pendingIncoming": "Solicitação recebida",
     "pendingOutgoing": "Solicitação enviada",
     "friends": "Amigos",
@@ -64,17 +64,17 @@
     "incoming": "Nenhuma solicitação recebida.",
     "outgoing": "Nenhuma solicitação enviada.",
     "blocked": "Nenhum usuário bloqueado.",
-    "blockedHelp": "Bloqueie pessoas pelo perfil ou cartão de amizade. Elas não podem encontrar nem contatar você enquanto estiverem bloqueadas."
+    "blockedHelp": "Bloqueie pessoas pelo perfil ou pelo card do amigo. Elas não podem encontrar nem contatar você enquanto estiverem bloqueadas."
   },
   "profile": {
     "usernameOnly": "Somente este nome de usuário é exibido até vocês se tornarem amigos.",
     "notFound": "Este perfil não foi encontrado.",
     "platforms": "Plataformas de jogos vinculadas",
-    "blockConsequence": "Bloquear remove a conexão e a participação compartilhada. A outra pessoa não recebe uma notificação."
+    "blockConsequence": "Bloquear remove a conexão e a participação compartilhada. A outra pessoa não é avisada."
   },
   "share": {
     "addLinkDescription": "Compartilhe este link para que um amigo encontre você pelo código.",
-    "profileLinkDescription": "Compartilhe este link para o seu perfil do PartyUp."
+    "profileLinkDescription": "Compartilhe o link do seu perfil no PartyUp."
   },
   "qr": {
     "description": "Escaneie o QR code ou use o link visível abaixo."
@@ -89,7 +89,7 @@
     "privateHelp": "Abrir as configurações de privacidade da Steam em uma nova aba",
     "zeroFriendsTitle": "Nenhum amigo da Steam encontrado",
     "zeroFriendsBody": "A Steam retornou uma lista de amigos vazia.",
-    "zeroMatchesTitle": "Nenhuma correspondência no PartyUp ainda",
+    "zeroMatchesTitle": "Ninguém encontrado no PartyUp ainda",
     "zeroMatchesBody": "Compartilhe seu link de convite com seus amigos da Steam.",
     "notConfiguredTitle": "A importação da Steam está indisponível",
     "notConfiguredBody": "Tente novamente mais tarde ou compartilhe seu link de convite.",
@@ -103,7 +103,7 @@
     "body": "Encontrar amigos é opcional. Compartilhe seu código, procure alguém ou continue para o PartyUp.",
     "continuation": "O amigo que você abriu",
     "steamOptional": "A importação da Steam é opcional e sempre exige uma ação explícita.",
-    "refreshFailed": "Seu perfil está ativo, mas o PartyUp não conseguiu atualizar sua sessão segura."
+    "refreshFailed": "Seu perfil está ativo, mas o PartyUp não conseguiu renovar seu acesso."
   },
   "live": {
     "copied": "{{label}} copiado."

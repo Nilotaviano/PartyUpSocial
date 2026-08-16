@@ -26,7 +26,7 @@
     "newLabel": "Nova senha",
     "hint": "Use pelo menos 12 caracteres.",
     "tooShort": "A senha deve ter pelo menos 12 caracteres.",
-    "currentIncorrect": "Essa senha atual está incorreta.",
+    "currentIncorrect": "Sua senha atual está incorreta.",
     "changeSubmit": "Alterar senha",
     "changeSuccess": "Sua senha foi alterada.",
     "setStart": "Definir uma senha",
@@ -34,9 +34,9 @@
     "setSuccess": "Sua senha foi definida."
   },
   "authMethods": {
-    "title": "Métodos de entrada",
+    "title": "Formas de entrar",
     "unlink": "Desvincular {{method}}",
-    "linkTitle": "Adicionar método de entrada",
+    "linkTitle": "Adicionar uma forma de entrar",
     "link": "Vincular {{provider}}",
     "kind": {
       "password": "Senha",
@@ -64,7 +64,7 @@
   },
   "delete": {
     "title": "Excluir conta",
-    "grace": "A exclusão inicia um período de carência de 7 dias antes dos efeitos destrutivos.",
+    "grace": "A exclusão inicia um período de carência de 7 dias antes que qualquer coisa seja apagada.",
     "loginCancels": "Entrar durante esse período cancela o pedido de exclusão.",
     "start": "Excluir minha conta",
     "scheduled": "A exclusão está programada para {{graceEndsAt}}."
@@ -75,9 +75,9 @@
     "password": "Senha atual",
     "confirmWithPassword": "Confirmar com senha",
     "confirmWithProvider": "Entrar novamente com {{provider}}",
-    "emailLink": "Envie-me um link de confirmação",
+    "emailLink": "Me enviar um link de confirmação",
     "confirmIdentity": "Continuar com identidade confirmada",
-    "confirmedIdentityChooseAction": "Sua identidade foi confirmada. Escolha a ação que deseja continuar."
+    "confirmedIdentityChooseAction": "Sua identidade foi confirmada. Escolha a ação que você quer continuar."
   },
   "notificationsPage": {
     "heading": "Configurações de notificações",
@@ -108,22 +108,22 @@
     },
     "email": {
       "title": "Notificações por e-mail",
-      "description": "Receba e-mail quando você for convidado para uma sessão ou enquete, ou quando seu pedido de participação for aprovado.",
+      "description": "Receba e-mail quando você for convidado para uma sessão ou enquete, ou quando seu pedido para entrar for aprovado.",
       "toggleOn": "Ativar notificações por e-mail",
       "toggleOff": "Desativar notificações por e-mail"
     }
   },
   "emailUnsubscribe": {
-    "confirmTitle": "Cancelar inscrição de notificações por e-mail",
+    "confirmTitle": "Cancelar inscrição nas notificações por e-mail",
     "confirmDescription": "Desative as notificações por e-mail de convites, aprovações e outras atividades da sua conta.",
     "confirm": "Cancelar inscrição",
-    "confirmed": "Você cancelou a inscrição das notificações por e-mail.",
+    "confirmed": "Você cancelou a inscrição nas notificações por e-mail.",
     "invalidLink": "Este link de cancelamento de inscrição é inválido ou expirou."
   },
   "timezoneMismatch": {
     "dialogLabel": "Fuso horário alterado",
     "title": "Seu fuso horário parece diferente",
-    "body": "Seu perfil está definido para {{profileZone}}, mas este navegador está atualmente em {{browserZone}}.",
+    "body": "Seu perfil está definido para {{profileZone}}, mas este navegador está em {{browserZone}}.",
     "update": "Atualizar para {{zone}}",
     "keep": "Manter {{zone}}",
     "updated": "Fuso horário atualizado para {{zone}}."
@@ -135,7 +135,7 @@
     "sendEmail": "Enviar instruções de exclusão",
     "emailSent": "Se este endereço puder receber instruções de exclusão, elas estão a caminho.",
     "steamDescription": "Não tem um endereço de e-mail na conta?",
-    "proveWithSteam": "Comprovar com Steam",
+    "proveWithSteam": "Confirmar com a Steam",
     "confirmTitle": "Confirmar exclusão da conta",
     "confirmDescription": "Sua identidade foi confirmada. Confirme que deseja iniciar o período de carência de 7 dias.",
     "confirm": "Confirmar exclusão da conta",

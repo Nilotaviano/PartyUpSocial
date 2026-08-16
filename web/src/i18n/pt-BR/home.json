@@ -11,7 +11,7 @@
       "heading": "Precisa da sua atenção",
       "invitationsHeading": "Convites",
       "joinRequestsHeading": "Pedidos para entrar",
-      "requestedBy": "Solicitado por {{name}}",
+      "requestedBy": "Pedido de {{name}}",
       "empty": "Nada precisa da sua atenção no momento.",
       "seeAll": "Ver todos"
     },

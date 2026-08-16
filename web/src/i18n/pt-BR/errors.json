@@ -1,8 +1,8 @@
 {
   "generic": "Algo deu errado.",
   "auth": {
-    "lastMethod": "Você precisa de pelo menos uma forma de entrada.",
-    "methodNotRemovable": "Este método de entrada não pode ser removido.",
+    "lastMethod": "Você precisa de pelo menos uma forma de entrar.",
+    "methodNotRemovable": "Esta forma de entrar não pode ser removida.",
     "reauthRequired": "Confirme que é você antes de continuar.",
     "emailRequired": "Confirme seu endereço de e-mail antes de definir uma senha."
   },
@@ -17,7 +17,7 @@
   },
   "user_not_found": "Este usuário não foi encontrado.",
   "friend_code_invalid": "Digite um código de amigo válido com 10 caracteres.",
-  "friend_request_self": "Você não pode enviar uma solicitação de amizade para si.",
+  "friend_request_self": "Você não pode enviar uma solicitação de amizade para você mesmo.",
   "block_self": "Você não pode bloquear a si mesmo.",
   "friend_request_not_found": "Esta solicitação de amizade não foi encontrada.",
   "friendship_not_found": "Esta amizade não foi encontrada.",

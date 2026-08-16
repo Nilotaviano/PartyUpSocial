@@ -12,7 +12,7 @@
     "platform": "Plataforma",
     "game": "Jogo",
     "gameFreeText": "Digite o nome do jogo",
-    "notes": "Notas",
+    "notes": "Observações",
     "min": "Presença mínima",
     "max": "Capacidade máxima",
     "unlimited": "Capacidade ilimitada",
@@ -24,8 +24,8 @@
     "defaults": "Padrões: mínimo 4, máximo 4, 2 horas, sem plataforma, não privada.",
     "submit": "Criar sessão",
     "platformOther": "Outra",
-    "steamAppId": "ID do aplicativo Steam",
-    "steamAppIdHelp": "Opcional. O número na URL da loja Steam do jogo, por exemplo 730 para Counter-Strike 2.",
+    "steamAppId": "ID do app na Steam",
+    "steamAppIdHelp": "Opcional. O número que aparece na URL do jogo na loja da Steam, por exemplo 730 para Counter-Strike 2.",
     "gamePicker": {
       "label": "Buscar no catálogo da Steam",
       "placeholder": "Busque ou digite o nome de um jogo",
@@ -41,20 +41,20 @@
     "minLocked": "A presença mínima não pode mais ser alterada.",
     "privacyDisclosure": "Essa alteração não notifica os participantes.",
     "clearMax": "Remover limite de capacidade",
-    "clearNotes": "Remover notas",
+    "clearNotes": "Remover observações",
     "clearGame": "Remover jogo",
-    "conflictRetry": "Esta sessão mudou em outro lugar. Nós a atualizamos e estamos tentando salvar novamente."
+    "conflictRetry": "Esta sessão foi alterada enquanto isso. Atualizamos os dados e estamos salvando de novo."
   },
   "validation": {
     "required": "Este campo é obrigatório.",
-    "range": "Insira um valor dentro do intervalo permitido.",
+    "range": "Digite um valor dentro do intervalo permitido.",
     "increment": "Escolha um horário em incrementos de 15 minutos.",
     "minMax": "A presença mínima não pode exceder a capacidade máxima.",
     "invitedFriend": "Uma sessão não privada precisa de pelo menos um amigo convidado.",
     "tooManyInvitees": "Você pode convidar até 50 amigos.",
     "tooManyGuestLinks": "Você pode criar até 20 links de convidado.",
-    "steamAppIdDigits": "Digite apenas o ID numérico do aplicativo Steam.",
-    "steamAppIdNeedsGameName": "Digite o nome do jogo correspondente ao ID do aplicativo Steam."
+    "steamAppIdDigits": "Digite apenas o ID numérico do app na Steam.",
+    "steamAppIdNeedsGameName": "Digite o nome do jogo que acompanha esse ID da Steam."
   },
   "detail": {
     "organizer": "Organizador",
@@ -69,9 +69,9 @@
     "muted": "Silenciada",
     "progress": "{{going}} de {{min}} confirmados.",
     "progressWaitlist": "Quando lotar, as próximas respostas entram na lista de espera.",
-    "joinRequests": "Pedidos de entrada",
+    "joinRequests": "Pedidos para entrar",
     "notificationsHeading": "Notificações desta sessão",
-    "dangerZone": "Zona de risco"
+    "dangerZone": "Zona de perigo"
   },
   "status": {
     "unconfirmed": "Aguardando jogadores",
@@ -95,19 +95,19 @@
     "updated": "Sua resposta foi atualizada."
   },
   "join": {
-    "request": "Solicitar entrada",
-    "withdraw": "Retirar solicitação",
+    "request": "Pedir para entrar",
+    "withdraw": "Cancelar meu pedido",
     "approve": "Aprovar",
     "reject": "Rejeitar",
-    "received": "Sua solicitação de entrada foi enviada.",
-    "accepted": "Solicitação de entrada aprovada.",
-    "rejected": "Solicitação de entrada rejeitada."
+    "received": "Seu pedido para entrar foi enviado.",
+    "accepted": "Pedido para entrar aprovado.",
+    "rejected": "Pedido para entrar recusado."
   },
   "waitlist": {
     "heading": "Lista de espera",
     "promote": "Promover",
     "reject": "Remover da lista de espera",
-    "vacancy": "Uma vaga foi aberta.",
+    "vacancy": "Abriu uma vaga.",
     "promoted": "Promovido da lista de espera."
   },
   "invite": {
@@ -118,7 +118,7 @@
     "copyLink": "Copiar link",
     "revoke": "Revogar",
     "removeGuest": "Remover convidado",
-    "removeGuestConfirm": "Remover este convidado da sessão? Ele perderá o acesso imediatamente.",
+    "removeGuestConfirm": "Remover este convidado da sessão? A pessoa perde o acesso na hora.",
     "revokeConfirm": "Revogar este link de convidado? Ele deixará de funcionar imediatamente.",
     "copySuccess": "Link copiado.",
     "noFriends": "Você ainda não tem amigos para convidar.",
@@ -143,10 +143,10 @@
   },
   "mute": {
     "on": "Silenciar",
-    "off": "Dessilenciar",
-    "copy": "Silenciar suprime tudo sobre esta sessão, exceto seu lembrete enquanto você estiver Confirmado ou Talvez. Dessilenciar não recupera nada — o que foi perdido enquanto estava silenciado não fica na fila para ser entregue depois.",
+    "off": "Remover silêncio",
+    "copy": "Silenciar suprime tudo sobre esta sessão, exceto seu lembrete enquanto você estiver Confirmado ou Talvez. Remover o silêncio não recupera nada — o que foi perdido enquanto estava silenciado não fica na fila para ser entregue depois.",
     "mutedAnnouncement": "Sessão silenciada.",
-    "unmutedAnnouncement": "Sessão dessilenciada."
+    "unmutedAnnouncement": "Silêncio removido da sessão."
   },
   "list": {
     "upcoming": "Próximas sessões",
@@ -179,13 +179,13 @@
   "errors": {
     "generic": "Algo deu errado.",
     "codes": {
-      "session_not_found": "Essa sessão não pôde ser encontrada.",
-      "user_not_found": "Esse usuário não pôde ser encontrado.",
+      "session_not_found": "Não encontramos essa sessão.",
+      "user_not_found": "Não encontramos esse usuário.",
       "session_validation": "Verifique os campos destacados e tente novamente.",
       "invalid_if_match": "Recarregue a sessão e tente novamente.",
       "invalid_scope": "Essa lista de sessões não é válida.",
       "invalid_cursor": "Essa página de resultados não é mais válida.",
-      "session_conflict": "Esta sessão mudou em outro lugar. Tente novamente.",
+      "session_conflict": "Esta sessão foi alterada enquanto isso. Tente novamente.",
       "session_terminal": "Esta sessão não pode mais ser alterada.",
       "session_time_locked": "O horário de início não pode mais ser alterado.",
       "capacity_below_occupancy": "A capacidade não pode ser reduzida abaixo do número de pessoas já confirmadas.",
@@ -194,22 +194,22 @@
       "session_responses_closed": "As respostas estão encerradas para esta sessão.",
       "session_leave_closed": "Você não pode mais sair desta sessão.",
       "session_guest_removal_closed": "Convidados não podem mais ser removidos desta sessão.",
-      "join_request_exists": "Você já tem uma solicitação de entrada pendente.",
-      "join_request_not_pending": "Essa solicitação de entrada não está mais pendente.",
-      "join_request_closed": "Esta sessão não aceita mais solicitações de entrada.",
+      "join_request_exists": "Você já tem um pedido para entrar pendente.",
+      "join_request_not_pending": "Esse pedido para entrar não está mais pendente.",
+      "join_request_closed": "Esta sessão não aceita mais pedidos para entrar.",
       "no_session_capacity": "Não há capacidade disponível.",
       "not_waitlisted": "Essa pessoa não está na lista de espera.",
       "guest_link_terminal": "Este link de convidado não está mais ativo.",
-      "guest_link_claimed": "Este link de convidado já foi utilizado.",
+      "guest_link_claimed": "Este link de convidado já foi usado.",
       "reminder_not_eligible": "Não é possível definir um lembrete para esta sessão.",
-      "transient_conflict": "Isso não foi concluído. Tente novamente.",
+      "transient_conflict": "Não deu certo. Tente novamente.",
       "rate_limited": "Muitas tentativas. Tente novamente mais tarde."
     }
   },
   "a11y": {
     "rosterLabel": "Lista de participantes da sessão",
     "waitlistLabel": "Lista de espera da sessão",
-    "validationSummary": "Houve problemas com seu envio",
+    "validationSummary": "Há problemas no formulário",
     "dialogLabel": "Diálogo de confirmação",
     "copyLink": "Copiar link para a área de transferência"
   }

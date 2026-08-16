@@ -19,7 +19,7 @@
   },
   "messages": {
     "platformLinksOptional": "A vinculação de plataformas é opcional.",
-    "platformLinksInfo": "Entrar com o Steam vincula essa conta ao seu perfil automaticamente. Não há nada para fazer nesta etapa — continue quando estiver pronto."
+    "platformLinksInfo": "Entrar com a Steam vincula essa conta ao seu perfil automaticamente. Não há nada para fazer nesta etapa — continue quando estiver pronto."
   },
   "progress": "Etapa {{current}} de {{total}}: {{step}}",
   "onboarding": {

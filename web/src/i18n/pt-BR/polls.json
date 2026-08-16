@@ -7,7 +7,7 @@
     "heading": "Nova enquete",
     "title": "Título",
     "options": "Horários candidatos",
-    "optionsHelp": "Adicione pelo menos dois horários candidatos. Adicionar o mesmo horário duas vezes o mescla em uma única opção.",
+    "optionsHelp": "Adicione pelo menos dois horários candidatos. Se você adicionar o mesmo horário duas vezes, ele vira uma opção só.",
     "removeOption": "Remover",
     "deadline": "Prazo de votação",
     "deadlineChoice": {
@@ -20,7 +20,7 @@
     "platform": "Plataforma",
     "game": "Jogo",
     "gameFreeText": "Digite o nome do jogo",
-    "notes": "Notas",
+    "notes": "Observações",
     "min": "Presença mínima",
     "max": "Capacidade máxima",
     "unlimited": "Capacidade ilimitada",
@@ -30,8 +30,8 @@
     "defaults": "Padrões: mínimo 4, máximo 4, 2 horas, prazo de 24 horas, sem plataforma, não privada.",
     "submit": "Criar enquete",
     "platformOther": "Outra",
-    "steamAppId": "ID do aplicativo Steam",
-    "steamAppIdHelp": "Opcional. O número na URL da loja Steam do jogo, por exemplo 730 para Counter-Strike 2.",
+    "steamAppId": "ID do app na Steam",
+    "steamAppIdHelp": "Opcional. O número que aparece na URL do jogo na loja da Steam, por exemplo 730 para Counter-Strike 2.",
     "gamePicker": {
       "label": "Buscar no catálogo da Steam",
       "placeholder": "Busque ou digite o nome de um jogo",
@@ -57,7 +57,7 @@
   },
   "validation": {
     "required": "Este campo é obrigatório.",
-    "range": "Informe um valor dentro do intervalo permitido.",
+    "range": "Digite um valor dentro do intervalo permitido.",
     "increment": "Escolha um horário em incrementos de 15 minutos.",
     "minMax": "A presença mínima não pode exceder a capacidade máxima.",
     "invitedFriend": "Uma enquete não privada precisa de pelo menos um amigo convidado.",
@@ -65,8 +65,8 @@
     "tooManyGuestLinks": "Você pode criar até 20 links de convidado.",
     "optionMinimum": "Adicione pelo menos dois horários candidatos.",
     "optionCap": "Uma enquete pode ter no máximo 12 horários candidatos.",
-    "steamAppIdDigits": "Digite apenas o ID numérico do aplicativo Steam.",
-    "steamAppIdNeedsGameName": "Digite o nome do jogo correspondente ao ID do aplicativo Steam."
+    "steamAppIdDigits": "Digite apenas o ID numérico do app na Steam.",
+    "steamAppIdNeedsGameName": "Digite o nome do jogo que acompanha esse ID da Steam."
   },
   "list": {
     "heading": "Enquetes",
@@ -108,7 +108,7 @@
     "yourVote": "Seu voto: {{value}}",
     "noVoteYet": "Você ainda não votou nesta opção.",
     "notificationsHeading": "Notificações desta enquete",
-    "dangerZone": "Zona de risco"
+    "dangerZone": "Zona de perigo"
   },
   "vote": {
     "available": "Disponível",
@@ -129,10 +129,10 @@
   },
   "mute": {
     "on": "Silenciar",
-    "off": "Dessilenciar",
-    "copy": "Silenciar suprime tudo sobre esta enquete, exceto seu lembrete enquanto seu voto for Disponível ou Talvez. Dessilenciar não recupera nada — o que foi perdido enquanto estava silenciada não fica na fila para ser entregue depois.",
+    "off": "Remover silêncio",
+    "copy": "Silenciar suprime tudo sobre esta enquete, exceto seu lembrete enquanto seu voto for Disponível ou Talvez. Remover o silêncio não recupera nada — o que foi perdido enquanto estava silenciada não fica na fila para ser entregue depois.",
     "mutedAnnouncement": "Enquete silenciada.",
-    "unmutedAnnouncement": "Enquete dessilenciada.",
+    "unmutedAnnouncement": "Silêncio removido da enquete.",
     "disabledTerminal": "Silenciar não está disponível quando uma enquete é finalizada, expira ou é cancelada. Para uma enquete finalizada, silencie a sessão criada por ela."
   },
   "leave": {
@@ -167,7 +167,7 @@
     "linkLabel": "Link de convidado",
     "revoke": "Revogar",
     "remove": "Remover convidado",
-    "removeConfirm": "Isso remove os votos dele e revoga o link. Esta ação não pode ser desfeita.",
+    "removeConfirm": "Isso remove os votos dessa pessoa e revoga o link dela. Esta ação não pode ser desfeita.",
     "justCreatedHint": "Esses links acabaram de ser criados. Salve-os agora — eles não aparecerão novamente depois que você sair desta página."
   },
   "live": {
@@ -181,7 +181,7 @@
     "canceled": "Esta enquete foi cancelada.",
     "revoked": "Este link de convite foi revogado.",
     "ended": "Este convite terminou.",
-    "expired": "A janela de seleção desta enquete encerrou.",
+    "expired": "A janela de seleção desta enquete terminou.",
     "finalized": "Esta enquete foi finalizada. Reabra seu link de convite para a sessão.",
     "invalid": "Este link de convite não é válido."
   },
@@ -194,31 +194,31 @@
   "errors": {
     "generic": "Algo deu errado.",
     "codes": {
-      "poll_not_found": "Essa enquete não pôde ser encontrada.",
+      "poll_not_found": "Não encontramos essa enquete.",
       "poll_validation": "Verifique os campos destacados e tente novamente.",
       "poll_option_cap": "Uma enquete pode ter no máximo 12 horários candidatos.",
-      "poll_option_not_found": "Essa opção não pôde ser encontrada.",
-      "poll_voting_closed": "A votação encerrou para esta enquete.",
+      "poll_option_not_found": "Não encontramos essa opção.",
+      "poll_voting_closed": "A votação desta enquete já terminou.",
       "poll_terminal": "Esta enquete não pode mais ser alterada.",
       "poll_invalid_transition": "Essa alteração não é mais possível.",
       "poll_invites_closed": "Esta enquete não está mais aceitando convites.",
       "poll_participant_removed": "Você não tem mais acesso a esta enquete.",
-      "poll_conflict": "Esse convidado já usou o link dele e não pode ser revogado. Remova o convidado em vez disso.",
-      "poll_guest_not_found": "Esse convidado não pôde ser encontrado.",
-      "poll_selection_window_closed": "A janela de seleção desta enquete encerrou.",
+      "poll_conflict": "Esse convidado já entrou pelo link, então ele não pode ser revogado. Remova o convidado em vez disso.",
+      "poll_guest_not_found": "Não encontramos esse convidado.",
+      "poll_selection_window_closed": "A janela de seleção desta enquete terminou.",
       "poll_zero_options": "Esta enquete não tem opções restantes.",
-      "poll_guest_link_not_found": "Esse link de convite não pôde ser encontrado.",
+      "poll_guest_link_not_found": "Não encontramos esse link de convite.",
       "poll_guest_link_inactive": "Esse link de convite não está mais ativo.",
       "guest_link_not_claimed": "Entre nesta enquete com seu nome antes de votar.",
       "guest_link_terminal": "Esse link de convite não está mais ativo.",
-      "user_not_found": "Esse usuário não pôde ser encontrado.",
+      "user_not_found": "Não encontramos esse usuário.",
       "invalid_scope": "Essa lista de enquetes não é válida.",
       "invalid_cursor": "Essa página de resultados não é mais válida.",
       "rate_limited": "Muitas tentativas. Tente novamente mais tarde."
     }
   },
   "a11y": {
-    "validationSummary": "Houve problemas com seu envio",
+    "validationSummary": "Há problemas no formulário",
     "dialogLabel": "Caixa de confirmação",
     "copyLink": "Copiar link de convite",
     "candidateFreeCount_one": "{{day}} {{time}} — {{count}} amigo livre",
@@ -263,7 +263,7 @@
     "alreadyPassed": "Já passou",
     "repliedCount": "{{responded}}/{{total}} responderam",
     "suggestedBy": "Sugerido por {{name}}",
-    "previewSeats": "Pré-visualizar vagas",
+    "previewSeats": "Prévia das vagas",
     "deleteOption": "Excluir opção",
     "deleteOptionTitle": "Excluir esta opção?",
     "deleteOptionBody": "Todos os votos neste horário são removidos. As outras opções não são afetadas.",
@@ -272,20 +272,20 @@
     "seated": "Vagas confirmadas",
     "waitlist": "Lista de espera",
     "nobodyCanMake": "Ninguém pode neste horário.",
-    "everyoneFits": "Todos cabem.",
+    "everyoneFits": "Todo mundo cabe.",
     "belowMinimumNotice": "Abaixo do mínimo de {{min}} jogadores — você ainda pode finalizar.",
     "notYet": "Ainda não",
     "lockInTime": "Definir este horário",
-    "previewAndFinalize": "Pré-visualizar e finalizar",
+    "previewAndFinalize": "Ver prévia e finalizar",
     "suggestDialogTitle": "Sugerir outro horário",
-    "suggestDialogHelp": "Vira uma opção imediatamente — sem aprovação necessária.",
+    "suggestDialogHelp": "Vira uma opção na hora — não precisa de aprovação.",
     "nudgeNotice": "Todos recebem um aviso para votar na nova opção.",
     "cancel": "Cancelar",
     "candidateHeading": "Horários candidatos",
     "candidateHint": "Ordenados por Disponível, depois Talvez. Vote em todas as opções.",
     "voterChipsLabel": "Votantes de {{category}}: {{names}}",
-    "voterChipsOverflow": "+{{count}} a mais",
-    "voterChipsOverflow_one": "+{{count}} a mais",
-    "voterChipsOverflow_other": "+{{count}} a mais"
+    "voterChipsOverflow": "+{{count}} outros",
+    "voterChipsOverflow_one": "+{{count}} outros",
+    "voterChipsOverflow_other": "+{{count}} outros"
   }
 }

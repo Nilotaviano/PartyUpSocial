@@ -13,7 +13,7 @@
     },
     "sessions": {
       "name": "Sessões",
-      "body": "Planeje noites de jogo em um horário fixo, com RSVPs e lista de espera."
+      "body": "Planeje noites de jogo em um horário fixo, com confirmação de presença e lista de espera."
     },
     "polls": {
       "name": "Enquetes",
@@ -21,7 +21,7 @@
     },
     "calendar": {
       "name": "Calendário",
-      "body": "Marque quando você está livre para facilitar encontrar um horário em comum."
+      "body": "Marque quando você está livre e fica fácil achar um horário em comum."
     },
     "discover": {
       "name": "Descobrir",
@@ -43,7 +43,7 @@
   },
   "replay": {
     "title": "Tour do app",
-    "body": "Reveja o tour do app novamente.",
+    "body": "Dê outra olhada no tour do app.",
     "action": "Repetir o tour"
   }
 }
