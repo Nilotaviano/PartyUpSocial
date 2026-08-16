@@ -243,6 +243,7 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
                     lockAttemptGate),
                 approveScope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
                 approveScope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+                approveScope.ServiceProvider.GetRequiredService<IFriendGroupRepository>(),
                 approveScope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
                 approveScope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
                 approveScope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
@@ -340,6 +341,7 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
                     lockAttemptGate),
                 requestScope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
                 requestScope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+                requestScope.ServiceProvider.GetRequiredService<IFriendGroupRepository>(),
                 requestScope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
                 requestScope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
                 requestScope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
@@ -426,7 +428,7 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            isPrivate: false);
+            visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
         Session session = Session.Create(organizerId, details, [invitedFriendId], _factory.Clock);
         _ = session.DequeueEvents();
         SessionId sessionId = session.Id;
@@ -452,6 +454,7 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
         scope.ServiceProvider.GetRequiredService<ISessionLockRepository>(),
         scope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
         scope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+        scope.ServiceProvider.GetRequiredService<IFriendGroupRepository>(),
         scope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
         scope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
@@ -463,6 +466,7 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
         scope.ServiceProvider.GetRequiredService<ISessionLockRepository>(),
         scope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
         scope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+        scope.ServiceProvider.GetRequiredService<IFriendGroupRepository>(),
         scope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
         scope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
@@ -524,7 +528,7 @@ public sealed class SessionAttachmentRaceTests : IAsyncLifetime, IDisposable
         SessionNotes.Empty,
         minAttendance: 1,
         maxCapacity: null,
-        isPrivate: true);
+        visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
 }
 
 internal sealed class AttemptGate

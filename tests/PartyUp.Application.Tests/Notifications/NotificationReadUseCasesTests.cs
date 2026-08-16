@@ -4,6 +4,7 @@ using PartyUp.Application.Notifications;
 using PartyUp.Application.Polls;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Friendships;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Polls;
@@ -185,7 +186,7 @@ public sealed class NotificationReadUseCasesTests
         Assert.True(row.HasSubject);
         Assert.Equal(NotificationSubjectKind.Session, row.SubjectKind);
         Assert.Equal(session.Id.Value, row.SubjectId);
-        Assert.Equal(session.Title.Value, row.SubjectTitle!.Value.Value);
+        Assert.Equal(session.Title.Value, row.SubjectTitle);
     }
 
     // ---- both-ref row: session unreachable falls back to the poll (F1) ----
@@ -215,7 +216,7 @@ public sealed class NotificationReadUseCasesTests
         Assert.True(row.HasSubject);
         Assert.Equal(NotificationSubjectKind.Poll, row.SubjectKind);
         Assert.Equal(poll.Id.Value, row.SubjectId);
-        Assert.Equal(poll.Title.Value, row.SubjectTitle!.Value.Value);
+        Assert.Equal(poll.Title.Value, row.SubjectTitle);
         Assert.Equal(selected, row.OptionStartTime);
     }
 
@@ -359,6 +360,70 @@ public sealed class NotificationReadUseCasesTests
 
         Assert.Null(row.OptionStartTime);
     }
+
+    // ---- D-207: a group ref masks by literal membership, not by collapsing the whole row ----------
+
+    [Fact]
+    public async Task GroupRef_MaskedWhenRecipientNoLongerInvolvesTheGroup_D207()
+    {
+        NotificationFixture fixture = new();
+        UserId ownerId = fixture.MakeRecipient();
+        UserId recipientId = fixture.MakeRecipient();
+
+        FriendGroup group = FriendGroup.Create(ownerId, GroupName.Create("Raid Crew"), fixture.Clock);
+        group.Invite(ownerId, recipientId, isAcceptedFriendOfOwner: true, fixture.Clock);
+        group.AcceptInvite(recipientId, fixture.Clock);
+        _ = group.DequeueEvents();
+        // The recipient no longer Involves the group (removed after the invite/accept round trip) —
+        // the group row itself still exists, so this is D-207's membership-lapsed case, distinct from
+        // AudienceGroupDeleted's hard-delete case.
+        group.RemoveMember(ownerId, recipientId);
+        fixture.Groups.Items.Add(group);
+
+        Notification notification = Notification.Create(
+            recipientId,
+            NotificationType.FriendGroupInviteAccepted,
+            NotificationSubject.ForFriendGroupInvite(group.Id, ownerId),
+            fixture.Clock);
+
+        NotificationReadModel row = await fixture.UseCases().ProjectAsync(notification, recipientId, default);
+
+        // Masked: no subject id/title leaks the group's name to a viewer no longer in it.
+        Assert.False(row.HasSubject);
+        Assert.Null(row.SubjectId);
+        Assert.Null(row.SubjectTitle);
+        // Not suppressed: the row still renders (actor resolves), matching D-207's "must not suppress
+        // the notification itself" — a group ref never forces the whole row to Minimal.
+        Assert.NotNull(row.Actor);
+        Assert.Equal(NotificationType.FriendGroupInviteAccepted, row.Type);
+    }
+
+    [Fact]
+    public async Task GroupRef_VisibleWhenRecipientStillInvolvesTheGroup_D207()
+    {
+        NotificationFixture fixture = new();
+        UserId ownerId = fixture.MakeRecipient();
+        UserId recipientId = fixture.MakeRecipient();
+
+        FriendGroup group = FriendGroup.Create(ownerId, GroupName.Create("Raid Crew"), fixture.Clock);
+        group.Invite(ownerId, recipientId, isAcceptedFriendOfOwner: true, fixture.Clock);
+        group.AcceptInvite(recipientId, fixture.Clock);
+        _ = group.DequeueEvents();
+        fixture.Groups.Items.Add(group);
+
+        Notification notification = Notification.Create(
+            recipientId,
+            NotificationType.FriendGroupInviteAccepted,
+            NotificationSubject.ForFriendGroupInvite(group.Id, ownerId),
+            fixture.Clock);
+
+        NotificationReadModel row = await fixture.UseCases().ProjectAsync(notification, recipientId, default);
+
+        Assert.True(row.HasSubject);
+        Assert.Equal(NotificationSubjectKind.Group, row.SubjectKind);
+        Assert.Equal(group.Id.Value, row.SubjectId);
+        Assert.Equal(group.Name.Value, row.SubjectTitle);
+    }
 }
 
 // ---- shared in-memory test doubles for this file ------------------------------------------------
@@ -481,6 +546,47 @@ internal sealed class FakeBlockRepository : IBlockRepository
     public void Remove(Block block) => Items.Remove(block);
 }
 
+internal sealed class FakeFriendGroupRepository : IFriendGroupRepository
+{
+    internal List<FriendGroup> Items { get; } = [];
+
+    public void Add(FriendGroup group) => Items.Add(group);
+
+    public void Remove(FriendGroup group) => Items.Remove(group);
+
+    public Task<FriendGroup?> FindNoTrackingAsync(FriendGroupId id, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.FirstOrDefault(g => g.Id == id));
+
+    public Task<FriendGroup?> LoadForUpdateAsync(FriendGroupId id, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.FirstOrDefault(g => g.Id == id));
+
+    public Task<int> CountOwnedForUpdateAsync(UserId ownerId, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.Count(g => g.OwnerId == ownerId));
+
+    public Task<IReadOnlyCollection<FriendGroupId>> LockViewerGroupIdsAsync(
+        UserId viewerId, IReadOnlyCollection<FriendGroupId> candidateGroupIds, CancellationToken cancellationToken) =>
+        Task.FromResult(ViewerGroupIds(viewerId, candidateGroupIds));
+
+    public Task<IReadOnlyCollection<FriendGroupId>> GetViewerGroupIdsAsync(
+        UserId viewerId, IReadOnlyCollection<FriendGroupId> candidateGroupIds, CancellationToken cancellationToken) =>
+        Task.FromResult(ViewerGroupIds(viewerId, candidateGroupIds));
+
+    public Task<GroupName?> FindNameAsync(FriendGroupId id, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.FirstOrDefault(g => g.Id == id)?.Name);
+
+    public Task<IReadOnlyCollection<FriendGroup>> ListInvolvingAsync(UserId userId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyCollection<FriendGroup>>([.. Items.Where(g => g.Involves(userId))]);
+
+    public Task<IReadOnlyCollection<UserId>> ListDistinctOrganizersTargetingAsync(
+        FriendGroupId groupId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyCollection<UserId>>([]);
+
+    private IReadOnlyCollection<FriendGroupId> ViewerGroupIds(
+        UserId viewerId, IReadOnlyCollection<FriendGroupId> candidateGroupIds) =>
+        [.. candidateGroupIds.Where(id => Items.Any(g =>
+            g.Id == id && (g.OwnerId == viewerId || g.HasAcceptedMember(viewerId))))];
+}
+
 /// <summary>Shared fixture wiring for this file's <see cref="NotificationReadUseCases"/> tests.</summary>
 internal sealed class NotificationFixture
 {
@@ -492,6 +598,7 @@ internal sealed class NotificationFixture
         Users = new FakeUserRepository();
         Friendships = new FakeFriendshipRepository();
         Blocks = new FakeBlockRepository();
+        Groups = new FakeFriendGroupRepository();
     }
 
     internal MutableClock Clock { get; }
@@ -506,8 +613,10 @@ internal sealed class NotificationFixture
 
     internal FakeBlockRepository Blocks { get; }
 
+    internal FakeFriendGroupRepository Groups { get; }
+
     internal NotificationReadUseCases UseCases() =>
-        new(Sessions, Polls, Users, Friendships, Blocks);
+        new(Sessions, Polls, Users, Friendships, Blocks, Groups);
 
     /// <summary>A minimal Active user, registered with the fake repository, used as the notification recipient.</summary>
     internal UserId MakeRecipient()
@@ -555,7 +664,7 @@ internal sealed class NotificationFixture
             SessionNotes.Empty,
             1,
             null,
-            isPrivate);
+            isPrivate ? ContentVisibility.Private : ContentVisibility.Public);
 
         Session session = Session.Create(organizerId, details, invitees ?? [], Clock);
         session.DequeueEvents();
@@ -572,7 +681,7 @@ internal sealed class NotificationFixture
             SessionNotes.Empty,
             1,
             null,
-            isPrivate: true);
+            visibility: ContentVisibility.Private);
 
         Instant now = Clock.GetCurrentInstant();
         Poll poll = Poll.Create(

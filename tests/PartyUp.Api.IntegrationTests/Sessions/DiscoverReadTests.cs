@@ -235,7 +235,7 @@ public sealed class DiscoverReadTests : IAsyncLifetime, IDisposable
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            isPrivate: false);
+            visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
 
         Session session = Session.Create(organizerId, details, [filler], _factory.Clock);
         _ = session.DequeueEvents();
@@ -288,7 +288,7 @@ public sealed class DiscoverReadTests : IAsyncLifetime, IDisposable
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            isPrivate: isPrivate);
+            visibility: (isPrivate ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
 
         // D-099: a non-private session needs at least one directly invited registered friend at
         // creation — fixtures that want an empty roster otherwise draw in an unrelated filler invitee.

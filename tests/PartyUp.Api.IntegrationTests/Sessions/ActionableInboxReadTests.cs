@@ -174,7 +174,7 @@ public sealed class ActionableInboxReadTests : IAsyncLifetime, IDisposable
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            isPrivate: invitees.Count == 0);
+            visibility: (invitees.Count == 0 ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
 
         Session session = Session.Create(organizerId, details, invitees, _factory.Clock);
         _ = session.DequeueEvents();

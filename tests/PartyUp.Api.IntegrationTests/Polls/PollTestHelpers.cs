@@ -23,13 +23,14 @@ internal static class PollTestHelpers
         SessionNotes.Empty,
         minAttendance: 1,
         maxCapacity: maxCapacity,
-        isPrivate: false);
+        visibility: ContentVisibility.Public);
 
     internal static CreatePollUseCase BuildCreateUseCase(AsyncServiceScope scope) => new(
         scope.ServiceProvider.GetRequiredService<IPollRepository>(),
         scope.ServiceProvider.GetRequiredService<IPollLockRepository>(),
         scope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
         scope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+        scope.ServiceProvider.GetRequiredService<IFriendGroupRepository>(),
         scope.ServiceProvider.GetRequiredService<IPollNotificationMaterializer>(),
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
         scope.ServiceProvider.GetRequiredService<IClock>(),
@@ -40,6 +41,7 @@ internal static class PollTestHelpers
         scope.ServiceProvider.GetRequiredService<IPollLockRepository>(),
         scope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
         scope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+        scope.ServiceProvider.GetRequiredService<IFriendGroupRepository>(),
         scope.ServiceProvider.GetRequiredService<IPollNotificationMaterializer>(),
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
         scope.ServiceProvider.GetRequiredService<IClock>());
@@ -49,6 +51,7 @@ internal static class PollTestHelpers
         scope.ServiceProvider.GetRequiredService<IPollLockRepository>(),
         scope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
         scope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+        scope.ServiceProvider.GetRequiredService<IFriendGroupRepository>(),
         scope.ServiceProvider.GetRequiredService<IPollNotificationMaterializer>(),
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
         scope.ServiceProvider.GetRequiredService<IClock>());
@@ -72,6 +75,7 @@ internal static class PollTestHelpers
         scope.ServiceProvider.GetRequiredService<IPollLockRepository>(),
         scope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
         scope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+        scope.ServiceProvider.GetRequiredService<IFriendGroupRepository>(),
         scope.ServiceProvider.GetRequiredService<IPollNotificationMaterializer>(),
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
         scope.ServiceProvider.GetRequiredService<IClock>(),

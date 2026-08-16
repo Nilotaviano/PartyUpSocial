@@ -1547,7 +1547,7 @@ internal static class SessionEndpointTestSupport
             SessionNotes.Empty,
             minAttendance,
             maxCapacity,
-            isPrivate);
+            isPrivate ? ContentVisibility.Private : ContentVisibility.Public);
         Session session = Session.Create(organizerId, details, invitees ?? [], factory.Clock);
         _ = session.DequeueEvents();
 

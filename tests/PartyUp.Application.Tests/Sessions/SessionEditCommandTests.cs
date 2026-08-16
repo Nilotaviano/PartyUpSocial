@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Application.Sessions;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
 
@@ -16,16 +17,12 @@ public sealed class SessionEditCommandTests
 
         // D-130 still applies to a reschedule, not just to creation.
         await Assert.ThrowsAsync<DomainException>(() => useCase.ExecuteAsync(
-            new EditSessionCommand(
-                session.Id, fixture.OrganizerId, null,
-                SessionTestFixture.Origin + Duration.FromDays(400), null, null, null, null, null, null, null, null),
+            new EditSessionCommand(session.Id, fixture.OrganizerId, null, SessionTestFixture.Origin + Duration.FromDays(400), null, null, null, null, null, null, null, null, null),
             default));
 
         fixture.Clock.Advance(SessionTestFixture.DefaultStart - SessionTestFixture.Origin + Duration.FromMinutes(1));
         await Assert.ThrowsAsync<DomainException>(() => useCase.ExecuteAsync(
-            new EditSessionCommand(
-                session.Id, fixture.OrganizerId, null,
-                fixture.Clock.GetCurrentInstant() + Duration.FromDays(2), null, null, null, null, null, null, null, null),
+            new EditSessionCommand(session.Id, fixture.OrganizerId, null, fixture.Clock.GetCurrentInstant() + Duration.FromDays(2), null, null, null, null, null, null, null, null, null),
             default));
     }
 
@@ -46,13 +43,13 @@ public sealed class SessionEditCommandTests
         Instant newStart = SessionTestFixture.DefaultStart + Duration.FromHours(3);
 
         await useCase.ExecuteAsync(
-            new EditSessionCommand(session.Id, fixture.OrganizerId, null, newStart, null, null, null, null, null, null, null, null),
+            new EditSessionCommand(session.Id, fixture.OrganizerId, null, newStart, null, null, null, null, null, null, null, null, null),
             default);
 
         Assert.Equal(ParticipationStatus.Pending, session.Find(ParticipantRef.ForUser(fixture.InviteeId))!.Status);
 
         await useCase.ExecuteAsync(
-            new EditSessionCommand(removalSession.Id, removedOrganizer, null, newStart, null, null, null, null, null, null, null, null),
+            new EditSessionCommand(removalSession.Id, removedOrganizer, null, newStart, null, null, null, null, null, null, null, null, null),
             default);
 
         Assert.True(removalSession.Find(ParticipantRef.ForUser(removedCounterpart))!.IsRemoved);
@@ -74,7 +71,7 @@ public sealed class SessionEditCommandTests
 
         EditSessionUseCase useCase = fixture.EditUseCase();
         await useCase.ExecuteAsync(
-            new EditSessionCommand(session.Id, fixture.OrganizerId, null, null, null, null, null, null, 5, null, null, null),
+            new EditSessionCommand(session.Id, fixture.OrganizerId, null, null, null, null, null, null, 5, null, null, null, null),
             default);
 
         // Active Going (organizer only) now sits below the raised minimum, but no Going-waitlisted
@@ -95,14 +92,12 @@ public sealed class SessionEditCommandTests
 
         // D-091/§12-1: clearing to unlimited is rejected while the waitlist is non-empty.
         await Assert.ThrowsAsync<DomainException>(() => useCase.ExecuteAsync(
-            new EditSessionCommand(
-                session.Id, fixture.OrganizerId, null, null, null, null, null, null, null, null, null,
-                [SessionEditClearField.MaxCapacity]),
+            new EditSessionCommand(session.Id, fixture.OrganizerId, null, null, null, null, null, null, null, null, null, null, [SessionEditClearField.MaxCapacity]),
             default));
 
         // D-121: cannot drop the maximum below current active occupancy.
         await Assert.ThrowsAsync<DomainException>(() => useCase.ExecuteAsync(
-            new EditSessionCommand(session.Id, fixture.OrganizerId, null, null, null, null, null, null, null, 0, null, null),
+            new EditSessionCommand(session.Id, fixture.OrganizerId, null, null, null, null, null, null, null, 0, null, null, null),
             default));
     }
 
@@ -114,15 +109,13 @@ public sealed class SessionEditCommandTests
         EditSessionUseCase useCase = fixture.EditUseCase();
 
         await useCase.ExecuteAsync(
-            new EditSessionCommand(
-                session.Id, fixture.OrganizerId, "New title", null, null, null, null, "New notes",
-                null, null, true, null),
+            new EditSessionCommand(session.Id, fixture.OrganizerId, "New title", null, null, null, null, "New notes", null, null, ContentVisibility.Private, null, null),
             default);
 
         Assert.Empty(fixture.Materializer.Calls[^1].Events);
 
         await useCase.ExecuteAsync(
-            new EditSessionCommand(session.Id, fixture.OrganizerId, null, null, 180, null, null, null, null, null, null, null),
+            new EditSessionCommand(session.Id, fixture.OrganizerId, null, null, 180, null, null, null, null, null, null, null, null),
             default);
 
         Assert.Contains(fixture.Materializer.Calls[^1].Events, e => e is SessionRescheduled);
@@ -138,9 +131,7 @@ public sealed class SessionEditCommandTests
         fixture.VersionStamp.MatchesFunc = (_, _) => false;
 
         EditSessionResult result = await useCase.ExecuteAsync(
-            new EditSessionCommand(
-                session.Id, fixture.OrganizerId, "New title", null, null, null, null, null,
-                null, null, null, null, IfMatch: "stale-token"),
+            new EditSessionCommand(session.Id, fixture.OrganizerId, "New title", null, null, null, null, null, null, null, null, null, null, IfMatch: "stale-token"),
             default);
 
         Assert.False(result.Succeeded);
@@ -159,12 +150,52 @@ public sealed class SessionEditCommandTests
             lockedSession.Id == session.Id && token == "current-token";
 
         EditSessionResult result = await useCase.ExecuteAsync(
-            new EditSessionCommand(
-                session.Id, fixture.OrganizerId, "New title", null, null, null, null, null,
-                null, null, null, null, IfMatch: "current-token"),
+            new EditSessionCommand(session.Id, fixture.OrganizerId, "New title", null, null, null, null, null, null, null, null, null, null, IfMatch: "current-token"),
             default);
 
         Assert.True(result.Succeeded, result.Code);
         Assert.Equal("New title", session.Title.Value);
+    }
+
+    /// <summary>
+    /// D-201: the group-authority check sits above every mutation in <c>EditSessionUseCase</c>
+    /// specifically so a rejected edit never commits a partial one — a title change bundled with an
+    /// unauthorized group id must leave the session completely untouched, not just the audience.
+    /// </summary>
+    [Fact]
+    public async Task GroupAuthorityRejection_AppliesZeroMutations_D201()
+    {
+        SessionTestFixture fixture = new();
+        Session session = fixture.SeedSession();
+        string originalTitle = session.Title.Value;
+        int originalMinAttendance = session.MinAttendance;
+        EditSessionUseCase useCase = fixture.EditUseCase();
+
+        var unauthorizedGroupId = FriendGroupId.New();
+
+        EditSessionResult result = await useCase.ExecuteAsync(
+            new EditSessionCommand(
+                session.Id,
+                fixture.OrganizerId,
+                "Title that must not stick",
+                null,
+                null,
+                null,
+                null,
+                null,
+                MinAttendance: 2,
+                null,
+                ContentVisibility.Groups,
+                [unauthorizedGroupId],
+                null),
+            default);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("group_not_found", result.Code);
+        Assert.Equal(originalTitle, session.Title.Value);
+        Assert.Equal(originalMinAttendance, session.MinAttendance);
+        Assert.Equal(ContentVisibility.Public, session.Visibility);
+        Assert.Empty(session.AudienceGroupIds);
+        Assert.Empty(fixture.Materializer.Calls);
     }
 }

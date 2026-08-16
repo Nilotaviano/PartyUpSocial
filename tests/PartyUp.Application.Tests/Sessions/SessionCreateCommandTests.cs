@@ -24,7 +24,7 @@ public sealed class SessionCreateCommandTests
         Assert.Equal(CreateSessionUseCase.DefaultMaxCapacity, session.MaxCapacity);
         Assert.Equal(CreateSessionUseCase.DefaultDurationMinutes, session.Duration.TotalMinutes);
         Assert.Equal(Platform.NotApplicable, session.Platform);
-        Assert.False(session.IsPrivate);
+        Assert.Equal(ContentVisibility.Public, session.Visibility);
 
         // D-130: outside the [now+15m, now+1y] window.
         await Assert.ThrowsAsync<DomainException>(() => useCase.ExecuteAsync(
@@ -44,12 +44,12 @@ public sealed class SessionCreateCommandTests
         CreateSessionUseCase useCase = fixture.CreateUseCase();
 
         await Assert.ThrowsAsync<DomainException>(() => useCase.ExecuteAsync(
-            fixture.CreateCommand(isPrivate: false, inviteeIds: []),
+            fixture.CreateCommand(visibility: ContentVisibility.Public, inviteeIds: []),
             default));
 
         // A private, guest-only session needs no invitee at all (D-125).
         CreateSessionResult result = await useCase.ExecuteAsync(
-            fixture.CreateCommand(isPrivate: true, inviteeIds: [], guestLinkCount: 2),
+            fixture.CreateCommand(visibility: ContentVisibility.Private, inviteeIds: [], guestLinkCount: 2),
             default);
 
         Assert.True(result.Succeeded);

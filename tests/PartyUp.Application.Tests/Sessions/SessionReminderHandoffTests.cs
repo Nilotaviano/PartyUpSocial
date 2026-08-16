@@ -55,6 +55,7 @@ public sealed class SessionReminderHandoffTests
             fixture.Locks,
             fixture.Friendships,
             fixture.Blocks,
+            fixture.Groups,
             throwingMaterializer,
             fixture.Reminders,
             fixture.UnitOfWork,

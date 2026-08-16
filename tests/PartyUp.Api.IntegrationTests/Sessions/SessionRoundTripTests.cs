@@ -51,7 +51,7 @@ public sealed class SessionRoundTripTests : IAsyncLifetime
             SessionNotes.Create("Bring snacks"),
             minAttendance: 1,
             maxCapacity: 3,
-            isPrivate: true);
+            visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
 
         // Occupancy plan (max 3): organizer(1) -> activeInvitee Going(2) -> guestActive claim Going(3,
         // at capacity) -> waitlistedInvitee Going(waitlisted) -> guestWaitlisted claim Going(waitlisted).
@@ -235,7 +235,7 @@ public sealed class SessionRoundTripTests : IAsyncLifetime
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            isPrivate: true);
+            visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
 
         Session session = Session.Create(organizerId, details, [], _clock);
 
@@ -290,7 +290,7 @@ public sealed class SessionRoundTripTests : IAsyncLifetime
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            isPrivate: true);
+            visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
         Session steamSession = Session.Create(organizerId, steamDetails, [], _clock);
 
         SessionGame freeTextGame = SessionGame.FreeText(GameName.Create("Rocket League"));
@@ -303,7 +303,7 @@ public sealed class SessionRoundTripTests : IAsyncLifetime
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            isPrivate: true);
+            visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
         Session freeTextSession = Session.Create(organizerId, freeTextDetails, [], _clock);
 
         var seedRepository = new SessionRepository(seedContext);

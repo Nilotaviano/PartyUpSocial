@@ -49,7 +49,7 @@ public sealed class SessionRosterMaskingWireTests : IAsyncLifetime, IDisposable
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            isPrivate: false);
+            visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
         Session session = Session.Create(organizerId, details, [viewerId, blockedId, tombstonedId], _factory.Clock);
         _ = session.DequeueEvents();
         context.Sessions.Add(session);
@@ -214,7 +214,7 @@ public sealed class SessionRosterMaskingWireTests : IAsyncLifetime, IDisposable
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            isPrivate: false);
+            visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
         Session session = Session.Create(organizerId, details, [viewerId, blockedId], _factory.Clock);
         _ = session.DequeueEvents();
         context.Sessions.Add(session);

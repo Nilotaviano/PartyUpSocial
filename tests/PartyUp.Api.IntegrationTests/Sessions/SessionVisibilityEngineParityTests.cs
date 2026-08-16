@@ -132,7 +132,7 @@ public sealed class SessionVisibilityEngineParityTests : IAsyncLifetime, IDispos
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            isPrivate: isPrivate);
+            visibility: (isPrivate ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
 
         Session session = Session.Create(organizerId, details, invitees, _factory.Clock);
         if (rsvpGoing is { } rsvpUserId)

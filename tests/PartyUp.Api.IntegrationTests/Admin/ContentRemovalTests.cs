@@ -244,7 +244,8 @@ public sealed class ContentRemovalTests : IAsyncLifetime, IDisposable
                     Notes: null,
                     MinAttendance: 1,
                     MaxCapacity: null,
-                    IsPrivate: false,
+                    Visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public),
+            AudienceGroupIds: null,
                     OptionStartTimes: [now + Duration.FromDays(6), now + Duration.FromDays(7)],
                     DeadlineChoice: PollDeadlineChoice.Hours48,
                     InviteeUserIds: [voterId],
@@ -374,7 +375,8 @@ public sealed class ContentRemovalTests : IAsyncLifetime, IDisposable
                     Notes: null,
                     MinAttendance: 1,
                     MaxCapacity: null,
-                    IsPrivate: false,
+                    Visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public),
+            AudienceGroupIds: null,
                     OptionStartTimes: [now + Duration.FromDays(6), now + Duration.FromDays(7)],
                     DeadlineChoice: PollDeadlineChoice.Hours48,
                     InviteeUserIds: [friendId],
@@ -409,7 +411,7 @@ public sealed class ContentRemovalTests : IAsyncLifetime, IDisposable
         SessionNotes.Empty,
         minAttendance: 1,
         maxCapacity: null,
-        isPrivate: true);
+        visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
 
     private sealed record RemovalSeed(
         UserId SubjectId,

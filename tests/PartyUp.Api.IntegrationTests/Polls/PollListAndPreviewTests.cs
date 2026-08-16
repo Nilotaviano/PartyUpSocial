@@ -754,7 +754,7 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
                     SessionNotes.Empty,
                     minAttendance: 1,
                     maxCapacity: null,
-                    isPrivate: false),
+                    visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public)),
                 PollDeadlineChoice.Hours24,
                 [
                     _factory.Clock.GetCurrentInstant() + Duration.FromDays(1),

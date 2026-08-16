@@ -70,7 +70,7 @@ public sealed class AvailabilityPayloadBudgetTests : IAsyncLifetime, IDisposable
                 SessionNotes.Empty,
                 minAttendance: 1,
                 maxCapacity: null,
-                isPrivate: true);
+                visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
             Session session = Session.Create(viewerId, details, [], _factory.Clock);
             _ = session.DequeueEvents();
             context.Sessions.Add(session);

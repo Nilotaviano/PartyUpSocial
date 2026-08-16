@@ -101,7 +101,7 @@ public sealed class GuestResponseTests : IAsyncLifetime, IDisposable
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            isPrivate: true);
+            visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
         Session session = Session.Create(organizerId, details, [], _factory.Clock);
         (GuestLink _, string token) = session.CreateGuestLink(_factory.Clock);
         _ = session.DequeueEvents();

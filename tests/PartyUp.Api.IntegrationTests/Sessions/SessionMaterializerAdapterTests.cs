@@ -362,7 +362,7 @@ public sealed class SessionMaterializerAdapterTests : IAsyncLifetime, IDisposabl
             SessionNotes.Empty,
             minAttendance,
             maxCapacity: null,
-            isPrivate: true);
+            visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
         Session session = Session.Create(organizerId, details, [], _factory.Clock);
         _ = session.DequeueEvents();
         return session;

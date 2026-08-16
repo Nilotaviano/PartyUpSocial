@@ -220,7 +220,7 @@ public sealed class InviteEmailServiceTests
                 SessionNotes.Empty,
                 minAttendance: 1,
                 maxCapacity: 4,
-                isPrivate: false);
+                visibility: ContentVisibility.Public);
 
             Session session = Session.Create(organizer.Id, details, [invitee.Id], Clock);
             _ = session.DequeueEvents();
@@ -240,7 +240,7 @@ public sealed class InviteEmailServiceTests
                 SessionNotes.Empty,
                 minAttendance: 1,
                 maxCapacity: null,
-                isPrivate: false);
+                visibility: ContentVisibility.Public);
 
             Poll poll = Poll.Create(
                 organizer.Id,

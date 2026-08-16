@@ -63,7 +63,8 @@ public sealed class DeletionResultApplierTests
             DeletedBlocks: [block],
             PurgedData: [UserDataScope.Notifications],
             ReservedUsername: null,
-            Journal: new DeletionJournalEntry(subject.Id, clock.GetCurrentInstant()));
+            Journal: new DeletionJournalEntry(subject.Id, clock.GetCurrentInstant()),
+            DeletedGroups: []);
         using var cancellation = new CancellationTokenSource();
 
         await DeletionResultApplication.ApplyAsync(

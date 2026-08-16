@@ -213,7 +213,8 @@ public sealed class FriendBlockConcurrencyTests : IAsyncLifetime
             DeletedBlocks: [],
             PurgedData: [],
             ReservedUsername: null,
-            Journal: new DeletionJournalEntry(_users[0].Id, _clock.GetCurrentInstant()));
+            Journal: new DeletionJournalEntry(_users[0].Id, _clock.GetCurrentInstant()),
+            DeletedGroups: []);
 
         await applier.ApplyAsync(result, _users[0].Id, default);
 
@@ -245,7 +246,7 @@ public sealed class FriendBlockConcurrencyTests : IAsyncLifetime
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            isPrivate: true);
+            visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
         Session session = Session.Create(organizerId, details, [], clock);
         _ = session.DequeueEvents();
         return session;

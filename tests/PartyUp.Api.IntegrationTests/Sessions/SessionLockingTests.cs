@@ -169,6 +169,7 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
             scope.ServiceProvider.GetRequiredService<ISessionLockRepository>(),
             scope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
             scope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+            scope.ServiceProvider.GetRequiredService<IFriendGroupRepository>(),
             scope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
             scope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
             scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
@@ -324,6 +325,7 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
             callerScope.ServiceProvider.GetRequiredService<ISessionLockRepository>(),
             callerScope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
             callerScope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+            callerScope.ServiceProvider.GetRequiredService<IFriendGroupRepository>(),
             callerScope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
             callerScope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
             callerScope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
@@ -344,7 +346,8 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
                 Notes: null,
                 MinAttendance: 1,
                 MaxCapacity: null,
-                IsPrivate: true,
+                Visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public),
+            AudienceGroupIds: null,
                 InviteeUserIds: [higherId, lowerId],
                 GuestLinkCount: 0),
             default);
@@ -650,6 +653,7 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
             readScope.ServiceProvider.GetRequiredService<ISessionReadRepository>(),
             readScope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
             readScope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+            readScope.ServiceProvider.GetRequiredService<IFriendGroupRepository>(),
             readScope.ServiceProvider.GetRequiredService<INotificationMuteRepository>());
 
         // A GET must take no row locks: this must complete promptly even though another transaction
@@ -673,7 +677,7 @@ public sealed class SessionLockingTests : IAsyncLifetime, IDisposable
         SessionNotes.Empty,
         minAttendance: 1,
         maxCapacity: null,
-        isPrivate: true);
+        visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
 
     public enum AttachmentCommand
     {

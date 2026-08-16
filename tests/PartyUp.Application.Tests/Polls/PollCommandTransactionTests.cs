@@ -4,6 +4,7 @@ using PartyUp.Application.Email;
 using PartyUp.Application.Polls;
 using PartyUp.Application.Tests.Friends;
 using PartyUp.Domain.Friendships;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
 using PartyUp.Domain.Users;
@@ -42,6 +43,7 @@ public sealed class PollCommandTransactionTests
             new FakePollLockRepository(),
             friendships,
             blocks,
+            new FakeFriendGroupRepository(),
             materializer,
             unitOfWork,
             clock,
@@ -56,7 +58,8 @@ public sealed class PollCommandTransactionTests
             Notes: null,
             MinAttendance: 1,
             MaxCapacity: null,
-            IsPrivate: false,
+            Visibility: ContentVisibility.Public,
+            AudienceGroupIds: null,
             OptionStartTimes: [clock.GetCurrentInstant() + Duration.FromHours(5), clock.GetCurrentInstant() + Duration.FromHours(6)],
             DeadlineChoice: null,
             InviteeUserIds: [inviteeId],
@@ -232,6 +235,47 @@ internal sealed class FakeBlockRepository : IBlockRepository
     public void Add(Block block) => Items.Add(block);
 
     public void Remove(Block block) => Items.Remove(block);
+}
+
+internal sealed class FakeFriendGroupRepository : IFriendGroupRepository
+{
+    internal List<FriendGroup> Items { get; } = [];
+
+    public void Add(FriendGroup group) => Items.Add(group);
+
+    public void Remove(FriendGroup group) => Items.Remove(group);
+
+    public Task<FriendGroup?> FindNoTrackingAsync(FriendGroupId id, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.FirstOrDefault(g => g.Id == id));
+
+    public Task<FriendGroup?> LoadForUpdateAsync(FriendGroupId id, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.FirstOrDefault(g => g.Id == id));
+
+    public Task<int> CountOwnedForUpdateAsync(UserId ownerId, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.Count(g => g.OwnerId == ownerId));
+
+    public Task<IReadOnlyCollection<FriendGroupId>> LockViewerGroupIdsAsync(
+        UserId viewerId, IReadOnlyCollection<FriendGroupId> candidateGroupIds, CancellationToken cancellationToken) =>
+        Task.FromResult(ViewerGroupIds(viewerId, candidateGroupIds));
+
+    public Task<IReadOnlyCollection<FriendGroupId>> GetViewerGroupIdsAsync(
+        UserId viewerId, IReadOnlyCollection<FriendGroupId> candidateGroupIds, CancellationToken cancellationToken) =>
+        Task.FromResult(ViewerGroupIds(viewerId, candidateGroupIds));
+
+    public Task<GroupName?> FindNameAsync(FriendGroupId id, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.FirstOrDefault(g => g.Id == id)?.Name);
+
+    public Task<IReadOnlyCollection<FriendGroup>> ListInvolvingAsync(UserId userId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyCollection<FriendGroup>>([.. Items.Where(g => g.Involves(userId))]);
+
+    public Task<IReadOnlyCollection<UserId>> ListDistinctOrganizersTargetingAsync(
+        FriendGroupId groupId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyCollection<UserId>>([]);
+
+    private IReadOnlyCollection<FriendGroupId> ViewerGroupIds(
+        UserId viewerId, IReadOnlyCollection<FriendGroupId> candidateGroupIds) =>
+        [.. candidateGroupIds.Where(id => Items.Any(g =>
+            g.Id == id && (g.OwnerId == viewerId || g.HasAcceptedMember(viewerId))))];
 }
 
 internal sealed class MutableClock(Instant current) : IClock

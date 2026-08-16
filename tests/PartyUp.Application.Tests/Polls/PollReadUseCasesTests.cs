@@ -48,7 +48,7 @@ public sealed class PollReadUseCasesTests
         _ = poll.DequeueEvents();
         polls.Add(poll);
 
-        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, mutes);
+        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, new FakeFriendGroupRepository(), mutes);
 
         PollDetail? detail = await useCase.GetPollDetailAsync(poll.Id, organizer.Id, default);
 
@@ -93,7 +93,7 @@ public sealed class PollReadUseCasesTests
         _ = poll.DequeueEvents();
         polls.Add(poll);
 
-        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, mutes);
+        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, new FakeFriendGroupRepository(), mutes);
 
         PollDetail? detail = await useCase.GetPollDetailAsync(poll.Id, viewer.Id, default);
 
@@ -143,7 +143,7 @@ public sealed class PollReadUseCasesTests
         _ = poll.DequeueEvents();
         polls.Add(poll);
 
-        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, mutes);
+        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, new FakeFriendGroupRepository(), mutes);
 
         PollDetail? detail = await useCase.GetPollDetailAsync(poll.Id, organizer.Id, default);
 
@@ -177,7 +177,7 @@ public sealed class PollReadUseCasesTests
         _ = poll.DequeueEvents();
         polls.Add(poll);
 
-        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, mutes);
+        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, new FakeFriendGroupRepository(), mutes);
 
         PollDetail? detail = await useCase.GetPollDetailAsync(poll.Id, organizer.Id, default);
 
@@ -210,7 +210,7 @@ public sealed class PollReadUseCasesTests
         _ = poll.DequeueEvents();
         polls.Add(poll);
 
-        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, mutes);
+        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, new FakeFriendGroupRepository(), mutes);
 
         PollDetail? detail = await useCase.GetPollDetailAsync(poll.Id, organizer.Id, default);
 
@@ -242,7 +242,7 @@ public sealed class PollReadUseCasesTests
         _ = poll.DequeueEvents();
         polls.Add(poll);
 
-        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, mutes);
+        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, new FakeFriendGroupRepository(), mutes);
 
         PollDetail? detail = await useCase.GetPollDetailAsync(poll.Id, organizer.Id, default);
 
@@ -272,7 +272,7 @@ public sealed class PollReadUseCasesTests
         _ = poll.DequeueEvents();
         polls.Add(poll);
 
-        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, mutes);
+        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, new FakeFriendGroupRepository(), mutes);
 
         PollDetail? detail = await useCase.GetPollDetailAsync(poll.Id, organizer.Id, default);
 
@@ -308,7 +308,7 @@ public sealed class PollReadUseCasesTests
         _ = poll.DequeueEvents();
         polls.Add(poll);
 
-        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, mutes);
+        var useCase = new PollReadUseCases(polls, reads, friendships, blocks, new FakeFriendGroupRepository(), mutes);
 
         PollDetail? detail = await useCase.GetPollDetailAsync(poll.Id, viewer.Id, default);
 
@@ -330,7 +330,7 @@ public sealed class PollReadUseCasesTests
                 SessionNotes.Empty,
                 minAttendance: 1,
                 maxCapacity: null,
-                isPrivate: false),
+                visibility: ContentVisibility.Public),
             PollDeadlineChoice.Hours24,
             [clock.GetCurrentInstant() + Duration.FromHours(5), clock.GetCurrentInstant() + Duration.FromHours(6)],
             inviteeIds,
@@ -347,7 +347,7 @@ public sealed class PollReadUseCasesTests
                 SessionNotes.Empty,
                 minAttendance: 1,
                 maxCapacity: null,
-                isPrivate: true),
+                visibility: ContentVisibility.Private),
             PollDeadlineChoice.Hours24,
             [clock.GetCurrentInstant() + Duration.FromHours(5), clock.GetCurrentInstant() + Duration.FromHours(6)],
             [],

@@ -269,7 +269,9 @@ public sealed class BanAndRemoveContentUseCaseTests
                 [],
                 [],
                 [],
-                null);
+                null,
+                [],
+                []);
             List<string> trace = [];
             var scopeProvider = new TracingScopeProvider(subject.Id, scope);
             var locks = new RecordingSessionLockRepository();
@@ -314,7 +316,7 @@ public sealed class BanAndRemoveContentUseCaseTests
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            isPrivate: true);
+            visibility: ContentVisibility.Private);
     }
 
     private sealed class TracingScopeProvider(UserId subject, DeletionScope scope) : IDeletionScopeProvider

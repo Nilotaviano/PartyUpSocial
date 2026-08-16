@@ -94,7 +94,7 @@ public sealed class SetReminderDefaultUseCaseTests
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            isPrivate: true);
+            visibility: ContentVisibility.Private);
 
         Session session = Session.Create(organizerId, details, [], clock);
         _ = session.DequeueEvents();

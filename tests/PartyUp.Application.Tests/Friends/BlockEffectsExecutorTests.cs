@@ -24,7 +24,7 @@ public sealed class BlockEffectsExecutorTests
         var calls = new List<string>();
         var repository = new BlockTestFriendshipRepository(calls) { Existing = friendship };
         var scope = new RecordingBlockEffectScopeProvider(
-            new BlockEffectScope([session], []));
+            new BlockEffectScope([session], [], []));
         var reminders = new RecordingReminderScheduleWriter();
         var executor = new BlockEffectsExecutor(scope, repository, reminders, clock);
 
@@ -53,7 +53,7 @@ public sealed class BlockEffectsExecutorTests
             blocked.Id,
             blocked.Username!.Value,
             clock);
-        _ = BlockEffects.Apply(controlBlock, [], [control], [], clock);
+        _ = BlockEffects.Apply(controlBlock, [], [control], [], [], clock);
         SessionUnconfirmed derived = Assert.Single(
             control.DequeueEvents().OfType<SessionUnconfirmed>());
         Assert.NotEmpty(
@@ -63,7 +63,7 @@ public sealed class BlockEffectsExecutorTests
         Block block = Block.Create(blocker.Id, blocked.Id, blocked.Username!.Value, clock);
         var materializer = new RecordingSessionNotificationMaterializer();
         var executor = new BlockEffectsExecutor(
-            new RecordingBlockEffectScopeProvider(new BlockEffectScope([actual], [])),
+            new RecordingBlockEffectScopeProvider(new BlockEffectScope([actual], [], [])),
             new BlockTestFriendshipRepository([]),
             new RecordingReminderScheduleWriter(),
             clock,
@@ -86,7 +86,7 @@ public sealed class BlockEffectsExecutorTests
         Session actual = BlockExecutorTestData.Session(blocker.Id, blocked.Id, clock, makeGoing: true);
         Block block = Block.Create(blocker.Id, blocked.Id, blocked.Username!.Value, clock);
         var executor = new BlockEffectsExecutor(
-            new RecordingBlockEffectScopeProvider(new BlockEffectScope([actual], [])),
+            new RecordingBlockEffectScopeProvider(new BlockEffectScope([actual], [], [])),
             new BlockTestFriendshipRepository([]),
             new RecordingReminderScheduleWriter(),
             clock);
@@ -118,7 +118,7 @@ public sealed class BlockEffectsExecutorTests
         Poll poll = BlockExecutorTestData.Poll(blocker.Id, blocked.Id, creationClock);
         Block block = Block.Create(blocker.Id, blocked.Id, blocked.Username!.Value, executionClock);
         var executor = new BlockEffectsExecutor(
-            new RecordingBlockEffectScopeProvider(new BlockEffectScope([], [poll])),
+            new RecordingBlockEffectScopeProvider(new BlockEffectScope([], [poll], [])),
             new BlockTestFriendshipRepository([]),
             new RecordingReminderScheduleWriter(),
             executionClock);
@@ -201,7 +201,7 @@ internal static class BlockExecutorTestData
             SessionNotes.Empty,
             minAttendance: 2,
             maxCapacity: null,
-            isPrivate: false);
+            visibility: ContentVisibility.Public);
         Session session = PartyUp.Domain.Sessions.Session.Create(
             organizer,
             details,
@@ -226,7 +226,7 @@ internal static class BlockExecutorTestData
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            isPrivate: false);
+            visibility: ContentVisibility.Public);
         Poll poll = PartyUp.Domain.Polls.Poll.Create(
             organizer,
             details,

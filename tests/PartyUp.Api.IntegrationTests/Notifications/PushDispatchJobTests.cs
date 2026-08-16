@@ -408,7 +408,7 @@ public sealed class PushDispatchJobTests : IAsyncLifetime, IDisposable
             SessionNotes.Empty,
             minAttendance: 1,
             maxCapacity: null,
-            isPrivate: isPrivate);
+            visibility: (isPrivate ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
         Session session = Session.Create(organizerId, details, [], _factory.Clock);
         _ = session.DequeueEvents();
 

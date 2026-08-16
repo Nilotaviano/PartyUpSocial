@@ -18,7 +18,7 @@ public sealed class UnblockUserUseCaseTests
         User blocked = FriendTestData.Active("unblock-target", "Unblock Target");
         Block block = Block.Create(blocker.Id, blocked.Id, blocked.Username!.Value, clock);
         Session session = BlockExecutorTestData.Session(blocker.Id, blocked.Id, clock, makeGoing: true);
-        _ = BlockEffects.Apply(block, [], [session], [], clock);
+        _ = BlockEffects.Apply(block, [], [session], [], [], clock);
         _ = session.DequeueEvents();
         var calls = new List<string>();
         var blocks = new BlockTestBlockRepository(calls);

@@ -215,6 +215,7 @@ public sealed class SessionJoinRequestInheritedAccessTests : IAsyncLifetime, IDi
         scope.ServiceProvider.GetRequiredService<ISessionLockRepository>(),
         scope.ServiceProvider.GetRequiredService<IFriendshipRepository>(),
         scope.ServiceProvider.GetRequiredService<IBlockRepository>(),
+        scope.ServiceProvider.GetRequiredService<IFriendGroupRepository>(),
         scope.ServiceProvider.GetRequiredService<ISessionNotificationMaterializer>(),
         scope.ServiceProvider.GetRequiredService<ISessionReminderHandoffWriter>(),
         scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
@@ -230,5 +231,5 @@ public sealed class SessionJoinRequestInheritedAccessTests : IAsyncLifetime, IDi
         SessionNotes.Empty,
         minAttendance: 1,
         maxCapacity: null,
-        isPrivate: false);
+        visibility: (false ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
 }

@@ -152,7 +152,7 @@ public sealed class AvailabilityZoneMigrationTests : IAsyncLifetime, IDisposable
                 SessionNotes.Empty,
                 minAttendance: 1,
                 maxCapacity: null,
-                isPrivate: true);
+                visibility: (true ? PartyUp.Domain.Kernel.ContentVisibility.Private : PartyUp.Domain.Kernel.ContentVisibility.Public));
             Session session = Session.Create(ownerId, details, [], SystemClock.Instance);
             _ = session.DequeueEvents();
             sessionId = session.Id;

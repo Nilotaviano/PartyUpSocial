@@ -4,6 +4,7 @@ using PartyUp.Application.Email;
 using PartyUp.Application.Sessions;
 using PartyUp.Application.Tests.Friends;
 using PartyUp.Domain.Friendships;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Sessions;
@@ -271,6 +272,47 @@ internal sealed class FakeBlockRepository : IBlockRepository
     public void Remove(Block block) => Items.Remove(block);
 }
 
+internal sealed class FakeFriendGroupRepository : IFriendGroupRepository
+{
+    internal List<FriendGroup> Items { get; } = [];
+
+    public void Add(FriendGroup group) => Items.Add(group);
+
+    public void Remove(FriendGroup group) => Items.Remove(group);
+
+    public Task<FriendGroup?> FindNoTrackingAsync(FriendGroupId id, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.FirstOrDefault(g => g.Id == id));
+
+    public Task<FriendGroup?> LoadForUpdateAsync(FriendGroupId id, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.FirstOrDefault(g => g.Id == id));
+
+    public Task<int> CountOwnedForUpdateAsync(UserId ownerId, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.Count(g => g.OwnerId == ownerId));
+
+    public Task<IReadOnlyCollection<FriendGroupId>> LockViewerGroupIdsAsync(
+        UserId viewerId, IReadOnlyCollection<FriendGroupId> candidateGroupIds, CancellationToken cancellationToken) =>
+        Task.FromResult(ViewerGroupIds(viewerId, candidateGroupIds));
+
+    public Task<IReadOnlyCollection<FriendGroupId>> GetViewerGroupIdsAsync(
+        UserId viewerId, IReadOnlyCollection<FriendGroupId> candidateGroupIds, CancellationToken cancellationToken) =>
+        Task.FromResult(ViewerGroupIds(viewerId, candidateGroupIds));
+
+    public Task<GroupName?> FindNameAsync(FriendGroupId id, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.FirstOrDefault(g => g.Id == id)?.Name);
+
+    public Task<IReadOnlyCollection<FriendGroup>> ListInvolvingAsync(UserId userId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyCollection<FriendGroup>>([.. Items.Where(g => g.Involves(userId))]);
+
+    public Task<IReadOnlyCollection<UserId>> ListDistinctOrganizersTargetingAsync(
+        FriendGroupId groupId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyCollection<UserId>>([]);
+
+    private IReadOnlyCollection<FriendGroupId> ViewerGroupIds(
+        UserId viewerId, IReadOnlyCollection<FriendGroupId> candidateGroupIds) =>
+        [.. candidateGroupIds.Where(id => Items.Any(g =>
+            g.Id == id && (g.OwnerId == viewerId || g.HasAcceptedMember(viewerId))))];
+}
+
 internal sealed class FakeNotificationMuteRepository : INotificationMuteRepository
 {
     internal List<NotificationMute> Items { get; } = [];
@@ -349,6 +391,7 @@ internal sealed class SessionTestFixture
         Locks = new FakeSessionLockRepository();
         Friendships = new FakeFriendshipRepository();
         Blocks = new FakeBlockRepository();
+        Groups = new FakeFriendGroupRepository();
         Materializer = new RecordingSessionNotificationMaterializer();
         Reminders = new RecordingReminderHandoffWriter();
         UnitOfWork = new RollbackAwareUnitOfWork(Sessions);
@@ -372,6 +415,8 @@ internal sealed class SessionTestFixture
     internal FakeFriendshipRepository Friendships { get; }
 
     internal FakeBlockRepository Blocks { get; }
+
+    internal FakeFriendGroupRepository Groups { get; }
 
     internal RecordingSessionNotificationMaterializer Materializer { get; }
 
@@ -398,7 +443,7 @@ internal sealed class SessionTestFixture
         Platform? platform = null,
         int? minAttendance = null,
         int? maxCapacity = null,
-        bool? isPrivate = null,
+        ContentVisibility? visibility = null,
         IReadOnlyList<UserId>? inviteeIds = null,
         int? guestLinkCount = null) =>
         new(
@@ -411,7 +456,8 @@ internal sealed class SessionTestFixture
             null,
             minAttendance,
             maxCapacity,
-            isPrivate,
+            visibility,
+            null,
             inviteeIds ?? [InviteeId],
             guestLinkCount);
 
@@ -421,6 +467,7 @@ internal sealed class SessionTestFixture
             Locks,
             Friendships,
             Blocks,
+            Groups,
             materializer ?? Materializer,
             Reminders,
             UnitOfWork,
@@ -428,29 +475,29 @@ internal sealed class SessionTestFixture
             InviteEmails);
 
     internal EditSessionUseCase EditUseCase() =>
-        new(Sessions, Locks, Materializer, Reminders, UnitOfWork, Clock, VersionStamp);
+        new(Sessions, Locks, Groups, Materializer, Reminders, UnitOfWork, Clock, VersionStamp);
 
     internal SessionInvitationUseCases InvitationUseCases() =>
         new(Sessions, Locks, Friendships, Blocks, Materializer, Reminders, UnitOfWork, Clock, InviteEmails);
 
     internal SessionParticipationUseCases ParticipationUseCases() =>
-        new(Sessions, Locks, Friendships, Blocks, Materializer, Reminders, UnitOfWork, Clock);
+        new(Sessions, Locks, Friendships, Blocks, Groups, Materializer, Reminders, UnitOfWork, Clock);
 
     internal SessionJoinRequestUseCases JoinRequestUseCases() =>
-        new(Sessions, Reads, Locks, Friendships, Blocks, Materializer, Reminders, UnitOfWork, Clock, InviteEmails);
+        new(Sessions, Reads, Locks, Friendships, Blocks, Groups, Materializer, Reminders, UnitOfWork, Clock, InviteEmails);
 
     internal SetSessionReminderUseCase ReminderUseCase() =>
-        new(Sessions, Locks, Friendships, Blocks, Reminders, UnitOfWork, Clock);
+        new(Sessions, Locks, Friendships, Blocks, Groups, Reminders, UnitOfWork, Clock);
 
     internal SessionReadUseCases ReadUseCases() =>
-        new(Sessions, Reads, Friendships, Blocks, Mutes);
+        new(Sessions, Reads, Friendships, Blocks, Groups, Mutes);
 
     /// <summary>Creates and returns a session directly on the repository, bypassing the use case.</summary>
     internal Session SeedSession(
         int inviteeCount = 1,
         int minAttendance = 1,
         int? maxCapacity = null,
-        bool isPrivate = false,
+        ContentVisibility visibility = ContentVisibility.Public,
         Instant? startTime = null,
         int durationMinutes = 120,
         IReadOnlyList<UserId>? invitees = null,
@@ -466,7 +513,7 @@ internal sealed class SessionTestFixture
             SessionNotes.Empty,
             minAttendance,
             maxCapacity,
-            isPrivate);
+            visibility);
 
         Session session = Session.Create(organizerId ?? OrganizerId, details, ids, Clock);
         _ = session.DequeueEvents();
@@ -517,7 +564,7 @@ internal sealed class FakeSessionReadRepository(FakeSessionRepository store) : I
 
         return Task.FromResult(Page(visible, pageSize, s => new SessionSummary(
             s.Id, s.OrganizerId, s.Title, s.StartTime, s.Duration, s.Platform, s.Game,
-            s.Status, s.IsPrivate, s.MaxCapacity, s.ActiveOccupancy)));
+            s.Status, s.MaxCapacity, s.ActiveOccupancy)));
     }
 
     public Task<SessionPage<SessionSummary>> ListHistoryAsync(
@@ -531,7 +578,7 @@ internal sealed class FakeSessionReadRepository(FakeSessionRepository store) : I
 
         return Task.FromResult(Page(visible, pageSize, s => new SessionSummary(
             s.Id, s.OrganizerId, s.Title, s.StartTime, s.Duration, s.Platform, s.Game,
-            s.Status, s.IsPrivate, s.MaxCapacity, s.ActiveOccupancy)));
+            s.Status, s.MaxCapacity, s.ActiveOccupancy)));
     }
 
     public Task<SessionPage<JoinRequestSummary>> ListJoinRequestsAsync(
@@ -568,7 +615,7 @@ internal sealed class FakeSessionReadRepository(FakeSessionRepository store) : I
 
         return Task.FromResult(Page(visible, pageSize, s => new SessionSummary(
             s.Id, s.OrganizerId, s.Title, s.StartTime, s.Duration, s.Platform, s.Game,
-            s.Status, s.IsPrivate, s.MaxCapacity, s.ActiveOccupancy)));
+            s.Status, s.MaxCapacity, s.ActiveOccupancy)));
     }
 
     public Task<IReadOnlyList<SessionSummary>> ListCalendarSessionsAsync(
@@ -582,7 +629,7 @@ internal sealed class FakeSessionReadRepository(FakeSessionRepository store) : I
             .ThenBy(s => s.Id.Value)
             .Select(s => new SessionSummary(
                 s.Id, s.OrganizerId, s.Title, s.StartTime, s.Duration, s.Platform, s.Game,
-                s.Status, s.IsPrivate, s.MaxCapacity, s.ActiveOccupancy))];
+                s.Status, s.MaxCapacity, s.ActiveOccupancy))];
 
         return Task.FromResult<IReadOnlyList<SessionSummary>>(summaries);
     }
@@ -603,7 +650,7 @@ internal sealed class FakeSessionReadRepository(FakeSessionRepository store) : I
             .Select(x => new ActionableInvitation(
                 new SessionSummary(
                     x.Session.Id, x.Session.OrganizerId, x.Session.Title, x.Session.StartTime, x.Session.Duration,
-                    x.Session.Platform, x.Session.Game, x.Session.Status, x.Session.IsPrivate, x.Session.MaxCapacity,
+                    x.Session.Platform, x.Session.Game, x.Session.Status, x.Session.MaxCapacity,
                     x.Session.ActiveOccupancy),
                 x.Participation.CreatedAt))];
 
@@ -627,7 +674,7 @@ internal sealed class FakeSessionReadRepository(FakeSessionRepository store) : I
                 x.Request.Id,
                 new SessionSummary(
                     x.Session.Id, x.Session.OrganizerId, x.Session.Title, x.Session.StartTime, x.Session.Duration,
-                    x.Session.Platform, x.Session.Game, x.Session.Status, x.Session.IsPrivate, x.Session.MaxCapacity,
+                    x.Session.Platform, x.Session.Game, x.Session.Status, x.Session.MaxCapacity,
                     x.Session.ActiveOccupancy),
                 x.Request.RequesterId,
                 null,
@@ -651,7 +698,7 @@ internal sealed class FakeSessionReadRepository(FakeSessionRepository store) : I
     private HashSet<UserId> BlockedOf(UserId viewer) =>
         _blocked.TryGetValue(viewer, out HashSet<UserId>? set) ? set : [];
 
-    private static SessionPage<TOut> Page<TIn, TOut>(IReadOnlyList<TIn> items, int pageSize, Func<TIn, TOut> select)
+    private static SessionPage<TOut> Page<TIn, TOut>(List<TIn> items, int pageSize, Func<TIn, TOut> select)
     {
         List<TIn> taken = [.. items.Take(pageSize)];
         string? next = items.Count > pageSize ? "more" : null;
@@ -674,7 +721,6 @@ internal sealed class FakeSessionReadRepository(FakeSessionRepository store) : I
             session.Notes,
             session.MinAttendance,
             session.MaxCapacity,
-            session.IsPrivate,
             session.Status,
             session.CreatedAt,
             roster,

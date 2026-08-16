@@ -490,7 +490,7 @@ internal sealed class FakeDeletionScopeProvider(UsernameRegistryEntry username)
     : IDeletionScopeProvider
 {
     public Task<DeletionScope> LoadAsync(UserId id, CancellationToken cancellationToken) =>
-        Task.FromResult(new DeletionScope([], [], [], [], username));
+        Task.FromResult(new DeletionScope([], [], [], [], username, [], []));
 }
 
 /// <summary>Discover and reload always agree — the §6.2 happy path (attempt 1 always succeeds).</summary>
@@ -527,7 +527,7 @@ internal sealed class StableDeletionScopeProvider(UserId subject, UserId friendI
         User friendUser = MinimalUser(friendId, "KLMNPQRSTU", clock);
         Friendship friendship = Friendship.Request(subjectUser, friendUser, clock);
         _ = friendship.DequeueEvents();
-        return new DeletionScope([], [], [friendship], [], null);
+        return new DeletionScope([], [], [friendship], [], null, [], []);
     }
 
     private static User MinimalUser(UserId id, string friendCode, IClock clock)
@@ -583,7 +583,7 @@ internal sealed class RecoveringDeletionScopeProvider(UserId subject, UserId fri
         RequestAccountDeletionUseCaseTests.Complete(friendUser, clock);
         Friendship friendship = Friendship.Request(subjectUser, friendUser, clock);
         _ = friendship.DequeueEvents();
-        return new DeletionScope([], [], [friendship], [], null);
+        return new DeletionScope([], [], [friendship], [], null, [], []);
     }
 }
 

@@ -34,7 +34,7 @@ public sealed class PollLeaveUseCaseTests
         polls.Add(poll);
 
         var useCase = new PollVoteUseCases(
-            polls, new FakePollLockRepository(), friendships, blocks, materializer, unitOfWork, clock);
+            polls, new FakePollLockRepository(), friendships, blocks, new FakeFriendGroupRepository(), materializer, unitOfWork, clock);
 
         PollCommandResult result = await useCase.LeavePollAsync(poll.Id, inviteeId, default);
 
@@ -72,7 +72,7 @@ public sealed class PollLeaveUseCaseTests
         polls.Add(poll);
 
         var useCase = new PollVoteUseCases(
-            polls, new FakePollLockRepository(), friendships, blocks, materializer, unitOfWork, clock);
+            polls, new FakePollLockRepository(), friendships, blocks, new FakeFriendGroupRepository(), materializer, unitOfWork, clock);
 
         PollCommandResult result = await useCase.LeavePollAsync(poll.Id, outsider.Id, default);
 
@@ -101,7 +101,7 @@ public sealed class PollLeaveUseCaseTests
                 SessionNotes.Empty,
                 minAttendance: 1,
                 maxCapacity: null,
-                isPrivate: false),
+                visibility: ContentVisibility.Public),
             PollDeadlineChoice.Hours24,
             [clock.GetCurrentInstant() + Duration.FromHours(5), clock.GetCurrentInstant() + Duration.FromHours(6)],
             [inviteeId],
