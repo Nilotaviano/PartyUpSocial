@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Availability;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
@@ -76,7 +77,7 @@ public sealed class DeletionScopeProvider(
         UsernameRegistryEntry? username = await usernames.FindActiveForOwnerAsync(
             id,
             cancellationToken);
-        return new DeletionScope([], [], friendships, blocks, username);
+        return new DeletionScope([], [], friendships, blocks, username, [], []);
     }
 
     public async Task<IReadOnlyCollection<UserId>> DiscoverAffectedUserIdsAsync(
@@ -246,7 +247,47 @@ public sealed class DeletionScopeProvider(
                 .ToListAsync(cancellationToken);
         }
 
-        return baseline with { Sessions = sessions, Polls = polls };
+        // D-209 / D-180: group parents lock last, after every session and poll parent. Both halves feed
+        // ContentRemovalExecutor, so the admin ban path (which reaches this same provider through
+        // LockedSubjectScopeRunner) severs groups exactly as the deletion sweep does. Membership rows
+        // count whatever their status — an Invited row is deleted with the account too.
+        List<FriendGroupId> groupIds = await context.FriendGroups
+            .Where(group =>
+                group.OwnerId == id ||
+                group.Members.Any(member => member.UserId == id))
+            .Select(group => group.Id)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        List<FriendGroup> ownedGroups = [];
+        List<FriendGroup> memberOfGroups = [];
+        if (groupIds.Count > 0)
+        {
+            Guid[] lockIds = [.. groupIds.Select(groupId => groupId.Value)];
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                SELECT 1
+                FROM friend_groups
+                WHERE id = ANY({lockIds})
+                ORDER BY id
+                FOR NO KEY UPDATE
+                """, cancellationToken);
+
+            List<FriendGroup> groups = await context.FriendGroups
+                .Include(group => group.Members)
+                .Where(group => groupIds.Contains(group.Id))
+                .ToListAsync(cancellationToken);
+
+            ownedGroups = [.. groups.Where(group => group.OwnerId == id)];
+            memberOfGroups = [.. groups.Where(group => group.OwnerId != id)];
+        }
+
+        return baseline with
+        {
+            Sessions = sessions,
+            Polls = polls,
+            OwnedGroups = ownedGroups,
+            MemberOfGroups = memberOfGroups,
+        };
     }
 
     /// <summary>

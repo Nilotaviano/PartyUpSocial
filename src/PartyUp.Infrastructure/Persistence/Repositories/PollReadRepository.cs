@@ -209,7 +209,7 @@ public sealed class PollReadRepository(AppDbContext context) : IPollReadReposito
             poll.OrganizerId,
             poll.Title,
             poll.Status,
-            poll.IsPrivate,
+            poll.Visibility == ContentVisibility.Private,
             poll.Deadline,
             poll.SelectionWindowEndsAt,
             poll.CreatedAt,

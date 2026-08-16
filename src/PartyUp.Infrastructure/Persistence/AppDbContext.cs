@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using PartyUp.Domain.Availability;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Polls;
@@ -39,6 +40,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Friendship> Friendships => Set<Friendship>();
 
     public DbSet<Block> Blocks => Set<Block>();
+
+    public DbSet<FriendGroup> FriendGroups => Set<FriendGroup>();
 
     public DbSet<Notification> Notifications => Set<Notification>();
 
@@ -125,6 +128,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.Ignore<IdentityUserPasskey<Guid>>();
         builder.ApplyConfiguration(new FriendshipConfiguration());
         builder.ApplyConfiguration(new BlockConfiguration());
+        builder.ApplyConfiguration(new FriendGroupConfiguration());
         builder.ApplyConfiguration(new NotificationConfiguration());
         builder.ApplyConfiguration(new SessionConfiguration());
         builder.ApplyConfiguration(new SessionParticipationConfiguration());

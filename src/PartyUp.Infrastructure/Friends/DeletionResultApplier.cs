@@ -1,7 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Availability;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Users;
@@ -102,10 +104,14 @@ public sealed class DeletionResultApplier(
     }
 
     /// <summary>
-    /// The §11 steps 1–3 tail on its own, which is the whole of what D-180's content removal has to
-    /// persist beyond the tracked aggregate mutations: the reminder handoff each participation
-    /// removal orphaned. No purge scopes, no friendship or block removal, no availability cascade and
-    /// no last-seen clearing — a banned account stays live and countable as active.
+    /// The §11 steps 1–3 plus step 4's group severing on its own, which is the whole of what D-180's
+    /// content removal has to persist beyond the tracked aggregate mutations: the reminder handoff each
+    /// participation removal orphaned, and the hard delete of every group the subject owned (D-209).
+    /// The subject's own membership rows in other people's groups are already gone from the tracked
+    /// <c>FriendGroup</c> aggregates, exactly like session/poll participation removals. No purge
+    /// scopes, no friendship or block removal, no availability cascade and no last-seen clearing — a
+    /// banned account stays live and countable as active. <see cref="ApplyAsync"/> delegates here, so
+    /// this is the only place the group delete happens on either path.
     /// </summary>
     public async Task ApplyContentRemovalAsync(
         ContentRemovalResult result,
@@ -117,6 +123,17 @@ public sealed class DeletionResultApplier(
         foreach (SessionReminderCanceled cancellation in result.CanceledReminders)
         {
             await reminderSchedule.ApplyAsync(cancellation, cancellationToken);
+        }
+
+        if (result.DeletedGroups.Count > 0)
+        {
+            // Membership rows and every session/poll audience junction row targeting the group follow
+            // the cascade FKs (D-199/D-205).
+            FriendGroupId[] deletedIds = [.. result.DeletedGroups];
+            List<FriendGroup> deleted = await context.FriendGroups
+                .Where(group => deletedIds.Contains(group.Id))
+                .ToListAsync(cancellationToken);
+            context.FriendGroups.RemoveRange(deleted);
         }
     }
 

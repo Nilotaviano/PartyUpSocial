@@ -90,6 +90,7 @@ public static class DependencyInjection
         services.AddScoped<IFriendCodeGenerator, FriendCodeGenerator>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ISessionRepository, SessionRepository>();
+        services.AddScoped<IFriendGroupRepository, FriendGroupRepository>();
         services.AddScoped<ISessionReadRepository, SessionReadRepository>();
         services.AddScoped<IAvailabilityRepository, AvailabilityRepository>();
         services.AddScoped<IAvailabilityReadRepository, AvailabilityReadRepository>();

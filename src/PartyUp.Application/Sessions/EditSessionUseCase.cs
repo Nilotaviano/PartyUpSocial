@@ -146,7 +146,10 @@ public sealed class EditSessionUseCase(
 
                 if (command.IsPrivate is { } isPrivate)
                 {
-                    session.ChangePrivacy(isPrivate, clock);
+                    session.ChangeVisibility(
+                        isPrivate ? ContentVisibility.Private : ContentVisibility.Public,
+                        [],
+                        clock);
                 }
 
                 IReadOnlyList<IDomainEvent> events = session.DequeueEvents();

@@ -18,6 +18,8 @@ public sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
             table.HasCheckConstraint("ck_sessions_min_attendance", "min_attendance >= 1");
             table.HasCheckConstraint("ck_sessions_capacity", "max_capacity IS NULL OR max_capacity >= min_attendance");
             table.HasCheckConstraint("ck_sessions_game_shape", "(game_steam_app_id IS NULL OR platform = 0) AND (game_steam_app_id IS NULL OR game_name IS NOT NULL)");
+            // The engine fails closed on an unknown level; the column must never hold one.
+            table.HasCheckConstraint("ck_sessions_visibility", "visibility IN (0, 1, 2)");
         });
         builder.HasKey(session => session.Id);
         builder.Property(session => session.Id).HasConversion(new TypedIdConverter<SessionId>()).ValueGeneratedNever();
@@ -29,6 +31,7 @@ public sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
         builder.Property(session => session.Notes).HasConversion(new TextValueConverter<SessionNotes>()).HasMaxLength(SessionNotes.MaxLength);
         builder.Property(session => session.OriginPollId).HasConversion(new TypedIdConverter<PollId>());
         builder.Property(session => session.Status).HasConversion<short>().HasColumnType("smallint");
+        builder.Property(session => session.Visibility).HasConversion<short>().HasColumnType("smallint");
         builder.Property(session => session.CreatedAt).HasColumnType("timestamp with time zone");
         builder.OwnsOne(session => session.Game, game =>
         {

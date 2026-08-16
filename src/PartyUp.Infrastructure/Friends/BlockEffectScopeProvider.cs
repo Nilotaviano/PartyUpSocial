@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PartyUp.Application.Abstractions;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
@@ -81,7 +82,36 @@ public sealed class BlockEffectScopeProvider(
                 .ToListAsync(cancellationToken);
         }
 
-        return new BlockEffectScope(sessions, polls);
+        // D-202: only groups where one party owns and the other holds a row (Invited or Accepted) are
+        // in scope — a member↔member block leaves the roster alone. Group parents lock last, after
+        // both session and poll parents, so the graph's lock order stays total.
+        List<FriendGroupId> groupCandidateIds = await context.FriendGroups
+            .Where(group =>
+                (group.OwnerId == first && group.Members.Any(member => member.UserId == second)) ||
+                (group.OwnerId == second && group.Members.Any(member => member.UserId == first)))
+            .Select(group => group.Id)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        List<FriendGroup> groups = [];
+        if (groupCandidateIds.Count > 0)
+        {
+            Guid[] groupIds = [.. groupCandidateIds.Select(id => id.Value)];
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                SELECT 1
+                FROM friend_groups
+                WHERE id = ANY({groupIds})
+                ORDER BY id
+                FOR NO KEY UPDATE
+                """, cancellationToken);
+
+            groups = await context.FriendGroups
+                .Include(group => group.Members)
+                .Where(group => groupCandidateIds.Contains(group.Id))
+                .ToListAsync(cancellationToken);
+        }
+
+        return new BlockEffectScope(sessions, polls, groups);
     }
 
     private static IQueryable<Session> LoadSessionWithChildren(IQueryable<Session> query) =>

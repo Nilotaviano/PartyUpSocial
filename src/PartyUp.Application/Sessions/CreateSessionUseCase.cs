@@ -84,7 +84,7 @@ public sealed class CreateSessionUseCase(
                     SessionNotes.Create(command.Notes),
                     command.MinAttendance ?? DefaultMinAttendance,
                     command.MaxCapacity ?? DefaultMaxCapacity,
-                    command.IsPrivate ?? false);
+                    command.IsPrivate ?? false ? ContentVisibility.Private : ContentVisibility.Public);
 
                 Session session = Session.Create(command.OrganizerId, details, invitees, clock);
                 sessions.Add(session);

@@ -21,6 +21,8 @@ public sealed class PollConfiguration : IEntityTypeConfiguration<Poll>
             table.HasCheckConstraint("ck_polls_min_attendance", "min_attendance >= 1");
             table.HasCheckConstraint("ck_polls_capacity", "max_capacity IS NULL OR max_capacity >= min_attendance");
             table.HasCheckConstraint("ck_polls_game_shape", "(game_steam_app_id IS NULL OR platform = 0) AND (game_steam_app_id IS NULL OR game_name IS NOT NULL)");
+            // The engine fails closed on an unknown level; the column must never hold one.
+            table.HasCheckConstraint("ck_polls_visibility", "visibility IN (0, 1, 2)");
         });
         builder.HasKey(poll => poll.Id);
         builder.Property(poll => poll.Id).HasConversion(new TypedIdConverter<PollId>()).ValueGeneratedNever();
@@ -32,6 +34,7 @@ public sealed class PollConfiguration : IEntityTypeConfiguration<Poll>
         builder.Property(poll => poll.DeadlineChoice).HasConversion<short>().HasColumnType("smallint");
         builder.Property(poll => poll.Deadline).HasColumnType("timestamp with time zone");
         builder.Property(poll => poll.Status).HasConversion<short>().HasColumnType("smallint");
+        builder.Property(poll => poll.Visibility).HasConversion<short>().HasColumnType("smallint");
         builder.Property(poll => poll.CreatedAt).HasColumnType("timestamp with time zone");
         builder.Property(poll => poll.SelectedOptionId).HasConversion(new TypedIdConverter<PollOptionId>());
         builder.Property(poll => poll.CreatedSessionId).HasConversion(new TypedIdConverter<SessionId>());

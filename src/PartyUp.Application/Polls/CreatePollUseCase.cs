@@ -86,7 +86,7 @@ public sealed class CreatePollUseCase(
                     SessionNotes.Create(command.Notes),
                     command.MinAttendance ?? DefaultMinAttendance,
                     command.MaxCapacity,
-                    command.IsPrivate ?? false);
+                    command.IsPrivate ?? false ? ContentVisibility.Private : ContentVisibility.Public);
 
                 Poll poll;
                 try
