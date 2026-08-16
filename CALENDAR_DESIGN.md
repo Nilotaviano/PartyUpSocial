@@ -13,7 +13,11 @@ Investigation found two of those are **spec violations already shipped**, not pr
 - **Recurring availability cannot be created.** `WeekGridPage.tsx:366`'s `handleCreateBlock`
   always calls `createAvailabilityBlock`; `createAvailabilitySeries` is called from nowhere in the
   UI. Contradicts **D-009** ("one-time *and recurring*") and §7 ("then choosing one-time or weekly
-  recurrence").
+  recurrence"). *(Corrected 2026-08-15: `WeekGridPage.tsx` no longer exists — the §9 Lovable port
+  renamed it to `CalendarShell.tsx`, where both mutations are wired today: `createBlock`
+  (`:238`, `mutationFn: createAvailabilityBlock`) and `createSeries` (`:242`,
+  `mutationFn: createAvailabilitySeries`). This bullet is historical — the bug it describes was
+  fixed by this doc's own §4/§6.)*
 - **A series cannot be deleted.** `deleteAvailabilitySeries` (`availabilityQueries.ts:114`) is
   likewise uncalled; only single occurrences can be removed. Contradicts **D-025** ("supports
   removing one occurrence or the entire series").
@@ -70,7 +74,8 @@ its one job.
 So **`MyAvailabilityLayer` gains a `Series` list, surfaced on `MyAvailabilityLayerResponse`**. That
 one addition serves both endpoints: `GetCalendarViewUseCase` *calls* `ReadMyAvailabilityUseCase`
 rather than re-implementing it, and the calendar page is the consumer that matters here — it queries
-`getCalendarView`, not `getMyAvailability` (`WeekGridPage.tsx:178`). The data is already in hand:
+`getCalendarView`, not `getMyAvailability` (`CalendarShell.tsx:157`, renamed from
+`WeekGridPage.tsx` by the §9 port — corrected 2026-08-15). The data is already in hand:
 `ReadMyAvailabilityUseCase` holds `data.Series` and passes it to the projection today, so no new
 query is added. `AvailabilitySeriesView` already carries `dayOfWeek`, `startTime`,
 `durationMinutes`, `zoneId`, `effectiveFrom`, `effectiveUntil`.
@@ -130,10 +135,23 @@ twelve identically-styled stacked cells with per-cell borders, not one band. Eac
 (O(cells x entries), unmemoized). The fix stays inside the shipped DOM shape - one
 `role="gridcell"` per slot survives, since the roving-tabindex keyboard model, the touch state
 machines, and the axe lane all hang off it. **No new fills and no new color tokens**: the
-ratified `free`/`busy` + `free-ink`/`busy-ink` pairs (PHASE5_1_DESIGN.md, WeekGrid.tsx:850-853)
-stay the only cell backgrounds - the axe lane scans `/calendar` with seeded availability and
-`AxeExclusions` may only shrink - so band styling is border/rounding/label work on the existing
-fills, never a third fill under `text-free-ink` spans.
+ratified `free`/`busy` + `free-ink`/`busy-ink` pairs (PHASE5_1_DESIGN.md) stay the only cell
+backgrounds - the axe lane scans `/calendar` with seeded availability and `AxeExclusions` may
+only shrink - so band styling is border/rounding/label work on the existing fills, never a
+third fill under `text-free-ink` spans.
+
+*(Corrected 2026-08-15 - the original citation here, `WeekGrid.tsx:850-853`, is stale: those
+lines are now `Handle`'s resize-handle keydown logic, not cell-fill code. Verified current
+truth: the tokens still exist in `index.css` (`--free`/`--free-ink`, `--busy`/`--busy-ink`,
+`--maybe`/`--maybe-ink`, exposed as `bg-free`/`text-free-foreground` etc.) and no new fill or
+token was added, so the constraint this paragraph states was honored. But §9/S2 (2026-08-13)
+changed which of these actually paint a cell: `WeekGrid.tsx:799-801` paints the **band**
+(`bg-free`/`bg-maybe`, own-availability only), `WeekGrid.tsx:630`/`:646` paint session/poll
+pills with the `accent` pair (not `free`/`busy`), and the plain grid **cell** itself carries no
+background at all (`bg-card` on the day column, `WeekGrid.tsx:525`) - `busy` survives only as
+`data-state`/`aria-label` on the pointer-transparent ARIA layer (`WeekGrid.tsx:735`). So
+"free/busy... stay the only cell backgrounds" no longer describes what paints; it remains true
+only as the ceiling on which tokens exist to paint with.)*
 
 - **Bands, not stacks.** Band metadata (start/middle/end per entry span) computes in `WeekGrid`
   via `useMemo` keyed on the entry-array prop identities plus `weekStart`, `startHour`,
@@ -151,7 +169,15 @@ fills, never a third fill under `text-free-ink` spans.
   information surface there. The same memo replaces the per-cell linear scans with an indexed
   lookup. No DOM restructuring, no ARIA change; each cell keeps its per-slot accessible name.
 - **Precedence, stated.** The **merged** layer owns the cell fill (`busy`, as today - an own
-  occurrence never paints separately from its merged projection, WeekGridPage.tsx:304-309).
+  occurrence never paints separately from its merged projection; merged spans compute in
+  `calendarData.ts:128-205` and reach the grid via `CalendarShell.tsx:827`
+  (`merged={mapped.merged}`), consumed at `WeekGrid.tsx:331` — corrected 2026-08-15, citation
+  was `WeekGridPage.tsx:304-309`. *As shipped, "owns the cell fill" no longer means a visible
+  busy background: `busy` is carried only as `data-state`/`aria-label` on the transparent ARIA
+  layer (`WeekGrid.tsx:735`), with no bg-* paint of its own; the only painted fills are the
+  `free`/`maybe` band (`WeekGrid.tsx:799-801`) and the session/poll pills. The precedence rule
+  (merged wins, no double-paint) still holds; only the "background" half of the sentence is
+  stale.*
   Sessions/poll options keep their existing inline spans but render titles at span start only.
   The friend layer keeps the existing single-glyph collapse (WeekGrid.tsx:820-828) - **no
   per-friend hues** (the disc-seed palette is three *fills*, two of which are the grid's own
