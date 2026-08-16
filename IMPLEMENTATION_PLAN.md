@@ -171,6 +171,11 @@ Phase 7 shipped end-to-end across seven slices (S1-S7), documented in `PHASE7_DE
 - Bug triage, restore drill #2, uptime monitor, log review.
 - Public v1: everything labeled initial release, at once (D-163).
 
+## Phase 10 — Friend Groups
+
+- **Scope: D-198..D-210** — the `FriendGroup` aggregate, invite/accept membership, the third `Groups` visibility level with its rule 2g grant, audience targeting on sessions/polls, and the group notification, caps, deletion, and unfriend-surface rules. Slices and ordering are in `docs/superpowers/plans/2026-08-16-friend-groups.md`.
+- Status: in progress, started 2026-08-16. Ships its own UI like every phase after Phase 1.
+
 ## Cross-cutting rules
 
 - Every phase ships its UI; no backend-only phases after Phase 1.
