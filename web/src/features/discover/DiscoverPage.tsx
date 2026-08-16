@@ -5,14 +5,14 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
-import { primaryCtaClasses, quietChipClasses } from '../../components/ui/classes'
+import { primaryCtaClasses } from '../../components/ui/classes'
 import { PageHeader } from '../../components/shell/PageHeader'
 import { EmptyState } from '../../components/shell/SectionCard'
 import { PageScaffold } from '../../components/ui/pageScaffold'
 import { Section } from '../../components/ui/section'
 import { StatusBanner } from '../../components/ui/statusBanner'
 import { getDiscoverSessions, homeKeys } from '../home/homeQueries'
-import { SessionStatusChip } from '../sessions/SessionStatusChip'
+import { SessionSummaryCard } from '../sessions/SessionSummaryCard'
 
 /**
  * D-149's dedicated Discover surface — `scope=discover` on the shipped
@@ -21,7 +21,7 @@ import { SessionStatusChip } from '../sessions/SessionStatusChip'
  * detail surface.
  */
 export function DiscoverPage() {
-  const { t, i18n } = useTranslation(['home', 'sessions', 'errors', 'common'])
+  const { t } = useTranslation(['home', 'sessions', 'errors', 'common'])
 
   const [cursors, setCursors] = useState<(string | undefined)[]>([undefined])
 
@@ -38,11 +38,6 @@ export function DiscoverPage() {
   const lastPage = pages[pages.length - 1]
   const nextCursor = lastPage?.data?.nextCursor ?? undefined
   const isFetchingNextPage = pages.length > 1 && (lastPage?.isFetching ?? false)
-
-  const timeFormat = new Intl.DateTimeFormat(i18n.language, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
 
   return (
     <main data-testid="screen-discover">
@@ -82,34 +77,9 @@ export function DiscoverPage() {
 
         {items.length > 0 && (
           <Section label={t('discover.heading')}>
-            <ul>
+            <ul className="flex flex-col gap-3">
               {items.map((session) => (
-                <li key={session.id} className="border-t border-ink/25 first:border-t-0">
-                  <Link
-                    className="flex flex-col gap-1 rounded-control px-2 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                    data-viewer-relation={session.viewerRelation}
-                    to={`/sessions/${session.id}`}
-                  >
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="font-display font-semibold text-ink">
-                        {session.title}
-                      </span>
-                      <SessionStatusChip status={session.status} />
-                    </span>
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className={quietChipClasses}>
-                        {timeFormat.format(new Date(session.startTime))}
-                      </span>
-                    </span>
-                    <span className="text-meta text-ink-soft">
-                      {t('discover.organizedBy', {
-                        name:
-                          session.organizer.displayName ??
-                          t('detail.anonymous', { ns: 'sessions' }),
-                      })}
-                    </span>
-                  </Link>
-                </li>
+                <SessionSummaryCard key={session.id} session={session} />
               ))}
             </ul>
           </Section>

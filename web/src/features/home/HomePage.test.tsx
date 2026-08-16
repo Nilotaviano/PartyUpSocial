@@ -249,6 +249,62 @@ describe('HomePage', () => {
     }
   })
 
+  it('shows the maybe count alongside available on each find-a-time preview row, not available alone', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/availability/suggestions') {
+        return Promise.resolve({
+          data: {
+            suggestions: [
+              {
+                start: '2030-08-01T10:00:00Z',
+                end: '2030-08-01T12:00:00Z',
+                available: [{ ordinal: 0, displayName: 'Friend' }],
+                maybe: [
+                  { ordinal: 0, displayName: 'Maybe One' },
+                  { ordinal: 1, displayName: 'Maybe Two' },
+                ],
+              },
+            ],
+            hasMore: false,
+          },
+        })
+      }
+      return defaultGetHandler(path)
+    })
+    renderPage()
+
+    const list = await screen.findByTestId('home-suggestions-list')
+    expect(within(list).getByText(/1 available/)).toBeInTheDocument()
+    expect(within(list).getByText(/2 maybe/)).toBeInTheDocument()
+  })
+
+  it('shows the discover region cards with game/platform/occupancy, not title/status/startTime alone', async () => {
+    api.get.mockImplementation((path: string, options?: { params?: { query?: { scope?: string } } }) => {
+      if (path === '/api/v1/sessions' && options?.params?.query?.scope === 'discover') {
+        return Promise.resolve({
+          data: {
+            items: [
+              summary({
+                id: 'session-discover',
+                title: 'Come join us',
+                game: { name: 'Deep Rock Galactic', steamAppId: 548430 },
+                maxCapacity: 6,
+                activeOccupancy: 2,
+              }),
+            ],
+            nextCursor: null,
+          },
+        })
+      }
+      return defaultGetHandler(path)
+    })
+    renderPage()
+
+    const discoverRegion = await screen.findByTestId('home-region-discover')
+    expect(await within(discoverRegion).findByText('Deep Rock Galactic')).toBeInTheDocument()
+    expect(within(discoverRegion).getByText('2/6 going')).toBeInTheDocument()
+  })
+
   it('shows five suggestions with see all_D110_D116', async () => {
     const suggestions = Array.from({ length: 5 }, (_, index) => ({
       start: `2030-08-0${index + 1}T10:00:00Z`,

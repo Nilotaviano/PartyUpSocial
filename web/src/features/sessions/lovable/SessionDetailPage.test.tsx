@@ -326,6 +326,23 @@ describe('SessionDetailPage (lovable)', () => {
     expect(await screen.findByText(format(profileZone))).toBeInTheDocument()
   })
 
+  it('renders the session end time, closing the HIGH duration-never-rendered gap', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/sessions/{sessionId}')
+        return Promise.resolve({ data: detail({ startTime: '2030-09-01T18:00:00Z', durationMinutes: 120 }) })
+      if (path === '/api/v1/sessions/{sessionId}/join-requests')
+        return Promise.resolve({ data: { items: [], nextCursor: null } })
+      if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: 'UTC' } })
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    renderPage()
+
+    const endText = new Intl.DateTimeFormat('en', { timeStyle: 'short', timeZone: 'UTC' }).format(
+      new Date('2030-09-01T20:00:00Z'),
+    )
+    expect(await screen.findByText(`Ends ${endText}`)).toBeInTheDocument()
+  })
+
   it('offers no join action to a removed viewer with inherited access_D018', async () => {
     mockedUseSession.mockReturnValue({ data: { userId: 'viewer-1' } })
     api.get.mockImplementation((path: string) => {

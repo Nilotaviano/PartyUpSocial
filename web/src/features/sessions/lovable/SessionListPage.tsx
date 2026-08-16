@@ -1,5 +1,5 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
-import { CalendarClock, Dices } from 'lucide-react'
+import { Dices } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
@@ -9,23 +9,14 @@ import { primaryCtaClasses } from '../../../components/ui/classes'
 import { EmptyState } from '../../../components/shell/SectionCard'
 import { PageHeader } from '../../../components/shell/PageHeader'
 import { StatusBanner } from '../../../components/ui/statusBanner'
-import { cn } from '../../availability/lovable/utils'
+import { SessionSummaryCard } from '../SessionSummaryCard'
 import {
   getSessionList,
   getViewerProfile,
-  isSessionInProgress,
   sessionKeys,
   viewerProfileKey,
   type SessionScope,
-  type SessionSummary,
 } from '../sessionQueries'
-import { OccupancyChip, OrganizerRow, StatusPill } from './SessionBits'
-import {
-  isKnownSessionStatus,
-  mapSessionSummary,
-  sessionPlatformLabel,
-  type SessionLabels,
-} from './sessionData'
 
 /**
  * `scope` is a prop, each scope its own route in `App.tsx`, so cursors reset
@@ -61,86 +52,12 @@ function useSessionScope(scope: SessionScope) {
   }
 }
 
-function SessionCard({
-  session,
-  scope,
-  timeZone,
-  labels,
-}: {
-  session: SessionSummary
-  scope: SessionScope
-  timeZone: string | undefined
-  labels: SessionLabels
-}) {
-  const { t, i18n } = useTranslation('sessions')
-  const mapped = mapSessionSummary(session, timeZone ?? 'UTC', labels)
-  const inProgress = scope === 'upcoming' && isSessionInProgress(session)
-  const dimmed = mapped.status === 'canceled' || mapped.status === 'expired'
-
-  const startText = new Intl.DateTimeFormat(i18n.language, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'UTC',
-  }).format(mapped.startTime)
-
-  const occupancyLabel =
-    mapped.maxCapacity == null
-      ? t('list.occupancyUnlimited', { active: mapped.activeOccupancy })
-      : t('list.occupancy', { active: mapped.activeOccupancy, max: mapped.maxCapacity })
-
-  return (
-    <li>
-      <Link
-        className={cn(
-          'surface block h-full p-4 transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
-          dimmed && 'opacity-80',
-        )}
-        to={`/sessions/${session.id}`}
-      >
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="min-w-0 truncate font-display text-base font-extrabold text-ink">
-            {mapped.title}
-          </h3>
-          {isKnownSessionStatus(mapped.status) && (
-            <StatusPill status={mapped.status} label={t(`status.${mapped.status}`)} />
-          )}
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-2 rounded-xl border border-border bg-muted/50 px-2.5 py-2">
-            <CalendarClock className="size-4 shrink-0" />
-            <span className="min-w-0 truncate text-[12px] font-semibold tabular-nums">
-              {startText}
-            </span>
-          </span>
-          {inProgress && (
-            <span className="rounded-full border-2 border-ink bg-accent px-2.5 py-1 font-display text-[11px] font-bold text-accent-ink">
-              {t('list.inProgress')}
-            </span>
-          )}
-        </div>
-
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
-          {mapped.game && <span>{mapped.game.name}</span>}
-          <span>{sessionPlatformLabel(mapped.platform, t)}</span>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <OrganizerRow organizer={mapped.organizer} organizerLabel={t('detail.organizer')} />
-          <OccupancyChip label={occupancyLabel} />
-        </div>
-      </Link>
-    </li>
-  )
-}
-
 type SessionListPageProps = {
   scope: SessionScope
 }
 
 export function SessionListPage({ scope }: SessionListPageProps) {
   const { t } = useTranslation(['sessions', 'errors', 'common'])
-  const labels: SessionLabels = { anonymousOrganizer: t('detail.anonymous') }
 
   // D-038/D-046: times render in the viewer's profile time zone, not the
   // browser's, falling back to the browser zone only until the profile
@@ -207,11 +124,10 @@ export function SessionListPage({ scope }: SessionListPageProps) {
           {items.length > 0 && (
             <ul className="grid gap-3 sm:grid-cols-2">
               {items.map((session) => (
-                <SessionCard
+                <SessionSummaryCard
                   key={session.id}
-                  labels={labels}
-                  scope={scope}
                   session={session}
+                  showInProgress={scope === 'upcoming'}
                   timeZone={viewerTimeZone}
                 />
               ))}

@@ -84,4 +84,27 @@ describe('DiscoverPage', () => {
 
     expect(await screen.findByText(/Anonymous User/)).toBeInTheDocument()
   })
+
+  it('renders game, platform, and occupancy off the same summary, not title/status/startTime alone', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/sessions')
+        return Promise.resolve({
+          data: {
+            items: [
+              session({
+                game: { name: 'Deep Rock Galactic', steamAppId: 548430 },
+                maxCapacity: 6,
+                activeOccupancy: 4,
+              }),
+            ],
+            nextCursor: null,
+          },
+        })
+      throw new Error(`Unexpected GET ${path}`)
+    })
+    renderPage()
+
+    expect(await screen.findByText('Deep Rock Galactic')).toBeInTheDocument()
+    expect(screen.getByText('4/6 going')).toBeInTheDocument()
+  })
 })

@@ -232,6 +232,20 @@ export function GuestSessionPage() {
                 }).format(new Date(view.startTime))}
               </span>
             )}
+            {view.startTime && view.durationMinutes != null && (
+              <span className={quietChipClasses}>
+                {t('detail.endsAt', {
+                  time: new Intl.DateTimeFormat(i18n.language, {
+                    timeStyle: 'short',
+                  }).format(
+                    new Date(
+                      new Date(view.startTime).getTime() +
+                        Number(view.durationMinutes) * 60_000,
+                    ),
+                  ),
+                })}
+              </span>
+            )}
             {view.platform && <span className={quietChipClasses}>{view.platform}</span>}
             {view.game?.name && <span className={quietChipClasses}>{view.game.name}</span>}
           </div>

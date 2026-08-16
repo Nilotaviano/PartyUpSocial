@@ -65,6 +65,7 @@
     "pending": "Pendiente",
     "anonymous": "Usuario Anónimo",
     "inProgress": "En curso",
+    "endsAt": "Termina a las {{time}}",
     "muted": "Silenciada",
     "progress": "{{going}} de {{min}} confirmados.",
     "progressWaitlist": "Cuando se llene, las siguientes respuestas pasan a la lista de espera.",

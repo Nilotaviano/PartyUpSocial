@@ -175,6 +175,16 @@ describe('GuestSessionPage', () => {
     ).toBeTruthy()
   })
 
+  it('renders the session end time, closing the HIGH duration-never-rendered gap', async () => {
+    api.get.mockResolvedValue({ data: liveUnclaimed() })
+    renderPage(`/guest/${linkId}`)
+
+    const endText = new Intl.DateTimeFormat('en', { timeStyle: 'short' }).format(
+      new Date('2030-09-01T20:00:00Z'),
+    )
+    expect(await screen.findByText(`Ends ${endText}`)).toBeInTheDocument()
+  })
+
   it('renders the localized message for a known error code on the invalid link', async () => {
     const ApiErrorClass = class extends Error {
       status = 429

@@ -8,7 +8,12 @@ import { useSession } from '../../../auth/useSession'
 import { AvatarDisc } from '../../friends/AvatarDisc'
 import { avatarImgUrl } from '../../friends/avatarImage'
 import { Button } from '../../../components/ui/button'
-import { neutralCtaClasses, raisedInteractiveClasses, segmentItemClasses } from '../../../components/ui/classes'
+import {
+  chipClasses,
+  neutralCtaClasses,
+  raisedInteractiveClasses,
+  segmentItemClasses,
+} from '../../../components/ui/classes'
 import { Dialog } from '../../../components/ui/dialog'
 import { PageHeader } from '../../../components/shell/PageHeader'
 import { IdentityRow } from '../../../components/ui/identityRow'
@@ -385,6 +390,21 @@ export function SessionDetailPage() {
       }).format(instantToFakeLocal(data.startTime, viewerTimeZone))
     : ''
 
+  // HIGH finding 1.1 (frontend audit 2026-08-15): `durationMinutes` was
+  // fetched but never rendered anywhere, so no surface ever showed when a
+  // session ends.
+  const endText = data
+    ? new Intl.DateTimeFormat(i18n.language, {
+        timeStyle: 'short',
+        timeZone: 'UTC',
+      }).format(
+        new Date(
+          instantToFakeLocal(data.startTime, viewerTimeZone).getTime() +
+            Number(data.durationMinutes) * 60_000,
+        ),
+      )
+    : ''
+
   function rosterRow(entry: (typeof going)[number]) {
     return (
       <li
@@ -468,11 +488,10 @@ export function SessionDetailPage() {
                   <CalendarClock className="size-4 shrink-0" />
                   <span className="text-[12px] font-semibold tabular-nums">{startText}</span>
                 </span>
-                {inProgress && (
-                  <span className="rounded-full border-2 border-ink bg-accent px-2.5 py-1 font-display text-[11px] font-bold text-accent-ink">
-                    {t('detail.inProgress')}
-                  </span>
-                )}
+                <span className="text-[12px] font-semibold text-ink-soft tabular-nums">
+                  {t('detail.endsAt', { time: endText })}
+                </span>
+                {inProgress && <span className={chipClasses}>{t('detail.inProgress')}</span>}
                 {data.muted && (
                   <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
                     {t('detail.muted')}

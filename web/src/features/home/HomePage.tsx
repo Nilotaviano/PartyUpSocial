@@ -32,6 +32,7 @@ import {
   weekStartsOnIso,
 } from '../availability/lovable/zone'
 import { SessionStatusChip } from '../sessions/SessionStatusChip'
+import { SessionSummaryCard } from '../sessions/SessionSummaryCard'
 import {
   approveJoinRequest,
   getSessionList,
@@ -495,19 +496,9 @@ export function HomePage() {
               >
                 {upcoming.isPending && loading()}
                 {upcomingItems.length > 0 && (
-                  <ul className="space-y-2">
+                  <ul className="flex flex-col gap-2">
                     {upcomingItems.map((session) => (
-                      <li key={session.id}>
-                        <Link className={itemCardClasses} to={`/sessions/${session.id}`}>
-                          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                            <span className={itemTitleClasses}>{session.title}</span>
-                            <SessionStatusChip status={session.status} />
-                          </div>
-                          <p className={`${itemMetaClasses} tabular-nums`}>
-                            {timeFormat.format(new Date(session.startTime))}
-                          </p>
-                        </Link>
-                      </li>
+                      <SessionSummaryCard key={session.id} session={session} />
                     ))}
                   </ul>
                 )}
@@ -559,6 +550,11 @@ export function HomePage() {
                               ns: 'availability',
                               count: window.available.length,
                             })}
+                            {' · '}
+                            {t('findATime.maybe', {
+                              ns: 'availability',
+                              count: window.maybe.length,
+                            })}
                           </p>
                         </li>
                       ))}
@@ -602,19 +598,9 @@ export function HomePage() {
                   />
                 )}
                 {discoverItems.length > 0 && (
-                  <ul className="space-y-2" data-testid="home-discover-list">
+                  <ul className="flex flex-col gap-2" data-testid="home-discover-list">
                     {discoverItems.map((session) => (
-                      <li key={session.id}>
-                        <Link className={itemCardClasses} to={`/sessions/${session.id}`}>
-                          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                            <span className={itemTitleClasses}>{session.title}</span>
-                            <SessionStatusChip status={session.status} />
-                          </div>
-                          <p className={`${itemMetaClasses} tabular-nums`}>
-                            {timeFormat.format(new Date(session.startTime))}
-                          </p>
-                        </Link>
-                      </li>
+                      <SessionSummaryCard key={session.id} session={session} />
                     ))}
                   </ul>
                 )}
