@@ -10,13 +10,17 @@ using PartyUp.Domain.Users.DeletionExecution;
 namespace PartyUp.Application.Admin;
 
 /// <summary>
-/// D-180's optional content removal (PHASE8_DESIGN.md §3 S2): a ban plus DOMAIN_MODEL §11 steps 1–3
+/// D-180's optional content removal (PHASE8_DESIGN.md §3 S2): a ban plus DOMAIN_MODEL §11 steps 1–4
 /// and nothing else — cancel the subject's not-started owned sessions, expire their live owned polls,
 /// remove them from other people's not-started content, lapse their own pending join requests, cancel
-/// the reminders those removals orphan. Friendships, blocks, Completed history, PII, credentials,
-/// avatars, push subscriptions, notifications, the username reservation and the A-017 journal are all
-/// deliberately untouched: the account stays a normal, live, banned account, and an unban does not
-/// restore any of the removed content.
+/// the reminders those removals orphan, and (D-209) hard-delete every group the subject owns plus
+/// their own membership row in every group someone else owns — the same group-severing step
+/// <see cref="DeletionExecutor"/> runs, shared through <see cref="ContentRemovalExecutor"/> so the ban
+/// path cannot fall behind account deletion's group effects. Friendships, blocks, Completed history,
+/// PII, credentials, avatars, push subscriptions,
+/// notifications, the username reservation and the A-017 journal are all deliberately untouched: the
+/// account stays a normal, live, banned account, and an unban does not restore any of the removed
+/// content (including groups — D-209 severing is not reversible by unban).
 ///
 /// <para>
 /// Both halves commit in <strong>one</strong> outermost <see cref="IUnitOfWork.ExecuteAsync"/>, run by

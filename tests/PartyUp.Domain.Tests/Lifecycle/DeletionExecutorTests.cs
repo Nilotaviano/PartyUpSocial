@@ -234,6 +234,24 @@ public class DeletionExecutorTests
         Assert.DoesNotContain(world.MemberOfGroup.Members, m => m.UserId == world.Subject.Id);
     }
 
+    /// <summary>
+    /// D-209 covers Invited rows, not just Accepted ones: severing does not wait for consent to
+    /// finish. A mutation that reintroduces a Leave-requires-Accepted guard on
+    /// <see cref="FriendGroup.Leave"/> would leave this Invited row behind and fail this test.
+    /// </summary>
+    [Fact]
+    public void Execute_RemovesTheSubjectsInvitedRowFromAnothersGroup_D209()
+    {
+        DeletionWorld world = DeletionWorld.Build();
+        Assert.Contains(
+            world.InvitedOnlyGroup.Members,
+            m => m.UserId == world.Subject.Id && m.Status == FriendGroupMemberStatus.Invited);
+
+        world.Execute();
+
+        Assert.DoesNotContain(world.InvitedOnlyGroup.Members, m => m.UserId == world.Subject.Id);
+    }
+
     [Fact]
     public void Execute_MarksTheAncillaryUserDataForDeletion_D092()
     {
@@ -397,6 +415,25 @@ public class DeletionExecutorTests
     }
 
     /// <summary>
+    /// D-209/D-180: the admin ban path drives <see cref="ContentRemovalExecutor.Execute"/> directly,
+    /// never <see cref="DeletionExecutor"/> — so the group-severing effect has to live in the shared
+    /// executor itself, not in <see cref="DeletionExecutor"/>'s own steps, or this admin-only caller
+    /// would never sever groups at all.
+    /// </summary>
+    [Fact]
+    public void Execute_AdminContentRemoval_DeletesOwnedGroupsAndMemberships_D209()
+    {
+        DeletionWorld world = DeletionWorld.Build();
+        Assert.Contains(world.MemberOfGroup.Members, m => m.UserId == world.Subject.Id);
+
+        ContentRemovalResult result = world.RemoveContent();
+
+        Assert.Equal(world.OwnedGroup.Id, Assert.Single(result.DeletedGroups));
+        Assert.DoesNotContain(world.MemberOfGroup.Members, m => m.UserId == world.Subject.Id);
+        Assert.DoesNotContain(world.InvitedOnlyGroup.Members, m => m.UserId == world.Subject.Id);
+    }
+
+    /// <summary>
     /// The exclusions D-180 names, asserted as absences: the account stays a normal live account with
     /// its friend graph, blocks, username and Completed history intact — a removal is not a deletion.
     /// </summary>
@@ -466,7 +503,8 @@ public class DeletionExecutorTests
         Block UnrelatedBlock,
         UsernameRegistryEntry UsernameEntry,
         FriendGroup OwnedGroup,
-        FriendGroup MemberOfGroup)
+        FriendGroup MemberOfGroup,
+        FriendGroup InvitedOnlyGroup)
     {
         internal DeletionScope Scope => new(
             [OwnedFuture, OwnedInProgress, OwnedCompleted, OthersFuture, OthersFull, OthersInProgress, OthersRequested],
@@ -475,7 +513,7 @@ public class DeletionExecutorTests
             [BlockAgainstSubject, UnrelatedBlock],
             UsernameEntry,
             [OwnedGroup],
-            [MemberOfGroup]);
+            [MemberOfGroup, InvitedOnlyGroup]);
 
         internal static DeletionWorld Build()
         {
@@ -569,6 +607,10 @@ public class DeletionExecutorTests
             memberOfGroup.AcceptInvite(me, clock);
             memberOfGroup.DequeueEvents();
 
+            FriendGroup invitedOnlyGroup = FriendGroup.Create(stranger, GroupName.Create("Stranger's crew"), clock);
+            invitedOnlyGroup.Invite(stranger, me, isAcceptedFriendOfOwner: true, clock);
+            invitedOnlyGroup.DequeueEvents();
+
             DeletionWorld world = new(
                 subject,
                 ownedFuture,
@@ -590,7 +632,8 @@ public class DeletionExecutorTests
                 unrelatedBlock,
                 usernameEntry,
                 ownedGroup,
-                memberOfGroup);
+                memberOfGroup,
+                invitedOnlyGroup);
 
             world.DrainEvents();
             return world;

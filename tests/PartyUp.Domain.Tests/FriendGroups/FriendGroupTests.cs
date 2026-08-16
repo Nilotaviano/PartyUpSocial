@@ -284,6 +284,48 @@ public class FriendGroupTests
         Assert.Empty(group.DequeueEvents());
     }
 
+    /// <summary>
+    /// D-207: decline, revoke, leave and remove are all silent — no notification-worthy event for
+    /// any of them, unlike invite and accept. One fact, four independent groups, so this is the
+    /// D-207-greppable proof rather than a side effect buried in each `_D200` row-deletion test.
+    /// </summary>
+    [Fact]
+    public void DeclineRevokeLeaveRemove_RaiseNoEvents_D207()
+    {
+        UserId owner = Owner;
+        FakeClock clock = Clock();
+
+        FriendGroup declined = FriendGroup.Create(owner, GroupName.Create("Declined"), clock);
+        UserId decliner = UserId.New();
+        declined.Invite(owner, decliner, isAcceptedFriendOfOwner: true, clock);
+        declined.DequeueEvents();
+        declined.DeclineInvite(decliner);
+        Assert.Empty(declined.DequeueEvents());
+
+        FriendGroup revoked = FriendGroup.Create(owner, GroupName.Create("Revoked"), clock);
+        UserId revokee = UserId.New();
+        revoked.Invite(owner, revokee, isAcceptedFriendOfOwner: true, clock);
+        revoked.DequeueEvents();
+        revoked.RevokeInvite(owner, revokee);
+        Assert.Empty(revoked.DequeueEvents());
+
+        FriendGroup left = FriendGroup.Create(owner, GroupName.Create("Left"), clock);
+        UserId leaver = UserId.New();
+        left.Invite(owner, leaver, isAcceptedFriendOfOwner: true, clock);
+        left.AcceptInvite(leaver, clock);
+        left.DequeueEvents();
+        left.Leave(leaver);
+        Assert.Empty(left.DequeueEvents());
+
+        FriendGroup removed = FriendGroup.Create(owner, GroupName.Create("Removed"), clock);
+        UserId removee = UserId.New();
+        removed.Invite(owner, removee, isAcceptedFriendOfOwner: true, clock);
+        removed.AcceptInvite(removee, clock);
+        removed.DequeueEvents();
+        removed.RemoveMember(owner, removee);
+        Assert.Empty(removed.DequeueEvents());
+    }
+
     [Fact]
     public void Leave_ByOwner_ThrowsInvalidTransition()
     {

@@ -1,15 +1,15 @@
 using NodaTime;
-using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 
 namespace PartyUp.Domain.Users.DeletionExecution;
 
 /// <summary>
-/// The grace-expiry sweep of DOMAIN_MODEL §11: seven deliberately ordered steps over aggregates the
-/// caller has already loaded and locked, in one transaction per user. Steps 1–3 run before step 4 so
-/// their notifications still see the intact friend graph; the deleting user is never a recipient
-/// (recipient computation excludes them).
+/// The grace-expiry sweep of DOMAIN_MODEL §11: deliberately ordered steps over aggregates the caller
+/// has already loaded and locked, in one transaction per user. Steps 1–4 (sessions, polls, other
+/// people's content, groups — shared with the D-180 ban path via <see cref="ContentRemovalExecutor"/>)
+/// run before step 5 so their notifications still see the intact friend graph; the deleting user is
+/// never a recipient (recipient computation excludes them).
 /// </summary>
 /// <remarks>
 /// The executor is a system actor (§1): it calls the same shared transition functions as the request
@@ -33,12 +33,12 @@ public static class DeletionExecutor
         Instant now = clock.GetCurrentInstant();
         UserId subject = user.Id;
 
-        // 1–3. Cancel owned not-started sessions, expire owned live polls, remove the subject from
-        //      other people's not-started content. Shared with the D-180 content-removal action,
-        //      which runs exactly these three and stops.
+        // 1–4. Cancel owned not-started sessions, expire owned live polls, remove the subject from
+        //      other people's not-started content, and sever their groups (D-209). Shared with the
+        //      D-180 content-removal action (admin ban path), which runs exactly this and stops.
         ContentRemovalResult contentRemoval = ContentRemovalExecutor.Execute(subject, scope, clock);
 
-        // 4. Friendships (accepted and still-pending requests alike) and blocks in both directions.
+        // 5. Friendships (accepted and still-pending requests alike) and blocks in both directions.
         List<Friendship> deletedFriendships = [];
         foreach (Friendship friendship in scope.Friendships)
         {
@@ -54,24 +54,6 @@ public static class DeletionExecutor
             if (block.Involves(subject))
             {
                 deletedBlocks.Add(block);
-            }
-        }
-
-        // Also (D-209): hard-delete every FriendGroup the user owns (full cascade — membership rows
-        // and every session/poll audience junction row that targeted it, D-199), and delete every
-        // membership row — Invited or Accepted — the user holds in groups owned by others. Silent:
-        // no notifications for either effect (D-207).
-        List<FriendGroupId> deletedGroups = [];
-        foreach (FriendGroup group in scope.OwnedGroups)
-        {
-            deletedGroups.Add(group.Id);
-        }
-
-        foreach (FriendGroup group in scope.MemberOfGroups)
-        {
-            if (group.Involves(subject))
-            {
-                group.Leave(subject);
             }
         }
 
@@ -101,7 +83,7 @@ public static class DeletionExecutor
             AllDataScopes,
             reservedUsername,
             journal,
-            deletedGroups);
+            contentRemoval.DeletedGroups);
     }
 
     /// <summary>

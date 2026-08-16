@@ -68,5 +68,6 @@ public sealed record DeletionExecutionResult(
         RemovedFromSessions,
         RemovedFromPolls,
         LapsedJoinRequests,
-        CanceledReminders);
+        CanceledReminders,
+        DeletedGroups);
 }
