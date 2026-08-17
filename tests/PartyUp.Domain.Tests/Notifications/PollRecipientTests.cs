@@ -41,7 +41,7 @@ public class PollRecipientTests
         _ = fixture.Drain();
         Instant suggested = TestPolls.Hours(120);
 
-        _ = fixture.Poll.SuggestOption(fixture.InviteeRef(0), suggested, clock);
+        _ = fixture.Poll.SuggestOption(fixture.InviteeRef(0), suggested, TestPolls.DefaultDuration, clock);
 
         PollOptionSuggested domainEvent = TestNotifications.Single<PollOptionSuggested>(fixture.Drain());
         IReadOnlyList<NotificationRequest> requests =
@@ -60,7 +60,7 @@ public class PollRecipientTests
         (_, ParticipantRef guest) = PollGuests.Claim(fixture.Poll, clock, "Ana");
         _ = fixture.Drain();
 
-        _ = fixture.Poll.SuggestOption(guest, TestPolls.Hours(120), clock);
+        _ = fixture.Poll.SuggestOption(guest, TestPolls.Hours(120), TestPolls.DefaultDuration, clock);
 
         PollOptionSuggested domainEvent = TestNotifications.Single<PollOptionSuggested>(fixture.Drain());
         IReadOnlyList<NotificationRequest> requests =
@@ -78,7 +78,7 @@ public class PollRecipientTests
         PollUnderTest fixture = TestPolls.New(clock);
         _ = fixture.Drain();
 
-        _ = fixture.Poll.SuggestOption(fixture.OrganizerRef, TestPolls.Hours(120), clock);
+        _ = fixture.Poll.SuggestOption(fixture.OrganizerRef, TestPolls.Hours(120), TestPolls.DefaultDuration, clock);
 
         PollOptionSuggested domainEvent = TestNotifications.Single<PollOptionSuggested>(fixture.Drain());
         IReadOnlyList<NotificationRequest> requests =

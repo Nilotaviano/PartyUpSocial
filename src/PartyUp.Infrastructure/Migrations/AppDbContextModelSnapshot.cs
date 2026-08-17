@@ -641,10 +641,6 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("deadline_choice");
 
-                    b.Property<int>("Duration")
-                        .HasColumnType("integer")
-                        .HasColumnName("duration_minutes");
-
                     b.Property<int?>("MaxCapacity")
                         .HasColumnType("integer")
                         .HasColumnName("max_capacity");
@@ -703,8 +699,6 @@ namespace PartyUp.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("ck_polls_capacity", "max_capacity IS NULL OR max_capacity >= min_attendance");
 
-                            t.HasCheckConstraint("ck_polls_duration", "duration_minutes BETWEEN 15 AND 1440 AND duration_minutes % 15 = 0");
-
                             t.HasCheckConstraint("ck_polls_game_shape", "(game_steam_app_id IS NULL OR platform = 0) AND (game_steam_app_id IS NULL OR game_name IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_polls_min_attendance", "min_attendance >= 1");
@@ -722,6 +716,10 @@ namespace PartyUp.Infrastructure.Migrations
                     b.Property<Instant>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<int>("Duration")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_minutes");
 
                     b.Property<Guid>("PollId")
                         .HasColumnType("uuid")
@@ -746,7 +744,10 @@ namespace PartyUp.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_poll_options");
 
-                    b.ToTable("poll_options", (string)null);
+                    b.ToTable("poll_options", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_poll_options_duration", "duration_minutes BETWEEN 15 AND 1440 AND duration_minutes % 15 = 0");
+                        });
                 });
 
             modelBuilder.Entity("PartyUp.Domain.Polls.PollParticipant", b =>

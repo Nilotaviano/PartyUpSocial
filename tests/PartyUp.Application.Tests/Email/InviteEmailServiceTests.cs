@@ -234,7 +234,6 @@ public sealed class InviteEmailServiceTests
 
             PollDetails details = new(
                 SessionTitle.Create("Raid poll"),
-                Duration15.FromMinutes(60),
                 Platform.NotApplicable,
                 null,
                 SessionNotes.Empty,
@@ -246,7 +245,7 @@ public sealed class InviteEmailServiceTests
                 organizer.Id,
                 details,
                 PollDeadlineChoice.Hours24,
-                [Clock.GetCurrentInstant() + Duration.FromHours(5), Clock.GetCurrentInstant() + Duration.FromHours(6)],
+                PollSpecs.Of(Clock.GetCurrentInstant() + Duration.FromHours(5), Clock.GetCurrentInstant() + Duration.FromHours(6)),
                 [invitee.Id],
                 Clock);
             _ = poll.DequeueEvents();

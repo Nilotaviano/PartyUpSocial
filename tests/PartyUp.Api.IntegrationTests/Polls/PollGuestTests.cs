@@ -248,7 +248,7 @@ public sealed class PollGuestTests : IAsyncLifetime, IDisposable
         await using (AsyncServiceScope suggestScope = _factory.Services.CreateAsyncScope())
         {
             GuestPollCommandResult suggestResult = await PollTestHelpers.BuildGuestUseCases(suggestScope)
-                .SuggestOptionAsGuestAsync(pollId, linkId, suggestedTime, default);
+                .SuggestOptionAsGuestAsync(pollId, linkId, suggestedTime, null, default);
             Assert.True(suggestResult.Succeeded, suggestResult.Code);
             Assert.Contains(
                 suggestResult.Poll!.Options,

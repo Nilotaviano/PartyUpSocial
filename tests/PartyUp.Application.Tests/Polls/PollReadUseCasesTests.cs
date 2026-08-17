@@ -268,7 +268,7 @@ public sealed class PollReadUseCasesTests
 
         Poll poll = NewPoll(organizer.Id, [invitee.Id], clock);
         PollOption suggested = poll.SuggestOption(
-            ParticipantRef.ForUser(invitee.Id), clock.GetCurrentInstant() + Duration.FromHours(7), clock);
+            ParticipantRef.ForUser(invitee.Id), clock.GetCurrentInstant() + Duration.FromHours(7), Duration15.FromMinutes(PollSpecs.DefaultDurationMinutes), clock);
         _ = poll.DequeueEvents();
         polls.Add(poll);
 
@@ -304,7 +304,7 @@ public sealed class PollReadUseCasesTests
 
         Poll poll = NewPoll(viewer.Id, [blockedSuggester.Id], clock);
         PollOption suggested = poll.SuggestOption(
-            ParticipantRef.ForUser(blockedSuggester.Id), clock.GetCurrentInstant() + Duration.FromHours(7), clock);
+            ParticipantRef.ForUser(blockedSuggester.Id), clock.GetCurrentInstant() + Duration.FromHours(7), Duration15.FromMinutes(PollSpecs.DefaultDurationMinutes), clock);
         _ = poll.DequeueEvents();
         polls.Add(poll);
 
@@ -324,7 +324,6 @@ public sealed class PollReadUseCasesTests
             organizerId,
             new PollDetails(
                 SessionTitle.Create("Raid poll"),
-                Duration15.FromMinutes(60),
                 Platform.NotApplicable,
                 null,
                 SessionNotes.Empty,
@@ -332,7 +331,7 @@ public sealed class PollReadUseCasesTests
                 maxCapacity: null,
                 visibility: ContentVisibility.Public),
             PollDeadlineChoice.Hours24,
-            [clock.GetCurrentInstant() + Duration.FromHours(5), clock.GetCurrentInstant() + Duration.FromHours(6)],
+            PollSpecs.Of(clock.GetCurrentInstant() + Duration.FromHours(5), clock.GetCurrentInstant() + Duration.FromHours(6)),
             inviteeIds,
             clock);
 
@@ -341,7 +340,6 @@ public sealed class PollReadUseCasesTests
             organizerId,
             new PollDetails(
                 SessionTitle.Create("Raid poll"),
-                Duration15.FromMinutes(60),
                 Platform.NotApplicable,
                 null,
                 SessionNotes.Empty,
@@ -349,7 +347,7 @@ public sealed class PollReadUseCasesTests
                 maxCapacity: null,
                 visibility: ContentVisibility.Private),
             PollDeadlineChoice.Hours24,
-            [clock.GetCurrentInstant() + Duration.FromHours(5), clock.GetCurrentInstant() + Duration.FromHours(6)],
+            PollSpecs.Of(clock.GetCurrentInstant() + Duration.FromHours(5), clock.GetCurrentInstant() + Duration.FromHours(6)),
             [],
             clock);
 }

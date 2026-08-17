@@ -28,7 +28,7 @@ public sealed class PollOptionTests : IAsyncLifetime, IDisposable
 
         await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
         SuggestOptionResult result = await PollTestHelpers.BuildOptionUseCases(scope)
-            .SuggestOptionAsync(pollId, voterId, existing, default);
+            .SuggestOptionAsync(pollId, voterId, existing, null, default);
 
         Assert.True(result.Succeeded, result.Code);
         Assert.Equal(2, result.Poll!.Options.Count);
@@ -70,7 +70,7 @@ public sealed class PollOptionTests : IAsyncLifetime, IDisposable
         {
             await using AsyncServiceScope fillScope = _factory.Services.CreateAsyncScope();
             SuggestOptionResult fillResult = await PollTestHelpers.BuildOptionUseCases(fillScope)
-                .SuggestOptionAsync(pollId, voterA, baseTime + Duration.FromHours(i + 2), default);
+                .SuggestOptionAsync(pollId, voterA, baseTime + Duration.FromHours(i + 2), null, default);
             Assert.True(fillResult.Succeeded, fillResult.Code);
         }
 
@@ -78,9 +78,9 @@ public sealed class PollOptionTests : IAsyncLifetime, IDisposable
         await using AsyncServiceScope raceScopeB = _factory.Services.CreateAsyncScope();
 
         Task<SuggestOptionResult> suggestA = PollTestHelpers.BuildOptionUseCases(raceScopeA)
-            .SuggestOptionAsync(pollId, voterA, baseTime + Duration.FromHours(50), default);
+            .SuggestOptionAsync(pollId, voterA, baseTime + Duration.FromHours(50), null, default);
         Task<SuggestOptionResult> suggestB = PollTestHelpers.BuildOptionUseCases(raceScopeB)
-            .SuggestOptionAsync(pollId, voterB, baseTime + Duration.FromHours(51), default);
+            .SuggestOptionAsync(pollId, voterB, baseTime + Duration.FromHours(51), null, default);
 
         SuggestOptionResult[] results = await Task.WhenAll(suggestA, suggestB);
 
@@ -152,7 +152,7 @@ public sealed class PollOptionTests : IAsyncLifetime, IDisposable
 
         await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
         SuggestOptionResult result = await PollTestHelpers.BuildOptionUseCases(scope)
-            .SuggestOptionAsync(pollId, voterId, baseTime + Duration.FromHours(5), default);
+            .SuggestOptionAsync(pollId, voterId, baseTime + Duration.FromHours(5), null, default);
         Assert.True(result.Succeeded, result.Code);
 
         await using AsyncServiceScope verify = _factory.Services.CreateAsyncScope();
@@ -170,7 +170,7 @@ public sealed class PollOptionTests : IAsyncLifetime, IDisposable
 
         await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
         SuggestOptionResult result = await PollTestHelpers.BuildOptionUseCases(scope)
-            .SuggestOptionAsync(pollId, organizerId, baseTime + Duration.FromHours(5), default);
+            .SuggestOptionAsync(pollId, organizerId, baseTime + Duration.FromHours(5), null, default);
         Assert.True(result.Succeeded, result.Code);
 
         await using AsyncServiceScope verify = _factory.Services.CreateAsyncScope();

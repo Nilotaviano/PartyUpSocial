@@ -28,7 +28,6 @@ public sealed record GuestPollResponse(
     Guid PollId,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? SessionId,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Title,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? DurationMinutes,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Platform,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] GameResponse? Game,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Notes,
@@ -51,7 +50,6 @@ public sealed record GuestPollResponse(
             detail.Id.Value,
             null,
             detail.Title.Value,
-            detail.Duration.TotalMinutes,
             SessionWireFormat.Platform(detail.Platform),
             detail.Game is { } game ? GameResponse.From(game) : null,
             detail.Notes.Value,
@@ -65,10 +63,10 @@ public sealed record GuestPollResponse(
     }
 
     public static GuestPollResponse Terminal(Guid pollId, GuestLinkView notice) =>
-        new(NoticeState(notice), pollId, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        new(NoticeState(notice), pollId, null, null, null, null, null, null, null, null, null, null, null, null);
 
     public static GuestPollResponse Finalized(Guid pollId, Guid sessionId) =>
-        new(FinalizedState, pollId, sessionId, null, null, null, null, null, null, null, null, null, null, null, null);
+        new(FinalizedState, pollId, sessionId, null, null, null, null, null, null, null, null, null, null, null);
 
     private static string NoticeState(GuestLinkView notice) => notice switch
     {

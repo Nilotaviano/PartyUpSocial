@@ -259,7 +259,6 @@ public sealed class GuestExchangeTests : IAsyncLifetime, IDisposable
             organizerId,
             new PollDetails(
                 SessionTitle.Create("Poll exchange test"),
-                Duration15.FromMinutes(60),
                 Platform.NotApplicable,
                 null,
                 SessionNotes.Empty,
@@ -267,7 +266,7 @@ public sealed class GuestExchangeTests : IAsyncLifetime, IDisposable
                 maxCapacity: null,
                 visibility: ContentVisibility.Private),
             PollDeadlineChoice.Hours24,
-            [baseTime, baseTime + Duration.FromHours(1)],
+            PollSpecs.Of(baseTime, baseTime + Duration.FromHours(1)),
             [],
             _factory.Clock);
         (GuestLink link, string token) = poll.CreateGuestLink(_factory.Clock);

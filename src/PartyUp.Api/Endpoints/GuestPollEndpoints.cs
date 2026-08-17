@@ -259,7 +259,7 @@ public static class GuestPollEndpoints
                     throw new DomainException(DomainError.ValidationFailed, "Malformed start time.");
                 }
 
-                return await useCase.SuggestOptionAsGuestAsync(pollId, linkId, startTime, ct);
+                return await useCase.SuggestOptionAsGuestAsync(pollId, linkId, startTime, request.DurationMinutes, ct);
             },
             cancellationToken);
 

@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Sessions;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
 using PartyUp.Domain.Sessions;
@@ -105,6 +106,7 @@ public sealed class GuestPollUseCases(
         PollId pollId,
         GuestLinkId guestLinkId,
         Instant startTime,
+        int? durationMinutes,
         CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync(
             async ct =>
@@ -126,7 +128,11 @@ public sealed class GuestPollUseCases(
 
                 try
                 {
-                    poll.SuggestOption(participant, startTime, clock);
+                    poll.SuggestOption(
+                        participant,
+                        startTime,
+                        Duration15.FromMinutes(durationMinutes ?? CreateSessionUseCase.DefaultDurationMinutes),
+                        clock);
                 }
                 catch (DomainException exception)
                 {

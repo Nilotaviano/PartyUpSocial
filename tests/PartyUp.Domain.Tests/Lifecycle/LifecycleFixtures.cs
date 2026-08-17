@@ -54,7 +54,7 @@ internal static class LifecycleFixtures
             organizer,
             TestPolls.Details(minAttendance, maxCapacity),
             PollDeadlineChoice.Hours24,
-            optionStartTimes,
+            TestPolls.Specs(optionStartTimes),
             invitees,
             clock);
 

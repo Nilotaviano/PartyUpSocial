@@ -136,7 +136,7 @@ public sealed class PollReadUseCases(
                 PollVoterListBuilder.Build(option.Id, poll.Votes, rosterByParticipant);
 
             options.Add(new PollOptionGridEntry(
-                option.Id, option.StartTime, option.SuggestedBy, suggesterMasked, suggestedByEntry,
+                option.Id, option.StartTime, option.Duration, option.SuggestedBy, suggesterMasked, suggestedByEntry,
                 available, maybe, unavailable, ownVote,
                 availableVoters, maybeVoters, unavailableVoters));
         }
@@ -149,7 +149,6 @@ public sealed class PollReadUseCases(
             poll.Id,
             poll.OrganizerId,
             poll.Title,
-            poll.Duration,
             poll.Platform,
             poll.Game,
             poll.Notes,

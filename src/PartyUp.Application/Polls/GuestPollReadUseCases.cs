@@ -114,7 +114,7 @@ public sealed class GuestPollReadUseCases(IPollRepository polls, IPollReadReposi
                 : rosterByParticipant.GetValueOrDefault(option.SuggestedBy);
 
             options.Add(new PollOptionGridEntry(
-                option.Id, option.StartTime, option.SuggestedBy, false, suggestedByEntry,
+                option.Id, option.StartTime, option.Duration, option.SuggestedBy, false, suggestedByEntry,
                 available, maybe, unavailable, ownVote,
                 availableVoters, maybeVoters, unavailableVoters));
         }
@@ -123,7 +123,6 @@ public sealed class GuestPollReadUseCases(IPollRepository polls, IPollReadReposi
             poll.Id,
             poll.OrganizerId,
             poll.Title,
-            poll.Duration,
             poll.Platform,
             poll.Game,
             poll.Notes,

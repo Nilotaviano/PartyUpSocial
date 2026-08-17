@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Sessions;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
@@ -38,12 +39,14 @@ public sealed class PollOptionUseCases(
     /// <summary>
     /// Resolves through <see cref="PollActorVisibilityGate"/> before any domain call -- a stranger or
     /// blocked actor gets the same <c>poll_not_found</c> a missing poll gives, never a
-    /// state-revealing <c>poll_voting_closed</c>.
+    /// state-revealing <c>poll_voting_closed</c>. D-211: the suggested option carries its own
+    /// length; an absent one takes the same D-129 default direct session creation takes.
     /// </summary>
     public Task<SuggestOptionResult> SuggestOptionAsync(
         PollId pollId,
         UserId actorId,
         Instant startTime,
+        int? durationMinutes,
         CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync(
             async ct =>
@@ -59,7 +62,11 @@ public sealed class PollOptionUseCases(
                 PollOption option;
                 try
                 {
-                    option = poll.SuggestOption(ParticipantRef.ForUser(actorId), startTime, clock);
+                    option = poll.SuggestOption(
+                        ParticipantRef.ForUser(actorId),
+                        startTime,
+                        Duration15.FromMinutes(durationMinutes ?? CreateSessionUseCase.DefaultDurationMinutes),
+                        clock);
                 }
                 catch (DomainException exception)
                 {

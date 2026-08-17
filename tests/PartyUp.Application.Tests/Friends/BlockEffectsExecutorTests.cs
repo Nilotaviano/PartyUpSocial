@@ -220,7 +220,6 @@ internal static class BlockExecutorTestData
     {
         var details = new PollDetails(
             SessionTitle.Create("Block effect poll"),
-            Duration15.FromMinutes(120),
             Platform.NotApplicable,
             null,
             SessionNotes.Empty,
@@ -231,10 +230,9 @@ internal static class BlockExecutorTestData
             organizer,
             details,
             PollDeadlineChoice.Hours24,
-            [
+            PollSpecs.Of(
                 clock.GetCurrentInstant() + Duration.FromHours(72),
-                clock.GetCurrentInstant() + Duration.FromHours(96),
-            ],
+                clock.GetCurrentInstant() + Duration.FromHours(96)),
             [invitee],
             clock);
         _ = poll.DequeueEvents();

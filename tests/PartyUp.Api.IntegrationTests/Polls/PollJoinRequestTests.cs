@@ -110,7 +110,7 @@ public sealed class PollJoinRequestTests : IAsyncLifetime, IDisposable
         {
             Instant now = _factory.Clock.GetCurrentInstant();
             SuggestOptionResult suggestResult = await PollTestHelpers.BuildOptionUseCases(suggestScope)
-                .SuggestOptionAsync(pollId, organizerId, now + Duration.FromHours(4), default);
+                .SuggestOptionAsync(pollId, organizerId, now + Duration.FromHours(4), null, default);
             Assert.True(suggestResult.Succeeded, suggestResult.Code);
             lateOptionId = suggestResult.OptionId!.Value;
         }

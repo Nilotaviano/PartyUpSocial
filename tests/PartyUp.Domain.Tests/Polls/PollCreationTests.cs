@@ -19,7 +19,7 @@ public class PollCreationTests
                 UserId.New(),
                 details,
                 PollDeadlineChoice.Hours24,
-                [TestPolls.Hours(72), TestPolls.Hours(96)],
+                TestPolls.Specs([TestPolls.Hours(72), TestPolls.Hours(96)]),
                 [],
                 clock,
                 audienceGroupIds: []));
@@ -87,7 +87,7 @@ public class PollCreationTests
                 UserId.New(),
                 TestPolls.Details(),
                 (PollDeadlineChoice)99,
-                [TestPolls.Hours(72), TestPolls.Hours(96)],
+                TestPolls.Specs([TestPolls.Hours(72), TestPolls.Hours(96)]),
                 [UserId.New()],
                 clock));
 
@@ -104,7 +104,7 @@ public class PollCreationTests
                 UserId.New(),
                 TestPolls.Details(),
                 PollDeadlineChoice.Hours24,
-                [TestPolls.Hours(72)],
+                TestPolls.Specs([TestPolls.Hours(72)]),
                 [UserId.New()],
                 clock));
 
@@ -121,7 +121,7 @@ public class PollCreationTests
                 UserId.New(),
                 TestPolls.Details(),
                 PollDeadlineChoice.Hours24,
-                [TestPolls.Hours(72), TestPolls.Hours(72)],
+                TestPolls.Specs([TestPolls.Hours(72), TestPolls.Hours(72)]),
                 [UserId.New()],
                 clock));
 
@@ -163,7 +163,7 @@ public class PollCreationTests
                 UserId.New(),
                 TestPolls.Details(),
                 PollDeadlineChoice.Hours24,
-                thirteen,
+                TestPolls.Specs(thirteen),
                 [UserId.New()],
                 clock));
 
@@ -191,7 +191,7 @@ public class PollCreationTests
                 UserId.New(),
                 TestPolls.Details(),
                 PollDeadlineChoice.Hours24,
-                [TestPolls.Hours(72), TestPolls.Origin + Duration.FromDays(366)],
+                TestPolls.Specs([TestPolls.Hours(72), TestPolls.Origin + Duration.FromDays(366)]),
                 [UserId.New()],
                 clock));
 
@@ -219,7 +219,7 @@ public class PollCreationTests
                 UserId.New(),
                 TestPolls.Details(visibility: ContentVisibility.Public),
                 PollDeadlineChoice.Hours24,
-                [TestPolls.Hours(72), TestPolls.Hours(96)],
+                TestPolls.Specs([TestPolls.Hours(72), TestPolls.Hours(96)]),
                 [],
                 clock));
 
@@ -248,7 +248,7 @@ public class PollCreationTests
                 organizer,
                 TestPolls.Details(),
                 PollDeadlineChoice.Hours24,
-                [TestPolls.Hours(72), TestPolls.Hours(96)],
+                TestPolls.Specs([TestPolls.Hours(72), TestPolls.Hours(96)]),
                 [organizer],
                 clock));
 
@@ -266,7 +266,7 @@ public class PollCreationTests
                 UserId.New(),
                 TestPolls.Details(),
                 PollDeadlineChoice.Hours24,
-                [TestPolls.Hours(72), TestPolls.Hours(96)],
+                TestPolls.Specs([TestPolls.Hours(72), TestPolls.Hours(96)]),
                 [invitee, invitee],
                 clock));
 
@@ -284,18 +284,17 @@ public class PollCreationTests
             TestPolls.Details(
                 minAttendance: 3,
                 maxCapacity: 5,
-                durationMinutes: 90,
                 title: "Deep Rock",
                 platform: Platform.Steam,
                 game: "Deep Rock Galactic",
                 notes: "Bring beer"),
             PollDeadlineChoice.Hours12,
-            [TestPolls.Hours(72), TestPolls.Hours(96)],
+            TestPolls.Specs([TestPolls.Hours(72), TestPolls.Hours(96)], durationMinutes: 90),
             [UserId.New()],
             clock);
 
         Assert.Equal("Deep Rock", poll.Title.Value);
-        Assert.Equal(90, poll.Duration.TotalMinutes);
+        Assert.All(poll.Options, option => Assert.Equal(90, option.Duration.TotalMinutes));
         Assert.Equal(Platform.Steam, poll.Platform);
         Assert.Equal("Deep Rock Galactic", poll.Game!.Name.Value);
         Assert.Equal("Bring beer", poll.Notes.Value);

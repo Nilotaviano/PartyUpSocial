@@ -81,7 +81,7 @@ public sealed class PollLockingTests : IAsyncLifetime, IDisposable
                 .Include(p => p.Options)
                 .Include(p => p.Participants)
                 .SingleAsync(p => p.Id == pollId);
-            tracked.SuggestOption(ParticipantRef.ForUser(organizerId), tracked.Options[0].StartTime + Duration.FromHours(10), _factory.Clock);
+            tracked.SuggestOption(ParticipantRef.ForUser(organizerId), tracked.Options[0].StartTime + Duration.FromHours(10), Duration15.FromMinutes(PollSpecs.DefaultDurationMinutes), _factory.Clock);
             await context.SaveChangesAsync();
 
             await Task.Delay(TimeSpan.FromMilliseconds(400));

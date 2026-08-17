@@ -209,7 +209,7 @@ public class IdentityMaskingTests
             organizer.Id,
             TestPolls.Details(),
             PollDeadlineChoice.Hours24,
-            [TestPolls.Hours(72), TestPolls.Hours(96)],
+            TestPolls.Specs([TestPolls.Hours(72), TestPolls.Hours(96)]),
             [first.Id, second.Id],
             clock);
         poll.Vote(ParticipantRef.ForUser(second.Id), poll.Options[0].Id, VoteChoice.Available, clock);
@@ -228,7 +228,7 @@ public class IdentityMaskingTests
         FakeClock clock = TestPolls.Clock();
         PollUnderTest p = TestPolls.New(clock, inviteeCount: 1);
         (_, ParticipantRef guest) = PollGuests.Claim(p.Poll, clock, "Casey");
-        PollOption suggested = p.Poll.SuggestOption(guest, TestPolls.Hours(120), clock);
+        PollOption suggested = p.Poll.SuggestOption(guest, TestPolls.Hours(120), TestPolls.DefaultDuration, clock);
 
         GuestIdentity identity = p.Poll.GuestIdentities.Single(g => g.Id == suggested.SuggestedByGuestIdentityId);
         MaskedIdentity attribution = IdentityMasking.ForGuestIdentity(identity);

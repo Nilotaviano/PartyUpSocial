@@ -18,7 +18,6 @@ public sealed class PollConfiguration : IEntityTypeConfiguration<Poll>
     {
         builder.ToTable("polls", table =>
         {
-            table.HasCheckConstraint("ck_polls_duration", "duration_minutes BETWEEN 15 AND 1440 AND duration_minutes % 15 = 0");
             table.HasCheckConstraint("ck_polls_min_attendance", "min_attendance >= 1");
             table.HasCheckConstraint("ck_polls_capacity", "max_capacity IS NULL OR max_capacity >= min_attendance");
             table.HasCheckConstraint("ck_polls_game_shape", "(game_steam_app_id IS NULL OR platform = 0) AND (game_steam_app_id IS NULL OR game_name IS NOT NULL)");
@@ -29,7 +28,6 @@ public sealed class PollConfiguration : IEntityTypeConfiguration<Poll>
         builder.Property(poll => poll.Id).HasConversion(new TypedIdConverter<PollId>()).ValueGeneratedNever();
         builder.Property(poll => poll.OrganizerId).HasConversion(new TypedIdConverter<UserId>());
         builder.Property(poll => poll.Title).HasConversion(new TextValueConverter<SessionTitle>()).HasMaxLength(SessionTitle.MaxLength);
-        builder.Property(poll => poll.Duration).HasConversion(duration => duration.TotalMinutes, minutes => Duration15.FromMinutes(minutes)).HasColumnName("duration_minutes");
         builder.Property(poll => poll.Platform).HasConversion<short>().HasColumnType("smallint");
         builder.Property(poll => poll.Notes).HasConversion(new TextValueConverter<SessionNotes>()).HasMaxLength(SessionNotes.MaxLength);
         builder.Property(poll => poll.DeadlineChoice).HasConversion<short>().HasColumnType("smallint");

@@ -17,7 +17,6 @@ internal static class PollTestHelpers
 {
     internal static PollDetails DetailsFor(string title = "S2 poll test", int? maxCapacity = null) => new(
         SessionTitle.Create(title),
-        Duration15.FromMinutes(60),
         Platform.NotApplicable,
         null,
         SessionNotes.Empty,

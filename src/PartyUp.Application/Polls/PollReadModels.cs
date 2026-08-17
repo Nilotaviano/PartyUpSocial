@@ -59,6 +59,8 @@ public sealed record PollRosterEntry(
 public sealed record PollOptionGridEntry(
     PollOptionId Id,
     Instant StartTime,
+    /// <summary>D-211: this option's own length; the poll carries none.</summary>
+    Duration15 Duration,
     ParticipantRef SuggestedBy,
     bool SuggestedByMasked,
     PollRosterEntry? SuggestedByEntry,
@@ -127,7 +129,6 @@ public sealed record PollDetail(
     PollId Id,
     UserId OrganizerId,
     SessionTitle Title,
-    Duration15 Duration,
     Platform Platform,
     SessionGame? Game,
     SessionNotes Notes,

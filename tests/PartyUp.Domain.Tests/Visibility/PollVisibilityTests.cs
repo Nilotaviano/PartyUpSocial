@@ -18,7 +18,7 @@ public class PollVisibilityTests
             organizer,
             TestPolls.Details(visibility: ContentVisibility.Private),
             PollDeadlineChoice.Hours24,
-            [TestPolls.Hours(72), TestPolls.Hours(96)],
+            TestPolls.Specs([TestPolls.Hours(72), TestPolls.Hours(96)]),
             invitees,
             clock);
 

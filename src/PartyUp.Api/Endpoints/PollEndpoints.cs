@@ -489,7 +489,7 @@ public static class PollEndpoints
         }
 
         SuggestOptionResult result = await useCase.SuggestOptionAsync(
-            PollId.From(pollId), actorId.Value, startTime, cancellationToken);
+            PollId.From(pollId), actorId.Value, startTime, request.DurationMinutes, cancellationToken);
         if (!result.Succeeded)
         {
             return Problem(context, StatusToCodeStatus(result.Code!), result.Code!);

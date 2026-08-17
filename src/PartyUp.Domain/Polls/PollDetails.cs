@@ -6,14 +6,13 @@ namespace PartyUp.Domain.Polls;
 
 /// <summary>
 /// Every eventual session detail a poll collects up front (D-154, DOMAIN_MODEL §6.1). Candidate
-/// options vary only by start time, so the start is the single session field this shape does not
-/// carry; <see cref="ForStartTime"/> supplies it when finalization mints the session.
+/// options vary by start time and by length (D-211), so those two are the session fields this shape
+/// does not carry; <see cref="ForOption"/> supplies them when finalization mints the session.
 /// </summary>
 public sealed record PollDetails
 {
     public PollDetails(
         SessionTitle title,
-        Duration15 duration,
         Platform platform,
         SessionGame? game,
         SessionNotes notes,
@@ -22,12 +21,13 @@ public sealed record PollDetails
         ContentVisibility visibility)
     {
         // The field rules live in SessionDetails — a poll carries exactly the session's details
-        // (§6.1) — and the start time belongs to the option (D-154), so validation runs against a
-        // placeholder instant that ForStartTime replaces. SessionDetails never constrains the start.
+        // (§6.1) — while the start time and the length belong to the option (D-154/D-211), so
+        // validation runs against placeholders that ForOption replaces. SessionDetails never
+        // constrains the start, and each option validates its own length on the way in.
         SessionDetails validated = new(
             title,
             NodaConstants.UnixEpoch,
-            duration,
+            Duration15.FromMinutes(Duration15.MinimumMinutes),
             platform,
             game,
             notes,
@@ -36,7 +36,6 @@ public sealed record PollDetails
             visibility);
 
         Title = validated.Title;
-        Duration = validated.Duration;
         Platform = validated.Platform;
         Game = validated.Game;
         Notes = validated.Notes;
@@ -46,8 +45,6 @@ public sealed record PollDetails
     }
 
     public SessionTitle Title { get; }
-
-    public Duration15 Duration { get; }
 
     public Platform Platform { get; }
 
@@ -63,7 +60,7 @@ public sealed record PollDetails
 
     public ContentVisibility Visibility { get; }
 
-    /// <summary>§6.4-2: the selected option's instant becomes the session's fixed start time.</summary>
-    public SessionDetails ForStartTime(Instant startTime) =>
-        new(Title, startTime, Duration, Platform, Game, Notes, MinAttendance, MaxCapacity, Visibility);
+    /// <summary>§6.4-2: the selected option's instant and length become the session's (D-211).</summary>
+    public SessionDetails ForOption(Instant startTime, Duration15 duration) =>
+        new(Title, startTime, duration, Platform, Game, Notes, MinAttendance, MaxCapacity, Visibility);
 }

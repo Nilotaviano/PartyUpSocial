@@ -98,7 +98,6 @@ public sealed class CreatePollUseCase(
 
                 PollDetails details = new(
                     SessionTitle.Create(command.Title),
-                    Duration15.FromMinutes(command.DurationMinutes ?? CreateSessionUseCase.DefaultDurationMinutes),
                     command.Platform ?? Platform.NotApplicable,
                     command.Game,
                     SessionNotes.Create(command.Notes),
@@ -109,11 +108,18 @@ public sealed class CreatePollUseCase(
                 Poll poll;
                 try
                 {
+                    // D-211: each option carries its own length. The wire still collects one length
+                    // for the whole poll, so every candidate is minted with it.
+                    Duration15 optionDuration =
+                        Duration15.FromMinutes(command.DurationMinutes ?? CreateSessionUseCase.DefaultDurationMinutes);
+                    PollOptionSpec[] optionSpecs =
+                        [.. (command.OptionStartTimes ?? []).Select(start => new PollOptionSpec(start, optionDuration))];
+
                     poll = Poll.Create(
                         command.OrganizerId,
                         details,
                         command.DeadlineChoice ?? DefaultDeadlineChoice,
-                        command.OptionStartTimes ?? [],
+                        optionSpecs,
                         invitees,
                         clock,
                         audienceGroupIds);

@@ -217,7 +217,6 @@ public sealed class GroupVisibilitySqlTests : IAsyncLifetime, IDisposable
         Instant baseTime = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
         PollDetails details = new(
             SessionTitle.Create("Groups poll SQL fixture"),
-            Duration15.FromMinutes(60),
             Platform.NotApplicable,
             null,
             SessionNotes.Empty,
@@ -229,7 +228,7 @@ public sealed class GroupVisibilitySqlTests : IAsyncLifetime, IDisposable
             organizerId,
             details,
             PollDeadlineChoice.Hours48,
-            [baseTime, baseTime + Duration.FromHours(1)],
+            PollSpecs.Of(baseTime, baseTime + Duration.FromHours(1)),
             invitees: [],
             _factory.Clock,
             [groupId]);

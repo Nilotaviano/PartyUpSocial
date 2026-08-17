@@ -81,7 +81,7 @@ public sealed class AdminDashboardTests : IAsyncLifetime, IDisposable
                 organizerB,
                 PollDetails("Finalized poll"),
                 PollDeadlineChoice.Hours24,
-                [now + Duration.FromHours(72), now + Duration.FromHours(96)],
+                PollSpecs.Of(now + Duration.FromHours(72), now + Duration.FromHours(96)),
                 [],
                 _factory.Clock);
             finalizedPoll = finalized.Id;
@@ -90,7 +90,7 @@ public sealed class AdminDashboardTests : IAsyncLifetime, IDisposable
                 organizerC,
                 PollDetails("Still polling"),
                 PollDeadlineChoice.Hours24,
-                [now + Duration.FromHours(72), now + Duration.FromHours(96)],
+                PollSpecs.Of(now + Duration.FromHours(72), now + Duration.FromHours(96)),
                 [],
                 _factory.Clock);
             openPoll = open.Id;
@@ -212,7 +212,7 @@ public sealed class AdminDashboardTests : IAsyncLifetime, IDisposable
                 organizerId,
                 PollDetails("Finalized then canceled"),
                 PollDeadlineChoice.Hours24,
-                [now + Duration.FromHours(72), now + Duration.FromHours(96)],
+                PollSpecs.Of(now + Duration.FromHours(72), now + Duration.FromHours(96)),
                 [],
                 _factory.Clock);
             _ = poll.DequeueEvents();
@@ -292,7 +292,6 @@ public sealed class AdminDashboardTests : IAsyncLifetime, IDisposable
     private static PollDetails PollDetails(string title) =>
         new(
             SessionTitle.Create(title),
-            Duration15.FromMinutes(60),
             Platform.NotApplicable,
             null,
             SessionNotes.Empty,

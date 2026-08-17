@@ -51,7 +51,6 @@ public sealed class PollPersistenceTests : IAsyncLifetime
                 organizerId,
                 new PollDetails(
                     SessionTitle.Create("Raid night"),
-                    Duration15.FromMinutes(120),
                     Platform.NotApplicable,
                     null,
                     SessionNotes.Empty,
@@ -59,7 +58,7 @@ public sealed class PollPersistenceTests : IAsyncLifetime
                     maxCapacity: null,
                     visibility: ContentVisibility.Public),
                 PollDeadlineChoice.Hours24,
-                [Origin + Duration.FromHours(72), Origin + Duration.FromHours(96)],
+                PollSpecs.Of(Origin + Duration.FromHours(72), Origin + Duration.FromHours(96)),
                 [inviteeId],
                 clock);
 
@@ -133,7 +132,6 @@ public sealed class PollPersistenceTests : IAsyncLifetime
                 organizerId,
                 new PollDetails(
                     SessionTitle.Create("Window proof"),
-                    Duration15.FromMinutes(60),
                     Platform.NotApplicable,
                     null,
                     SessionNotes.Empty,
@@ -141,7 +139,7 @@ public sealed class PollPersistenceTests : IAsyncLifetime
                     maxCapacity: null,
                     visibility: ContentVisibility.Private),
                 PollDeadlineChoice.Hours24,
-                [Origin + Duration.FromHours(72), Origin + Duration.FromHours(96)],
+                PollSpecs.Of(Origin + Duration.FromHours(72), Origin + Duration.FromHours(96)),
                 [],
                 clock);
 

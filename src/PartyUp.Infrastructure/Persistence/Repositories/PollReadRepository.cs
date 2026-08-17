@@ -164,7 +164,7 @@ public sealed class PollReadRepository(AppDbContext context) : IPollReadReposito
             List<CalendarPollOptionInstant> instants = [];
             foreach (PollOption option in poll.Options)
             {
-                if (option.StartTime >= range.End || option.StartTime + poll.Duration.Value <= range.Start)
+                if (option.StartTime >= range.End || option.StartTime + option.Duration.Value <= range.Start)
                 {
                     continue;
                 }

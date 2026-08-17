@@ -48,7 +48,6 @@ public sealed class Poll : AggregateRoot
         Id = id;
         OrganizerId = organizerId;
         Title = details.Title;
-        Duration = details.Duration;
         Platform = details.Platform;
         Game = details.Game;
         Notes = details.Notes;
@@ -67,8 +66,6 @@ public sealed class Poll : AggregateRoot
     public UserId OrganizerId { get; private set; }
 
     public SessionTitle Title { get; private set; }
-
-    public Duration15 Duration { get; private set; }
 
     public Platform Platform { get; private set; }
 
@@ -111,7 +108,7 @@ public sealed class Poll : AggregateRoot
     public bool IsRetainedInHistory => Status == PollStatus.Finalized;
 
     public PollDetails Details =>
-        new(Title, Duration, Platform, Game, Notes, MinAttendance, MaxCapacity, Visibility);
+        new(Title, Platform, Game, Notes, MinAttendance, MaxCapacity, Visibility);
 
     public IReadOnlyList<PollOption> Options => _options;
 
@@ -137,7 +134,7 @@ public sealed class Poll : AggregateRoot
 
     /// <summary>
     /// Creation (spec §7.3). At least two distinct candidate instants are required (D-131) and
-    /// identical ones merge on the way in (D-080); a public poll needs at least one directly
+    /// identical ones merge on the way in, first spec wins (D-080/D-211); a public poll needs at least one directly
     /// invited registered friend (D-125) and a Groups poll at least one targeted friend group
     /// (D-201) — the friendship and group-authority checks themselves are application-layer — while
     /// a private poll may be guest-only. The organizer holds a participant row from creation (§6.1).
@@ -146,13 +143,13 @@ public sealed class Poll : AggregateRoot
         UserId organizerId,
         PollDetails details,
         PollDeadlineChoice deadlineChoice,
-        IReadOnlyCollection<Instant> optionStartTimes,
+        IReadOnlyCollection<PollOptionSpec> options,
         IReadOnlyCollection<UserId> invitees,
         IClock clock,
         IReadOnlyCollection<FriendGroupId>? audienceGroupIds = null)
     {
         ArgumentNullException.ThrowIfNull(details);
-        ArgumentNullException.ThrowIfNull(optionStartTimes);
+        ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(invitees);
         ArgumentNullException.ThrowIfNull(clock);
 
@@ -192,16 +189,16 @@ public sealed class Poll : AggregateRoot
 
         poll._participants.Add(PollParticipant.Organizer(poll.Id, organizerId, now));
 
-        foreach (Instant startTime in optionStartTimes)
+        foreach (PollOptionSpec spec in options)
         {
-            PollOptionWindow.Require(startTime, now);
+            PollOptionWindow.Require(spec.StartTime, now);
 
-            if (poll._options.Exists(o => o.StartTime == startTime))
+            if (poll._options.Exists(o => o.StartTime == spec.StartTime))
             {
                 continue;
             }
 
-            poll._options.Add(PollOption.Create(poll.Id, startTime, organizer, now));
+            poll._options.Add(PollOption.Create(poll.Id, spec.StartTime, spec.Duration, organizer, now));
         }
 
         if (poll._options.Count < MinimumInitialOptions)
@@ -386,8 +383,10 @@ public sealed class Poll : AggregateRoot
     /// (D-080) — and only a genuinely new instant meets the cap (D-171). D-185: suggesting also
     /// records the suggester's own Available vote on the resulting option, overwriting any prior
     /// vote there — this applies on the dedup path too, not only to newly created options.
+    /// D-211: the suggester also picks the option's own length; on the merge path the existing
+    /// option keeps the length it was created with, because an option's identity is its start.
     /// </summary>
-    public PollOption SuggestOption(ParticipantRef suggester, Instant startTime, IClock clock)
+    public PollOption SuggestOption(ParticipantRef suggester, Instant startTime, Duration15 duration, IClock clock)
     {
         ArgumentNullException.ThrowIfNull(clock);
 
@@ -411,7 +410,7 @@ public sealed class Poll : AggregateRoot
                     $"This poll already holds the maximum of {MaximumOptions} distinct options (D-171)."));
         }
 
-        PollOption option = PollOption.Create(Id, startTime, suggester, now);
+        PollOption option = PollOption.Create(Id, startTime, duration, suggester, now);
         _options.Add(option);
         CastVote(suggester, option.Id, VoteChoice.Available, now, row);
         Raise(new PollOptionSuggested(Id, option.Id, suggester));
@@ -674,7 +673,8 @@ public sealed class Poll : AggregateRoot
                     $"Voting closes at {Deadline}; before then only an option already holding {MinAttendance} available can be selected (D-187)."));
         }
 
-        Instant endTime = option.StartTime + Duration.Value;
+        // D-211: the winning option's own length settles the session's window.
+        Instant endTime = option.StartTime + option.Duration.Value;
 
         // D-153: an ended option settles immediately as Completed or Expired; anything else — future
         // or in progress — goes through the normal confirmation evaluation.
@@ -685,7 +685,7 @@ public sealed class Poll : AggregateRoot
         Session session = Session.FromPollFinalization(
             Id,
             OrganizerId,
-            Details.ForStartTime(option.StartTime),
+            Details.ForOption(option.StartTime, option.Duration),
             roster,
             initialStatus,
             clock,

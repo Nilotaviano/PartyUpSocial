@@ -56,7 +56,6 @@ internal static class TestPolls
     internal static PollDetails Details(
         int minAttendance = 2,
         int? maxCapacity = null,
-        int durationMinutes = DefaultDurationMinutes,
         ContentVisibility visibility = ContentVisibility.Public,
         string title = "Raid night",
         Platform platform = Platform.NotApplicable,
@@ -64,7 +63,6 @@ internal static class TestPolls
         string? notes = null) =>
         new(
             SessionTitle.Create(title),
-            Duration15.FromMinutes(durationMinutes),
             platform,
             game is null ? null : SessionGame.FreeText(GameName.Create(game)),
             notes is null ? SessionNotes.Empty : SessionNotes.Create(notes),
@@ -80,16 +78,17 @@ internal static class TestPolls
         int? maxCapacity = null,
         int durationMinutes = DefaultDurationMinutes,
         PollDeadlineChoice deadlineChoice = PollDeadlineChoice.Hours24,
-        IReadOnlyCollection<Instant>? optionStartTimes = null)
+        IReadOnlyCollection<Instant>? optionStartTimes = null,
+        IReadOnlyCollection<PollOptionSpec>? optionSpecs = null)
     {
         UserId organizer = UserId.New();
         UserId[] invitees = [.. Enumerable.Range(0, inviteeCount).Select(_ => UserId.New())];
 
         Poll poll = Poll.Create(
             organizer,
-            Details(minAttendance, maxCapacity, durationMinutes),
+            Details(minAttendance, maxCapacity),
             deadlineChoice,
-            optionStartTimes ?? [Hours(72), Hours(96)],
+            optionSpecs ?? Specs(optionStartTimes, durationMinutes),
             invitees,
             clock);
 
@@ -109,10 +108,22 @@ internal static class TestPolls
             organizer,
             Details(minAttendance, maxCapacity, visibility: ContentVisibility.Private),
             PollDeadlineChoice.Hours24,
-            optionStartTimes ?? [Hours(72), Hours(96)],
+            Specs(optionStartTimes, DefaultDurationMinutes),
             [],
             clock);
 
         return new PollUnderTest(poll, organizer, []);
     }
+
+    /// <summary>D-211: the same length on every candidate, which is what a start-times-only test means.</summary>
+    internal static PollOptionSpec[] Specs(
+        IReadOnlyCollection<Instant>? startTimes,
+        int durationMinutes = DefaultDurationMinutes) =>
+        [.. (startTimes ?? [Hours(72), Hours(96)])
+            .Select(start => new PollOptionSpec(start, Duration15.FromMinutes(durationMinutes)))];
+
+    internal static PollOptionSpec Spec(Instant startTime, int durationMinutes = DefaultDurationMinutes) =>
+        new(startTime, Duration15.FromMinutes(durationMinutes));
+
+    internal static Duration15 DefaultDuration => Duration15.FromMinutes(DefaultDurationMinutes);
 }

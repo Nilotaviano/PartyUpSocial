@@ -679,7 +679,6 @@ internal sealed class NotificationFixture
     {
         PollDetails details = new(
             SessionTitle.Create("Raid poll"),
-            Duration15.FromMinutes(120),
             Platform.NotApplicable,
             null,
             SessionNotes.Empty,
@@ -692,7 +691,7 @@ internal sealed class NotificationFixture
             organizerId,
             details,
             PollDeadlineChoice.Hours24,
-            [now + Duration.FromHours(6), now + Duration.FromHours(7)],
+            PollSpecs.Of(now + Duration.FromHours(6), now + Duration.FromHours(7)),
             invitees ?? [],
             Clock);
         poll.DequeueEvents();

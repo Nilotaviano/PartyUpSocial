@@ -748,7 +748,6 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
                 organizerId,
                 new PollDetails(
                     SessionTitle.Create("Blocked-counterpart preview fixture"),
-                    Duration15.FromMinutes(60),
                     Platform.NotApplicable,
                     null,
                     SessionNotes.Empty,
@@ -756,10 +755,9 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
                     maxCapacity: null,
                     visibility: ContentVisibility.Public),
                 PollDeadlineChoice.Hours24,
-                [
+                PollSpecs.Of(
                     _factory.Clock.GetCurrentInstant() + Duration.FromDays(1),
-                    _factory.Clock.GetCurrentInstant() + Duration.FromDays(2),
-                ],
+                    _factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
                 [blockedFriendId],
                 _factory.Clock);
             _ = poll.DequeueEvents();

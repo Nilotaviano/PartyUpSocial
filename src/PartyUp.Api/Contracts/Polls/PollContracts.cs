@@ -105,7 +105,7 @@ public sealed record CreatePollRequest(
     int? GuestLinkCount);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record SuggestPollOptionRequest(string? StartTime);
+public sealed record SuggestPollOptionRequest(string? StartTime, int? DurationMinutes);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record VoteOnPollOptionRequest(string? Choice);
@@ -124,6 +124,8 @@ public sealed record InvitePollUsersRequest(IReadOnlyList<Guid> UserIds);
 public sealed record PollOptionResponse(
     Guid Id,
     string StartTime,
+    // D-211: this option's own length; the poll carries none.
+    int DurationMinutes,
     // D-076: a masked-for-viewer suggester's user id is absent, matching PollRosterEntryResponse.UserId's
     // own JsonIgnore mechanics.
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? SuggestedByUserId,
@@ -147,6 +149,7 @@ public sealed record PollOptionResponse(
         new(
             entry.Id.Value,
             SessionWireFormat.Format(entry.StartTime),
+            entry.Duration.TotalMinutes,
             // The roster already masks a blocked-pair suggester's identity; this is a second wire
             // channel that must agree with it.
             entry.SuggestedByMasked ? null : entry.SuggestedBy.UserId?.Value,
@@ -190,7 +193,6 @@ public sealed record PollDetailResponse(
     Guid Id,
     Guid OrganizerId,
     string Title,
-    int DurationMinutes,
     string Platform,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] GameResponse? Game,
     string Notes,
@@ -215,7 +217,6 @@ public sealed record PollDetailResponse(
             detail.Id.Value,
             detail.OrganizerId.Value,
             detail.Title.Value,
-            detail.Duration.TotalMinutes,
             SessionWireFormat.Platform(detail.Platform),
             detail.Game is { } game ? GameResponse.From(game) : null,
             detail.Notes.Value,

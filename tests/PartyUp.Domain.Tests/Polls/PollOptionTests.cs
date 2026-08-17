@@ -13,7 +13,7 @@ public class PollOptionTests
         FakeClock clock = TestPolls.Clock();
         PollUnderTest fixture = TestPolls.New(clock);
 
-        PollOption option = fixture.Poll.SuggestOption(fixture.InviteeRef(0), TestPolls.Hours(80), clock);
+        PollOption option = fixture.Poll.SuggestOption(fixture.InviteeRef(0), TestPolls.Hours(80), TestPolls.DefaultDuration, clock);
 
         Assert.Equal(3, fixture.Poll.Options.Count);
         Assert.True(option.WasSuggestedBy(fixture.InviteeRef(0)));
@@ -26,7 +26,7 @@ public class PollOptionTests
         PollUnderTest fixture = TestPolls.New(clock);
         fixture.Drain();
 
-        fixture.Poll.SuggestOption(fixture.InviteeRef(0), TestPolls.Hours(80), clock);
+        fixture.Poll.SuggestOption(fixture.InviteeRef(0), TestPolls.Hours(80), TestPolls.DefaultDuration, clock);
 
         PollOptionSuggested suggested = Assert.Single(fixture.Drain().OfType<PollOptionSuggested>());
         Assert.Equal(fixture.InviteeRef(0), suggested.SuggestedBy);
@@ -39,7 +39,7 @@ public class PollOptionTests
         PollUnderTest fixture = TestPolls.GuestOnly(clock);
         (_, ParticipantRef guest) = PollGuests.Claim(fixture.Poll, clock, "Robin");
 
-        PollOption option = fixture.Poll.SuggestOption(guest, TestPolls.Hours(80), clock);
+        PollOption option = fixture.Poll.SuggestOption(guest, TestPolls.Hours(80), TestPolls.DefaultDuration, clock);
 
         Assert.True(option.SuggestedBy.IsGuest);
         Assert.True(option.WasSuggestedBy(guest));
@@ -53,7 +53,7 @@ public class PollOptionTests
         PollOption existing = fixture.Option(0);
         fixture.Drain();
 
-        PollOption merged = fixture.Poll.SuggestOption(fixture.InviteeRef(0), existing.StartTime, clock);
+        PollOption merged = fixture.Poll.SuggestOption(fixture.InviteeRef(0), existing.StartTime, TestPolls.DefaultDuration, clock);
 
         Assert.Equal(existing.Id, merged.Id);
         Assert.Equal(2, fixture.Poll.Options.Count);
@@ -67,7 +67,7 @@ public class PollOptionTests
         Instant[] twelve = [.. Enumerable.Range(1, 12).Select(TestPolls.Hours)];
         PollUnderTest fixture = TestPolls.New(clock, optionStartTimes: twelve);
 
-        PollOption merged = fixture.Poll.SuggestOption(fixture.InviteeRef(0), TestPolls.Hours(1), clock);
+        PollOption merged = fixture.Poll.SuggestOption(fixture.InviteeRef(0), TestPolls.Hours(1), TestPolls.DefaultDuration, clock);
 
         Assert.Equal(fixture.Option(0).Id, merged.Id);
         Assert.Equal(Poll.MaximumOptions, fixture.Poll.Options.Count);
@@ -81,7 +81,7 @@ public class PollOptionTests
         PollUnderTest fixture = TestPolls.New(clock, optionStartTimes: twelve);
 
         DomainException error = Assert.Throws<DomainException>(
-            () => fixture.Poll.SuggestOption(fixture.InviteeRef(0), TestPolls.Hours(13), clock));
+            () => fixture.Poll.SuggestOption(fixture.InviteeRef(0), TestPolls.Hours(13), TestPolls.DefaultDuration, clock));
 
         Assert.Equal(DomainError.LimitExceeded, error.Error);
         Assert.Equal(Poll.MaximumOptions, fixture.Poll.Options.Count);
@@ -94,7 +94,7 @@ public class PollOptionTests
         Instant[] eleven = [.. Enumerable.Range(1, 11).Select(TestPolls.Hours)];
         PollUnderTest fixture = TestPolls.New(clock, optionStartTimes: eleven);
 
-        fixture.Poll.SuggestOption(fixture.InviteeRef(0), TestPolls.Hours(13), clock);
+        fixture.Poll.SuggestOption(fixture.InviteeRef(0), TestPolls.Hours(13), TestPolls.DefaultDuration, clock);
 
         Assert.Equal(Poll.MaximumOptions, fixture.Poll.Options.Count);
     }
@@ -107,7 +107,7 @@ public class PollOptionTests
 
         DomainException error = Assert.Throws<DomainException>(
             () => fixture.Poll.SuggestOption(
-                fixture.InviteeRef(0), TestPolls.Origin + Duration.FromDays(366), clock));
+                fixture.InviteeRef(0), TestPolls.Origin + Duration.FromDays(366), TestPolls.DefaultDuration, clock));
 
         Assert.Equal(DomainError.ValidationFailed, error.Error);
     }
@@ -120,7 +120,7 @@ public class PollOptionTests
         FakeClock late = TestPolls.At(TestPolls.DefaultDeadline);
 
         DomainException error = Assert.Throws<DomainException>(
-            () => fixture.Poll.SuggestOption(fixture.InviteeRef(0), TestPolls.Hours(80), late));
+            () => fixture.Poll.SuggestOption(fixture.InviteeRef(0), TestPolls.Hours(80), TestPolls.DefaultDuration, late));
 
         Assert.Equal(DomainError.WindowClosed, error.Error);
         Assert.Equal(PollStatus.Polling, fixture.Poll.Status);
@@ -135,7 +135,7 @@ public class PollOptionTests
         fixture.Poll.ApplyDueTransitions(closed);
 
         DomainException error = Assert.Throws<DomainException>(
-            () => fixture.Poll.SuggestOption(fixture.InviteeRef(0), TestPolls.Hours(80), closed));
+            () => fixture.Poll.SuggestOption(fixture.InviteeRef(0), TestPolls.Hours(80), TestPolls.DefaultDuration, closed));
 
         Assert.Equal(DomainError.WindowClosed, error.Error);
     }
@@ -147,7 +147,7 @@ public class PollOptionTests
         PollUnderTest fixture = TestPolls.New(clock);
 
         DomainException error = Assert.Throws<DomainException>(
-            () => fixture.Poll.SuggestOption(ParticipantRef.ForUser(UserId.New()), TestPolls.Hours(80), clock));
+            () => fixture.Poll.SuggestOption(ParticipantRef.ForUser(UserId.New()), TestPolls.Hours(80), TestPolls.DefaultDuration, clock));
 
         Assert.Equal(DomainError.NotFound, error.Error);
     }
@@ -160,7 +160,7 @@ public class PollOptionTests
         fixture.Poll.RemoveParticipant(fixture.InviteeRef(0), clock);
 
         DomainException error = Assert.Throws<DomainException>(
-            () => fixture.Poll.SuggestOption(fixture.InviteeRef(0), TestPolls.Hours(80), clock));
+            () => fixture.Poll.SuggestOption(fixture.InviteeRef(0), TestPolls.Hours(80), TestPolls.DefaultDuration, clock));
 
         Assert.Equal(DomainError.RemovalIsPermanent, error.Error);
     }

@@ -95,7 +95,6 @@ public sealed class PollLeaveUseCaseTests
             organizerId,
             new PollDetails(
                 SessionTitle.Create("Raid poll"),
-                Duration15.FromMinutes(60),
                 Platform.NotApplicable,
                 null,
                 SessionNotes.Empty,
@@ -103,7 +102,7 @@ public sealed class PollLeaveUseCaseTests
                 maxCapacity: null,
                 visibility: ContentVisibility.Public),
             PollDeadlineChoice.Hours24,
-            [clock.GetCurrentInstant() + Duration.FromHours(5), clock.GetCurrentInstant() + Duration.FromHours(6)],
+            PollSpecs.Of(clock.GetCurrentInstant() + Duration.FromHours(5), clock.GetCurrentInstant() + Duration.FromHours(6)),
             [inviteeId],
             clock);
 }

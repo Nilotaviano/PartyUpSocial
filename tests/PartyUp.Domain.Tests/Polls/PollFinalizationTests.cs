@@ -22,7 +22,7 @@ public class PollFinalizationTests
             UserId.New(),
             TestPolls.Details(minAttendance: 1, visibility: ContentVisibility.Groups),
             PollDeadlineChoice.Hours24,
-            [TestPolls.Hours(72), TestPolls.Hours(96)],
+            TestPolls.Specs([TestPolls.Hours(72), TestPolls.Hours(96)]),
             [],
             clock,
             audienceGroupIds: [groupA, groupB]);
@@ -734,7 +734,7 @@ public class PollFinalizationTests
             organizer,
             TestPolls.Details(minAttendance: 3, maxCapacity: 3),
             PollDeadlineChoice.Hours24,
-            [TestPolls.Hours(72), TestPolls.Hours(96)],
+            TestPolls.Specs([TestPolls.Hours(72), TestPolls.Hours(96)]),
             invitees,
             clock);
 }

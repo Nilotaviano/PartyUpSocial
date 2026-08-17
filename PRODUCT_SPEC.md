@@ -141,13 +141,13 @@ Availability uses specific time blocks and is visible to all friends in the init
 
 ### 7.3 Poll multiple candidate times
 
-1. An organizer supplies the eventual session details, creates a poll containing multiple possible start times, and chooses a 6-, 12-, 24-, or 48-hour voting deadline. Candidate options vary only by start time and share the poll's duration and other session details.
+1. An organizer supplies the eventual session details, creates a poll containing multiple possible start times, and chooses a 6-, 12-, 24-, or 48-hour voting deadline. Each candidate option carries its own start time **and its own duration**; every other eventual session detail is shared across the options (D-211).
    The default deadline is 24 hours and at least two initial options are required. Candidate times are not required to occur after the voting deadline.
 2. Registered or guest invitees mark each option **Available**, **Maybe**, or **Unavailable**. Voters can suggest additional times.
    Suggested times become poll options immediately without organizer approval.
 3. Identical date-times are deduplicated and a poll can contain at most 12 options. Suggesting an option beyond the limit fails with a clear error. The organizer can delete any option without notifying its voters.
 4. Voting closes at the deadline and waits for the organizer to select an option; there is no automatic winner. If no option is selected within 48 hours after the deadline, the poll expires and its registered participants are notified.
-5. The selected option becomes the session's fixed start time. Available voters become Going, Maybe voters remain Maybe, and Unavailable voters become Declined, except that the organizer becomes Going regardless of their vote.
+5. The selected option becomes the session's fixed start time, and its own duration becomes the session's duration (D-211). Available voters become Going, Maybe voters remain Maybe, and Unavailable voters become Declined, except that the organizer becomes Going regardless of their vote.
 
 Candidate options remain visible and selectable after their start times pass. A poll does not expire early when every option has passed; its normal voting deadline and 48-hour organizer-selection window still apply.
 
@@ -187,7 +187,7 @@ Confirmed:
 - Poll finalization allocates capacity to the organizer first, then Available voters by response time, then Maybe voters by response time; overflow is waitlisted with matching attendance status. Response time is the timestamp of the voter's first submitted poll response and is not changed by later revisions.
 - Voter-suggested times become poll options immediately without organizer approval.
 - Choosing a poll option maps Available to Going, Maybe to Maybe, and Unavailable to Declined. The organizer is the exception and becomes Going regardless of their vote.
-- A poll carries the eventual session's title, duration, platform, optional game, optional notes, minimum attendance, optional maximum capacity, and privacy. Its candidate options vary only by start time.
+- A poll carries the eventual session's title, platform, optional game, optional notes, minimum attendance, optional maximum capacity, and privacy. Its candidate options vary by start time and by duration, and the selected option's duration becomes the session's. (amended for D-211)
 - Finalizing an option that has started but not ended creates an in-progress session. Finalizing one that has ended immediately produces Completed when its mapped Going count meets minimum or Expired otherwise.
 - Availability recommendations default to the next seven days, accept a custom date/time range, return all continuous full and partial overlap windows, rank first by the number Available, and use the number Maybe to break ties. Duration is not an input and every selected friend is optional.
 - Overlapping availability blocks are merged visually and algorithmically into continuous intervals.
@@ -620,7 +620,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-128 | Usernames are case-insensitive and changeable once every 30 days; old profile links stop while stable friend codes persist. | Confirmed |
 | D-129 | Fixed-session defaults are minimum 4, maximum 4, two hours, N/A platform, and **public** visibility (D-198's three-level `Public \| Private \| Groups`). (amended for D-198) | Confirmed |
 | D-130 | Sessions start at least 15 minutes and at most one year in the future. | Confirmed |
-| D-131 | Polls default to 24 hours, require two initial options, and may contain options before the deadline. | Confirmed |
+| D-131 | Polls default to 24 hours, require two initial options, and may contain options before the deadline. Each initial option also carries its own duration (D-211). | Confirmed |
 | D-132 | Availability is selected on a week calendar in 15-minute increments with one-time or weekly recurrence. | Confirmed |
 | D-133 | Weekly availability continues until deleted. | Confirmed |
 | D-134 | Recurring-occurrence edits expose a checkbox to apply the change to one occurrence or the series. | Confirmed |
@@ -631,7 +631,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-139 | The responsive web release targets WCAG 2.2 Level AA. | Confirmed |
 | D-140 | Elapsed poll options remain visible and selectable, and a poll does not expire early merely because all options have passed. | Confirmed |
 | D-141 | Minimum attendance is an integer of at least 1; maximum is blank for unlimited or an integer at least equal to minimum. | Confirmed |
-| D-142 | Sessions last 15 minutes to 24 hours in 15-minute increments. | Confirmed |
+| D-142 | Sessions last 15 minutes to 24 hours in 15-minute increments. The same bounds apply to each poll candidate option's own duration (D-211). | Confirmed |
 | D-143 | Recurring-availability edits default to one occurrence; an explicit checkbox applies the edit to that occurrence and all future occurrences. | Confirmed |
 | D-144 | QR codes use the stable friend code rather than a username-based profile link. | Confirmed |
 | D-145 | A former username is reserved for 30 days after a change. | Confirmed |
@@ -643,7 +643,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-151 | Primary launch measures are confirmation and 30-day repeat scheduling, each with a provisional 50% target. | Confirmed |
 | D-152 | Users cannot save custom session-creation defaults in the initial release. | Confirmed |
 | D-153 | Finalizing a started poll option creates an in-progress session; finalizing an ended option immediately produces Completed or Expired according to its mapped Going count. | Confirmed |
-| D-154 | Polls collect all eventual session details up front, and candidate options vary only by start time. | Confirmed |
+| D-154 | Polls collect all eventual session details up front, and candidate options vary only by start time. **Amended by D-211:** options also vary by duration, and the poll itself no longer carries one. | Confirmed |
 | D-155 | Organizers vote on poll options like other voters but become Going when an option is finalized. | Confirmed |
 | D-156 | Organizers can cancel unconfirmed, Confirmed, in-progress, or Completed sessions and can cancel polls before finalization. | Confirmed |
 | D-157 | “Delete a previously Confirmed session” means Cancel; there is no separate session Delete action. | Clarified |
@@ -700,6 +700,7 @@ Every feature labeled **initial release**, **initial web product**, or **web MVP
 | D-208 | Friend-group caps, app-checked under lock: 50 groups owned per user (creation locks the owner's `users` row before counting) and 100 membership rows per group, counting both `Invited` and `Accepted` (invite/accept lock the group row before counting, the session-RSVP idiom). The owner is never counted toward the 100-row cap — they are an implicit member with no row. | Confirmed |
 | D-209 | Account deletion execution (§11) and D-180's admin content removal hard-delete every friend group the subject owns (full cascade, D-199) and every membership row — `Invited` and `Accepted` — the subject holds in others' groups, in the same executor pass as the D-092/D-180 effects they already run. | Confirmed |
 | D-210 | Because friend-group membership survives unfriending (D-200), the unfriend flow shows the acting user, and only them, which of their groups the unfriended person remains in, with an optional one-tap "also remove from my groups" action. Backend unfriend behavior is unchanged; this is actor-side presentation only. | Confirmed |
+| D-211 | Each poll candidate option carries its **own duration**, bounded by D-142 (15 minutes to 24 hours, 15-minute steps) per option; the poll itself carries no duration. Finalization gives the created session the winning option's duration, and an option's end time stays derived from its start plus its own duration, never stored. Deduplication is unchanged and still keyed on the start instant alone (D-080): an identical instant merges into the existing option and keeps the duration already recorded there. (ratified 2026-08-17) | Confirmed |
 
 ## 15. Open questions
 
