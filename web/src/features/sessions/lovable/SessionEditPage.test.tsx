@@ -75,14 +75,17 @@ function renderPage() {
 // already 2+ chars) through this same mocked `client.GET`. Dispatching by
 // path keeps those calls from consuming the session-detail response queue
 // tests below rely on (`mockResolvedValueOnce` chains, call-count asserts).
-function mockSessionDetail(next: (call: number) => unknown) {
+function mockSessionDetail(
+  next: (call: number) => unknown,
+  groupList: unknown = { owned: [], memberOf: [], invites: [] },
+) {
   let call = 0
   api.get.mockImplementation((path: string) => {
     if (path === '/api/v1/steam-catalog') {
       return Promise.resolve({ data: { catalogAvailable: false, results: [] } })
     }
     if (path === '/api/v1/friend-groups') {
-      return Promise.resolve({ data: { owned: [], memberOf: [], invites: [] } })
+      return Promise.resolve({ data: groupList })
     }
     call += 1
     return Promise.resolve({ data: next(call) })
@@ -421,5 +424,63 @@ describe('SessionEditPage (lovable)', () => {
     dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Discard' }))
     expect(navigate).toHaveBeenCalledWith('/sessions/session-1')
+  })
+
+  it('prefills the audience chips from audienceGroups, including a masked left-group entry_D201_D206', async () => {
+    mockSessionDetail(
+      () =>
+        detail({
+          visibility: 'groups',
+          sharedWithGroup: true,
+          audienceGroups: [
+            { id: 'g1', name: 'Study Group' },
+            { id: 'g2' },
+          ],
+        }),
+      { owned: [{ id: 'g1', name: 'Study Group' }], memberOf: [], invites: [] },
+    )
+    renderPage()
+
+    const groupsRadio = await screen.findByRole('radio', { name: 'Groups' })
+    expect(groupsRadio).toHaveAttribute('aria-checked', 'true')
+
+    const liveChip = await screen.findByRole('button', { name: /Study Group/ })
+    expect(liveChip).toHaveAttribute('aria-pressed', 'true')
+
+    const maskedChip = await screen.findByRole('button', { name: /a group you left/ })
+    expect(maskedChip).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('removing the masked chip and saving sends only the remaining ids_D203', async () => {
+    mockSessionDetail(
+      () =>
+        detail({
+          visibility: 'groups',
+          sharedWithGroup: true,
+          audienceGroups: [
+            { id: 'g1', name: 'Study Group' },
+            { id: 'g2' },
+          ],
+        }),
+      { owned: [{ id: 'g1', name: 'Study Group' }], memberOf: [], invites: [] },
+    )
+    api.patch.mockResolvedValue({ data: detail() })
+    renderPage()
+
+    const maskedChip = await screen.findByRole('button', { name: /a group you left/ })
+    fireEvent.click(maskedChip)
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith(
+        '/api/v1/sessions/{sessionId}',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            visibility: 'groups',
+            audienceGroupIds: ['g1'],
+          }),
+        }),
+      ),
+    )
   })
 })

@@ -125,7 +125,8 @@
     "visibleTo": "Visible para miembros de",
     "selectedCount_one": "{{count}} seleccionado",
     "selectedCount_other": "{{count}} seleccionados",
-    "pickAtLeastOne": "Elige al menos un grupo."
+    "pickAtLeastOne": "Elige al menos un grupo.",
+    "maskedGroup": "un grupo que dejaste"
   },
   "shareTag": {
     "via": "vía {{name}}",

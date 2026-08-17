@@ -62,14 +62,15 @@ function formFrom(session: SessionDetail) {
     notes: session.notes,
     minAttendance: String(session.minAttendance),
     maxCapacity: session.maxCapacity === null ? '' : String(session.maxCapacity),
-    // The read model carries the viewer's own grant (`viaGroup`) and a neutral
-    // `sharedWithGroup` flag (D-206), never the session's full audience-group
-    // list — there is no read surface for that (mobile-clean contract). The
-    // control below is seeded from `visibility` alone; touching it starts a
-    // fresh group pick (`visibilityTouched`) rather than pretending to know
-    // the current audience.
+    // D-201: the organizer's own detail read carries `audienceGroups` (id +
+    // live name, name absent for a group the organizer has since left —
+    // D-206 retained targeting), so the picker preselects the actual current
+    // audience rather than starting the organizer from a blank pick.
+    // `visibilityTouched` still gates whether visibility/audience are sent
+    // at all (A-070-style omit-when-unchanged PATCH body), it just no longer
+    // needs to also mean "the prefill was thrown away."
     visibility: session.visibility as Visibility,
-    audienceGroupIds: [] as string[],
+    audienceGroupIds: (session.audienceGroups ?? []).map((group) => group.id),
     visibilityTouched: false,
     // The single unlimited-capacity control (A-070): pre-checked when the
     // session already has no maximum, mapped onto the PATCH `clear` list
@@ -107,6 +108,27 @@ export function SessionEditPage() {
     ...(groupList.data?.owned ?? []),
     ...(groupList.data?.memberOf ?? []),
   ].map((group) => ({ id: group.id, name: group.name }))
+
+  // D-206: a prefilled audience id the organizer no longer owns/holds an
+  // Accepted row in (its `name` came back absent) has no entry in
+  // `targetableGroups` at all — folded in here as a masked chip so the
+  // organizer still sees and can remove it, rather than it silently
+  // vanishing from the picker while staying selected underneath.
+  const maskedGroupIds = new Set(
+    (detail.data?.audienceGroups ?? [])
+      .filter((group) => group.name == null)
+      .map((group) => group.id),
+  )
+  const pickerGroups = [
+    ...targetableGroups,
+    ...[...maskedGroupIds]
+      .filter((id) => !targetableGroups.some((group) => group.id === id))
+      .map((id) => ({
+        id,
+        name: t('visibilityControl.maskedGroup', { ns: 'groups' }),
+        masked: true,
+      })),
+  ]
 
   useDirtyGuard(dirty, {
     onBlockedNavigation: (target) => {
@@ -358,7 +380,7 @@ export function SessionEditPage() {
 
               <div id="field-visibility">
                 <VisibilityControl
-                  groups={targetableGroups}
+                  groups={pickerGroups}
                   selectedGroupIds={form.audienceGroupIds}
                   value={form.visibility}
                   onChange={(visibility) => {

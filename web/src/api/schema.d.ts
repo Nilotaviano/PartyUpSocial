@@ -2143,6 +2143,11 @@ export interface components {
         AntiforgeryTokenResponse: {
             token: string;
         };
+        AudienceGroupResponse: {
+            /** Format: uuid */
+            id: string;
+            name: null | string;
+        };
         AuthMethodResponse: {
             kind: string;
             linked: boolean;
@@ -2990,6 +2995,7 @@ export interface components {
             roster: components["schemas"]["RosterEntryResponse"][];
             version: string;
             muted: boolean;
+            audienceGroups: null | components["schemas"]["AudienceGroupResponse"][];
         };
         SessionPageResponseOfJoinRequestViewResponse: {
             items: components["schemas"]["JoinRequestViewResponse"][];

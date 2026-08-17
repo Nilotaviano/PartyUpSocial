@@ -5,6 +5,7 @@ import { client, isApiError } from '../../api/client'
 export type ViewerProfile = components['schemas']['MyProfileResponse']
 export type SessionSummary = components['schemas']['SessionSummaryResponse']
 export type SessionDetail = components['schemas']['SessionDetailResponse']
+export type AudienceGroupEntry = components['schemas']['AudienceGroupResponse']
 export type RosterEntry = components['schemas']['RosterEntryResponse']
 export type JoinRequestView = components['schemas']['JoinRequestViewResponse']
 export type ParticipationView =

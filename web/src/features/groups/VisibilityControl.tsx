@@ -17,10 +17,16 @@ import { cn } from '../availability/lovable/utils'
  * (D-201). The zero-selection state renders a destructive hint inline
  * (`errorMessage`) in addition to whatever the caller's own field-error
  * machinery surfaces above the control.
+ *
+ * A `masked` option (D-206: the session-edit prefill's retained-targeting
+ * entry for a group the organizer has since left) renders as a dashed,
+ * lower-emphasis chip carrying its caller-supplied placeholder label
+ * instead of a real group name — still toggleable like any other chip, so
+ * the organizer can keep or explicitly remove it on save.
  */
 
 export type Visibility = 'private' | 'groups' | 'public'
-export type VisibilityGroupOption = { id: string; name: string }
+export type VisibilityGroupOption = { id: string; name: string; masked?: boolean }
 
 export function VisibilityControl({
   value,
@@ -88,7 +94,12 @@ export function VisibilityControl({
                     aria-pressed={on}
                     className={cn(
                       'inline-flex h-11 items-center gap-1.5 rounded-xl border-2 px-3 font-display text-[12.5px] font-bold',
-                      on ? 'border-primary bg-primary/15 text-ink' : 'border-ink bg-muted text-ink-soft',
+                      group.masked && 'border-dashed italic',
+                      on
+                        ? 'border-primary bg-primary/15 text-ink'
+                        : group.masked
+                          ? 'border-ink-soft bg-muted text-ink-soft'
+                          : 'border-ink bg-muted text-ink-soft',
                     )}
                     id={`${idPrefix}-${group.id}`}
                     type="button"
