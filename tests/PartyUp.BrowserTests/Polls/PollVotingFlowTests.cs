@@ -64,7 +64,7 @@ public sealed class PollVotingFlowTests(PlaywrightFixture fixture)
 
         await organizerPage.Locator("#field-min").FillAsync("1");
         await organizerPage.Locator("#field-max").FillAsync("4");
-        await organizerPage.GetByRole(AriaRole.Radiogroup, new() { Name = "Private poll" })
+        await organizerPage.GetByRole(AriaRole.Radiogroup, new() { Name = "Visibility" })
             .GetByRole(AriaRole.Radio, new() { Name = "Private" }).ClickAsync();
 
         IResponse response = await organizerPage.RunAndWaitForResponseAsync(

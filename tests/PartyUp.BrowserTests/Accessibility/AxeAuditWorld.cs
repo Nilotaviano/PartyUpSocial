@@ -129,7 +129,7 @@ internal static class AxeAuditWorld
             await organizer.Page.Locator("#field-duration").FillAsync("60");
             await organizer.Page.Locator("#field-min").FillAsync("1");
             await organizer.Page.Locator("#field-max").FillAsync("4");
-            await organizer.Page.GetByRole(AriaRole.Radiogroup, new() { Name = "Private session" })
+            await organizer.Page.GetByRole(AriaRole.Radiogroup, new() { Name = "Visibility" })
                 .GetByRole(AriaRole.Radio, new() { Name = "Private" }).ClickAsync();
             await organizer.Page.GetByRole(AriaRole.Button, new() { Name = "Create session" }).ClickAsync();
             await organizer.Page.WaitForURLAsync(url => Regex.IsMatch(url, @"/sessions/[0-9a-fA-F-]{36}$"));
@@ -293,7 +293,7 @@ internal static class AxeAuditWorld
 
         await page.Locator("#field-min").FillAsync("1");
         await page.Locator("#field-max").FillAsync("4");
-        await page.GetByRole(AriaRole.Radiogroup, new() { Name = "Private poll" })
+        await page.GetByRole(AriaRole.Radiogroup, new() { Name = "Visibility" })
             .GetByRole(AriaRole.Radio, new() { Name = "Private" }).ClickAsync();
         await page.Locator("#field-guest-links").FillAsync("1");
         await page.GetByRole(AriaRole.Button, new() { Name = "Create poll" }).ClickAsync();

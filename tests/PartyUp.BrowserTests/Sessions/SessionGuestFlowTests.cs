@@ -63,7 +63,7 @@ public sealed class SessionGuestFlowTests(PlaywrightFixture fixture)
         await organizerPage.Locator("#field-duration").FillAsync("60");
         await organizerPage.Locator("#field-min").FillAsync("1");
         await organizerPage.Locator("#field-max").FillAsync("4");
-        await organizerPage.GetByRole(AriaRole.Radiogroup, new() { Name = "Private session" })
+        await organizerPage.GetByRole(AriaRole.Radiogroup, new() { Name = "Visibility" })
             .GetByRole(AriaRole.Radio, new() { Name = "Private" }).ClickAsync();
 
         IResponse response = await organizerPage.RunAndWaitForResponseAsync(
