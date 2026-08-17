@@ -41,8 +41,21 @@ public sealed record FriendGroupMemberView(
     };
 }
 
-/// <summary>A pending invite the actor holds in someone else's group — name + owner only (D-199).</summary>
-public sealed record FriendGroupInviteSummary(FriendGroupId Id, string Name, UserId OwnerId, Instant InvitedAt);
+/// <summary>
+/// A pending invite the actor holds in someone else's group — name + owner only (D-199).
+/// <see cref="OwnerDisplayName"/>/<see cref="OwnerAvatar"/> route through the same D-076 masking
+/// primitive the detail read uses (<see cref="OwnerMasked"/>); in practice D-202 makes an owner↔member
+/// block impossible for a live invite (it deletes the row outright), so masking never actually fires
+/// here, but the code does not assume that invariant.
+/// </summary>
+public sealed record FriendGroupInviteSummary(
+    FriendGroupId Id,
+    string Name,
+    UserId OwnerId,
+    Instant InvitedAt,
+    DisplayName? OwnerDisplayName = null,
+    Avatar? OwnerAvatar = null,
+    bool OwnerMasked = false);
 
 public sealed record FriendGroupListResult(
     IReadOnlyList<FriendGroupSummary> Owned,
@@ -74,13 +87,20 @@ public sealed record FriendGroupDetail(
 /// </summary>
 public sealed class FriendGroupReadUseCases(IFriendGroupRepository groups, IBlockRepository blocks)
 {
+    /// <summary>
+    /// Owned cards need no owner nameplate (the actor is the owner); member-of and invite cards do, so
+    /// this resolves the owning users' nameplates in one bulk, non-locking prefetch and masks any
+    /// counterpart the VIEWER is blocked with — the same primitives <see cref="GetAsync"/> uses, so a
+    /// "owned by {name}" line and an invite's "{name} invited you" line never diverge from the detail
+    /// page's identity resolution.
+    /// </summary>
     public async Task<FriendGroupListResult> ListMineAsync(UserId actorId, CancellationToken cancellationToken)
     {
         IReadOnlyCollection<FriendGroup> involved = await groups.ListInvolvingAsync(actorId, cancellationToken);
 
         List<FriendGroupSummary> owned = [];
-        List<FriendGroupSummary> memberOf = [];
-        List<FriendGroupInviteSummary> invites = [];
+        List<FriendGroup> memberOfGroups = [];
+        List<(FriendGroup Group, FriendGroupMember Row)> inviteGroups = [];
 
         foreach (FriendGroup group in involved)
         {
@@ -98,15 +118,64 @@ public sealed class FriendGroupReadUseCases(IFriendGroupRepository groups, IBloc
 
             if (row.Status == FriendGroupMemberStatus.Accepted)
             {
-                memberOf.Add(FriendGroupSummary.From(group));
+                memberOfGroups.Add(group);
             }
             else
             {
-                invites.Add(new FriendGroupInviteSummary(group.Id, group.Name.Value, group.OwnerId, row.InvitedAt));
+                inviteGroups.Add((group, row));
             }
         }
 
+        List<UserId> ownerIds = [.. memberOfGroups.Select(group => group.OwnerId), .. inviteGroups.Select(entry => entry.Group.OwnerId)];
+        List<UserId> distinctOwnerIds = [.. ownerIds.Distinct()];
+        IReadOnlyDictionary<Guid, UserNameplate> nameplates = distinctOwnerIds.Count == 0
+            ? new Dictionary<Guid, UserNameplate>()
+            : await groups.FindNameplatesAsync(distinctOwnerIds, cancellationToken);
+        IReadOnlyList<Block> ownerBlocks = distinctOwnerIds.Count == 0
+            ? []
+            : await blocks.FindPairsAmongAsync(actorId, distinctOwnerIds, cancellationToken);
+        HashSet<UserId> blockedOwnerIds =
+            [.. ownerBlocks.Select(block => block.BlockerId == actorId ? block.BlockedId : block.BlockerId)];
+
+        List<FriendGroupSummary> memberOf =
+            [.. memberOfGroups.Select(group => WithOwner(group, nameplates, blockedOwnerIds))];
+        List<FriendGroupInviteSummary> invites =
+            [.. inviteGroups.Select(entry => WithOwnerInvite(entry.Group, entry.Row, nameplates, blockedOwnerIds))];
+
         return new FriendGroupListResult(owned, memberOf, invites);
+    }
+
+    private static FriendGroupSummary WithOwner(
+        FriendGroup group,
+        IReadOnlyDictionary<Guid, UserNameplate> nameplates,
+        HashSet<UserId> blockedOwnerIds)
+    {
+        bool masked = blockedOwnerIds.Contains(group.OwnerId);
+        UserNameplate? nameplate = nameplates.GetValueOrDefault(group.OwnerId.Value);
+        return FriendGroupSummary.From(group) with
+        {
+            OwnerDisplayName = masked ? null : nameplate?.DisplayName,
+            OwnerAvatar = masked ? null : nameplate?.Avatar,
+            OwnerMasked = masked,
+        };
+    }
+
+    private static FriendGroupInviteSummary WithOwnerInvite(
+        FriendGroup group,
+        FriendGroupMember row,
+        IReadOnlyDictionary<Guid, UserNameplate> nameplates,
+        HashSet<UserId> blockedOwnerIds)
+    {
+        bool masked = blockedOwnerIds.Contains(group.OwnerId);
+        UserNameplate? nameplate = nameplates.GetValueOrDefault(group.OwnerId.Value);
+        return new FriendGroupInviteSummary(
+            group.Id,
+            group.Name.Value,
+            group.OwnerId,
+            row.InvitedAt,
+            masked ? null : nameplate?.DisplayName,
+            masked ? null : nameplate?.Avatar,
+            masked);
     }
 
     /// <summary>

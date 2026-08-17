@@ -1,6 +1,7 @@
 using NodaTime;
 using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
+using PartyUp.Domain.Users;
 
 namespace PartyUp.Application.FriendGroups;
 
@@ -16,9 +17,20 @@ public sealed record FriendGroupCommandResult(bool Succeeded, string? Code, Frie
 /// creation time, and the humans-in-group count. <see cref="MemberCount"/> counts the owner (always
 /// implicit, D-198) plus every <c>Accepted</c> row — <c>Invited</c> rows are not yet "in" the group,
 /// so they do not count toward it. Computed off the already-loaded <see cref="FriendGroup.Members"/>
-/// collection, never a separate query.
+/// collection, never a separate query. <see cref="OwnerDisplayName"/>/<see cref="OwnerAvatar"/> are
+/// populated only by the list read (<c>FriendGroupReadUseCases.ListMineAsync</c>) via the same D-076
+/// masking primitive the detail read uses (<see cref="OwnerMasked"/>) — command results (create/rename/
+/// delete) leave them null since the owner is always the actor there.
 /// </summary>
-public sealed record FriendGroupSummary(FriendGroupId Id, string Name, UserId OwnerId, Instant CreatedAt, int MemberCount)
+public sealed record FriendGroupSummary(
+    FriendGroupId Id,
+    string Name,
+    UserId OwnerId,
+    Instant CreatedAt,
+    int MemberCount,
+    DisplayName? OwnerDisplayName = null,
+    Avatar? OwnerAvatar = null,
+    bool OwnerMasked = false)
 {
     internal static FriendGroupSummary From(FriendGroup group) =>
         new(

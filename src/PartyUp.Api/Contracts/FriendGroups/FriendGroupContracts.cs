@@ -20,7 +20,15 @@ public sealed record InviteFriendGroupMembersRequest(IReadOnlyList<Guid> UserIds
 /// list card to render a count/stack with no per-group detail fetch.
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record FriendGroupResponse(Guid Id, string Name, Guid OwnerId, string CreatedAt, int MemberCount)
+public sealed record FriendGroupResponse(
+    Guid Id,
+    string Name,
+    Guid OwnerId,
+    string CreatedAt,
+    int MemberCount,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? OwnerDisplayName,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AvatarResponse? OwnerAvatar,
+    bool OwnerMasked)
 {
     public static FriendGroupResponse From(FriendGroupSummary summary) =>
         new(
@@ -28,15 +36,32 @@ public sealed record FriendGroupResponse(Guid Id, string Name, Guid OwnerId, str
             summary.Name,
             summary.OwnerId.Value,
             InstantPattern.ExtendedIso.Format(summary.CreatedAt),
-            summary.MemberCount);
+            summary.MemberCount,
+            summary.OwnerDisplayName?.Value,
+            summary.OwnerAvatar is { } avatar ? AvatarResponse.From(avatar) : null,
+            summary.OwnerMasked);
 }
 
 /// <summary>A pending invite the actor holds in someone else's group — name + owner only (D-199).</summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record FriendGroupInviteResponse(Guid Id, string Name, Guid OwnerId, string InvitedAt)
+public sealed record FriendGroupInviteResponse(
+    Guid Id,
+    string Name,
+    Guid OwnerId,
+    string InvitedAt,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? OwnerDisplayName,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AvatarResponse? OwnerAvatar,
+    bool OwnerMasked)
 {
     public static FriendGroupInviteResponse From(FriendGroupInviteSummary summary) =>
-        new(summary.Id.Value, summary.Name, summary.OwnerId.Value, InstantPattern.ExtendedIso.Format(summary.InvitedAt));
+        new(
+            summary.Id.Value,
+            summary.Name,
+            summary.OwnerId.Value,
+            InstantPattern.ExtendedIso.Format(summary.InvitedAt),
+            summary.OwnerDisplayName?.Value,
+            summary.OwnerAvatar is { } avatar ? AvatarResponse.From(avatar) : null,
+            summary.OwnerMasked);
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
