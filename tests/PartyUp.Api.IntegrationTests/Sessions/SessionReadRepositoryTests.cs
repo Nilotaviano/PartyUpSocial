@@ -223,10 +223,10 @@ public sealed class SessionReadRepositoryTests : IAsyncLifetime
         await context.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO sessions
                 (id, organizer_id, title, start_time, duration_minutes, platform, notes,
-                 min_attendance, max_capacity, is_private, status, created_at)
+                 min_attendance, max_capacity, visibility, status, created_at)
             VALUES
                 ({id}, {organizerId.Value}, 'Read repository test', {startTime}, 60, 3, '',
-                 1, NULL, true, {status}, now())
+                 1, NULL, 1, {status}, now())
             """);
 
     private static async Task InsertParticipationAsync(

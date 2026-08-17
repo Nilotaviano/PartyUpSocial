@@ -165,7 +165,7 @@ public sealed class PollProblemCodeClosureTests : IAsyncLifetime, IDisposable
                     SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
                     SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
                 },
-                isPrivate = true,
+                visibility = "private",
                 minAttendance = 1,
                 guestLinkCount = 1,
             }));
@@ -411,7 +411,7 @@ public sealed class PollProblemCodeClosureTests : IAsyncLifetime, IDisposable
             {
                 title = "Closure fixture poll",
                 optionStartTimes = times.Select(SessionEndpointTestSupport.Iso).ToArray(),
-                isPrivate = true,
+                visibility = "private",
                 minAttendance = 1,
                 inviteeUserIds = Array.Empty<Guid>(),
             }));
@@ -435,7 +435,7 @@ public sealed class PollProblemCodeClosureTests : IAsyncLifetime, IDisposable
                     SessionEndpointTestSupport.Iso(baseTime),
                     SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)),
                 },
-                isPrivate = inviteeIds.Count == 0,
+                visibility = inviteeIds.Count == 0 ? "private" : "public",
                 minAttendance,
                 inviteeUserIds = inviteeIds.Select(id => id.Value).ToArray(),
             }));

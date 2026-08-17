@@ -38,7 +38,7 @@ public sealed class SessionVersionStampTests : IAsyncLifetime, IDisposable
                 title = "Key-ring session",
                 startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + NodaTime.Duration.FromDays(1)),
                 minAttendance = 1,
-                isPrivate = true,
+                visibility = "private",
             }));
         using var body = await SessionEndpointTestSupport.SuccessJsonAsync(created);
         Guid sessionGuid = body.RootElement.GetProperty("session").GetProperty("id").GetGuid();

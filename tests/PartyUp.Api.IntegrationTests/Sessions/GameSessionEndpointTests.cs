@@ -302,7 +302,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
         Assert.Equal(4, detail.GetProperty("minAttendance").GetInt32());
         Assert.Equal(4, detail.GetProperty("maxCapacity").GetInt32());
         Assert.Equal("notApplicable", detail.GetProperty("platform").GetString());
-        Assert.False(detail.GetProperty("isPrivate").GetBoolean());
+        Assert.Equal("public", detail.GetProperty("visibility").GetString());
 
         // D-130: too close to now.
         HttpResponseMessage tooSoon = await session.SendUnsafeAsync(
@@ -312,7 +312,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
             {
                 title = "Too soon",
                 startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromMinutes(5)),
-                isPrivate = true,
+                visibility = "private",
             }));
         await SessionEndpointTestSupport.AssertProblemAsync(tooSoon, HttpStatusCode.BadRequest, "session_validation");
 
@@ -325,7 +325,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 title = "Bad duration",
                 startTime = SessionEndpointTestSupport.Iso(validStart),
                 durationMinutes = 37,
-                isPrivate = true,
+                visibility = "private",
             }));
         await SessionEndpointTestSupport.AssertProblemAsync(badDuration, HttpStatusCode.BadRequest, "session_validation");
 
@@ -339,7 +339,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 startTime = SessionEndpointTestSupport.Iso(validStart),
                 minAttendance = 3,
                 maxCapacity = 2,
-                isPrivate = true,
+                visibility = "private",
             }));
         await SessionEndpointTestSupport.AssertProblemAsync(badCapacity, HttpStatusCode.BadRequest, "session_validation");
 
@@ -352,7 +352,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 title = "Bad minimum bound",
                 startTime = SessionEndpointTestSupport.Iso(validStart),
                 minAttendance = 0,
-                isPrivate = true,
+                visibility = "private",
             }));
         await SessionEndpointTestSupport.AssertProblemAsync(badMinimum, HttpStatusCode.BadRequest, "session_validation");
     }
@@ -673,7 +673,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
                 minAttendance = 1,
                 maxCapacity = 1,
-                isPrivate = false,
+                visibility = "public",
                 inviteeUserIds = new[] { filler.Id.Value },
             }));
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
@@ -769,7 +769,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 {
                     title = "x",
                     startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant()),
-                    isPrivate = true,
+                    visibility = "private",
                 })),
             HttpStatusCode.BadRequest,
             "session_validation");
@@ -784,7 +784,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 title = "Time-locked edit",
                 startTime = SessionEndpointTestSupport.Iso(timeLockedStart),
                 minAttendance = 1,
-                isPrivate = true,
+                visibility = "private",
             }));
         Assert.Equal(HttpStatusCode.Created, timeLockedCreated.StatusCode);
         using JsonDocument timeLockedBody = await SessionEndpointTestSupport.SuccessJsonAsync(timeLockedCreated);
@@ -821,7 +821,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
                 minAttendance = 1,
                 maxCapacity = 2,
-                isPrivate = true,
+                visibility = "private",
                 inviteeUserIds = new[] { capacityFriend.Id.Value },
             }));
         Assert.Equal(HttpStatusCode.Created, capacityCreated.StatusCode);
@@ -864,7 +864,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
                 minAttendance = 1,
                 maxCapacity = 1,
-                isPrivate = false,
+                visibility = "public",
                 // D-099: a non-private session needs at least one directly invited friend at creation;
                 // this filler stays Pending and never consumes a slot, so it does not affect the
                 // maxCapacity=1/waitlist mechanics under test.
@@ -912,7 +912,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 title = "Invites closed",
                 startTime = SessionEndpointTestSupport.Iso(inviteClosedStart),
                 minAttendance = 1,
-                isPrivate = true,
+                visibility = "private",
             }));
         Assert.Equal(HttpStatusCode.Created, inviteClosedCreated.StatusCode);
         Guid inviteClosedSessionId = (await SessionEndpointTestSupport.SuccessJsonAsync(inviteClosedCreated))
@@ -943,7 +943,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 title = "Responses closed",
                 startTime = SessionEndpointTestSupport.Iso(responseClosedStart),
                 minAttendance = 1,
-                isPrivate = true,
+                visibility = "private",
                 inviteeUserIds = new[] { responseClosedFriend.Id.Value },
             }));
         Assert.Equal(HttpStatusCode.Created, responseClosedCreated.StatusCode);
@@ -975,7 +975,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 title = "Leave closed",
                 startTime = SessionEndpointTestSupport.Iso(leaveClosedStart),
                 minAttendance = 1,
-                isPrivate = true,
+                visibility = "private",
                 inviteeUserIds = new[] { leaveClosedFriend.Id.Value },
             }));
         Assert.Equal(HttpStatusCode.Created, leaveClosedCreated.StatusCode);
@@ -1010,7 +1010,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 startTime = SessionEndpointTestSupport.Iso(guestRemovalStart),
                 durationMinutes = 15,
                 minAttendance = 1,
-                isPrivate = true,
+                visibility = "private",
                 guestLinkCount = 1,
             }));
         Assert.Equal(HttpStatusCode.Created, guestRemovalCreated.StatusCode);
@@ -1071,7 +1071,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 title = "Join request exists",
                 startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
                 minAttendance = 1,
-                isPrivate = false,
+                visibility = "public",
                 // D-099: a non-private session needs at least one directly invited friend at creation.
                 inviteeUserIds = new[] { joinExistsFiller.Id.Value },
             }));
@@ -1106,7 +1106,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 title = "Join request not pending",
                 startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
                 minAttendance = 1,
-                isPrivate = false,
+                visibility = "public",
                 // D-099: a non-private session needs at least one directly invited friend at creation.
                 inviteeUserIds = new[] { notPendingFiller.Id.Value },
             }));
@@ -1153,7 +1153,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 // D-099: a non-private session needs at least one directly invited friend at creation.
                 inviteeUserIds = new[] { joinClosedFiller.Id.Value },
                 minAttendance = 1,
-                isPrivate = false,
+                visibility = "public",
             }));
         Assert.Equal(HttpStatusCode.Created, joinClosedCreated.StatusCode);
         Guid joinClosedSessionId = (await SessionEndpointTestSupport.SuccessJsonAsync(joinClosedCreated))
@@ -1178,7 +1178,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 title = "Guest link claimed twice",
                 startTime = SessionEndpointTestSupport.Iso(claimedTwiceStart),
                 minAttendance = 1,
-                isPrivate = true,
+                visibility = "private",
                 guestLinkCount = 1,
             }));
         Assert.Equal(HttpStatusCode.Created, claimedTwiceCreated.StatusCode);
@@ -1230,7 +1230,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 title = "Reminder not eligible",
                 startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
                 minAttendance = 1,
-                isPrivate = true,
+                visibility = "private",
                 inviteeUserIds = new[] { reminderFriend.Id.Value },
             }));
         Assert.Equal(HttpStatusCode.Created, reminderCreated.StatusCode);
@@ -1262,7 +1262,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 title = "Guest link terminal",
                 startTime = SessionEndpointTestSupport.Iso(terminalGuestStart),
                 minAttendance = 1,
-                isPrivate = true,
+                visibility = "private",
                 guestLinkCount = 1,
             }));
         Assert.Equal(HttpStatusCode.Created, terminalGuestCreated.StatusCode);
@@ -1382,7 +1382,7 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
                 minAttendance = 1,
                 maxCapacity,
-                isPrivate,
+                visibility = isPrivate ? "private" : "public",
                 guestLinkCount,
             }));
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);

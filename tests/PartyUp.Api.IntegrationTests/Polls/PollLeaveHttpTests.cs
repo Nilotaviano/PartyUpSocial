@@ -165,7 +165,7 @@ public sealed class PollLeaveHttpTests : IAsyncLifetime, IDisposable
                     SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
                     SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
                 },
-                isPrivate = false,
+                visibility = "public",
                 minAttendance = 1,
                 inviteeUserIds = inviteeIds.Select(id => id.Value).ToArray(),
             }));

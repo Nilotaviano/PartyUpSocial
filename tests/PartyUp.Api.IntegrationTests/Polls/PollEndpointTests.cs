@@ -137,7 +137,7 @@ public sealed class PollEndpointTests : IAsyncLifetime, IDisposable
                     SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
                     SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
                 },
-                isPrivate = true,
+                visibility = "private",
                 minAttendance = 1,
             }));
         using JsonDocument createBody = await SessionEndpointTestSupport.SuccessJsonAsync(created);
@@ -439,7 +439,7 @@ public sealed class PollEndpointTests : IAsyncLifetime, IDisposable
                     SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
                     SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
                 },
-                isPrivate = false,
+                visibility = "public",
                 minAttendance = 1,
                 inviteeUserIds = inviteeIds.Select(id => id.Value).ToArray(),
             }));

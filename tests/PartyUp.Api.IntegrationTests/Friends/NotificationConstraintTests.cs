@@ -45,9 +45,9 @@ public sealed class NotificationConstraintTests : IAsyncLifetime
             await pollSeed.Database.ExecuteSqlInterpolatedAsync($"""
                 INSERT INTO polls
                     (id, organizer_id, title, duration_minutes, platform, notes, min_attendance,
-                     max_capacity, is_private, deadline_choice, deadline, status, created_at, selection_window_end)
+                     max_capacity, visibility, deadline_choice, deadline, status, created_at, selection_window_end)
                 VALUES
-                    ({pollId.Value}, {users[0].Id.Value}, 'Selected-option subject', 60, 3, '', 1, NULL, true, 3,
+                    ({pollId.Value}, {users[0].Id.Value}, 'Selected-option subject', 60, 3, '', 1, NULL, 1, 3,
                      {optionStart}, 0, {optionStart}, {optionStart})
                 """);
         }

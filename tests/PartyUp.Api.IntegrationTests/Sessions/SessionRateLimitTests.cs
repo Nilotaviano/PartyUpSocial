@@ -55,7 +55,7 @@ public sealed class SessionRateLimitTests : IAsyncLifetime, IDisposable
                     title = $"Rate limit {i}",
                     startTime = SessionEndpointTestSupport.Iso(
                         _factory.Clock.GetCurrentInstant() + Duration.FromDays(1) + Duration.FromMinutes(i)),
-                    isPrivate = true,
+                    visibility = "private",
                 }));
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
@@ -76,7 +76,7 @@ public sealed class SessionRateLimitTests : IAsyncLifetime, IDisposable
             {
                 title = "Second user still has budget",
                 startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
-                isPrivate = true,
+                visibility = "private",
             }));
         Assert.Equal(HttpStatusCode.Created, secondUserResponse.StatusCode);
     }

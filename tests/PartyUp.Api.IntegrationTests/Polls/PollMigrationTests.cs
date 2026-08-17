@@ -132,9 +132,9 @@ public sealed class PollMigrationTests : IAsyncLifetime
         await ExecuteAsync(context, $"""
             INSERT INTO polls
                 (id, organizer_id, title, duration_minutes, platform, notes, min_attendance,
-                 max_capacity, is_private, deadline_choice, deadline, status, created_at, selection_window_end)
+                 max_capacity, visibility, deadline_choice, deadline, status, created_at, selection_window_end)
             VALUES
-                ({pollId}, {organizerId.Value}, 'Divergent window', 60, 3, '', 1, NULL, true, 3,
+                ({pollId}, {organizerId.Value}, 'Divergent window', 60, 3, '', 1, NULL, 1, 3,
                  {deadline}, 0, {deadline}, {divergentEnd})
             """);
 
@@ -290,10 +290,10 @@ public sealed class PollMigrationTests : IAsyncLifetime
         PostgresException exception = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(context, $"""
             INSERT INTO sessions
                 (id, organizer_id, title, start_time, duration_minutes, platform, notes,
-                 min_attendance, max_capacity, is_private, origin_poll_id, status, created_at)
+                 min_attendance, max_capacity, visibility, origin_poll_id, status, created_at)
             VALUES
                 ({Guid.CreateVersion7()}, {organizerId.Value}, 'Dangling origin', now() + interval '1 day', 60, 3, '',
-                 1, NULL, true, {danglingPollId}, 0, now())
+                 1, NULL, 1, {danglingPollId}, 0, now())
             """));
         Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, exception.SqlState);
         Assert.Equal("fk_sessions_polls_origin_poll_id", exception.ConstraintName);
@@ -372,9 +372,9 @@ public sealed class PollMigrationTests : IAsyncLifetime
         await ExecuteAsync(context, $"""
             INSERT INTO polls
                 (id, organizer_id, title, duration_minutes, platform, notes, min_attendance,
-                 max_capacity, is_private, deadline_choice, deadline, status, created_at, selection_window_end)
+                 max_capacity, visibility, deadline_choice, deadline, status, created_at, selection_window_end)
             VALUES
-                ({pollId}, {organizerId.Value}, 'Boundary test', 60, 3, '', 1, NULL, true, 2,
+                ({pollId}, {organizerId.Value}, 'Boundary test', 60, 3, '', 1, NULL, 1, 2,
                  {deadline}, 0, {deadline - Duration.FromHours(24)}, {PollSelectionWindow.EndsAt(deadline)})
             """);
         return pollId;

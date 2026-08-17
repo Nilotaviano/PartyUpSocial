@@ -631,7 +631,7 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
                     SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
                     SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
                 },
-                isPrivate = false,
+                visibility = "public",
                 minAttendance = 1,
                 maxCapacity = 3,
                 inviteeUserIds = new[] { avail1Id.Value, avail2Id.Value, maybe1Id.Value, maybe2Id.Value },
@@ -819,7 +819,7 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
                     SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
                     SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
                 },
-                isPrivate = inviteeIds.Count == 0,
+                visibility = inviteeIds.Count == 0 ? "private" : "public",
                 minAttendance = 1,
                 inviteeUserIds = inviteeIds.Select(id => id.Value).ToArray(),
             }));
@@ -841,7 +841,7 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
                     SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
                     SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
                 },
-                isPrivate = false,
+                visibility = "public",
                 minAttendance = 1,
                 inviteeUserIds = new[] { inviteeId.Value },
             }));

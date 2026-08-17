@@ -119,7 +119,7 @@ public sealed class SessionRosterMaskingWireTests : IAsyncLifetime, IDisposable
             {
                 title = "Avatar fan-out fixture",
                 startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
-                isPrivate = false,
+                visibility = "public",
                 minAttendance = 1,
                 inviteeUserIds = new[] { participantId.Value },
             }));
@@ -163,7 +163,7 @@ public sealed class SessionRosterMaskingWireTests : IAsyncLifetime, IDisposable
             {
                 title = "MaskedParticipant fixture",
                 startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
-                isPrivate = false,
+                visibility = "public",
                 minAttendance = 1,
                 inviteeUserIds = new[] { participantId.Value },
             }));
@@ -265,7 +265,7 @@ public sealed class SessionRosterMaskingWireTests : IAsyncLifetime, IDisposable
             {
                 title = "Join request wire fixture",
                 startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
-                isPrivate = false,
+                visibility = "public",
                 minAttendance = 1,
                 inviteeUserIds = new[] { fillerId.Value },
             }));

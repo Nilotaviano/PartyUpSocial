@@ -107,10 +107,10 @@ public sealed class SessionMigrationTests : IAsyncLifetime
         await ExecuteAsync(context, $"""
             INSERT INTO sessions
                 (id, organizer_id, title, start_time, duration_minutes, platform, notes,
-                 min_attendance, max_capacity, is_private, status, created_at)
+                 min_attendance, max_capacity, visibility, status, created_at)
             VALUES
                 ({unlimitedId}, {organizerId.Value}, 'Unlimited', now() + interval '1 day', 60, 3, '',
-                 1, NULL, true, 0, now())
+                 1, NULL, 1, 0, now())
             """);
 
         // D-091's waitlist shape: `is_waitlisted` is an ordinary boolean column with no database-level
@@ -143,10 +143,10 @@ public sealed class SessionMigrationTests : IAsyncLifetime
         PostgresException exception = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(context, $"""
             INSERT INTO sessions
                 (id, organizer_id, title, start_time, duration_minutes, platform, notes,
-                 min_attendance, max_capacity, is_private, status, created_at)
+                 min_attendance, max_capacity, visibility, status, created_at)
             VALUES
                 ({invalidId}, {organizerId.Value}, 'Invalid', now() + interval '1 day', 60, 3, '',
-                 4, 2, true, 0, now())
+                 4, 2, 1, 0, now())
             """));
         Assert.Equal(PostgresErrorCodes.CheckViolation, exception.SqlState);
         Assert.Equal("ck_sessions_capacity", exception.ConstraintName);
@@ -283,10 +283,10 @@ public sealed class SessionMigrationTests : IAsyncLifetime
         await ExecuteAsync(context, $"""
             INSERT INTO sessions
                 (id, organizer_id, title, start_time, duration_minutes, platform, notes,
-                 min_attendance, max_capacity, is_private, status, created_at)
+                 min_attendance, max_capacity, visibility, status, created_at)
             VALUES
                 ({sessionId}, {organizerId.Value}, 'Reminder test', now() + interval '1 day', 60, 3, '',
-                 1, NULL, true, 0, now())
+                 1, NULL, 1, 0, now())
             """);
 
         Guid handoffId = Guid.CreateVersion7();
@@ -328,10 +328,10 @@ public sealed class SessionMigrationTests : IAsyncLifetime
         await ExecuteAsync(context, $"""
             INSERT INTO sessions
                 (id, organizer_id, title, start_time, duration_minutes, platform, notes,
-                 min_attendance, max_capacity, is_private, status, created_at)
+                 min_attendance, max_capacity, visibility, status, created_at)
             VALUES
                 ({sessionId}, {organizerId.Value}, 'Boundary test', now() + interval '1 day', 60, 3, '',
-                 1, NULL, true, 0, now())
+                 1, NULL, 1, 0, now())
             """);
         return sessionId;
     }

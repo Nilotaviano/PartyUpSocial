@@ -141,6 +141,16 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             ["POST /api/v1/blocks"] = Onboarded(() =>
                 JsonContent.Create(new { targetUsername = "MatrixPlayer" })),
             ["DELETE /api/v1/blocks/{blockId}"] = Onboarded(() => null),
+            ["POST /api/v1/friend-groups"] = Onboarded(() =>
+                JsonContent.Create(new { name = "Antiforgery probe group" })),
+            ["PATCH /api/v1/friend-groups/{groupId:guid}"] = Onboarded(() =>
+                JsonContent.Create(new { name = "Renamed group" })),
+            ["DELETE /api/v1/friend-groups/{groupId:guid}"] = Onboarded(() => null),
+            ["POST /api/v1/friend-groups/{groupId:guid}/members"] = Onboarded(() =>
+                JsonContent.Create(new { userIds = Array.Empty<Guid>() })),
+            ["DELETE /api/v1/friend-groups/{groupId:guid}/members/{userId:guid}"] = Onboarded(() => null),
+            ["POST /api/v1/friend-groups/{groupId:guid}/invitation/accept"] = Onboarded(() => null),
+            ["POST /api/v1/friend-groups/{groupId:guid}/invitation/decline"] = Onboarded(() => null),
             ["POST /api/v1/admin/users/{id:guid}/ban"] = Admin(() =>
                 JsonContent.Create(new { removeContent = false })),
             ["POST /api/v1/admin/users/{id:guid}/unban"] = Admin(() => null),
@@ -149,7 +159,7 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             {
                 title = "Antiforgery probe",
                 startTime = "2027-01-01T00:00:00Z",
-                isPrivate = true,
+                visibility = "private",
             })),
             ["PATCH /api/v1/sessions/{sessionId:guid}"] = Onboarded(() =>
                 JsonContent.Create(new { title = "Antiforgery probe", ifMatch = "probe" })),
@@ -219,7 +229,7 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             {
                 title = "Antiforgery probe",
                 optionStartTimes = new[] { "2027-01-01T00:00:00Z", "2027-01-02T00:00:00Z" },
-                isPrivate = true,
+                visibility = "private",
             })),
             ["POST /api/v1/polls/{pollId:guid}/options"] = Onboarded(() =>
                 JsonContent.Create(new { startTime = "2027-01-01T00:00:00Z" })),
@@ -532,7 +542,9 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             .Replace("{optionId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
             .Replace("{guestIdentityId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
             .Replace("{subscriptionId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
-            .Replace("{notificationId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal);
+            .Replace("{notificationId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
+            .Replace("{groupId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal)
+            .Replace("{userId:guid}", Guid.Empty.ToString("D"), StringComparison.Ordinal);
 
     private static HttpMethod MethodFromKey(string key) =>
         new(key[..key.IndexOf(' ')]);

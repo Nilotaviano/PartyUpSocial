@@ -438,7 +438,7 @@ public sealed class PollGuestHttpTests : IAsyncLifetime, IDisposable
                     SessionEndpointTestSupport.Iso(baseTime),
                     SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)),
                 },
-                isPrivate = true,
+                visibility = "private",
                 minAttendance = 1,
                 guestLinkCount = 1,
             }));

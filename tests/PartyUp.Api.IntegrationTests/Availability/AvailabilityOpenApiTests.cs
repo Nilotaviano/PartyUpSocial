@@ -62,6 +62,15 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
     /// <summary>D-193: the one operation id the poll mid-flight-invite route added.</summary>
     private static readonly string[] NewPollInviteOperationIds = [ApiOperationIds.InvitePollUsers];
 
+    /// <summary>D-198/D-199: the nine operation ids the FriendGroup HTTP surface added.</summary>
+    private static readonly string[] NewFriendGroupOperationIds =
+    [
+        ApiOperationIds.ListFriendGroups, ApiOperationIds.CreateFriendGroup, ApiOperationIds.GetFriendGroup,
+        ApiOperationIds.RenameFriendGroup, ApiOperationIds.DeleteFriendGroup,
+        ApiOperationIds.InviteFriendGroupMembers, ApiOperationIds.RemoveFriendGroupMember,
+        ApiOperationIds.AcceptFriendGroupInvitation, ApiOperationIds.DeclineFriendGroupInvitation,
+    ];
+
     /// <summary>PHASE7_DESIGN.md §4 (ticket-P7-S4): the eleven operation ids the S4 HTTP surface added.</summary>
     private static readonly string[] NewPushNotificationOperationIds =
     [
@@ -170,7 +179,7 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
             .. PreExistingOperationIds, .. NewPhase5OperationIds, .. NewPollOperationIds,
             .. NewGuestPollOperationIds, .. NewPollListOperationIds, .. NewPollLeaveOperationIds,
             .. NewPushNotificationOperationIds, .. NewEmailNotificationOperationIds,
-            .. NewPollInviteOperationIds,
+            .. NewPollInviteOperationIds, .. NewFriendGroupOperationIds,
         ];
         Assert.Equal(
             expectedOperationIds.OrderBy(id => id, StringComparer.Ordinal).ToArray(),

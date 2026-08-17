@@ -216,7 +216,7 @@ public sealed class PollOptionVoterListsWireTests : IAsyncLifetime, IDisposable
                     SessionEndpointTestSupport.Iso(baseTime),
                     SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)),
                 },
-                isPrivate = true,
+                visibility = "private",
                 minAttendance = 1,
                 guestLinkCount = 1,
             }));
@@ -277,7 +277,7 @@ public sealed class PollOptionVoterListsWireTests : IAsyncLifetime, IDisposable
                     SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
                     SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
                 },
-                isPrivate = false,
+                visibility = "public",
                 minAttendance = 1,
                 inviteeUserIds = inviteeIds.Select(id => id.Value).ToArray(),
             }));

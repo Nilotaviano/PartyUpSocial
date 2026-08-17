@@ -46,7 +46,7 @@ public sealed class DiscoverEndpointTests : IAsyncLifetime, IDisposable
             {
                 title = "Hidden from discover",
                 startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
-                isPrivate = true,
+                visibility = "private",
                 minAttendance = 1,
                 inviteeUserIds = new[] { fillerId.Value },
             }));
@@ -314,7 +314,7 @@ public sealed class DiscoverEndpointTests : IAsyncLifetime, IDisposable
             {
                 title,
                 startTime = SessionEndpointTestSupport.Iso(startTime),
-                isPrivate,
+                visibility = isPrivate ? "private" : "public",
                 minAttendance,
                 maxCapacity,
                 inviteeUserIds = new[] { fillerId.Value },

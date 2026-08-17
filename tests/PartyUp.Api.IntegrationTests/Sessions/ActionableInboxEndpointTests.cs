@@ -42,7 +42,7 @@ public sealed class ActionableInboxEndpointTests : IAsyncLifetime, IDisposable
             {
                 title = "Actionable inbox fixture",
                 startTime = SessionEndpointTestSupport.Iso(start),
-                isPrivate = false,
+                visibility = "public",
                 minAttendance = 1,
                 inviteeUserIds = new[] { inviteeId.Value },
             }));
@@ -129,7 +129,7 @@ public sealed class ActionableInboxEndpointTests : IAsyncLifetime, IDisposable
             {
                 title = "Ordinal fixture B",
                 startTime = SessionEndpointTestSupport.Iso(start),
-                isPrivate = false,
+                visibility = "public",
                 minAttendance = 1,
                 inviteeUserIds = new[] { viewerId.Value },
             }));
@@ -196,7 +196,7 @@ public sealed class ActionableInboxEndpointTests : IAsyncLifetime, IDisposable
             {
                 title,
                 startTime = SessionEndpointTestSupport.Iso(start),
-                isPrivate = false,
+                visibility = "public",
                 minAttendance = 1,
                 inviteeUserIds = new[] { fillerId.Value },
             }));
@@ -223,7 +223,7 @@ public sealed class ActionableInboxEndpointTests : IAsyncLifetime, IDisposable
             {
                 title = "Resolved invitation",
                 startTime = SessionEndpointTestSupport.Iso(start),
-                isPrivate = true,
+                visibility = "private",
                 minAttendance = 1,
                 inviteeUserIds = new[] { inviteeId.Value },
             }));

@@ -83,7 +83,10 @@ public sealed class FriendRequestTransactionTests : IAsyncLifetime
             PostgresException postgresException =
                 Assert.IsType<PostgresException>(exception.InnerException);
             Assert.Equal(PostgresErrorCodes.CheckViolation, postgresException.SqlState);
-            Assert.Equal("ck_notifications_type", postgresException.ConstraintName);
+            // D-207: type 25 (FriendGroupInviteReceived) is a valid ck_notifications_type value now
+            // that friend groups shipped, so this fixture's shape (actor set, group_id null) instead
+            // trips ck_notifications_group_shape — still a genuine constraint-violation rollback.
+            Assert.Equal("ck_notifications_group_shape", postgresException.ConstraintName);
         }
 
         await using AppDbContext verification = _database.CreateContext();

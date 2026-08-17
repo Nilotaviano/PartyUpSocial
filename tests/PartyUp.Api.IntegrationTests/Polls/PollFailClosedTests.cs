@@ -179,7 +179,7 @@ public sealed class PollFailClosedTests : IAsyncLifetime, IDisposable
             {
                 title = "Fail-closed fixture poll",
                 optionStartTimes = new[] { SessionEndpointTestSupport.Iso(baseTime), SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)) },
-                isPrivate = false,
+                visibility = "public",
                 minAttendance = 1,
                 inviteeUserIds = inviteeIds.Select(id => id.Value).ToArray(),
                 guestLinkCount = 1,
@@ -203,7 +203,7 @@ public sealed class PollFailClosedTests : IAsyncLifetime, IDisposable
             {
                 title = "Fail-closed fixture poll",
                 optionStartTimes = new[] { SessionEndpointTestSupport.Iso(baseTime), SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)) },
-                isPrivate,
+                visibility = isPrivate ? "private" : "public",
                 minAttendance = 1,
                 inviteeUserIds = (inviteeIds ?? []).Select(id => id.Value).ToArray(),
             }));

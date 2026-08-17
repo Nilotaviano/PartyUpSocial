@@ -405,7 +405,7 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
             {
                 title = "N1 muted-field probe",
                 startTime = SessionEndpointTestSupport.Iso(startTime),
-                isPrivate = true,
+                visibility = "private",
             }));
         using JsonDocument createdBody = await SessionEndpointTestSupport.SuccessJsonAsync(created);
         Guid sessionId = createdBody.RootElement.GetProperty("session").GetProperty("id").GetGuid();
@@ -448,7 +448,7 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
                     SessionEndpointTestSupport.Iso(baseTime),
                     SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)),
                 },
-                isPrivate = true,
+                visibility = "private",
                 minAttendance = 1,
             }));
         using JsonDocument createdBody = await SessionEndpointTestSupport.SuccessJsonAsync(created);
@@ -491,7 +491,7 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
                     SessionEndpointTestSupport.Iso(baseTime),
                     SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)),
                 },
-                isPrivate = true,
+                visibility = "private",
                 minAttendance = 1,
             }));
         using JsonDocument createdBody = await SessionEndpointTestSupport.SuccessJsonAsync(created);
@@ -627,7 +627,7 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
             {
                 title = "S4 replan probe",
                 startTime = SessionEndpointTestSupport.Iso(startTime),
-                isPrivate = true,
+                visibility = "private",
             }));
         using JsonDocument createdBody = await SessionEndpointTestSupport.SuccessJsonAsync(created);
         Guid sessionId = createdBody.RootElement.GetProperty("session").GetProperty("id").GetGuid();
@@ -679,7 +679,7 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
             {
                 title = "D-147 qualifying session",
                 startTime = SessionEndpointTestSupport.Iso(startTime),
-                isPrivate = true,
+                visibility = "private",
             }));
         Assert.True(created.IsSuccessStatusCode, await created.Content.ReadAsStringAsync());
 
@@ -714,13 +714,13 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
             "UnmutePoll",
         ];
 
-        // Pinned against the live op-id total this test's own factory serves (verified: 141 after
+        // Pinned against the live op-id total this test's own factory serves (verified: 150 after
         // D-178's GetAdminDashboard op-id on top of D-194's SearchSteamCatalog, D-193's
-        // InvitePollUsers, D-189's ChangeMyEmailNotifications + UnsubscribeEmailNotifications, which
-        // includes the test-only `_slice2` debug sign-in endpoints the production host never
-        // registers) -- a grown-by-one total fails here even though every named id is still
-        // individually present.
-        const int expectedTotalOperationIdCount = 141;
+        // InvitePollUsers, D-189's ChangeMyEmailNotifications + UnsubscribeEmailNotifications, and
+        // D-198/D-199's nine-operation FriendGroup HTTP surface, which includes the test-only
+        // `_slice2` debug sign-in endpoints the production host never registers) -- a grown-by-one
+        // total fails here even though every named id is still individually present.
+        const int expectedTotalOperationIdCount = 150;
 
         using HttpClient client = _factory.CreateClient();
         using HttpResponseMessage response = await client.GetAsync("/openapi/v1.json");
@@ -808,7 +808,7 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
             {
                 title,
                 startTime = SessionEndpointTestSupport.Iso(startTime),
-                isPrivate = true,
+                visibility = "private",
                 inviteeUserIds = new[] { inviteeId.Value },
             }));
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());

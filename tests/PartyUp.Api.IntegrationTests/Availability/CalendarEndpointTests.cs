@@ -203,7 +203,7 @@ public sealed class CalendarEndpointTests : IAsyncLifetime, IDisposable
             {
                 title,
                 startTime = Iso(start),
-                isPrivate = false,
+                visibility = "public",
                 minAttendance = 1,
                 inviteeUserIds = new[] { inviteeId.Value },
             }));
@@ -234,7 +234,7 @@ public sealed class CalendarEndpointTests : IAsyncLifetime, IDisposable
             {
                 title = "Calendar poll layer fixture",
                 optionStartTimes = new[] { Iso(inRangeStart), Iso(outOfRangeStart) },
-                isPrivate = true,
+                visibility = "private",
                 minAttendance = 1,
             }));
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
