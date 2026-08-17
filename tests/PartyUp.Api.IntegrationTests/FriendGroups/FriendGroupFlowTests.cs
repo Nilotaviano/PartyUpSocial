@@ -165,6 +165,92 @@ public sealed class FriendGroupFlowTests : IAsyncLifetime, IDisposable
         await SessionEndpointTestSupport.AssertProblemAsync(strangerInvite, HttpStatusCode.NotFound, "not_found");
     }
 
+    /// <summary>
+    /// Closes the group-roster identity gap: the LIST card gets <c>memberCount</c> with no per-group
+    /// detail fetch, and the DETAIL roster carries real nameplates for the owner and every Accepted
+    /// member server-side — no client-side friends-list join required (D-199).
+    /// </summary>
+    [Fact]
+    public async Task ListCarriesMemberCount_AndDetailCarriesNameplates_D199()
+    {
+        SessionHttpUser owner = await SessionEndpointTestSupport.SeedAsync(_factory);
+        SessionHttpUser member = await SessionEndpointTestSupport.SeedAsync(_factory);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, owner.Id, member.Id);
+
+        using SessionHttpSession ownerSession = await SessionEndpointTestSupport.SignInAsync(_factory, owner.Id);
+        using SessionHttpSession memberSession = await SessionEndpointTestSupport.SignInAsync(_factory, member.Id);
+
+        Guid groupId = await CreateGroupAsync(ownerSession, "Nameplate fixture group");
+        await InviteMembersAsync(ownerSession, groupId, [member.Id.Value]);
+        await AcceptInviteAsync(memberSession, groupId);
+
+        // memberCount = owner (implicit) + 1 Accepted member = 2, off ONE list call, no detail fetch.
+        using JsonDocument list = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await ownerSession.GetAsync("/api/v1/friend-groups"));
+        JsonElement ownedCard = list.RootElement.GetProperty("owned").EnumerateArray()
+            .Single(g => g.GetProperty("id").GetGuid() == groupId);
+        Assert.Equal(2, ownedCard.GetProperty("memberCount").GetInt32());
+
+        using JsonDocument detail = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await ownerSession.GetAsync($"/api/v1/friend-groups/{groupId:D}"));
+        Assert.Equal("HTTP Session Test", detail.RootElement.GetProperty("ownerDisplayName").GetString());
+        Assert.False(detail.RootElement.GetProperty("ownerMasked").GetBoolean());
+
+        JsonElement memberRow = detail.RootElement.GetProperty("members").EnumerateArray()
+            .Single(m => m.GetProperty("userId").GetGuid() == member.Id.Value);
+        Assert.Equal("HTTP Session Test", memberRow.GetProperty("displayName").GetString());
+        Assert.False(memberRow.GetProperty("masked").GetBoolean());
+        Assert.True(memberRow.TryGetProperty("avatar", out JsonElement avatar) && avatar.ValueKind == JsonValueKind.Object);
+    }
+
+    /// <summary>
+    /// D-202: a block between two NON-OWNER members leaves both membership rows in place, masked at
+    /// render time for the blocking viewer only — the other member's own read of the roster (and the
+    /// owner's) is unaffected.
+    /// </summary>
+    [Fact]
+    public async Task BlockBetweenTwoMembers_MasksTheCounterpartForTheBlockerOnly_D202()
+    {
+        SessionHttpUser owner = await SessionEndpointTestSupport.SeedAsync(_factory);
+        SessionHttpUser memberA = await SessionEndpointTestSupport.SeedAsync(_factory);
+        SessionHttpUser memberB = await SessionEndpointTestSupport.SeedAsync(_factory);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, owner.Id, memberA.Id);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, owner.Id, memberB.Id);
+
+        using SessionHttpSession ownerSession = await SessionEndpointTestSupport.SignInAsync(_factory, owner.Id);
+        using SessionHttpSession memberASession = await SessionEndpointTestSupport.SignInAsync(_factory, memberA.Id);
+        using SessionHttpSession memberBSession = await SessionEndpointTestSupport.SignInAsync(_factory, memberB.Id);
+
+        Guid groupId = await CreateGroupAsync(ownerSession, "Block-masking fixture group");
+        await InviteMembersAsync(ownerSession, groupId, [memberA.Id.Value, memberB.Id.Value]);
+        await AcceptInviteAsync(memberASession, groupId);
+        await AcceptInviteAsync(memberBSession, groupId);
+
+        HttpResponseMessage blockResponse = await memberASession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/blocks",
+            JsonContent.Create(new { targetUsername = memberB.Username }));
+        Assert.Equal(HttpStatusCode.Created, blockResponse.StatusCode);
+
+        // memberA (the blocker) sees memberB masked, but the row is still listed (D-202: coexist).
+        using JsonDocument aView = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await memberASession.GetAsync($"/api/v1/friend-groups/{groupId:D}"));
+        JsonElement bRowForA = aView.RootElement.GetProperty("members").EnumerateArray()
+            .Single(m => m.GetProperty("userId").GetGuid() == memberB.Id.Value);
+        Assert.True(bRowForA.GetProperty("masked").GetBoolean());
+        Assert.False(bRowForA.TryGetProperty("displayName", out _));
+        Assert.False(bRowForA.TryGetProperty("avatar", out _));
+        Assert.Equal("accepted", bRowForA.GetProperty("status").GetString());
+
+        // The owner's own read is unaffected — the block is between two non-owner members.
+        using JsonDocument ownerView = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await ownerSession.GetAsync($"/api/v1/friend-groups/{groupId:D}"));
+        JsonElement bRowForOwner = ownerView.RootElement.GetProperty("members").EnumerateArray()
+            .Single(m => m.GetProperty("userId").GetGuid() == memberB.Id.Value);
+        Assert.False(bRowForOwner.GetProperty("masked").GetBoolean());
+        Assert.Equal("HTTP Session Test", bRowForOwner.GetProperty("displayName").GetString());
+    }
+
     [Fact]
     public async Task A51stOwnedGroup_Is409GroupLimitReached_D208()
     {

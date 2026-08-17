@@ -1,3 +1,4 @@
+using PartyUp.Application.Polls;
 using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 
@@ -51,6 +52,15 @@ public interface IFriendGroupRepository
 
     /// <summary>Every group the user owns or holds a row in — <c>Invited</c> rows included.</summary>
     Task<IReadOnlyCollection<FriendGroup>> ListInvolvingAsync(UserId userId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Bulk name+avatar resolution for a group's owner + roster, mirroring
+    /// <c>IPollReadRepository.FindNameplatesAsync</c> exactly: one prefetch, both fields, so no read
+    /// path can resolve one without the other.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, UserNameplate>> FindNameplatesAsync(
+        IReadOnlyCollection<UserId> userIds,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// D-205's deletion-time read: the distinct organizer of every session and poll whose audience

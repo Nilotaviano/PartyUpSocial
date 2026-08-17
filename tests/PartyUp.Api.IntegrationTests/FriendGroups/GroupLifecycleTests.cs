@@ -302,7 +302,9 @@ public sealed class GroupLifecycleTests : IAsyncLifetime, IDisposable
         Assert.Equal(HttpStatusCode.NoContent, unfriended.StatusCode);
 
         // Membership survives: the member still reads the full roster (still Accepted), and the
-        // owner's detail still lists them.
+        // owner's detail still lists them — WITH a real nameplate, not an anonymous/masked row. No
+        // block exists between them, so unfriending alone must never mask an identity (D-076 is
+        // block-scoped, not friendship-scoped).
         using JsonDocument detail = await SessionEndpointTestSupport.SuccessJsonAsync(
             await memberSession.GetAsync($"/api/v1/friend-groups/{groupId:D}"));
         JsonElement members = detail.RootElement.GetProperty("members");
@@ -310,6 +312,11 @@ public sealed class GroupLifecycleTests : IAsyncLifetime, IDisposable
             members.EnumerateArray(),
             row => row.GetProperty("userId").GetGuid() == member.Id.Value
                 && row.GetProperty("status").GetString() == "accepted");
+
+        JsonElement memberRow = members.EnumerateArray()
+            .Single(row => row.GetProperty("userId").GetGuid() == member.Id.Value);
+        Assert.False(memberRow.GetProperty("masked").GetBoolean());
+        Assert.Equal("HTTP Session Test", memberRow.GetProperty("displayName").GetString());
     }
 
     // ---- shared HTTP fixtures ---------------------------------------------------------------------

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PartyUp.Application.Abstractions;
+using PartyUp.Application.Polls;
 using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 
@@ -120,6 +121,32 @@ public sealed class FriendGroupRepository(AppDbContext context) : IFriendGroupRe
             .Where(group => group.OwnerId == userId || group.Members.Any(member => member.UserId == userId))
             .OrderBy(group => group.Id)
             .ToListAsync(cancellationToken);
+
+    /// <summary>Mirrors <c>PollReadRepository.FindNameplatesAsync</c> exactly — one bulk, non-locking read.</summary>
+    public async Task<IReadOnlyDictionary<Guid, UserNameplate>> FindNameplatesAsync(
+        IReadOnlyCollection<UserId> userIds,
+        CancellationToken cancellationToken)
+    {
+        if (userIds.Count == 0)
+        {
+            return new Dictionary<Guid, UserNameplate>();
+        }
+
+        List<UserId> ids = [.. userIds.Distinct()];
+        var rows = await context.DomainUsers
+            .AsNoTracking()
+            .Where(u => ids.Contains(u.Id))
+            .Select(u => new { u.Id, u.DisplayName, u.Avatar })
+            .ToListAsync(cancellationToken);
+
+        Dictionary<Guid, UserNameplate> result = [];
+        foreach (var row in rows)
+        {
+            result[row.Id.Value] = new UserNameplate(row.DisplayName, row.Avatar);
+        }
+
+        return result;
+    }
 
     /// <summary>D-205's deletion-time read, raw SQL over the two audience junction tables (neither has its own DbSet).</summary>
     public async Task<IReadOnlyCollection<UserId>> ListDistinctOrganizersTargetingAsync(

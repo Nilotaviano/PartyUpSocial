@@ -1,6 +1,7 @@
 using NodaTime;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Email;
+using PartyUp.Application.Polls;
 using PartyUp.Application.Sessions;
 using PartyUp.Application.Tests.Friends;
 using PartyUp.Domain.Friendships;
@@ -306,6 +307,10 @@ internal sealed class FakeFriendGroupRepository : IFriendGroupRepository
     public Task<IReadOnlyCollection<UserId>> ListDistinctOrganizersTargetingAsync(
         FriendGroupId groupId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyCollection<UserId>>([]);
+
+    public Task<IReadOnlyDictionary<Guid, UserNameplate>> FindNameplatesAsync(
+        IReadOnlyCollection<UserId> userIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, UserNameplate>>(new Dictionary<Guid, UserNameplate>());
 
     private IReadOnlyCollection<FriendGroupId> ViewerGroupIds(
         UserId viewerId, IReadOnlyCollection<FriendGroupId> candidateGroupIds) =>

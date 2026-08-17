@@ -581,6 +581,10 @@ internal sealed class FakeFriendGroupRepository : IFriendGroupRepository
         FriendGroupId groupId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyCollection<UserId>>([]);
 
+    public Task<IReadOnlyDictionary<Guid, UserNameplate>> FindNameplatesAsync(
+        IReadOnlyCollection<UserId> userIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, UserNameplate>>(new Dictionary<Guid, UserNameplate>());
+
     private IReadOnlyCollection<FriendGroupId> ViewerGroupIds(
         UserId viewerId, IReadOnlyCollection<FriendGroupId> candidateGroupIds) =>
         [.. candidateGroupIds.Where(id => Items.Any(g =>
