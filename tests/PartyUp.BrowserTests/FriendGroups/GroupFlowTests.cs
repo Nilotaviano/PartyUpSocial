@@ -120,6 +120,11 @@ public sealed class GroupFlowTests(PlaywrightFixture fixture)
         // session (D-198 rule-2g: no membership, no access).
         IPage strangerPage = setup.Stranger.Page;
         await strangerPage.GotoAsync(PlaywrightFixture.WebBaseUrl + "/sessions/upcoming");
+        // Wait for the list to actually finish loading (the stranger has no friendships and no
+        // group membership, so their own upcoming list is genuinely empty) before asserting the
+        // title is absent — otherwise the assertion can pass vacuously while the fetch is still
+        // in flight.
+        await strangerPage.GetByText("No upcoming sessions.").WaitForAsync();
         await Assertions.Expect(strangerPage.GetByText(title)).Not.ToBeVisibleAsync();
 
         await strangerPage.GotoAsync(PlaywrightFixture.WebBaseUrl + "/sessions/" + sessionId);

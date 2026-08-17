@@ -130,6 +130,7 @@ describe('PollCreatePage (lovable)', () => {
     fireEvent.change(await screen.findByLabelText('Title'), {
       target: { value: 'Weekend raid' },
     })
+    await selectTwoGridSlots()
     fireEvent.click(screen.getByRole('radio', { name: 'Groups' }))
     fireEvent.click(screen.getByRole('button', { name: 'Create poll' }))
 

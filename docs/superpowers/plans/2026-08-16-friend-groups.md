@@ -381,7 +381,7 @@ Structurally: rule-2 arms get wrapped as `(s.visibility = 0 AND (<the two existi
 - Modify: `TRACEABILITY.md`, `IMPLEMENTATION_PLAN.md` (phase entry)
 
 - [x] **Step 1:** Browser test (fixture pattern from `SessionRegisteredFlowTests`): owner seeds two users + friendship, creates group via UI, invites friend; friend accepts; owner creates Groups session; friend sees it on their upcoming list, and the D-206 "via" tag on the session detail page (`SessionListPage` carries no provenance tag in the shipped UI, so the tag assertion runs where `ShareTag` actually renders); stranger gets neither the list entry nor direct access (`CreateGroupInviteAcceptAndTarget_ShowsViaTagToMembers_D198_D206`).
-- [x] **Step 2:** Full gate: `wsl -d Ubuntu-24.04 -e bash -lc "cd /mnt/c/Users/nilot/source/repos/PartyUpSocial && scripts/wsl-gate.sh"` — all lanes green.
+- [x] **Step 2:** Full gate: `wsl -d Ubuntu-24.04 -e bash -lc "cd /mnt/c/Users/nilot/source/repos/PartyUpSocial && scripts/wsl-gate.sh"` — all lanes green. `scripts/wsl-gate.sh` carries no web or browser lane (rerun red web/browser lanes SOLO per the act recipe before treating as real).
 - [x] **Step 3:** TRACEABILITY final sweep (every D-198..D-210 row cites its tests; regenerate the counts by grepping `_D\d\d\d`). IMPLEMENTATION_PLAN.md gains the Friend Groups phase entry marked complete.
 - [x] **Step 4: Commit** `test(browser): friend group end-to-end flow` — then STOP. Push only after the owner's explicit go (mandatory WSL gate already run).
 
