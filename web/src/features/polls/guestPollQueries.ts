@@ -43,10 +43,15 @@ export async function voteOnPollAsGuest(
   return data
 }
 
-export async function suggestPollOptionAsGuest(guestLinkId: string, startTime: string) {
+// D-211: an option carries its own length, so suggesting one has to send it.
+export async function suggestPollOptionAsGuest(
+  guestLinkId: string,
+  startTime: string,
+  durationMinutes: number,
+) {
   const { data } = await client.POST('/api/v1/guest/{guestLinkId}/poll/options', {
     params: { header: csrf, path: { guestLinkId } },
-    body: { startTime },
+    body: { startTime, durationMinutes },
   })
   if (!data) throw new Error('Guest suggest option response was empty.')
   return data

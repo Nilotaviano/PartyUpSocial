@@ -16,7 +16,6 @@
       "hours24": "24 hours",
       "hours48": "48 hours"
     },
-    "duration": "Duration (minutes)",
     "platform": "Platform",
     "game": "Game",
     "gameFreeText": "Enter a game name",
@@ -40,13 +39,13 @@
     },
     "grid": {
       "heading": "Candidate start times",
-      "hint": "Tap a time to add it. Drag a band to move it, or drag its handle to change the duration of every candidate.",
+      "hint": "Press and drag on an empty column to paint a time. Tap to place one at the last length you used. Drag a band to move it, or its handle to change that time’s length.",
       "showDaytime": "Show daytime",
       "eveningsOnly": "Evenings only",
       "weekOf": "Week of {{range}}",
       "count": "{{count}}/{{max}} options",
       "sessionCount": "{{occupancy}} in",
-      "resizeDuration": "Drag to change the duration of every candidate",
+      "resizeDuration": "Drag to change this time’s length",
       "dayPagerRange": "{{start}} – {{end}}",
       "earlierDays": "Earlier days",
       "laterDays": "Later days"
@@ -118,6 +117,8 @@
   },
   "suggest": {
     "heading": "Suggest a time",
+    "duration": "Length",
+    "durationOption": "{{minutes}} minutes",
     "add": "Suggest",
     "added": "Your suggestion was added.",
     "optionCap": "This poll already has 12 candidate times — the most it can hold."
@@ -222,7 +223,7 @@
     "candidateFreeCount_one": "{{day}} {{time}} — {{count}} friend free",
     "candidateFreeCount_other": "{{day}} {{time}} — {{count}} friends free",
     "candidateGridLabel": "Candidate times",
-    "candidateBand": "Candidate {{day}} {{range}}. Enter removes it, arrow keys move it, Shift with arrow keys changes the shared duration.",
+    "candidateBand": "Candidate {{day}} {{range}}. Enter removes it, arrow keys move it, Shift with arrow keys changes its length.",
     "candidateAdded": "Candidate added: {{day}} {{range}}.",
     "candidateRemoved": "Candidate removed: {{day}} {{range}}.",
     "candidateMoved": "Candidate moved: {{day}} {{range}}.",
@@ -238,7 +239,6 @@
   },
   "detailLovable": {
     "meta": {
-      "duration": "Duration",
       "privacy": "Privacy",
       "minimum": "Minimum",
       "capacity": "Capacity",

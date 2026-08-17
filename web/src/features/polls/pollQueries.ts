@@ -73,10 +73,15 @@ export async function voteOnPollOption(
   return data
 }
 
-export async function suggestPollOption(pollId: string, startTime: string) {
+// D-211: an option carries its own length, so suggesting one has to send it.
+export async function suggestPollOption(
+  pollId: string,
+  startTime: string,
+  durationMinutes: number,
+) {
   const { data } = await client.POST('/api/v1/polls/{pollId}/options', {
     params: { header: csrf, path: { pollId } },
-    body: { startTime },
+    body: { startTime, durationMinutes },
   })
   if (!data) throw new Error('Suggest option response was empty.')
   return data

@@ -17,7 +17,12 @@ import {
 import { isApiError } from '../../../api/client'
 import { useSession } from '../../../auth/useSession'
 import { Button } from '../../../components/ui/button'
-import { fieldControlClasses, neutralCtaClasses, raisedInteractiveClasses } from '../../../components/ui/classes'
+import {
+  fieldControlClasses,
+  fieldSelectClasses,
+  neutralCtaClasses,
+  raisedInteractiveClasses,
+} from '../../../components/ui/classes'
 import { Dialog } from '../../../components/ui/dialog'
 import { BOTTOM_BAR_OFFSET_CLASSES } from '../../../components/shell/bottomBarOffset'
 import { PageHeader } from '../../../components/shell/PageHeader'
@@ -116,6 +121,14 @@ import {
  */
 
 const MAX_OPTIONS = 12
+
+/**
+ * D-211: with no grid on this page, suggesting a time collects its length from
+ * a plain select. The choices mirror the lengths the create grid paints most,
+ * all on D-131's 15-minute grid.
+ */
+const SUGGEST_DURATION_CHOICES = [30, 60, 90, 120, 180, 240] as const
+const DEFAULT_SUGGEST_MINUTES = 60
 /** Matches the prototype's `g.ids.slice(0, 5)` collapse count for per-option voter chips. */
 const CHIP_LIMIT = 5
 
@@ -242,7 +255,7 @@ function OptionCard({
   const total = poll.roster.filter((voter) => voter.isActive).length
   const isFinal = poll.selectedOptionId === option.id
   const muted = Boolean(poll.selectedOptionId) && !isFinal
-  const timeText = `${optionDayLabel(option, formatters)} · ${optionRange(option, poll.durationMinutes, formatters)}`
+  const timeText = `${optionDayLabel(option, formatters)} · ${optionRange(option, formatters)}`
   const legend = t('vote.legend', { time: timeText })
 
   const groups: { key: VoteValue | 'pending'; count: number; voters: Voter[] }[] = [
@@ -440,7 +453,7 @@ function FinalizeDialog({
   const short = option ? seated.length < poll.minAttendance : false
   const notViableYet = early && option ? !option.meetsMinimum : false
   const optionText = optionCard
-    ? `${optionDayLabel(optionCard, formatters)} ${optionRange(optionCard, poll.durationMinutes, formatters)}`
+    ? `${optionDayLabel(optionCard, formatters)} ${optionRange(optionCard, formatters)}`
     : null
 
   return (
@@ -591,11 +604,12 @@ function SuggestDialog({
   open: boolean
   pending: boolean
   onClose: () => void
-  onAdd: (startTimeLocal: string) => void
+  onAdd: (startTimeLocal: string, durationMinutes: number) => void
 }) {
   const { t } = useTranslation('polls')
   const cancelButton = useRef<HTMLButtonElement>(null)
   const [value, setValue] = useState('')
+  const [duration, setDuration] = useState(String(DEFAULT_SUGGEST_MINUTES))
 
   return (
     <Dialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
@@ -631,6 +645,26 @@ function SuggestDialog({
             />
           </div>
 
+          {/* D-211: an option owns its own length, so suggesting one has to
+              collect it — this is the no-grid equivalent of painting a band. */}
+          <div className="mt-3 flex flex-col gap-1.5">
+            <label className="font-body font-semibold text-ink" htmlFor="suggest-option-duration">
+              {t('suggest.duration')}
+            </label>
+            <select
+              className={fieldSelectClasses}
+              id="suggest-option-duration"
+              value={duration}
+              onChange={(event) => setDuration(event.target.value)}
+            >
+              {SUGGEST_DURATION_CHOICES.map((minutes) => (
+                <option key={minutes} value={minutes}>
+                  {t('suggest.durationOption', { minutes })}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <p className="mt-4 flex items-center gap-2 rounded-xl border border-border bg-muted/50 px-2.5 py-2 text-[12px] text-muted-foreground">
             <CalendarClock className="size-4 shrink-0" />
             {t('detailLovable.nudgeNotice')}
@@ -657,7 +691,7 @@ function SuggestDialog({
               type="button"
               variant="primary"
               onClick={() => {
-                onAdd(value)
+                onAdd(value, Number(duration))
                 setValue('')
               }}
             >
@@ -1146,7 +1180,8 @@ export function PollDetailPage() {
   })
 
   const suggest = useMutation({
-    mutationFn: (startTime: string) => suggestPollOption(pollId, startTime),
+    mutationFn: ({ startTime, durationMinutes }: { startTime: string; durationMinutes: number }) =>
+      suggestPollOption(pollId, startTime, durationMinutes),
     onSuccess: () => {
       setSuggestOpen(false)
       setAnnouncement(t('suggest.added'))
@@ -1233,7 +1268,7 @@ export function PollDetailPage() {
     vote.mutate({ optionId, choice })
   }
 
-  function handleSuggest(startTimeLocal: string) {
+  function handleSuggest(startTimeLocal: string, durationMinutes: number) {
     setSuggestError(null)
     const asInstant = new Date(startTimeLocal)
     if (Number.isNaN(asInstant.getTime())) return
@@ -1241,7 +1276,7 @@ export function PollDetailPage() {
       setSuggestError(t('suggest.optionCap'))
       return
     }
-    suggest.mutate(asInstant.toISOString())
+    suggest.mutate({ startTime: asInstant.toISOString(), durationMinutes })
   }
 
   const canLeave =
@@ -1319,7 +1354,6 @@ export function PollDetailPage() {
           <div className="contents lg:order-2 lg:block lg:min-w-0 lg:space-y-4 lg:sticky lg:top-4 lg:self-start">
             <section className="order-1 surface p-4" data-testid="poll-summary-card">
               <dl className="grid grid-cols-2 gap-2 text-[12px]">
-                <Meta label={t('detailLovable.meta.duration')} value={`${poll.durationMinutes / 60}h`} />
                 <Meta
                   label={t('detailLovable.meta.privacy')}
                   value={
@@ -1367,7 +1401,7 @@ export function PollDetailPage() {
                     <Trophy className="size-4 shrink-0" />
                     <span className="text-[13px] font-semibold">
                       {t('detailLovable.countdown.lockedIn', {
-                        time: `${optionDayLabel(finalOptionCard, formatters)} ${optionRange(finalOptionCard, poll.durationMinutes, formatters)}`,
+                        time: `${optionDayLabel(finalOptionCard, formatters)} ${optionRange(finalOptionCard, formatters)}`,
                       })}
                     </span>
                   </>

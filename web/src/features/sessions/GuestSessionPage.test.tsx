@@ -228,7 +228,6 @@ function livePollUnclaimed() {
     pollId: 'poll-1',
     sessionId: null,
     title: 'Raid night poll',
-    durationMinutes: 120,
     platform: 'steam',
     game: null,
     notes: null,
@@ -241,6 +240,7 @@ function livePollUnclaimed() {
       {
         id: 'option-1',
         startTime: '2099-01-01T10:00:00Z',
+        durationMinutes: 120,
         suggestedByUserId: null,
         suggestedByGuestIdentityId: null,
         availableCount: 0,
@@ -313,6 +313,49 @@ describe('GuestSessionPage — poll branch (S6, PHASE6_DESIGN.md §5.4)', () => 
         expect.objectContaining({ body: { choice: 'available' } }),
       ),
     )
+  })
+
+  it('sends the chosen length alongside a guest-suggested start_D211', async () => {
+    api.get.mockImplementation((path: string) =>
+      path === '/api/v1/guest/{guestLinkId}/session'
+        ? Promise.reject(new SessionNotFound())
+        : Promise.resolve({ data: livePollClaimed() }),
+    )
+    api.post.mockResolvedValue({ data: livePollClaimed() })
+    renderPage(`/guest/${linkId}`)
+
+    fireEvent.change(await screen.findByLabelText('Suggest a time'), {
+      target: { value: '2099-03-04T19:30' },
+    })
+    fireEvent.change(screen.getByLabelText('Length'), { target: { value: '120' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/guest/{guestLinkId}/poll/options',
+        expect.objectContaining({
+          body: {
+            startTime: new Date('2099-03-04T19:30').toISOString(),
+            durationMinutes: 120,
+          },
+        }),
+      ),
+    )
+  })
+
+  it('renders each poll option own start-to-end range_D211', async () => {
+    api.get.mockImplementation((path: string) =>
+      path === '/api/v1/guest/{guestLinkId}/session'
+        ? Promise.reject(new SessionNotFound())
+        : Promise.resolve({ data: livePollClaimed() }),
+    )
+    renderPage(`/guest/${linkId}`)
+
+    const row = await screen.findByTestId('poll-option-option-1')
+    const time = (iso: string) =>
+      new Intl.DateTimeFormat('en', { timeStyle: 'short' }).format(new Date(iso))
+    // The fixture option is 120 minutes long, so its end has to be on the row.
+    expect(row.textContent).toContain(time('2099-01-01T12:00:00Z'))
   })
 
   it('a claimed guest renames themselves (D-044 guest arm)', async () => {

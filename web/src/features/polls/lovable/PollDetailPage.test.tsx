@@ -23,7 +23,6 @@ function pollDetail(overrides: Partial<Record<string, unknown>> = {}) {
     id: 'poll-1',
     organizerId: 'organizer-1',
     title: 'Raid night poll',
-    durationMinutes: 120,
     platform: 'notApplicable',
     game: null,
     notes: '',
@@ -41,6 +40,7 @@ function pollDetail(overrides: Partial<Record<string, unknown>> = {}) {
       {
         id: 'option-1',
         startTime: '2099-01-01T10:00:00Z',
+        durationMinutes: 120,
         suggestedByUserId: null,
         suggestedByGuestIdentityId: null,
         availableCount: 3,
@@ -55,6 +55,7 @@ function pollDetail(overrides: Partial<Record<string, unknown>> = {}) {
         id: 'option-2',
         // D-140: an already-elapsed option, alongside the future one above.
         startTime: '2020-01-01T10:00:00Z',
+        durationMinutes: 120,
         suggestedByUserId: null,
         suggestedByGuestIdentityId: null,
         availableCount: 2,
@@ -212,6 +213,66 @@ describe('PollDetailPage (lovable)', () => {
     expect(within(maskedRow).getAllByText('Anonymous User').length).toBeGreaterThan(0)
   })
 
+  /** D-211: the poll has no length of its own; every option states its own. */
+  function utcTime(iso: string) {
+    return new Intl.DateTimeFormat('en', {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: 'UTC',
+    }).format(new Date(iso))
+  }
+
+  it('renders every option own start-to-end range, never one shared length_D211', async () => {
+    mockGet({
+      detail: pollDetail({
+        options: [
+          { ...pollDetail().options[0], durationMinutes: 60 },
+          { ...pollDetail().options[1], durationMinutes: 180 },
+        ],
+      }),
+    })
+    renderPage()
+
+    const first = await screen.findByTestId('poll-option-option-1')
+    expect(first.textContent).toContain(
+      `${utcTime('2099-01-01T10:00:00Z')}–${utcTime('2099-01-01T11:00:00Z')}`,
+    )
+    const second = screen.getByTestId('poll-option-option-2')
+    expect(second.textContent).toContain(
+      `${utcTime('2020-01-01T10:00:00Z')}–${utcTime('2020-01-01T13:00:00Z')}`,
+    )
+  })
+
+  it('drops the poll-wide Duration summary row_D211', async () => {
+    mockGet()
+    renderPage()
+
+    await screen.findByText('Raid night poll')
+    expect(within(screen.getByTestId('poll-summary-card')).queryByText('Duration')).toBeNull()
+  })
+
+  it('sends the chosen length alongside a suggested start_D211', async () => {
+    mockGet()
+    api.post.mockResolvedValue({ data: {} })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Suggest a time' }))
+    fireEvent.change(screen.getByLabelText('Suggest a time'), {
+      target: { value: '2099-03-04T19:30' },
+    })
+    fireEvent.change(screen.getByLabelText('Length'), { target: { value: '90' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest' }))
+
+    await waitFor(() => expect(api.post).toHaveBeenCalled())
+    const [path, options] = api.post.mock.calls.at(-1) as [
+      string,
+      { body: { startTime: string; durationMinutes: number } },
+    ]
+    expect(path).toBe('/api/v1/polls/{pollId}/options')
+    expect(options.body.durationMinutes).toBe(90)
+    expect(options.body.startTime).toBe(new Date('2099-03-04T19:30').toISOString())
+  })
+
   it('renders a small "Suggested by" attribution line for an option with a resolved suggester_D196', async () => {
     mockGet({
       detail: pollDetail({
@@ -219,6 +280,7 @@ describe('PollDetailPage (lovable)', () => {
           {
             id: 'option-1',
             startTime: '2099-01-01T10:00:00Z',
+            durationMinutes: 120,
             suggestedByUserId: 'participation-2-user',
             suggestedByGuestIdentityId: null,
             suggester: {
@@ -253,6 +315,7 @@ describe('PollDetailPage (lovable)', () => {
           {
             id: 'option-1',
             startTime: '2099-01-01T10:00:00Z',
+            durationMinutes: 120,
             suggestedByUserId: null,
             suggestedByGuestIdentityId: null,
             suggester: {
@@ -330,6 +393,7 @@ describe('PollDetailPage (lovable)', () => {
           {
             id: 'option-1',
             startTime: '2099-01-01T10:00:00Z',
+            durationMinutes: 120,
             suggestedByUserId: null,
             suggestedByGuestIdentityId: null,
             availableCount: 2,
@@ -383,6 +447,7 @@ describe('PollDetailPage (lovable)', () => {
           {
             id: 'option-1',
             startTime: '2099-01-01T10:00:00Z',
+            durationMinutes: 120,
             suggestedByUserId: null,
             suggestedByGuestIdentityId: null,
             availableCount: 7,
@@ -409,6 +474,7 @@ describe('PollDetailPage (lovable)', () => {
           {
             id: 'option-1',
             startTime: '2099-01-01T10:00:00Z',
+            durationMinutes: 120,
             suggestedByUserId: null,
             suggestedByGuestIdentityId: null,
             availableCount: 9,
@@ -580,6 +646,7 @@ describe('PollDetailPage (lovable)', () => {
           options: Array.from({ length: 12 }, (_, index) => ({
             id: `option-${index + 1}`,
             startTime: `2099-01-0${(index % 9) + 1}T10:00:00Z`,
+            durationMinutes: 120,
             suggestedByUserId: null,
             suggestedByGuestIdentityId: null,
             availableCount: 0,
@@ -802,6 +869,7 @@ describe('PollDetailPage (lovable)', () => {
           {
             optionId: 'option-1',
             startTime: '2099-01-01T10:00:00Z',
+            durationMinutes: 120,
             meetsMinimum: true,
             roster: [
               {

@@ -42,8 +42,10 @@ export type Voter = {
 
 export type PollOptionT = {
   id: string
-  /** Fake-local instant (D-046) — a poll option carries no duration (spec §7.3-1). */
+  /** Fake-local instant (D-046). */
   start: Date
+  /** D-211: this option's own length; the poll carries none. */
+  durationMinutes: number
   availableCount: number
   maybeCount: number
   unavailableCount: number
@@ -74,8 +76,8 @@ export function optionDayLabel(option: PollOptionT, formatters: PollFormatters) 
 }
 
 /** `formatters.time` must be built with `timeZone: 'UTC'` over fake-local dates (D-046). */
-export function optionRange(option: PollOptionT, durationMin: number, formatters: PollFormatters) {
-  const end = new Date(option.start.getTime() + durationMin * 60_000)
+export function optionRange(option: PollOptionT, formatters: PollFormatters) {
+  const end = new Date(option.start.getTime() + option.durationMinutes * 60_000)
   return `${formatters.time.format(option.start)}–${formatters.time.format(end)}`
 }
 
@@ -104,15 +106,20 @@ export const VOTE_META: Record<VoteValue, { icon: typeof ThumbsUp; cls: string }
   },
 }
 
-/** A candidate time slot on the `CandidateGrid` (day index + minute-of-day). */
-export type Candidate = { day: number; start: number }
+/**
+ * A candidate time band on the `CandidateGrid`: a day index, a minute-of-day
+ * start, and — D-211 — that option's own length. Two candidates on the same
+ * day and start are the same option whatever their lengths, which is why
+ * `candidateKey` ignores the duration (D-080 dedups on the start instant).
+ */
+export type Candidate = { day: number; start: number; durationMinutes: number }
 
 /**
  * Same reasoning as `VOTE_META` above: `candidateKey` lives here, not in the
  * component file `./CandidateGrid`, purely to satisfy `react-refresh/only-
  * export-components` (a component file may not export anything else).
  */
-export function candidateKey(c: Candidate) {
+export function candidateKey(c: Pick<Candidate, 'day' | 'start'>) {
   return `${c.day}-${c.start}`
 }
 
@@ -245,7 +252,6 @@ export type MappedPoll = {
   title: string
   game: { name: string; steamAppId: number | string | null } | null
   platform: string
-  durationMinutes: number
   notes: string
   minAttendance: number
   maxCapacity: number | null
@@ -276,7 +282,6 @@ export function mapPollDetail(
     title: response.title,
     game: response.game ? { name: response.game.name, steamAppId: response.game.steamAppId } : null,
     platform: response.platform,
-    durationMinutes: Number(response.durationMinutes),
     notes: response.notes,
     minAttendance: Number(response.minAttendance),
     maxCapacity: response.maxCapacity == null ? null : Number(response.maxCapacity),
@@ -303,6 +308,7 @@ function mapOption(
   return {
     id: option.id,
     start: instantToFakeLocal(option.startTime, timeZone),
+    durationMinutes: Number(option.durationMinutes),
     availableCount: Number(option.availableCount),
     maybeCount: Number(option.maybeCount),
     unavailableCount: Number(option.unavailableCount),

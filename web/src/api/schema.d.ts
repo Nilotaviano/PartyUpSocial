@@ -2303,10 +2303,13 @@ export interface components {
             /** Format: int32 */
             count: number | string;
         };
-        CreatePollRequest: {
-            title: null | string;
+        CreatePollOptionRequest: {
+            startTime: null | string;
             /** Format: int32 */
             durationMinutes: null | number | string;
+        };
+        CreatePollRequest: {
+            title: null | string;
             platform: null | string;
             game: null | components["schemas"]["GameRequest"];
             notes: null | string;
@@ -2316,7 +2319,7 @@ export interface components {
             maxCapacity: null | number | string;
             visibility: null | string;
             audienceGroupIds: null | string[];
-            optionStartTimes: null | string[];
+            options: null | components["schemas"]["CreatePollOptionRequest"][];
             deadlineChoice: null | string;
             inviteeUserIds: null | string[];
             /** Format: int32 */
@@ -2573,8 +2576,6 @@ export interface components {
             /** Format: uuid */
             sessionId: null | string;
             title: null | string;
-            /** Format: int32 */
-            durationMinutes: null | number | string;
             platform: null | string;
             game: null | components["schemas"]["GameResponse"];
             notes: null | string;
@@ -2756,8 +2757,6 @@ export interface components {
             /** Format: uuid */
             organizerId: string;
             title: string;
-            /** Format: int32 */
-            durationMinutes: number | string;
             platform: string;
             game: null | components["schemas"]["GameResponse"];
             notes: string;
@@ -2813,6 +2812,8 @@ export interface components {
             /** Format: uuid */
             id: string;
             startTime: string;
+            /** Format: int32 */
+            durationMinutes: number | string;
             /** Format: uuid */
             suggestedByUserId: null | string;
             /** Format: uuid */
@@ -3140,6 +3141,8 @@ export interface components {
         };
         SuggestPollOptionRequest: {
             startTime: null | string;
+            /** Format: int32 */
+            durationMinutes: null | number | string;
         };
         TargetUsernameRequest: {
             targetUsername: null | string;

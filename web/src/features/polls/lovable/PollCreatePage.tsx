@@ -49,9 +49,10 @@ import { createPoll, type CreatePollRequest } from '../pollQueries'
  *  - The prototype's free-text `game`/`platform` pair is the real Steam-arm
  *    game field (D-176/D-194, `SteamGamePicker`) plus a `Platform` select —
  *    absorbed near-verbatim from the pre-port `PollCreatePage`.
- *  - The prototype's own `Duration`/`Notes`/`Minimum`/`Maximum capacity`
- *    controls are the real validated fields (D-131's 15-minute increments,
- *    min/max range checks), not decorative segmented pickers.
+ *  - The prototype's own `Notes`/`Minimum`/`Maximum capacity` controls are the
+ *    real validated fields (min/max range checks), not decorative segmented
+ *    pickers. There is no duration field at all: D-211 gives every candidate
+ *    its own length, painted on the grid below.
  *  - The prototype's three-state `Privacy` (`friends`/`invite`/`public`) is
  *    the real three-level `visibility` (Private/Groups/Public,
  *    `VisibilityControl` from `features/groups`), with the real invitee
@@ -80,9 +81,21 @@ const MIN_OPTIONS = 2
 // D-130's minimum lead, mirrored client-side, matching the pre-port page.
 const MINIMUM_LEAD_MS = 15 * 60_000
 
+/**
+ * D-211: an option is a start *and* a length. `durationMinutes` starts at the
+ * grid's own default and is whatever the organizer painted or resized it to.
+ */
+type PollOptionDraft = { start: string; durationMinutes: number }
+
+const DEFAULT_OPTION_MINUTES = 60
+
+function sortDrafts(drafts: PollOptionDraft[]) {
+  return [...drafts].sort((a, b) => a.start.localeCompare(b.start))
+}
+
 function readPollPrefill(
   params: URLSearchParams,
-): { options: string[]; anyClamped: boolean; anyTruncated: boolean } {
+): { options: PollOptionDraft[]; anyClamped: boolean; anyTruncated: boolean } {
   const raw = params.getAll('startTimes')
   if (raw.length === 0) return { options: [], anyClamped: false, anyTruncated: false }
 
@@ -103,7 +116,9 @@ function readPollPrefill(
 
   const sorted = deduped.sort()
   return {
-    options: sorted.slice(0, MAX_OPTIONS),
+    options: sorted
+      .slice(0, MAX_OPTIONS)
+      .map((start) => ({ start, durationMinutes: DEFAULT_OPTION_MINUTES })),
     anyClamped,
     anyTruncated: sorted.length > MAX_OPTIONS,
   }
@@ -112,7 +127,6 @@ function readPollPrefill(
 const fieldIds: Record<string, string> = {
   title: 'field-title',
   options: 'field-options',
-  durationMinutes: 'field-duration',
   minAttendance: 'field-min',
   maxCapacity: 'field-max',
   inviteeUserIds: 'field-invitees',
@@ -133,9 +147,8 @@ const deadlineChoices = ['hours6', 'hours12', 'hours24', 'hours48'] as const
 
 const emptyForm = {
   title: '',
-  options: [] as string[],
+  options: [] as PollOptionDraft[],
   deadlineChoice: 'hours24' as (typeof deadlineChoices)[number],
-  durationMinutes: '120',
   platform: '',
   gameName: '',
   gameAppId: '',
@@ -291,6 +304,10 @@ export function PollCreatePage() {
     () => new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }),
     [i18n.language],
   )
+  const endFormat = useMemo(
+    () => new Intl.DateTimeFormat(i18n.language, { timeStyle: 'short' }),
+    [i18n.language],
+  )
 
   const profile = useQuery({ queryKey: viewerProfileKey, queryFn: getViewerProfile })
   const timeZone = profile.data?.timeZone ?? 'UTC'
@@ -403,15 +420,13 @@ export function PollCreatePage() {
     setPageStart(Math.max(0, Math.min(pageStartValue + delta, 4)))
   }
 
-  const durationMinutesNumber = Number(form.durationMinutes) || 0
-
   const candidatesInView: Candidate[] = useMemo(() => {
-    return form.options.flatMap((iso) => {
-      const fakeLocal = instantToFakeLocal(iso, timeZone)
+    return form.options.flatMap((option) => {
+      const fakeLocal = instantToFakeLocal(option.start, timeZone)
       const dayIndex = Math.floor((fakeLocal.getTime() - weekStart.getTime()) / DAY_MS)
       if (dayIndex < 0 || dayIndex > 6) return []
       const start = fakeLocal.getUTCHours() * 60 + fakeLocal.getUTCMinutes()
-      return [{ day: dayIndex, start }]
+      return [{ day: dayIndex, start, durationMinutes: option.durationMinutes }]
     })
   }, [form.options, weekStart, timeZone])
 
@@ -434,23 +449,30 @@ export function PollCreatePage() {
     })
   }
 
-  // D-080: identical instants merge, never a validation error — a slot is
-  // toggled on the grid, so a repeated click on the same instant simply
-  // toggles it off again rather than ever producing a duplicate.
-  function handleCandidateToggle(c: Candidate) {
+  // D-080: identical instants merge, never a validation error — painting or
+  // tapping a start another candidate already holds keeps the one already
+  // there rather than producing a duplicate, and the second gesture's length
+  // wins because it is the more recent expression of intent.
+  function handleCandidateCreate(c: Candidate) {
     const iso = candidateToIso(c)
-    if (!form.options.includes(iso) && form.options.length >= MAX_OPTIONS) {
+    const existing = form.options.some((o) => o.start === iso)
+    if (!existing && form.options.length >= MAX_OPTIONS) {
       setFieldErrors((current) => ({ ...current, options: t('validation.optionCap') }))
       return
     }
     clearOptionsError()
     setForm((current) => ({
       ...current,
-      options: current.options.includes(iso)
-        ? current.options.filter((o) => o !== iso)
-        : [...current.options, iso].sort(),
+      options: sortDrafts([
+        ...current.options.filter((o) => o.start !== iso),
+        { start: iso, durationMinutes: c.durationMinutes },
+      ]),
     }))
     setDirty(true)
+  }
+
+  function handleCandidateRemove(c: Candidate) {
+    removeOption(candidateToIso(c))
   }
 
   // Dragging a band to a time another candidate already holds is the same
@@ -461,23 +483,32 @@ export function PollCreatePage() {
     const toIso = candidateToIso(to)
     clearOptionsError()
     setForm((current) => {
-      const without = current.options.filter((o) => o !== fromIso)
+      const without = current.options.filter((o) => o.start !== fromIso)
       return {
         ...current,
-        options: without.includes(toIso) ? without : [...without, toIso].sort(),
+        options: sortDrafts([
+          ...without.filter((o) => o.start !== toIso),
+          { start: toIso, durationMinutes: to.durationMinutes },
+        ]),
       }
     })
     setDirty(true)
   }
 
-  function handleDurationChange(minutes: number) {
-    update('durationMinutes', String(minutes))
+  // D-211: a resize edits the one option the handle belongs to, never the rest.
+  function handleCandidateResize(c: Candidate, durationMinutes: number) {
+    const iso = candidateToIso(c)
+    setForm((current) => ({
+      ...current,
+      options: current.options.map((o) => (o.start === iso ? { ...o, durationMinutes } : o)),
+    }))
+    setDirty(true)
   }
 
   function removeOption(iso: string) {
     setForm((current) => ({
       ...current,
-      options: current.options.filter((value) => value !== iso),
+      options: current.options.filter((option) => option.start !== iso),
     }))
     setDirty(true)
   }
@@ -487,9 +518,16 @@ export function PollCreatePage() {
     if (!form.title.trim()) errors.title = t('validation.required')
     if (form.options.length < MIN_OPTIONS) errors.options = t('validation.optionMinimum')
     if (form.options.length > MAX_OPTIONS) errors.options = t('validation.optionCap')
-    const duration = Number(form.durationMinutes)
-    if (!Number.isFinite(duration) || duration <= 0 || duration % 15 !== 0) {
-      errors.durationMinutes = t('validation.increment')
+    // D-131 is now a per-option rule: every band carries its own length.
+    if (
+      form.options.some(
+        (option) =>
+          !Number.isFinite(option.durationMinutes) ||
+          option.durationMinutes <= 0 ||
+          option.durationMinutes % 15 !== 0,
+      )
+    ) {
+      errors.options = t('validation.increment')
     }
     const min = Number(form.minAttendance)
     const max = form.unlimited ? undefined : Number(form.maxCapacity)
@@ -541,9 +579,11 @@ export function PollCreatePage() {
 
     submit.mutate({
       title: form.title,
-      optionStartTimes: form.options,
+      options: form.options.map((option) => ({
+        startTime: option.start,
+        durationMinutes: option.durationMinutes,
+      })),
       deadlineChoice: form.deadlineChoice,
-      durationMinutes: Number(form.durationMinutes),
       platform: form.platform ? platformWireValues[form.platform] : null,
       game,
       notes: form.notes || null,
@@ -702,26 +742,6 @@ export function PollCreatePage() {
                   </>
                 )}
               </fieldset>
-
-              <label className="block" htmlFor="field-duration">
-                <span className="text-[12px] font-bold text-ink-soft">{t('create.duration')}</span>
-                <input
-                  aria-describedby={fieldErrors.durationMinutes ? 'duration-error' : undefined}
-                  aria-invalid={Boolean(fieldErrors.durationMinutes)}
-                  className={fieldControlClasses}
-                  id="field-duration"
-                  min={15}
-                  step={15}
-                  type="number"
-                  value={form.durationMinutes}
-                  onChange={(event) => update('durationMinutes', event.target.value)}
-                />
-              </label>
-              {fieldErrors.durationMinutes && (
-                <p id="duration-error" role="alert">
-                  {fieldErrors.durationMinutes}
-                </p>
-              )}
 
               <label className="block" htmlFor="field-notes">
                 <span className="text-[12px] font-bold text-ink-soft">{t('create.notes')}</span>
@@ -993,17 +1013,17 @@ export function PollCreatePage() {
                 candidates={candidatesInView}
                 capReached={form.options.length >= MAX_OPTIONS}
                 days={visibleDays}
-                durationMin={durationMinutesNumber > 0 ? durationMinutesNumber : 30}
                 friends={calendarLayers.friends}
                 labels={labels}
                 max={MAX_OPTIONS}
                 rangeEnd={24 * 60}
                 rangeStart={earlyHours ? 10 * 60 : 16 * 60}
                 sessions={calendarLayers.sessions}
-                onDurationChange={handleDurationChange}
+                onCreate={handleCandidateCreate}
                 onMove={handleCandidateMove}
                 onPageStep={isMobile ? stepDays : undefined}
-                onToggle={handleCandidateToggle}
+                onRemove={handleCandidateRemove}
+                onResize={handleCandidateResize}
               />
             </div>
 
@@ -1019,22 +1039,29 @@ export function PollCreatePage() {
               )}
               {form.options.length > 0 && (
                 <ul>
-                  {form.options.map((iso) => (
-                    <li
-                      key={iso}
-                      className="flex items-center justify-between gap-2 border-t border-ink/25 py-2 first:border-t-0"
-                    >
-                      <span className="text-ink">{optionFormat.format(new Date(iso))}</span>
-                      <Button
-                        aria-label={`${t('create.removeOption')} ${optionFormat.format(new Date(iso))}`}
-                        type="button"
-                        variant="ghost"
-                        onClick={() => removeOption(iso)}
+                  {form.options.map((option) => {
+                    // D-211: the option owns its end, so the row states the
+                    // whole window rather than a bare start.
+                    const label = `${optionFormat.format(new Date(option.start))} – ${endFormat.format(
+                      new Date(new Date(option.start).getTime() + option.durationMinutes * 60_000),
+                    )}`
+                    return (
+                      <li
+                        key={option.start}
+                        className="flex items-center justify-between gap-2 border-t border-ink/25 py-2 first:border-t-0"
                       >
-                        {t('create.removeOption')}
-                      </Button>
-                    </li>
-                  ))}
+                        <span className="text-ink">{label}</span>
+                        <Button
+                          aria-label={`${t('create.removeOption')} ${label}`}
+                          type="button"
+                          variant="ghost"
+                          onClick={() => removeOption(option.start)}
+                        >
+                          {t('create.removeOption')}
+                        </Button>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </fieldset>

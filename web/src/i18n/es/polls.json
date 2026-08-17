@@ -16,7 +16,6 @@
       "hours24": "24 horas",
       "hours48": "48 horas"
     },
-    "duration": "Duración (minutos)",
     "platform": "Plataforma",
     "game": "Juego",
     "gameFreeText": "Escribe el nombre del juego",
@@ -40,13 +39,13 @@
     },
     "grid": {
       "heading": "Horarios candidatos",
-      "hint": "Toca un horario para agregarlo. Arrastra una franja para moverla o arrastra su tirador para cambiar la duración de todos los candidatos.",
+      "hint": "Mantén pulsado y arrastra en una columna vacía para pintar un horario. Toca para colocar uno con la última duración usada. Arrastra una franja para moverla o su tirador para cambiar la duración de ese horario.",
       "showDaytime": "Mostrar horario diurno",
       "eveningsOnly": "Solo por la noche",
       "weekOf": "Semana del {{range}}",
       "count": "{{count}}/{{max}} opciones",
       "sessionCount": "{{occupancy}} dentro",
-      "resizeDuration": "Arrastra para cambiar la duración de todos los candidatos",
+      "resizeDuration": "Arrastra para cambiar la duración de este horario",
       "dayPagerRange": "{{start}} – {{end}}",
       "earlierDays": "Días anteriores",
       "laterDays": "Días siguientes"
@@ -118,6 +117,8 @@
   },
   "suggest": {
     "heading": "Sugerir un horario",
+    "duration": "Duración",
+    "durationOption": "{{minutes}} minutos",
     "add": "Sugerir",
     "added": "Tu sugerencia se agregó.",
     "optionCap": "Esta encuesta ya tiene 12 horarios candidatos, el máximo que puede tener."
@@ -222,7 +223,7 @@
     "candidateFreeCount_one": "{{day}} {{time}} — {{count}} amigo libre",
     "candidateFreeCount_other": "{{day}} {{time}} — {{count}} amigos libres",
     "candidateGridLabel": "Horarios candidatos",
-    "candidateBand": "Candidato {{day}} {{range}}. Enter lo quita, las flechas lo mueven y Shift con las flechas cambia la duración compartida.",
+    "candidateBand": "Candidato {{day}} {{range}}. Enter lo quita, las flechas lo mueven y Shift con las flechas cambia su duración.",
     "candidateAdded": "Candidato agregado: {{day}} {{range}}.",
     "candidateRemoved": "Candidato quitado: {{day}} {{range}}.",
     "candidateMoved": "Candidato movido: {{day}} {{range}}.",
@@ -238,7 +239,6 @@
   },
   "detailLovable": {
     "meta": {
-      "duration": "Duración",
       "privacy": "Privacidad",
       "minimum": "Mínimo",
       "capacity": "Capacidad",

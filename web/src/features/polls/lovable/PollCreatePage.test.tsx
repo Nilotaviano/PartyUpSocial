@@ -278,14 +278,17 @@ describe('PollCreatePage (lovable)', () => {
     const [, options] = api.post.mock.calls[0] as [string, { body: Record<string, unknown> }]
     expect(options.body).toMatchObject({
       title: 'Weekend raid',
-      durationMinutes: 120,
       notes: 'Bring snacks',
       minAttendance: 4,
       maxCapacity: 4,
       visibility: 'private',
       deadlineChoice: 'hours24',
     })
-    expect(options.body.optionStartTimes).toHaveLength(2)
+    // D-211: one start AND one length per option; the poll carries none.
+    expect(options.body).not.toHaveProperty('durationMinutes')
+    const sent = options.body.options as { startTime: string; durationMinutes: number }[]
+    expect(sent).toHaveLength(2)
+    expect(sent.every((option) => option.durationMinutes === 60)).toBe(true)
     expect(navigateSpy).toHaveBeenCalledWith('/polls/poll-1')
   })
 
@@ -672,23 +675,15 @@ describe('PollCreatePage (lovable)', () => {
     expect(realDisc).toBeTruthy()
   })
 
-  it('edits to the duration field reflow every candidate band_D131', async () => {
+  it('offers no poll-wide duration field at all_D211', async () => {
     mockGet()
     renderPage()
 
-    const slots = await findGridSlots()
-    fireEvent.click(slots[0])
-
-    const grid = screen.getByTestId('candidate-grid')
-    const [band] = within(grid).getAllByRole('button')
-    expect(band).toHaveTextContent('16:00–18:00')
-
-    fireEvent.change(screen.getByLabelText('Duration (minutes)'), { target: { value: '90' } })
-
-    expect(within(grid).getAllByRole('button')[0]).toHaveTextContent('16:00–17:30')
+    await screen.findByLabelText('Title')
+    expect(screen.queryByLabelText('Duration (minutes)')).toBeNull()
   })
 
-  it('a band resize writes the new shared duration back into the field_D131', async () => {
+  it('places a tapped candidate at the grid default length_D211', async () => {
     mockGet()
     renderPage()
 
@@ -696,15 +691,50 @@ describe('PollCreatePage (lovable)', () => {
     fireEvent.click(slots[0])
 
     const grid = screen.getByTestId('candidate-grid')
-    // Shift+Arrow is the resize handle's keyboard equivalent: it changes the
-    // poll's one shared duration, in D-131's 15-minute increments.
+    expect(within(grid).getAllByRole('button')[0]).toHaveTextContent('16:00–17:00')
+  })
+
+  it('resizes only the band whose handle moved, leaving the rest alone_D211', async () => {
+    mockGet()
+    renderPage()
+
+    const slots = await findGridSlots()
+    fireEvent.click(slots[0])
+    fireEvent.click(slots[1])
+
+    const grid = screen.getByTestId('candidate-grid')
+    const bands = () => within(grid).getAllByRole('button')
+    // Shift+Arrow is the resize handle's keyboard equivalent: it changes this
+    // one option's length, in D-131's 15-minute increments.
+    fireEvent.keyDown(bands()[0], { key: 'ArrowDown', shiftKey: true })
+
+    // The two slots are the same 16:00 row on adjacent days, so only the
+    // length of the first one may change.
+    expect(bands()[0]).toHaveTextContent('16:00–17:15')
+    expect(bands()[1]).toHaveTextContent('16:00–17:00')
+  })
+
+  it('sends each option its own painted length_D211', async () => {
+    mockGet()
+    api.post.mockResolvedValue({ data: { poll: { id: 'poll-1' }, guestLinks: [] } })
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Weekend raid' } })
+    await selectTwoGridSlots()
+
+    const grid = screen.getByTestId('candidate-grid')
     fireEvent.keyDown(within(grid).getAllByRole('button')[0], {
       key: 'ArrowDown',
       shiftKey: true,
     })
 
-    expect(screen.getByLabelText('Duration (minutes)')).toHaveValue(135)
-    expect(within(grid).getAllByRole('button')[0]).toHaveTextContent('16:00–18:15')
+    fireEvent.click(screen.getByRole('radio', { name: 'Private' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create poll' }))
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1))
+    const [, options] = api.post.mock.calls[0] as [string, { body: Record<string, unknown> }]
+    const sent = options.body.options as { startTime: string; durationMinutes: number }[]
+    expect(sent.map((option) => option.durationMinutes)).toEqual([75, 60])
   })
 
   it('paints the calendar response scheduled sessions underneath the candidate layer', async () => {

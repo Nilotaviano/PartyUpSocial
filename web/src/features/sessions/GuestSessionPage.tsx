@@ -6,6 +6,7 @@ import { isApiError } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import {
   fieldControlClasses,
+  fieldSelectClasses,
   quietChipClasses,
   segmentItemClasses,
 } from '../../components/ui/classes'
@@ -38,6 +39,14 @@ import {
 
 const rsvpChoices: GuestRsvpResponse[] = ['Going', 'Maybe', 'Declined']
 const MAX_OPTIONS = 12
+
+/**
+ * D-211: an option owns its own length, and this arm has no candidate grid to
+ * paint one on — so a suggestion collects it from a plain select, the same
+ * choices the registered suggest dialog offers.
+ */
+const SUGGEST_DURATION_CHOICES = [30, 60, 90, 120, 180, 240] as const
+const DEFAULT_SUGGEST_MINUTES = 60
 
 /**
  * design §10.1: the single component behind both guest routes. Mounted at
@@ -381,6 +390,7 @@ function GuestPollBranch({ guestLinkId, heading, view }: GuestPollBranchProps) {
   const [displayName, setDisplayName] = useState('')
   const [pendingOptionId, setPendingOptionId] = useState<string | null>(null)
   const [suggestValue, setSuggestValue] = useState('')
+  const [suggestDuration, setSuggestDuration] = useState(String(DEFAULT_SUGGEST_MINUTES))
   const [suggestError, setSuggestError] = useState<string | null>(null)
   const renameInput = useRef<HTMLInputElement>(null)
 
@@ -414,7 +424,8 @@ function GuestPollBranch({ guestLinkId, heading, view }: GuestPollBranchProps) {
   })
 
   const suggest = useMutation({
-    mutationFn: (startTime: string) => suggestPollOptionAsGuest(guestLinkId, startTime),
+    mutationFn: ({ startTime, durationMinutes }: { startTime: string; durationMinutes: number }) =>
+      suggestPollOptionAsGuest(guestLinkId, startTime, durationMinutes),
     onSuccess: () => {
       setSuggestValue('')
       return afterMutation(t('suggest.added'))
@@ -455,7 +466,10 @@ function GuestPollBranch({ guestLinkId, heading, view }: GuestPollBranchProps) {
       setSuggestError(t('suggest.optionCap'))
       return
     }
-    suggest.mutate(asInstant.toISOString())
+    suggest.mutate({
+      startTime: asInstant.toISOString(),
+      durationMinutes: Number(suggestDuration),
+    })
   }
 
   return (
@@ -582,6 +596,26 @@ function GuestPollBranch({ guestLinkId, heading, view }: GuestPollBranchProps) {
                   onChange={(event) => setSuggestValue(event.target.value)}
                 />
                 <DateEcho value={suggestValue} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label
+                  className="font-body font-semibold text-ink"
+                  htmlFor="guest-suggest-option-duration"
+                >
+                  {t('suggest.duration')}
+                </label>
+                <select
+                  className={fieldSelectClasses}
+                  id="guest-suggest-option-duration"
+                  value={suggestDuration}
+                  onChange={(event) => setSuggestDuration(event.target.value)}
+                >
+                  {SUGGEST_DURATION_CHOICES.map((minutes) => (
+                    <option key={minutes} value={minutes}>
+                      {t('suggest.durationOption', { minutes })}
+                    </option>
+                  ))}
+                </select>
               </div>
               <Button
                 aria-busy={suggest.isPending}

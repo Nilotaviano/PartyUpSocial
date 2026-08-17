@@ -33,7 +33,6 @@ function pollResponse(overrides: Partial<PollDetailResponse> = {}): PollDetailRe
     id: 'poll-1',
     organizerId: 'user-organizer',
     title: 'Deep Rock co-op night',
-    durationMinutes: 120,
     platform: 'PC · Discord',
     game: { name: 'Deep Rock Galactic', steamAppId: 548430 },
     notes: 'Bring snacks.',
@@ -53,6 +52,7 @@ function pollResponse(overrides: Partial<PollDetailResponse> = {}): PollDetailRe
       {
         id: 'opt-1',
         startTime: '2026-08-15T20:00:00Z',
+        durationMinutes: 120,
         suggestedByUserId: null,
         suggestedByGuestIdentityId: null,
         suggester: null,
@@ -84,6 +84,7 @@ function pollResponse(overrides: Partial<PollDetailResponse> = {}): PollDetailRe
       {
         id: 'opt-2',
         startTime: '2026-08-15T21:30:00Z',
+        durationMinutes: 120,
         suggestedByUserId: null,
         suggestedByGuestIdentityId: null,
         suggester: null,
@@ -199,6 +200,7 @@ describe('mapPollDetail', () => {
           {
             id: 'opt-1',
             startTime: '2026-08-15T20:00:00Z',
+            durationMinutes: 120,
             suggestedByUserId: 'user-2',
             suggestedByGuestIdentityId: null,
             suggester: {
@@ -232,6 +234,7 @@ describe('mapPollDetail', () => {
           {
             id: 'opt-1',
             startTime: '2026-08-15T20:00:00Z',
+            durationMinutes: 120,
             suggestedByUserId: null,
             suggestedByGuestIdentityId: null,
             suggester: {
@@ -277,6 +280,7 @@ describe('D-052 ranking: Available then Maybe', () => {
           {
             id: 'a',
             startTime: '2026-08-15T22:00:00Z',
+            durationMinutes: 120,
             suggestedByUserId: null,
             suggestedByGuestIdentityId: null,
             suggester: null,
@@ -291,6 +295,7 @@ describe('D-052 ranking: Available then Maybe', () => {
           {
             id: 'b',
             startTime: '2026-08-15T20:00:00Z',
+            durationMinutes: 120,
             suggestedByUserId: null,
             suggestedByGuestIdentityId: null,
             suggester: null,
@@ -322,7 +327,7 @@ describe('tallyFor', () => {
 describe('optionDayLabel/optionRange', () => {
   it('formats a fake-local option time as a sane HH:mm range', () => {
     const mapped = mapPollDetail(pollResponse(), 'UTC', labels)!
-    const range = optionRange(mapped.options[0]!, mapped.durationMinutes, formatters())
+    const range = optionRange(mapped.options[0]!, formatters())
     expect(range).toBe('20:00–22:00')
     expect(optionDayLabel(mapped.options[0]!, formatters())).toBe('Sat')
   })

@@ -32,7 +32,6 @@ function pollDetail() {
     id: 'poll-1',
     organizerId: 'organizer-1',
     title: 'Raid night poll',
-    durationMinutes: 120,
     platform: 'notApplicable',
     game: null,
     notes: '',

@@ -85,10 +85,14 @@ export function VotingGrid({
   return (
     <ul className="mt-2 space-y-2">
       {options.map((option) => {
-        const timeText = new Intl.DateTimeFormat(locale, {
+        // D-211: every option owns its own end, so the row states the whole
+        // window — a bare start would read as if they all shared one length.
+        const start = new Date(option.startTime)
+        const end = new Date(start.getTime() + Number(option.durationMinutes) * 60_000)
+        const timeText = `${new Intl.DateTimeFormat(locale, {
           dateStyle: 'medium',
           timeStyle: 'short',
-        }).format(new Date(option.startTime))
+        }).format(start)} – ${new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(end)}`
         const current = (option.viewerVote as VoteChoiceValue | null) ?? null
         // An in-flight vote on THIS row must never disable its controls — a disabled button
         // drops browser focus outright, which would break revise-keeps-focus (design §6 S6

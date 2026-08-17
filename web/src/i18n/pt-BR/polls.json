@@ -16,7 +16,6 @@
       "hours24": "24 horas",
       "hours48": "48 horas"
     },
-    "duration": "Duração (minutos)",
     "platform": "Plataforma",
     "game": "Jogo",
     "gameFreeText": "Digite o nome do jogo",
@@ -40,13 +39,13 @@
     },
     "grid": {
       "heading": "Opções de horário",
-      "hint": "Toque em um horário para adicioná-lo. Arraste uma faixa para movê-la ou arraste a alça para mudar a duração de todas as opções.",
+      "hint": "Pressione e arraste em uma coluna vazia para pintar um horário. Toque para colocar um com a última duração usada. Arraste uma faixa para movê-la ou a alça para mudar a duração desse horário.",
       "showDaytime": "Mostrar horário diurno",
       "eveningsOnly": "Somente à noite",
       "weekOf": "Semana de {{range}}",
       "count": "{{count}}/{{max}} opções",
       "sessionCount": "{{occupancy}} confirmados",
-      "resizeDuration": "Arraste para mudar a duração de todas as opções",
+      "resizeDuration": "Arraste para mudar a duração deste horário",
       "dayPagerRange": "{{start}} – {{end}}",
       "earlierDays": "Dias anteriores",
       "laterDays": "Dias seguintes"
@@ -118,6 +117,8 @@
   },
   "suggest": {
     "heading": "Sugerir um horário",
+    "duration": "Duração",
+    "durationOption": "{{minutes}} minutos",
     "add": "Sugerir",
     "added": "Sua sugestão foi adicionada.",
     "optionCap": "Esta enquete já tem 12 opções de horário, o máximo que ela pode ter."
@@ -222,7 +223,7 @@
     "candidateFreeCount_one": "{{day}} {{time}} — {{count}} amigo livre",
     "candidateFreeCount_other": "{{day}} {{time}} — {{count}} amigos livres",
     "candidateGridLabel": "Opções de horário",
-    "candidateBand": "Opção {{day}} {{range}}. Enter remove, as setas movem e Shift com as setas muda a duração compartilhada.",
+    "candidateBand": "Opção {{day}} {{range}}. Enter remove, as setas movem e Shift com as setas muda a duração dela.",
     "candidateAdded": "Opção adicionada: {{day}} {{range}}.",
     "candidateRemoved": "Opção removida: {{day}} {{range}}.",
     "candidateMoved": "Opção movida: {{day}} {{range}}.",
@@ -238,7 +239,6 @@
   },
   "detailLovable": {
     "meta": {
-      "duration": "Duração",
       "privacy": "Privacidade",
       "minimum": "Mínimo",
       "capacity": "Capacidade",

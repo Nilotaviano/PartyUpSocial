@@ -8,6 +8,7 @@ function options() {
     {
       id: 'option-1',
       startTime: '2099-01-01T10:00:00Z',
+      durationMinutes: 120,
       suggestedByUserId: null,
       suggestedByGuestIdentityId: null,
       suggester: null,
@@ -44,6 +45,30 @@ describe('VotingGrid', () => {
       'radiogroup',
     )
     expect(screen.queryByRole('grid')).not.toBeInTheDocument()
+  })
+
+  it('names each row with that option own start-to-end range_D211', () => {
+    render(
+      <VotingGrid
+        disabled={false}
+        locale="en-US"
+        options={[
+          { ...options()[0], durationMinutes: 90 },
+          { ...options()[0], id: 'option-2', durationMinutes: 240 },
+        ]}
+        pendingOptionId={null}
+        onVote={vi.fn()}
+      />,
+    )
+
+    const end = (iso: string) =>
+      new Intl.DateTimeFormat('en-US', { timeStyle: 'short' }).format(new Date(iso))
+    expect(screen.getByTestId('poll-option-option-1').textContent).toContain(
+      end('2099-01-01T11:30:00Z'),
+    )
+    expect(screen.getByTestId('poll-option-option-2').textContent).toContain(
+      end('2099-01-01T14:00:00Z'),
+    )
   })
 
   it('renders the value glyph aria-hidden with the accessible name carrying "{time}, {value}"', () => {
