@@ -24,7 +24,7 @@ jobs:
         with:
           global-json-file: global.json
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj', 'global.json') }}
@@ -62,7 +62,7 @@ jobs:
         with:
           global-json-file: global.json
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj', 'global.json') }}
@@ -152,7 +152,7 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj', 'global.json') }}
@@ -180,7 +180,7 @@ jobs:
       # Browser binaries keyed to the pinned Playwright package version; `install` becomes a
       # no-op download on a hit. `--with-deps` still apt-installs system libraries every run —
       # those live outside the cacheable home directory.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ matrix.browser }}-${{ runner.os }}-${{ hashFiles('Directory.Packages.props') }}
