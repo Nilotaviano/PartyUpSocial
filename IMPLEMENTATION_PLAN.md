@@ -174,7 +174,7 @@ Phase 7 shipped end-to-end across seven slices (S1-S7), documented in `PHASE7_DE
 ## Phase 10 — Friend Groups
 
 - **Scope: D-198..D-210** — the `FriendGroup` aggregate, invite/accept membership, the third `Groups` visibility level with its rule 2g grant, audience targeting on sessions/polls, and the group notification, caps, deletion, and unfriend-surface rules. Slices and ordering are in `docs/superpowers/plans/2026-08-16-friend-groups.md`.
-- Status: in progress, started 2026-08-16. Ships its own UI like every phase after Phase 1.
+- Status: complete 2026-08-17. Domain aggregate + rule 2g engine, persistence/SQL, application use cases, API contracts, integration tests, the `/groups` web feature with visibility control/provenance tags/unfriend surfacing, a real-browser end-to-end flow test, and the closing review sweep all landed; decision-log rows verified in TRACEABILITY.md.
 
 ## Cross-cutting rules
 
