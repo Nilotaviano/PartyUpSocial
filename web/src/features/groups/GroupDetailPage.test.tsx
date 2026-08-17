@@ -18,20 +18,77 @@ vi.mock('../../auth/useSession', () => ({
 
 import '../../i18n'
 import { GroupDetailPage } from './GroupDetailPage'
+import type { FriendGroupDetail } from './groupQueries'
 
 function avatar(emoji: string) {
   return { kind: 'emoji', emoji, avatarSourceId: null, imgUrl: null }
 }
 
-function detail() {
+function detail(): FriendGroupDetail {
   return {
     id: 'g1',
     name: 'D&D crew',
     ownerId: 'owner-1',
     createdAt: '2030-01-01T00:00:00Z',
+    ownerDisplayName: 'Owner One',
+    ownerAvatar: avatar('👑'),
+    ownerMasked: false,
     members: [
-      { userId: 'friend-1', status: 'accepted', invitedAt: '2030-01-01T00:00:00Z', acceptedAt: '2030-01-01T00:00:00Z' },
-      { userId: 'friend-2', status: 'invited', invitedAt: '2030-01-01T00:00:00Z', acceptedAt: null },
+      {
+        userId: 'friend-1',
+        status: 'accepted',
+        invitedAt: '2030-01-01T00:00:00Z',
+        acceptedAt: '2030-01-01T00:00:00Z',
+        displayName: 'Friend One',
+        avatar: avatar('🎲'),
+        masked: false,
+      },
+      {
+        userId: 'friend-2',
+        status: 'invited',
+        invitedAt: '2030-01-01T00:00:00Z',
+        acceptedAt: null,
+        displayName: 'Friend Two',
+        avatar: avatar('🕹️'),
+        masked: false,
+      },
+    ],
+  }
+}
+
+/**
+ * A retained-but-unfriended Accepted member (D-200) alongside a blocked-pair
+ * member masked at render (D-076/D-202) — the roster carries real identity
+ * data straight from the server for both cases, no client-side friends join.
+ */
+function detailWithRetainedAndMaskedMembers(): FriendGroupDetail {
+  return {
+    id: 'g1',
+    name: 'D&D crew',
+    ownerId: 'owner-1',
+    createdAt: '2030-01-01T00:00:00Z',
+    ownerDisplayName: 'Owner One',
+    ownerAvatar: avatar('👑'),
+    ownerMasked: false,
+    members: [
+      {
+        userId: 'retained-1',
+        status: 'accepted',
+        invitedAt: '2030-01-01T00:00:00Z',
+        acceptedAt: '2030-01-01T00:00:00Z',
+        displayName: 'Retained Rae',
+        avatar: avatar('🎯'),
+        masked: false,
+      },
+      {
+        userId: 'blocked-1',
+        status: 'accepted',
+        invitedAt: '2030-01-01T00:00:00Z',
+        acceptedAt: '2030-01-01T00:00:00Z',
+        displayName: null,
+        avatar: null,
+        masked: true,
+      },
     ],
   }
 }
@@ -47,10 +104,10 @@ const FRIENDS = [
   },
 ]
 
-function mockGetGroup() {
+function mockGetGroup(data: FriendGroupDetail = detail()) {
   api.get.mockImplementation((path: string) => {
     if (path === '/api/v1/friend-groups/{groupId}') {
-      return Promise.resolve({ data: detail() })
+      return Promise.resolve({ data })
     }
     if (path === '/api/v1/friends') {
       return Promise.resolve({ data: { items: FRIENDS } })
@@ -108,5 +165,47 @@ describe('GroupDetailPage — owner-only management_D199', () => {
     expect(screen.queryByRole('button', { name: /Invite friends/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Delete/ })).not.toBeInTheDocument()
+  })
+
+  it("renders the owner's server-resolved name in the eyebrow for a member viewer", async () => {
+    mockedUseSession.mockReturnValue({
+      data: { userId: 'friend-1', profile: { displayName: 'Friend One', avatar: avatar('🎲') } },
+    })
+    mockGetGroup()
+
+    renderPage()
+
+    expect(await screen.findByText('Owned by Owner One')).toBeInTheDocument()
+  })
+})
+
+describe('GroupDetailPage — server-resolved roster identities, no client-side friends join_D200_D202', () => {
+  it('names a retained non-friend Accepted member from the server response_D200', async () => {
+    mockedUseSession.mockReturnValue({
+      data: { userId: 'owner-1', profile: { displayName: 'Me', avatar: avatar('😀') } },
+    })
+    mockGetGroup(detailWithRetainedAndMaskedMembers())
+
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'D&D crew' })).toBeInTheDocument()
+    // No friends-list entry exists for this id at all, yet the roster still names them —
+    // proving the name came from the server response, not a client-side friends join.
+    expect(screen.getAllByText('Retained Rae').length).toBeGreaterThan(0)
+  })
+
+  it('renders a blocked-pair member as Anonymous User, the row still listed_D076_D202', async () => {
+    mockedUseSession.mockReturnValue({
+      data: { userId: 'owner-1', profile: { displayName: 'Me', avatar: avatar('😀') } },
+    })
+    mockGetGroup(detailWithRetainedAndMaskedMembers())
+
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'D&D crew' })).toBeInTheDocument()
+    // Renders at least once visibly, plus once more inside the row's sr-only Remove label.
+    expect(screen.getAllByText('Anonymous User').length).toBeGreaterThan(0)
+    // Still one row per member — masking never drops the row (D-202).
+    expect(screen.getAllByRole('button', { name: /^Remove/ }).length).toBe(2)
   })
 })

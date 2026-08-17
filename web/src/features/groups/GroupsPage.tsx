@@ -1,4 +1,4 @@
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Crown, Inbox, Plus, UserPlus, UsersRound } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -11,13 +11,12 @@ import { Button } from '../../components/ui/button'
 import { primaryCtaClasses } from '../../components/ui/classes'
 import { useToast } from '../../components/ui/toastStore'
 import { friendKeys, getFriends } from '../friends/friendGraph'
-import { AvatarStack, Tag, NewGroupDialog } from './GroupBits'
+import { AvatarStack, Tag, NewGroupDialog, type StackPerson } from './GroupBits'
 import { identityName, type IdentityLookup } from './identity'
 import {
   acceptGroupInvitation,
   createGroup,
   declineGroupInvitation,
-  getGroupDetail,
   getGroupList,
   groupKeys,
   inviteGroupMembers,
@@ -30,13 +29,14 @@ import {
  * Adaptations:
  *  - The prototype's in-memory `useGroups()` store is replaced by TanStack
  *    Query against the real API.
- *  - `GET /friend-groups` returns only `{id,name,ownerId,createdAt}` per
- *    group (no member ids, no counts) — the prototype's `Group` type carried
- *    both directly. Each card's member count/avatar stack is filled in by a
- *    second, per-group `GET /friend-groups/{id}` fetch (the same endpoint
- *    the detail page uses), fired for every listed group via `useQueries`;
- *    a card whose detail hasn't resolved yet simply omits the stack/count
- *    line rather than showing a placeholder.
+ *  - `GET /friend-groups` returns `memberCount` (owner + every Accepted
+ *    member) directly on each card's summary — no per-group detail fetch
+ *    needed for the count. A card's avatar stack renders only from a
+ *    group's detail query that is ALREADY in the TanStack Query cache (the
+ *    viewer has visited that group's detail page this session) — read
+ *    passively via `queryClient.getQueryData`, never fetched here, so
+ *    listing groups never fires the N+1 per-card request the count alone
+ *    used to require.
  *  - The prototype's 6-tab bottom bar is not reproduced; Groups reaches the
  *    shell nav through `navItems.ts` like every other section.
  *  - Empty states render through the shell's `EmptyState` (h3 heading).
@@ -68,38 +68,30 @@ function useIdentityLookup() {
   return { resolve, candidates: friends.data ?? [] }
 }
 
-type GroupDetailMap = Map<string, FriendGroupDetail | undefined>
+/** The stack people for a card, read passively from an already-cached detail — never fetched here. */
+function stackPeopleFrom(detail: FriendGroupDetail | undefined): StackPerson[] | undefined {
+  if (!detail || !detail.members) {
+    return undefined
+  }
 
-function useGroupDetails(groupIds: string[]): GroupDetailMap {
-  const pages = useQueries({
-    queries: groupIds.map((id) => ({
-      queryKey: groupKeys.detail(id),
-      queryFn: () => getGroupDetail(id),
-    })),
-  })
-  return new Map(groupIds.map((id, index) => [id, pages[index]?.data]))
-}
-
-function rosterFor(group: FriendGroupSummary, detail: FriendGroupDetail | undefined) {
-  const members = detail?.members ?? []
-  const accepted = [group.ownerId, ...members.filter((m) => m.status === 'accepted').map((m) => m.userId)]
-  const invited = members.filter((m) => m.status === 'invited').length
-  return { accepted, invited, resolved: detail !== undefined }
+  return [
+    { userId: detail.ownerId, masked: detail.ownerMasked, avatar: detail.ownerAvatar },
+    ...detail.members
+      .filter((member) => member.status === 'accepted')
+      .map((member) => ({ userId: member.userId, masked: member.masked, avatar: member.avatar })),
+  ]
 }
 
 function GroupCard({
   group,
   owner,
-  resolve,
-  detail,
+  stackPeople,
 }: {
   group: FriendGroupSummary
   owner: boolean
-  resolve: IdentityLookup
-  detail: FriendGroupDetail | undefined
+  stackPeople: StackPerson[] | undefined
 }) {
   const { t } = useTranslation('groups')
-  const roster = rosterFor(group, detail)
 
   return (
     <li>
@@ -112,13 +104,9 @@ function GroupCard({
             <span className="block truncate font-display text-[15px] font-extrabold text-ink">
               {group.name}
             </span>
-            {roster.resolved && (
-              <span className="mt-0.5 block text-[12px] text-ink-soft tabular-nums">
-                {t('roster.memberCount', { count: roster.accepted.length })}
-                {owner && roster.invited > 0 && ` · ${t('roster.invitedCount', { count: roster.invited })}`}
-                {!owner && ` · ${t('roster.ownedBy', { name: identityName(group.ownerId, resolve, t) })}`}
-              </span>
-            )}
+            <span className="mt-0.5 block text-[12px] text-ink-soft tabular-nums">
+              {t('roster.memberCount', { count: group.memberCount })}
+            </span>
           </span>
           {owner && (
             <Tag icon={Crown} tone="accent">
@@ -126,9 +114,9 @@ function GroupCard({
             </Tag>
           )}
         </div>
-        {roster.resolved && (
+        {stackPeople && (
           <div className="mt-3">
-            <AvatarStack resolve={resolve} userIds={roster.accepted} />
+            <AvatarStack people={stackPeople} />
           </div>
         )}
       </Link>
@@ -149,7 +137,6 @@ export function GroupsPage() {
   const owned = list.data?.owned ?? []
   const memberOf = list.data?.memberOf ?? []
   const invites = list.data?.invites ?? []
-  const detailById = useGroupDetails([...owned, ...memberOf].map((g) => g.id))
 
   function reportError(error: unknown) {
     showToast({
@@ -270,11 +257,12 @@ export function GroupsPage() {
               <ul className="grid gap-2 sm:grid-cols-2">
                 {owned.map((group) => (
                   <GroupCard
-                    detail={detailById.get(group.id)}
                     group={group}
                     key={group.id}
                     owner
-                    resolve={resolve}
+                    stackPeople={stackPeopleFrom(
+                      queryClient.getQueryData<FriendGroupDetail>(groupKeys.detail(group.id)),
+                    )}
                   />
                 ))}
               </ul>
@@ -292,11 +280,12 @@ export function GroupsPage() {
               <ul className="grid gap-2 sm:grid-cols-2">
                 {memberOf.map((group) => (
                   <GroupCard
-                    detail={detailById.get(group.id)}
                     group={group}
                     key={group.id}
                     owner={false}
-                    resolve={resolve}
+                    stackPeople={stackPeopleFrom(
+                      queryClient.getQueryData<FriendGroupDetail>(groupKeys.detail(group.id)),
+                    )}
                   />
                 ))}
               </ul>

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Crown, DoorOpen, MailPlus, Pencil, Trash2, UsersRound } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { isApiError } from '../../api/client'
@@ -16,7 +16,6 @@ import { AvatarDisc } from '../friends/AvatarDisc'
 import { avatarImgUrl } from '../friends/avatarImage'
 import { friendKeys, getFriends, type FriendItem } from '../friends/friendGraph'
 import { FriendMultiSelect, Tag } from './GroupBits'
-import { identityName, type IdentityLookup } from './identity'
 import {
   deleteGroup,
   getGroupDetail,
@@ -24,44 +23,53 @@ import {
   inviteGroupMembers,
   removeGroupMember,
   renameGroup,
+  type FriendGroupDetail,
   type FriendGroupMember,
 } from './groupQueries'
 
 /**
  * Ported from the Lovable reference (`src/routes/groups.$groupId.tsx`).
  * Adaptations mirror `GroupBits.tsx`'s file header: `AvatarDisc`/`IdentityRow`
- * replace the prototype's own `Avatar`, roster identity resolves through the
- * viewer's friends list (the roster API ships bare `userId`s only), and every
- * dialog follows the `SessionDiscardDialog` contract instead of the
- * prototype's shadcn `Dialog`/`AlertDialog`. The prototype's single
- * `AlertDialog` covering delete/leave/remove is one local `ConfirmDialog`
- * here, parameterised the same way.
+ * replace the prototype's own `Avatar`, roster identity renders straight off
+ * the server response (`FriendGroupMemberResponse.displayName`/`avatar`/
+ * `masked`, plus the detail's `ownerDisplayName`/`ownerAvatar`/`ownerMasked`)
+ * rather than a client-side friends-list join — a retained non-friend member
+ * (D-200) still gets a real name, and a D-076-masked blocked-pair member
+ * renders anonymous, both server-decided. Every dialog follows the
+ * `SessionDiscardDialog` contract instead of the prototype's shadcn
+ * `Dialog`/`AlertDialog`. The prototype's single `AlertDialog` covering
+ * delete/leave/remove is one local `ConfirmDialog` here, parameterised the
+ * same way.
  */
 
 type ConfirmKind = { kind: 'delete' } | { kind: 'leave' } | { kind: 'remove'; userId: string }
 
-function useIdentityLookup() {
-  const friends = useQuery({ queryKey: friendKeys.friends, queryFn: getFriends })
-  const { data: session } = useSession()
+type RosterPerson = {
+  userId: string
+  displayName: string
+  avatar?: { emoji?: string | null; imgUrl?: string | null } | null
+  masked: boolean
+  isOwner: boolean
+}
 
-  return useMemo<IdentityLookup>(() => {
-    const map = new Map<string, { displayName: string; emoji?: string | null; imgUrl?: string | null }>()
-    for (const friend of friends.data ?? []) {
-      map.set(friend.userId, {
-        displayName: friend.displayName,
-        emoji: friend.avatar.emoji,
-        imgUrl: friend.avatar.imgUrl,
-      })
-    }
-    if (session?.userId && session.profile) {
-      map.set(session.userId, {
-        displayName: session.profile.displayName,
-        emoji: session.profile.avatar.emoji,
-        imgUrl: session.profile.avatar.imgUrl,
-      })
-    }
-    return (userId) => map.get(userId)
-  }, [friends.data, session])
+function ownerRosterPerson(group: FriendGroupDetail, t: (key: string) => string): RosterPerson {
+  return {
+    userId: group.ownerId,
+    displayName: group.ownerMasked ? t('member.anonymous') : (group.ownerDisplayName ?? t('member.unknown')),
+    avatar: group.ownerAvatar,
+    masked: group.ownerMasked,
+    isOwner: true,
+  }
+}
+
+function memberRosterPerson(member: FriendGroupMember, t: (key: string) => string): RosterPerson {
+  return {
+    userId: member.userId,
+    displayName: member.masked ? t('member.anonymous') : (member.displayName ?? t('member.unknown')),
+    avatar: member.avatar,
+    masked: member.masked,
+    isOwner: false,
+  }
 }
 
 function RenameDialog({
@@ -316,7 +324,6 @@ export function GroupDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const showToast = useToast()
-  const resolve = useIdentityLookup()
   const { data: session } = useSession()
   const friends = useQuery({ queryKey: friendKeys.friends, queryFn: getFriends })
 
@@ -416,8 +423,12 @@ export function GroupDetailPage() {
   const isOwner = session?.userId === group.ownerId
   const acceptedMembers: FriendGroupMember[] = group.members.filter((m) => m.status === 'accepted')
   const invitedMembers: FriendGroupMember[] = group.members.filter((m) => m.status === 'invited')
-  const rosterIds = [group.ownerId, ...acceptedMembers.map((m) => m.userId)]
-  const alreadyInGroup = new Set([...rosterIds, ...invitedMembers.map((m) => m.userId)])
+  const roster: RosterPerson[] = [
+    ownerRosterPerson(group, t),
+    ...acceptedMembers.map((member) => memberRosterPerson(member, t)),
+  ]
+  const invitedRoster: RosterPerson[] = invitedMembers.map((member) => memberRosterPerson(member, t))
+  const alreadyInGroup = new Set([...roster.map((p) => p.userId), ...invitedRoster.map((p) => p.userId)])
   const candidates = (friends.data ?? []).filter((friend) => !alreadyInGroup.has(friend.userId))
 
   return (
@@ -456,60 +467,58 @@ export function GroupDetailPage() {
             )
           }
           back={{ to: '/groups', label: t('list.heading') }}
-          description={t('roster.memberCount', { count: rosterIds.length })}
-          eyebrow={isOwner ? t('eyebrow.owner') : t('eyebrow.ownedBy', { name: identityName(group.ownerId, resolve, t) })}
+          description={t('roster.memberCount', { count: roster.length })}
+          eyebrow={
+            isOwner
+              ? t('eyebrow.owner')
+              : t('eyebrow.ownedBy', { name: ownerRosterPerson(group, t).displayName })
+          }
           title={group.name}
         />
 
-        <SectionCard icon={UsersRound} title={`${t('sections.roster')} · ${rosterIds.length}`}>
+        <SectionCard icon={UsersRound} title={`${t('sections.roster')} · ${roster.length}`}>
           <ul className="space-y-2">
-            {rosterIds.map((userId) => {
-              const identity = resolve(userId)
-              const isGroupOwner = userId === group.ownerId
-              return (
-                <li className="rounded-xl border-2 border-ink bg-card px-3 py-2.5" key={userId}>
-                  <IdentityRow
-                    avatar={
-                      <AvatarDisc
-                        emoji={identity?.emoji}
-                        imgUrl={avatarImgUrl(identity)}
-                        masked={!identity}
-                        seed={userId}
-                        size="sm"
-                      />
-                    }
-                    displayName={
-                      session?.userId === userId ? t('roster.you') : identityName(userId, resolve, t)
-                    }
-                    meta={
-                      isGroupOwner && (
-                        <Tag icon={Crown} tone="accent">
-                          {t('badges.owner')}
-                        </Tag>
-                      )
-                    }
-                    actions={
-                      isOwner && session?.userId !== userId ? (
-                        <button
-                          className={neutralCtaClasses}
-                          type="button"
-                          onClick={() => setConfirm({ kind: 'remove', userId })}
-                        >
-                          {t('actions.remove')}
-                          <span className="sr-only"> {identityName(userId, resolve, t)}</span>
-                        </button>
-                      ) : undefined
-                    }
-                  />
-                </li>
-              )
-            })}
+            {roster.map((person) => (
+              <li className="rounded-xl border-2 border-ink bg-card px-3 py-2.5" key={person.userId}>
+                <IdentityRow
+                  avatar={
+                    <AvatarDisc
+                      emoji={person.avatar?.emoji}
+                      imgUrl={avatarImgUrl(person.avatar)}
+                      masked={person.masked}
+                      seed={person.userId}
+                      size="sm"
+                    />
+                  }
+                  displayName={session?.userId === person.userId ? t('roster.you') : person.displayName}
+                  meta={
+                    person.isOwner && (
+                      <Tag icon={Crown} tone="accent">
+                        {t('badges.owner')}
+                      </Tag>
+                    )
+                  }
+                  actions={
+                    isOwner && session?.userId !== person.userId ? (
+                      <button
+                        className={neutralCtaClasses}
+                        type="button"
+                        onClick={() => setConfirm({ kind: 'remove', userId: person.userId })}
+                      >
+                        {t('actions.remove')}
+                        <span className="sr-only"> {person.displayName}</span>
+                      </button>
+                    ) : undefined
+                  }
+                />
+              </li>
+            ))}
           </ul>
         </SectionCard>
 
         {isOwner && (
-          <SectionCard icon={MailPlus} title={`${t('sections.invited')} · ${invitedMembers.length}`}>
-            {invitedMembers.length === 0 ? (
+          <SectionCard icon={MailPlus} title={`${t('sections.invited')} · ${invitedRoster.length}`}>
+            {invitedRoster.length === 0 ? (
               <EmptyState
                 action={
                   <Button variant="primary" onClick={() => setInviting(true)}>
@@ -522,28 +531,28 @@ export function GroupDetailPage() {
               />
             ) : (
               <ul className="space-y-2">
-                {invitedMembers.map((member) => (
+                {invitedRoster.map((person) => (
                   <li
                     className="rounded-xl border-2 border-dashed border-ink/50 bg-muted/40 px-3 py-2.5"
-                    key={member.userId}
+                    key={person.userId}
                   >
                     <IdentityRow
                       avatar={
                         <AvatarDisc
-                          emoji={resolve(member.userId)?.emoji}
-                          imgUrl={avatarImgUrl(resolve(member.userId))}
-                          masked={!resolve(member.userId)}
-                          seed={member.userId}
+                          emoji={person.avatar?.emoji}
+                          imgUrl={avatarImgUrl(person.avatar)}
+                          masked={person.masked}
+                          seed={person.userId}
                           size="sm"
                         />
                       }
-                      displayName={identityName(member.userId, resolve, t)}
+                      displayName={person.displayName}
                       meta={<Tag>{t('badges.invited')}</Tag>}
                       actions={
                         <button
                           className={neutralCtaClasses}
                           type="button"
-                          onClick={() => removeMember.mutate(member.userId)}
+                          onClick={() => removeMember.mutate(person.userId)}
                         >
                           {t('actions.revoke')}
                         </button>
@@ -588,7 +597,13 @@ export function GroupDetailPage() {
         <ConfirmDialog
           confirm={confirm}
           groupName={group.name}
-          memberName={confirmMemberId ? identityName(confirmMemberId, resolve, t) : ''}
+          memberName={
+            confirmMemberId
+              ? (roster.find((p) => p.userId === confirmMemberId)?.displayName ??
+                invitedRoster.find((p) => p.userId === confirmMemberId)?.displayName ??
+                t('member.unknown'))
+              : ''
+          }
           onConfirm={() => {
             if (confirm?.kind === 'delete') remove.mutate()
             else if (confirm?.kind === 'leave' && session?.userId) removeMember.mutate(session.userId)

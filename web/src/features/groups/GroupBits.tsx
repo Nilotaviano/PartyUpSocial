@@ -12,7 +12,6 @@ import { Dialog } from '../../components/ui/dialog'
 import { AvatarDisc } from '../friends/AvatarDisc'
 import { avatarImgUrl } from '../friends/avatarImage'
 import type { FriendItem } from '../friends/friendGraph'
-import type { IdentityLookup } from './identity'
 
 /**
  * Ported from the Lovable reference (`src/components/groups/GroupBits.tsx`)
@@ -25,14 +24,12 @@ import type { IdentityLookup } from './identity'
  *    repo's existing `AvatarDisc` (`features/friends/AvatarDisc`) — never
  *    reinvented here.
  *  - The prototype resolves every id through an in-memory `person()`
- *    directory. The real roster API (`FriendGroupMemberResponse`) carries
- *    only a bare `userId` — no name/avatar projection ships on that
- *    contract (backend gap outside this task's write set) — so every call
- *    site here takes an `IdentityLookup` resolver instead of an id array,
- *    and an id the resolver can't answer (an unfriended member surviving
- *    in the roster, per design §2's "membership survives unfriending")
- *    renders with the same ordinary "masked" `AvatarDisc` treatment D-076
- *    already uses for a blocked pair, plus a neutral fallback name.
+ *    directory. `AvatarStack` instead takes the server-resolved roster
+ *    people directly (`FriendGroupMemberResponse.displayName`/`avatar`/
+ *    `masked`, plus the detail response's owner nameplate) — a D-076-masked
+ *    entry (a blocked-pair counterpart, per D-202) renders through the same
+ *    ordinary "masked" `AvatarDisc` treatment every other masked surface
+ *    uses, with no client-side friends-list join involved.
  *  - Dialogs follow the repo's `SessionDiscardDialog` contract (Radix,
  *    `bg-scrim` overlay, `rounded-card border-2 border-ink`, explicit
  *    `onOpenAutoFocus`/`onCloseAutoFocus`) rather than the prototype's
@@ -45,44 +42,40 @@ function useGroupsTranslation() {
   return useTranslation('groups')
 }
 
+/** One roster person's server-resolved identity — enough to render a disc. */
+export type StackPerson = {
+  userId: string
+  masked: boolean
+  avatar?: { emoji?: string | null; imgUrl?: string | null } | null
+}
+
 /** Overlapping avatars with a +N overflow disc (max 5, `-space-x-2`). */
-export function AvatarStack({
-  userIds,
-  resolve,
-  max = 5,
-}: {
-  userIds: string[]
-  resolve: IdentityLookup
-  max?: number
-}) {
+export function AvatarStack({ people, max = 5 }: { people: StackPerson[]; max?: number }) {
   const { t } = useGroupsTranslation()
-  const shown = userIds.slice(0, max)
-  const rest = userIds.length - shown.length
+  const shown = people.slice(0, max)
+  const rest = people.length - shown.length
 
   return (
     <span className="flex items-center">
       <span className="flex -space-x-2">
-        {shown.map((id) => {
-          const identity = resolve(id)
-          return (
-            <AvatarDisc
-              key={id}
-              className="ring-2 ring-card"
-              emoji={identity?.emoji}
-              imgUrl={avatarImgUrl(identity)}
-              masked={!identity}
-              seed={id}
-              size="xs"
-            />
-          )
-        })}
+        {shown.map((person) => (
+          <AvatarDisc
+            key={person.userId}
+            className="ring-2 ring-card"
+            emoji={person.avatar?.emoji}
+            imgUrl={avatarImgUrl(person.avatar)}
+            masked={person.masked}
+            seed={person.userId}
+            size="xs"
+          />
+        ))}
         {rest > 0 && (
           <span className="grid size-9 shrink-0 place-items-center rounded-full border-2 border-ink bg-muted font-display text-[11px] font-bold text-ink-soft ring-2 ring-card tabular-nums">
             +{rest}
           </span>
         )}
       </span>
-      <span className="sr-only">{t('roster.memberCount', { count: userIds.length })}</span>
+      <span className="sr-only">{t('roster.memberCount', { count: people.length })}</span>
     </span>
   )
 }

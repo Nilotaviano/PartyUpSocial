@@ -113,7 +113,8 @@
     "deleted": "Group deleted."
   },
   "member": {
-    "unknown": "Member"
+    "unknown": "Member",
+    "anonymous": "Anonymous User"
   },
   "a11y": {
     "dialogLabel": "Confirmation dialog"

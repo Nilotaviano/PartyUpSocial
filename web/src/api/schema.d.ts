@@ -2452,6 +2452,9 @@ export interface components {
             /** Format: uuid */
             ownerId: string;
             createdAt: string;
+            ownerDisplayName: null | string;
+            ownerAvatar: null | components["schemas"]["AvatarResponse"];
+            ownerMasked: boolean;
             members: null | components["schemas"]["FriendGroupMemberResponse"][];
         };
         FriendGroupInviteResponse: {
@@ -2473,6 +2476,9 @@ export interface components {
             status: string;
             invitedAt: string;
             acceptedAt: null | string;
+            displayName: null | string;
+            avatar: null | components["schemas"]["AvatarResponse"];
+            masked: boolean;
         };
         FriendGroupResponse: {
             /** Format: uuid */
@@ -2481,6 +2487,8 @@ export interface components {
             /** Format: uuid */
             ownerId: string;
             createdAt: string;
+            /** Format: int32 */
+            memberCount: number | string;
         };
         FriendItemResponse: {
             /** Format: uuid */

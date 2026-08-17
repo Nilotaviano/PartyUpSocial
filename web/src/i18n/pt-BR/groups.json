@@ -113,7 +113,8 @@
     "deleted": "Grupo excluído."
   },
   "member": {
-    "unknown": "Membro"
+    "unknown": "Membro",
+    "anonymous": "Usuário Anônimo"
   },
   "a11y": {
     "dialogLabel": "Diálogo de confirmação"

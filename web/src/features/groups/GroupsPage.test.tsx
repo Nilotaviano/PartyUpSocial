@@ -28,12 +28,14 @@ const OWNED_GROUP = {
   name: 'D&D crew',
   ownerId: 'owner-1',
   createdAt: '2030-01-01T00:00:00Z',
+  memberCount: 2,
 }
 const MEMBER_GROUP = {
   id: 'g2',
   name: 'FPS squad',
   ownerId: 'friend-1',
   createdAt: '2030-01-02T00:00:00Z',
+  memberCount: 2,
 }
 const INVITE = {
   id: 'g3',
@@ -124,6 +126,16 @@ describe('GroupsPage', () => {
     expect(screen.getByText('FPS squad')).toBeInTheDocument()
     expect(screen.getByText('Pending invites · 1')).toBeInTheDocument()
     expect(screen.getByText(/Tuesday D&D/)).toBeInTheDocument()
+
+    // The list card's member count comes straight off FriendGroupSummary.memberCount — both
+    // cards render "2 members" with no per-group detail fetch at all (asserted below).
+    expect(screen.getAllByText('2 members')).toHaveLength(2)
+
+    // Closes the N+1: listing groups must never fetch any group's own detail endpoint.
+    expect(api.get).not.toHaveBeenCalledWith(
+      '/api/v1/friend-groups/{groupId}',
+      expect.anything(),
+    )
   })
 
   it('fires the accept-invite mutation when Accept is clicked', async () => {
