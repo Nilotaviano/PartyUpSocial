@@ -1140,6 +1140,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/friend-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListFriendGroups"];
+        put?: never;
+        post: operations["CreateFriendGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friend-groups/{groupId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetFriendGroup"];
+        put?: never;
+        post?: never;
+        delete: operations["DeleteFriendGroup"];
+        options?: never;
+        head?: never;
+        patch: operations["RenameFriendGroup"];
+        trace?: never;
+    };
+    "/api/v1/friend-groups/{groupId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InviteFriendGroupMembers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friend-groups/{groupId}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["RemoveFriendGroupMember"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friend-groups/{groupId}/invitation/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AcceptFriendGroupInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friend-groups/{groupId}/invitation/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DeclineFriendGroupInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions": {
         parameters: {
             query?: never;
@@ -2195,6 +2291,9 @@ export interface components {
             effectiveFrom: null | string;
             effectiveUntil: null | string;
         };
+        CreateFriendGroupRequest: {
+            name: null | string;
+        };
         CreatePollGuestLinksRequest: {
             /** Format: int32 */
             count: number | string;
@@ -2210,7 +2309,8 @@ export interface components {
             minAttendance: null | number | string;
             /** Format: int32 */
             maxCapacity: null | number | string;
-            isPrivate: null | boolean;
+            visibility: null | string;
+            audienceGroupIds: null | string[];
             optionStartTimes: null | string[];
             deadlineChoice: null | string;
             inviteeUserIds: null | string[];
@@ -2247,7 +2347,8 @@ export interface components {
             minAttendance: null | number | string;
             /** Format: int32 */
             maxCapacity: null | number | string;
-            isPrivate: null | boolean;
+            visibility: null | string;
+            audienceGroupIds: null | string[];
             inviteeUserIds: null | string[];
             /** Format: int32 */
             guestLinkCount: null | number | string;
@@ -2309,7 +2410,8 @@ export interface components {
             minAttendance: null | number | string;
             /** Format: int32 */
             maxCapacity: null | number | string;
-            isPrivate: null | boolean;
+            visibility: null | string;
+            audienceGroupIds: null | string[];
             clear: null | components["schemas"]["ClearFieldRequest"][];
             ifMatch: null | string;
         };
@@ -2342,6 +2444,43 @@ export interface components {
         };
         FriendCodeResolutionResponse: {
             profile: components["schemas"]["ProfileViewResponse"];
+        };
+        FriendGroupDetailResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uuid */
+            ownerId: string;
+            createdAt: string;
+            members: null | components["schemas"]["FriendGroupMemberResponse"][];
+        };
+        FriendGroupInviteResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uuid */
+            ownerId: string;
+            invitedAt: string;
+        };
+        FriendGroupListResponse: {
+            owned: components["schemas"]["FriendGroupResponse"][];
+            memberOf: components["schemas"]["FriendGroupResponse"][];
+            invites: components["schemas"]["FriendGroupInviteResponse"][];
+        };
+        FriendGroupMemberResponse: {
+            /** Format: uuid */
+            userId: string;
+            status: string;
+            invitedAt: string;
+            acceptedAt: null | string;
+        };
+        FriendGroupResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uuid */
+            ownerId: string;
+            createdAt: string;
         };
         FriendItemResponse: {
             /** Format: uuid */
@@ -2398,6 +2537,11 @@ export interface components {
             /** Format: int64 */
             steamAppId: null | number | string;
         };
+        GroupProvenanceResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
         GuestLinkInvitationResponse: {
             /** Format: uuid */
             guestLinkId: string;
@@ -2443,6 +2587,9 @@ export interface components {
         HomeSuggestionsResponse: {
             suggestions: components["schemas"]["OverlapWindowView"][];
             hasMore: boolean;
+        };
+        InviteFriendGroupMembersRequest: {
+            userIds: string[];
         };
         InvitePollUsersRequest: {
             userIds: string[];
@@ -2566,7 +2713,7 @@ export interface components {
             status: number | string;
             instance: string;
             /** @enum {string} */
-            code: "validation_failed" | "friend_code_invalid" | "friend_request_self" | "block_self" | "antiforgery_failed" | "unauthorized" | "onboarding_required" | "user_not_found" | "friend_request_not_found" | "friendship_not_found" | "block_not_found" | "friend_request_already_exists" | "friendship_already_exists" | "friend_request_not_pending" | "steam_not_linked" | "unsupported_media_type" | "rate_limited" | "internal_error" | "session_not_found" | "session_validation" | "invalid_if_match" | "invalid_scope" | "invalid_cursor" | "session_conflict" | "session_terminal" | "session_time_locked" | "capacity_below_occupancy" | "waitlist_requires_capacity" | "session_invites_closed" | "session_responses_closed" | "session_leave_closed" | "session_guest_removal_closed" | "join_request_exists" | "join_request_not_pending" | "join_request_closed" | "no_session_capacity" | "not_waitlisted" | "guest_link_terminal" | "guest_link_claimed" | "reminder_not_eligible" | "transient_conflict" | "poll_not_found" | "poll_validation" | "poll_option_cap" | "poll_option_not_found" | "poll_voting_closed" | "poll_terminal" | "poll_invalid_transition" | "poll_participant_removed" | "poll_conflict" | "poll_guest_not_found" | "poll_selection_window_closed" | "poll_zero_options" | "poll_invites_closed" | "guest_link_not_claimed" | "notification_not_found" | "push_subscription_not_found" | "push_not_configured" | "push_channel_unsupported" | "scope_contended";
+            code: "validation_failed" | "friend_code_invalid" | "friend_request_self" | "block_self" | "antiforgery_failed" | "unauthorized" | "onboarding_required" | "user_not_found" | "friend_request_not_found" | "friendship_not_found" | "block_not_found" | "friend_request_already_exists" | "friendship_already_exists" | "friend_request_not_pending" | "steam_not_linked" | "unsupported_media_type" | "rate_limited" | "internal_error" | "session_not_found" | "session_validation" | "invalid_if_match" | "invalid_scope" | "invalid_cursor" | "session_conflict" | "session_terminal" | "session_time_locked" | "capacity_below_occupancy" | "waitlist_requires_capacity" | "session_invites_closed" | "session_responses_closed" | "session_leave_closed" | "session_guest_removal_closed" | "join_request_exists" | "join_request_not_pending" | "join_request_closed" | "no_session_capacity" | "not_waitlisted" | "guest_link_terminal" | "guest_link_claimed" | "reminder_not_eligible" | "transient_conflict" | "poll_not_found" | "poll_validation" | "poll_option_cap" | "poll_option_not_found" | "poll_voting_closed" | "poll_terminal" | "poll_invalid_transition" | "poll_participant_removed" | "poll_conflict" | "poll_guest_not_found" | "poll_selection_window_closed" | "poll_zero_options" | "poll_invites_closed" | "guest_link_not_claimed" | "notification_not_found" | "push_subscription_not_found" | "push_not_configured" | "push_channel_unsupported" | "scope_contended" | "group_not_found" | "group_limit_reached" | "group_member_limit_reached" | "group_name_taken";
             traceId: string;
             errors?: null | {
                 [key: string]: string[];
@@ -2599,7 +2746,9 @@ export interface components {
             minAttendance: number | string;
             /** Format: int32 */
             maxCapacity: null | number | string;
-            isPrivate: boolean;
+            visibility: string;
+            viaGroup: null | components["schemas"]["GroupProvenanceResponse"];
+            sharedWithGroup: boolean;
             deadlineChoice: string;
             deadline: string;
             selectionWindowEndsAt: string;
@@ -2679,12 +2828,14 @@ export interface components {
             organizerId: string;
             title: string;
             status: string;
-            isPrivate: boolean;
             deadline: string;
             selectionWindowEndsAt: string;
             createdAt: string;
             /** Format: int32 */
             optionCount: number | string;
+            visibility: string;
+            viaGroup: null | components["schemas"]["GroupProvenanceResponse"];
+            sharedWithGroup: boolean;
         };
         ProblemDetails: {
             type?: null | string;
@@ -2768,6 +2919,9 @@ export interface components {
         ReminderViewResponse: {
             choice: null | string;
         };
+        RenameFriendGroupRequest: {
+            name: null | string;
+        };
         RenameGuestPollIdentityRequest: {
             displayName: null | string;
         };
@@ -2814,7 +2968,9 @@ export interface components {
             minAttendance: number | string;
             /** Format: int32 */
             maxCapacity: null | number | string;
-            isPrivate: boolean;
+            visibility: string;
+            viaGroup: null | components["schemas"]["GroupProvenanceResponse"];
+            sharedWithGroup: boolean;
             status: string;
             createdAt: string;
             roster: components["schemas"]["RosterEntryResponse"][];
@@ -2865,13 +3021,15 @@ export interface components {
             platform: string;
             game: null | components["schemas"]["GameResponse"];
             status: string;
-            isPrivate: boolean;
             /** Format: int32 */
             maxCapacity: null | number | string;
             /** Format: int32 */
             activeOccupancy: number | string;
             organizer: components["schemas"]["MaskedParticipant"];
             viewerRelation: string;
+            visibility: string;
+            viaGroup: null | components["schemas"]["GroupProvenanceResponse"];
+            sharedWithGroup: boolean;
         };
         SetPasswordRequest: {
             newPassword: string;
@@ -6087,6 +6245,723 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    ListFriendGroups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendGroupListResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    CreateFriendGroup: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateFriendGroupRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendGroupResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    GetFriendGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendGroupDetailResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    DeleteFriendGroup: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                groupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    RenameFriendGroup: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                groupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameFriendGroupRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendGroupResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    InviteFriendGroupMembers: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                groupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteFriendGroupMembersRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendGroupResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    RemoveFriendGroupMember: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                groupId: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    AcceptFriendGroupInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                groupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendGroupResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    DeclineFriendGroupInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                groupId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
