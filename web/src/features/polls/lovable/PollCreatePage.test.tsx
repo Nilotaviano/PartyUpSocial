@@ -26,6 +26,7 @@ import {
   weekStartsOnIso,
 } from '../../availability/lovable/zone'
 import { PollCreatePage } from './PollCreatePage'
+import { BOTTOM_BAR_OFFSET_CLASSES } from '../../../components/shell/bottomBarOffset'
 
 function renderPage(initialEntry = '/polls/new') {
   return render(
@@ -755,6 +756,17 @@ describe('PollCreatePage (lovable)', () => {
       expect(screen.queryByText(enOnlyFormat.format(new Date(0)))).not.toBeInTheDocument()
     } finally {
       await i18n.changeLanguage('en')
+    }
+  })
+
+  it('lifts the sticky action bar above the mobile tab bar', async () => {
+    mockGet()
+    renderPage()
+    const bar = (await screen.findByRole('button', { name: 'Create poll' })).closest('div.fixed')
+
+    expect(bar).not.toBeNull()
+    for (const offsetClass of BOTTOM_BAR_OFFSET_CLASSES.split(' ')) {
+      expect(bar).toHaveClass(offsetClass)
     }
   })
 })

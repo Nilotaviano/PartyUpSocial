@@ -22,6 +22,7 @@ vi.mock('react-router', async () => {
 
 import '../../../i18n'
 import { SessionCreatePage } from './SessionCreatePage'
+import { BOTTOM_BAR_OFFSET_CLASSES } from '../../../components/shell/bottomBarOffset'
 
 function renderPage(initialEntries: string[] = ['/sessions/new']) {
   return render(
@@ -517,6 +518,16 @@ describe('SessionCreatePage (lovable)', () => {
         expect.objectContaining({ body: expect.objectContaining({ durationMinutes: 120 }) }),
       ),
     )
+  })
+
+  it('lifts the sticky action bar above the mobile tab bar', async () => {
+    renderPage()
+    const bar = (await screen.findByRole('button', { name: 'Create session' })).closest('div.fixed')
+
+    expect(bar).not.toBeNull()
+    for (const offsetClass of BOTTOM_BAR_OFFSET_CLASSES.split(' ')) {
+      expect(bar).toHaveClass(offsetClass)
+    }
   })
 })
 

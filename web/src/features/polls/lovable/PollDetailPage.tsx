@@ -19,6 +19,7 @@ import { useSession } from '../../../auth/useSession'
 import { Button } from '../../../components/ui/button'
 import { fieldControlClasses, neutralCtaClasses, raisedInteractiveClasses } from '../../../components/ui/classes'
 import { Dialog } from '../../../components/ui/dialog'
+import { BOTTOM_BAR_OFFSET_CLASSES } from '../../../components/shell/bottomBarOffset'
 import { PageHeader } from '../../../components/shell/PageHeader'
 import { StatusBanner } from '../../../components/ui/statusBanner'
 import { useToast } from '../../../components/ui/toastStore'
@@ -1539,7 +1540,7 @@ export function PollDetailPage() {
       )}
 
       {poll && isOrganizer && (isAwaitingSelection || isPolling) && viableEarly.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur">
+        <div className={`fixed inset-x-0 z-40 border-t border-border bg-card/95 backdrop-blur ${BOTTOM_BAR_OFFSET_CLASSES}`}>
           <div className="mx-auto flex max-w-[1400px] items-center gap-2 px-3 py-3 sm:px-6">
             <p className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
               {isAwaitingSelection

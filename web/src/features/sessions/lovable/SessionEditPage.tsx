@@ -6,6 +6,7 @@ import { CalendarClock, Gamepad2, Users } from 'lucide-react'
 import { isApiError } from '../../../api/client'
 import { Button } from '../../../components/ui/button'
 import { controlRowClasses, raisedInteractiveClasses } from '../../../components/ui/classes'
+import { BOTTOM_BAR_OFFSET_CLASSES } from '../../../components/shell/bottomBarOffset'
 import { PageHeader } from '../../../components/shell/PageHeader'
 import { StatusBanner } from '../../../components/ui/statusBanner'
 import { useDirtyGuard } from '../../../components/useDirtyGuard'
@@ -404,7 +405,7 @@ export function SessionEditPage() {
             </Section>
           </div>
 
-          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur">
+          <div className={`fixed inset-x-0 z-40 border-t border-border bg-card/95 backdrop-blur ${BOTTOM_BAR_OFFSET_CLASSES}`}>
             <div className="mx-auto flex max-w-[880px] items-center justify-end gap-2 px-3 py-3 sm:px-6">
               <button
                 ref={cancelTrigger}
