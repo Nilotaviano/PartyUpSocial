@@ -196,7 +196,6 @@ public sealed class PollOptionTests : IAsyncLifetime, IDisposable
             new PartyUp.Application.Polls.CreatePollCommand(
                 organizerId,
                 "Option test poll",
-                DurationMinutes: 60,
                 Platform: null,
                 Game: null,
                 Notes: null,
@@ -204,7 +203,7 @@ public sealed class PollOptionTests : IAsyncLifetime, IDisposable
                 MaxCapacity: null,
                 Visibility: ContentVisibility.Public,
                 AudienceGroupIds: null,
-                OptionStartTimes: [baseTime, baseTime + Duration.FromHours(1)],
+                Options: [new CreatePollOptionInput(baseTime, 60), new CreatePollOptionInput(baseTime + Duration.FromHours(1), 60)],
                 DeadlineChoice: PollDeadlineChoice.Hours48,
                 InviteeUserIds: [voterId],
                 GuestLinkCount: null),

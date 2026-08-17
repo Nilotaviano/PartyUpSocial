@@ -52,7 +52,6 @@ public sealed class PollCommandTransactionTests
         CreatePollCommand command = new(
             organizerId,
             "Raid poll",
-            DurationMinutes: 60,
             Platform: null,
             Game: null,
             Notes: null,
@@ -60,7 +59,7 @@ public sealed class PollCommandTransactionTests
             MaxCapacity: null,
             Visibility: ContentVisibility.Public,
             AudienceGroupIds: null,
-            OptionStartTimes: [clock.GetCurrentInstant() + Duration.FromHours(5), clock.GetCurrentInstant() + Duration.FromHours(6)],
+            Options: [new CreatePollOptionInput(clock.GetCurrentInstant() + Duration.FromHours(5), 60), new CreatePollOptionInput(clock.GetCurrentInstant() + Duration.FromHours(6), 60)],
             DeadlineChoice: null,
             InviteeUserIds: [inviteeId],
             GuestLinkCount: null);

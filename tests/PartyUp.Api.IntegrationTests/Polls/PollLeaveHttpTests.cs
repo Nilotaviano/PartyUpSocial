@@ -160,10 +160,10 @@ public sealed class PollLeaveHttpTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new
             {
                 title = "Leave poll fixture",
-                optionStartTimes = new[]
+                options = new[]
                 {
-                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
-                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
+                    new { startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)) },
+                    new { startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)) },
                 },
                 visibility = "public",
                 minAttendance = 1,

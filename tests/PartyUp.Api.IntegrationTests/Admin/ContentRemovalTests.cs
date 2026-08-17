@@ -238,7 +238,6 @@ public sealed class ContentRemovalTests : IAsyncLifetime, IDisposable
                 new CreatePollCommand(
                     subjectId,
                     "Notify owned poll",
-                    DurationMinutes: 60,
                     Platform: null,
                     Game: null,
                     Notes: null,
@@ -246,7 +245,7 @@ public sealed class ContentRemovalTests : IAsyncLifetime, IDisposable
                     MaxCapacity: null,
                     Visibility: ContentVisibility.Public,
             AudienceGroupIds: null,
-                    OptionStartTimes: [now + Duration.FromDays(6), now + Duration.FromDays(7)],
+                    Options: [new CreatePollOptionInput(now + Duration.FromDays(6), 60), new CreatePollOptionInput(now + Duration.FromDays(7), 60)],
                     DeadlineChoice: PollDeadlineChoice.Hours48,
                     InviteeUserIds: [voterId],
                     GuestLinkCount: null),
@@ -369,7 +368,6 @@ public sealed class ContentRemovalTests : IAsyncLifetime, IDisposable
                 new CreatePollCommand(
                     subjectId,
                     "Owned poll",
-                    DurationMinutes: 60,
                     Platform: null,
                     Game: null,
                     Notes: null,
@@ -377,7 +375,7 @@ public sealed class ContentRemovalTests : IAsyncLifetime, IDisposable
                     MaxCapacity: null,
                     Visibility: ContentVisibility.Public,
             AudienceGroupIds: null,
-                    OptionStartTimes: [now + Duration.FromDays(6), now + Duration.FromDays(7)],
+                    Options: [new CreatePollOptionInput(now + Duration.FromDays(6), 60), new CreatePollOptionInput(now + Duration.FromDays(7), 60)],
                     DeadlineChoice: PollDeadlineChoice.Hours48,
                     InviteeUserIds: [friendId],
                     GuestLinkCount: null),

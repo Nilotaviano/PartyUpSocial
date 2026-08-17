@@ -187,7 +187,6 @@ public sealed class PollCancelTests : IAsyncLifetime, IDisposable
             new CreatePollCommand(
                 organizerId,
                 "Cancel test poll",
-                DurationMinutes: 60,
                 Platform: null,
                 Game: null,
                 Notes: null,
@@ -195,7 +194,7 @@ public sealed class PollCancelTests : IAsyncLifetime, IDisposable
                 MaxCapacity: null,
                 Visibility: ContentVisibility.Public,
             AudienceGroupIds: null,
-                OptionStartTimes: [now + Duration.FromHours(2), now + Duration.FromHours(3)],
+                Options: [new CreatePollOptionInput(now + Duration.FromHours(2), 60), new CreatePollOptionInput(now + Duration.FromHours(3), 60)],
                 DeadlineChoice: deadlineChoice,
                 InviteeUserIds: [inviteeId],
                 GuestLinkCount: null),

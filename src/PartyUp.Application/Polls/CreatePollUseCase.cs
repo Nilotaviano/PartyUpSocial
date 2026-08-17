@@ -108,12 +108,15 @@ public sealed class CreatePollUseCase(
                 Poll poll;
                 try
                 {
-                    // D-211: each option carries its own length. The wire still collects one length
-                    // for the whole poll, so every candidate is minted with it.
-                    Duration15 optionDuration =
-                        Duration15.FromMinutes(command.DurationMinutes ?? CreateSessionUseCase.DefaultDurationMinutes);
+                    // D-211: each candidate carries its own length, bounded per option by D-142.
+                    // An omitted length falls back to the session-creation default, exactly as
+                    // CreateSessionUseCase treats an omitted duration.
                     PollOptionSpec[] optionSpecs =
-                        [.. (command.OptionStartTimes ?? []).Select(start => new PollOptionSpec(start, optionDuration))];
+                    [
+                        .. (command.Options ?? []).Select(option => new PollOptionSpec(
+                            option.StartTime,
+                            Duration15.FromMinutes(option.DurationMinutes ?? CreateSessionUseCase.DefaultDurationMinutes))),
+                    ];
 
                     poll = Poll.Create(
                         command.OrganizerId,
@@ -160,10 +163,16 @@ public sealed class CreatePollUseCase(
     }
 }
 
+/// <summary>
+/// One candidate as poll creation supplies it (D-211): its own start instant and its own length in
+/// minutes. An absent length means the <see cref="CreateSessionUseCase.DefaultDurationMinutes"/>
+/// default; the D-142 grid is enforced when it is turned into a <see cref="Duration15"/>.
+/// </summary>
+public sealed record CreatePollOptionInput(Instant StartTime, int? DurationMinutes);
+
 public sealed record CreatePollCommand(
     UserId OrganizerId,
     string Title,
-    int? DurationMinutes,
     Platform? Platform,
     SessionGame? Game,
     string? Notes,
@@ -173,7 +182,8 @@ public sealed record CreatePollCommand(
     ContentVisibility? Visibility,
     /// <summary>D-201: ignored unless <see cref="Visibility"/> is <see cref="ContentVisibility.Groups"/>.</summary>
     IReadOnlyList<FriendGroupId>? AudienceGroupIds,
-    IReadOnlyList<Instant>? OptionStartTimes,
+    /// <summary>D-211: one start instant and one length per candidate.</summary>
+    IReadOnlyList<CreatePollOptionInput>? Options,
     PollDeadlineChoice? DeadlineChoice,
     IReadOnlyList<UserId>? InviteeUserIds,
     int? GuestLinkCount);

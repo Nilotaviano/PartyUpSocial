@@ -482,10 +482,10 @@ public sealed class PushDispatchJobTests : IAsyncLifetime, IDisposable
         Instant deadline = _factory.Clock.GetCurrentInstant() + Duration.FromHours(48);
         await context.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO polls
-                (id, organizer_id, title, duration_minutes, platform, notes, min_attendance,
+                (id, organizer_id, title, platform, notes, min_attendance,
                  max_capacity, visibility, deadline_choice, deadline, status, created_at, selection_window_end)
             VALUES
-                ({pollId}, {organizerId.Value}, 'Dispatch job mute test', 60, 3, '', 1, NULL, 1, 2,
+                ({pollId}, {organizerId.Value}, 'Dispatch job mute test', 3, '', 1, NULL, 1, 2,
                  {deadline}, 0, {deadline - Duration.FromHours(72)}, {deadline + Duration.FromHours(48)})
             """);
         return pollId;

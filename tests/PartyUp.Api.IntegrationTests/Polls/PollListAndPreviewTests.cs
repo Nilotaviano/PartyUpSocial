@@ -626,10 +626,10 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new
             {
                 title = "Waitlist-split preview fixture",
-                optionStartTimes = new[]
+                options = new[]
                 {
-                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
-                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
+                    new { startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)) },
+                    new { startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)) },
                 },
                 visibility = "public",
                 minAttendance = 1,
@@ -812,10 +812,10 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new
             {
                 title = "List/preview fixture poll",
-                optionStartTimes = new[]
+                options = new[]
                 {
-                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
-                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
+                    new { startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)) },
+                    new { startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)) },
                 },
                 visibility = inviteeIds.Count == 0 ? "private" : "public",
                 minAttendance = 1,
@@ -834,10 +834,10 @@ public sealed class PollListAndPreviewTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new
             {
                 title = "Discoverable fixture poll",
-                optionStartTimes = new[]
+                options = new[]
                 {
-                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
-                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
+                    new { startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)) },
+                    new { startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)) },
                 },
                 visibility = "public",
                 minAttendance = 1,

@@ -178,7 +178,11 @@ public sealed class PollFailClosedTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new
             {
                 title = "Fail-closed fixture poll",
-                optionStartTimes = new[] { SessionEndpointTestSupport.Iso(baseTime), SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)) },
+                options = new[]
+                {
+                    new { startTime = SessionEndpointTestSupport.Iso(baseTime) },
+                    new { startTime = SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)) },
+                },
                 visibility = "public",
                 minAttendance = 1,
                 inviteeUserIds = inviteeIds.Select(id => id.Value).ToArray(),
@@ -202,7 +206,11 @@ public sealed class PollFailClosedTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new
             {
                 title = "Fail-closed fixture poll",
-                optionStartTimes = new[] { SessionEndpointTestSupport.Iso(baseTime), SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)) },
+                options = new[]
+                {
+                    new { startTime = SessionEndpointTestSupport.Iso(baseTime) },
+                    new { startTime = SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)) },
+                },
                 visibility = isPrivate ? "private" : "public",
                 minAttendance = 1,
                 inviteeUserIds = (inviteeIds ?? []).Select(id => id.Value).ToArray(),

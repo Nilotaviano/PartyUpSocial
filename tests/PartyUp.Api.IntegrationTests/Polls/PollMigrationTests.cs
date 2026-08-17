@@ -53,7 +53,8 @@ public sealed class PollMigrationTests : IAsyncLifetime
             await AssertRelationExistsAsync(context, relation);
         }
 
-        await AssertConstraintExistsAsync(context, "ck_polls_duration");
+        // D-211: the length lives on the option, so the D-142 check does too.
+        await AssertConstraintExistsAsync(context, "ck_poll_options_duration");
         await AssertConstraintExistsAsync(context, "ck_polls_min_attendance");
         await AssertConstraintExistsAsync(context, "ck_polls_capacity");
         await AssertConstraintExistsAsync(context, "ck_polls_game_shape");
@@ -131,10 +132,10 @@ public sealed class PollMigrationTests : IAsyncLifetime
         Guid pollId = Guid.CreateVersion7();
         await ExecuteAsync(context, $"""
             INSERT INTO polls
-                (id, organizer_id, title, duration_minutes, platform, notes, min_attendance,
+                (id, organizer_id, title, platform, notes, min_attendance,
                  max_capacity, visibility, deadline_choice, deadline, status, created_at, selection_window_end)
             VALUES
-                ({pollId}, {organizerId.Value}, 'Divergent window', 60, 3, '', 1, NULL, 1, 3,
+                ({pollId}, {organizerId.Value}, 'Divergent window', 3, '', 1, NULL, 1, 3,
                  {deadline}, 0, {deadline}, {divergentEnd})
             """);
 
@@ -371,10 +372,10 @@ public sealed class PollMigrationTests : IAsyncLifetime
         Instant deadline = Instant.FromUtc(2026, 9, 2, 12, 0);
         await ExecuteAsync(context, $"""
             INSERT INTO polls
-                (id, organizer_id, title, duration_minutes, platform, notes, min_attendance,
+                (id, organizer_id, title, platform, notes, min_attendance,
                  max_capacity, visibility, deadline_choice, deadline, status, created_at, selection_window_end)
             VALUES
-                ({pollId}, {organizerId.Value}, 'Boundary test', 60, 3, '', 1, NULL, 1, 2,
+                ({pollId}, {organizerId.Value}, 'Boundary test', 3, '', 1, NULL, 1, 2,
                  {deadline}, 0, {deadline - Duration.FromHours(24)}, {PollSelectionWindow.EndsAt(deadline)})
             """);
         return pollId;
@@ -383,8 +384,8 @@ public sealed class PollMigrationTests : IAsyncLifetime
     private static async Task<Guid> InsertOptionAsync(AppDbContext context, Guid optionId, Guid pollId, Instant startTime)
     {
         await ExecuteAsync(context, $"""
-            INSERT INTO poll_options (id, poll_id, start_time, created_at)
-            VALUES ({optionId}, {pollId}, {startTime}, now())
+            INSERT INTO poll_options (id, poll_id, start_time, duration_minutes, created_at)
+            VALUES ({optionId}, {pollId}, {startTime}, 120, now())
             """);
         return optionId;
     }

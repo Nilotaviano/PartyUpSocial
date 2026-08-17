@@ -255,15 +255,16 @@ public static class PollEndpoints
             return Problem(context, StatusCodes.Status400BadRequest, "poll_validation");
         }
 
-        List<Instant> optionStartTimes = [];
-        foreach (string raw in request.OptionStartTimes ?? [])
+        // D-211: one start and one length per candidate; the poll itself carries no duration.
+        List<CreatePollOptionInput> options = [];
+        foreach (CreatePollOptionRequest option in request.Options ?? [])
         {
-            if (!PollWireFormat.TryParseInstant(raw, out Instant parsed))
+            if (option is null || !PollWireFormat.TryParseInstant(option.StartTime, out Instant parsed))
             {
                 return Problem(context, StatusCodes.Status400BadRequest, "poll_validation");
             }
 
-            optionStartTimes.Add(parsed);
+            options.Add(new CreatePollOptionInput(parsed, option.DurationMinutes));
         }
 
         List<FriendGroupId> audienceGroupIds = (request.AudienceGroupIds ?? []).Select(FriendGroupId.From).ToList();
@@ -271,7 +272,6 @@ public static class PollEndpoints
         CreatePollCommand command = new(
             actorId.Value,
             request.Title ?? string.Empty,
-            request.DurationMinutes,
             platform,
             game,
             request.Notes,
@@ -279,7 +279,7 @@ public static class PollEndpoints
             request.MaxCapacity,
             visibility,
             audienceGroupIds,
-            optionStartTimes,
+            options,
             deadlineChoice,
             (request.InviteeUserIds ?? []).Select(UserId.From).ToArray(),
             request.GuestLinkCount);

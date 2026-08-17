@@ -233,7 +233,11 @@ public sealed class CalendarEndpointTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new
             {
                 title = "Calendar poll layer fixture",
-                optionStartTimes = new[] { Iso(inRangeStart), Iso(outOfRangeStart) },
+                options = new[]
+                {
+                    new { startTime = Iso(inRangeStart) },
+                    new { startTime = Iso(outOfRangeStart) },
+                },
                 visibility = "private",
                 minAttendance = 1,
             }));

@@ -160,10 +160,10 @@ public sealed class PollProblemCodeClosureTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new
             {
                 title = "Guest link conflict fixture",
-                optionStartTimes = new[]
+                options = new[]
                 {
-                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
-                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
+                    new { startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)) },
+                    new { startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)) },
                 },
                 visibility = "private",
                 minAttendance = 1,
@@ -410,7 +410,7 @@ public sealed class PollProblemCodeClosureTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new
             {
                 title = "Closure fixture poll",
-                optionStartTimes = times.Select(SessionEndpointTestSupport.Iso).ToArray(),
+                options = times.Select(time => new { startTime = SessionEndpointTestSupport.Iso(time) }).ToArray(),
                 visibility = "private",
                 minAttendance = 1,
                 inviteeUserIds = Array.Empty<Guid>(),
@@ -430,10 +430,10 @@ public sealed class PollProblemCodeClosureTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new
             {
                 title = "Closure fixture poll",
-                optionStartTimes = new[]
+                options = new[]
                 {
-                    SessionEndpointTestSupport.Iso(baseTime),
-                    SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)),
+                    new { startTime = SessionEndpointTestSupport.Iso(baseTime) },
+                    new { startTime = SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)) },
                 },
                 visibility = inviteeIds.Count == 0 ? "private" : "public",
                 minAttendance,

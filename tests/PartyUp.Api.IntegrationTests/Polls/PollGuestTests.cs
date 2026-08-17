@@ -299,7 +299,6 @@ public sealed class PollGuestTests : IAsyncLifetime, IDisposable
             new CreatePollCommand(
                 organizerId,
                 "Guest test poll",
-                DurationMinutes: 60,
                 Platform: null,
                 Game: null,
                 Notes: null,
@@ -307,7 +306,7 @@ public sealed class PollGuestTests : IAsyncLifetime, IDisposable
                 MaxCapacity: null,
                 Visibility: ContentVisibility.Private,
             AudienceGroupIds: null,
-                OptionStartTimes: [startTime, startTime + Duration.FromHours(1)],
+                Options: [new CreatePollOptionInput(startTime, 60), new CreatePollOptionInput(startTime + Duration.FromHours(1), 60)],
                 DeadlineChoice: deadlineChoice,
                 InviteeUserIds: [],
                 GuestLinkCount: null),

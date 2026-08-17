@@ -118,7 +118,6 @@ public sealed class PollDeadlineApproachingJobTests : IAsyncLifetime, IDisposabl
             new CreatePollCommand(
                 organizerId,
                 "Deadline notice test poll",
-                DurationMinutes: 60,
                 Platform: null,
                 Game: null,
                 Notes: null,
@@ -126,7 +125,7 @@ public sealed class PollDeadlineApproachingJobTests : IAsyncLifetime, IDisposabl
                 MaxCapacity: null,
                 Visibility: ContentVisibility.Public,
             AudienceGroupIds: null,
-                OptionStartTimes: [now + Duration.FromHours(2), now + Duration.FromHours(3)],
+                Options: [new CreatePollOptionInput(now + Duration.FromHours(2), 60), new CreatePollOptionInput(now + Duration.FromHours(3), 60)],
                 DeadlineChoice: PollDeadlineChoice.Hours6,
                 InviteeUserIds: [inviteeId],
                 GuestLinkCount: null),

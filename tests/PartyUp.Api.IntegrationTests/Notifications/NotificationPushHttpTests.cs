@@ -443,10 +443,10 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new
             {
                 title = "Invisible-to-stranger poll",
-                optionStartTimes = new[]
+                options = new[]
                 {
-                    SessionEndpointTestSupport.Iso(baseTime),
-                    SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)),
+                    new { startTime = SessionEndpointTestSupport.Iso(baseTime) },
+                    new { startTime = SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)) },
                 },
                 visibility = "private",
                 minAttendance = 1,
@@ -486,10 +486,10 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new
             {
                 title = "Live poll mute/unmute",
-                optionStartTimes = new[]
+                options = new[]
                 {
-                    SessionEndpointTestSupport.Iso(baseTime),
-                    SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)),
+                    new { startTime = SessionEndpointTestSupport.Iso(baseTime) },
+                    new { startTime = SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)) },
                 },
                 visibility = "private",
                 minAttendance = 1,
@@ -541,7 +541,6 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
             new CreatePollCommand(
                 organizerId,
                 "S4 mute finalize poll",
-                DurationMinutes: 60,
                 Platform: null,
                 Game: null,
                 Notes: null,
@@ -549,7 +548,7 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
                 MaxCapacity: null,
                 Visibility: ContentVisibility.Public,
             AudienceGroupIds: null,
-                OptionStartTimes: [now + Duration.FromDays(2), now + Duration.FromDays(3)],
+                Options: [new CreatePollOptionInput(now + Duration.FromDays(2), 60), new CreatePollOptionInput(now + Duration.FromDays(3), 60)],
                 DeadlineChoice: PollDeadlineChoice.Hours6,
                 InviteeUserIds: [inviteeId],
                 GuestLinkCount: null),

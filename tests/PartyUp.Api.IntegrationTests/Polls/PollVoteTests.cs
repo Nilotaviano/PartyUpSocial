@@ -111,7 +111,6 @@ public sealed class PollVoteTests : IAsyncLifetime, IDisposable
             new CreatePollCommand(
                 organizerId,
                 "Vote test poll",
-                DurationMinutes: 60,
                 Platform: null,
                 Game: null,
                 Notes: null,
@@ -119,7 +118,7 @@ public sealed class PollVoteTests : IAsyncLifetime, IDisposable
                 MaxCapacity: null,
                 Visibility: ContentVisibility.Public,
             AudienceGroupIds: null,
-                OptionStartTimes: [startTime, startTime + Duration.FromHours(1)],
+                Options: [new CreatePollOptionInput(startTime, 60), new CreatePollOptionInput(startTime + Duration.FromHours(1), 60)],
                 DeadlineChoice: deadlineChoice,
                 InviteeUserIds: [voterId],
                 GuestLinkCount: null),

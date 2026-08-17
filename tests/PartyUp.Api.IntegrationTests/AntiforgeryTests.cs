@@ -228,7 +228,11 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             ["POST /api/v1/polls"] = Onboarded(() => JsonContent.Create(new
             {
                 title = "Antiforgery probe",
-                optionStartTimes = new[] { "2027-01-01T00:00:00Z", "2027-01-02T00:00:00Z" },
+                options = new[]
+                {
+                    new { startTime = "2027-01-01T00:00:00Z" },
+                    new { startTime = "2027-01-02T00:00:00Z" },
+                },
                 visibility = "private",
             })),
             ["POST /api/v1/polls/{pollId:guid}/options"] = Onboarded(() =>

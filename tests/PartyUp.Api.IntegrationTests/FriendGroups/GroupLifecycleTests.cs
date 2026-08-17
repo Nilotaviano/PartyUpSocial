@@ -229,10 +229,10 @@ public sealed class GroupLifecycleTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new
             {
                 title = "Groups poll to finalize",
-                optionStartTimes = new[]
+                options = new[]
                 {
-                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
-                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
+                    new { startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)) },
+                    new { startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)) },
                 },
                 minAttendance = 1,
                 visibility = "groups",

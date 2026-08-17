@@ -392,10 +392,10 @@ public sealed class PushTransportMigrationTests : IAsyncLifetime
         Instant deadline = Instant.FromUtc(2026, 9, 2, 12, 0);
         await ExecuteAsync(context, $"""
             INSERT INTO polls
-                (id, organizer_id, title, duration_minutes, platform, notes, min_attendance,
+                (id, organizer_id, title, platform, notes, min_attendance,
                  max_capacity, visibility, deadline_choice, deadline, status, created_at, selection_window_end)
             VALUES
-                ({pollId}, {organizerId.Value}, 'Mute boundary test', 60, 3, '', 1, NULL, 1, 2,
+                ({pollId}, {organizerId.Value}, 'Mute boundary test', 3, '', 1, NULL, 1, 2,
                  {deadline}, 0, {deadline - Duration.FromHours(24)}, {deadline + Duration.FromHours(48)})
             """);
         return pollId;

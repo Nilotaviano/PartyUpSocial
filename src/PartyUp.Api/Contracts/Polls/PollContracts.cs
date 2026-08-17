@@ -88,10 +88,17 @@ public static class PollWireFormat
     }
 }
 
+/// <summary>
+/// One candidate on the create-poll wire (D-211): its own start instant and its own length. The
+/// length mirrors <c>CreateSessionRequest.DurationMinutes</c> — absent means the server default —
+/// and the option's end stays derived from the pair, never sent, exactly as a session's does.
+/// </summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record CreatePollOptionRequest(string? StartTime, int? DurationMinutes);
+
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CreatePollRequest(
     string? Title,
-    int? DurationMinutes,
     string? Platform,
     GameRequest? Game,
     string? Notes,
@@ -99,7 +106,7 @@ public sealed record CreatePollRequest(
     int? MaxCapacity,
     string? Visibility,
     IReadOnlyList<Guid>? AudienceGroupIds,
-    IReadOnlyList<string>? OptionStartTimes,
+    IReadOnlyList<CreatePollOptionRequest>? Options,
     string? DeadlineChoice,
     IReadOnlyList<Guid>? InviteeUserIds,
     int? GuestLinkCount);

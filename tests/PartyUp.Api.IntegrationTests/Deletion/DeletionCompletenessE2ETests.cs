@@ -672,7 +672,6 @@ public sealed class DeletionCompletenessE2ETests : IAsyncLifetime, IDisposable
             new CreatePollCommand(
                 organizerId,
                 title,
-                DurationMinutes: 60,
                 Platform: null,
                 Game: null,
                 Notes: null,
@@ -680,7 +679,7 @@ public sealed class DeletionCompletenessE2ETests : IAsyncLifetime, IDisposable
                 MaxCapacity: null,
                 Visibility: ContentVisibility.Public,
             AudienceGroupIds: null,
-                OptionStartTimes: [now + Duration.FromDays(6), now + Duration.FromDays(7)],
+                Options: [new CreatePollOptionInput(now + Duration.FromDays(6), 60), new CreatePollOptionInput(now + Duration.FromDays(7), 60)],
                 DeadlineChoice: PollDeadlineChoice.Hours48,
                 InviteeUserIds: [inviteeId],
                 GuestLinkCount: null),

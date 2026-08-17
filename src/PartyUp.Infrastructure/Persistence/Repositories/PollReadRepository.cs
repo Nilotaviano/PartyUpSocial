@@ -150,7 +150,7 @@ public sealed class PollReadRepository(AppDbContext context) : IPollReadReposito
             JOIN poll_options po ON po.poll_id = p.id
             WHERE p.status IN ({1}, {2})
               AND po.start_time < {3}
-              AND po.start_time + make_interval(mins => p.duration_minutes) > {4}
+              AND po.start_time + make_interval(mins => po.duration_minutes) > {4}
               AND {{predicate}}
             ORDER BY p.id
             """, viewer, polling, closed, range.End, range.Start))

@@ -211,10 +211,10 @@ public sealed class PollOptionVoterListsWireTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new
             {
                 title = "Guest attribution poll",
-                optionStartTimes = new[]
+                options = new[]
                 {
-                    SessionEndpointTestSupport.Iso(baseTime),
-                    SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)),
+                    new { startTime = SessionEndpointTestSupport.Iso(baseTime) },
+                    new { startTime = SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)) },
                 },
                 visibility = "private",
                 minAttendance = 1,
@@ -272,10 +272,10 @@ public sealed class PollOptionVoterListsWireTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new
             {
                 title = "Voter list poll fixture",
-                optionStartTimes = new[]
+                options = new[]
                 {
-                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
-                    SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)),
+                    new { startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(1)) },
+                    new { startTime = SessionEndpointTestSupport.Iso(_factory.Clock.GetCurrentInstant() + Duration.FromDays(2)) },
                 },
                 visibility = "public",
                 minAttendance = 1,

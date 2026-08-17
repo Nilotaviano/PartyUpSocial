@@ -234,7 +234,6 @@ public sealed class PollInvitationUseCasesTests
             CreatePollCommand command = new(
                 OrganizerId,
                 "Raid poll",
-                DurationMinutes: 60,
                 Platform: null,
                 Game: null,
                 Notes: null,
@@ -242,7 +241,7 @@ public sealed class PollInvitationUseCasesTests
                 MaxCapacity: null,
                 Visibility: ContentVisibility.Private,
                 AudienceGroupIds: null,
-                OptionStartTimes: [Clock.GetCurrentInstant() + Duration.FromHours(5), Clock.GetCurrentInstant() + Duration.FromHours(6)],
+                Options: [new CreatePollOptionInput(Clock.GetCurrentInstant() + Duration.FromHours(5), 60), new CreatePollOptionInput(Clock.GetCurrentInstant() + Duration.FromHours(6), 60)],
                 DeadlineChoice: null,
                 InviteeUserIds: [],
                 GuestLinkCount: null);

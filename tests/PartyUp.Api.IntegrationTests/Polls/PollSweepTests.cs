@@ -139,7 +139,6 @@ public sealed class PollSweepTests : IAsyncLifetime, IDisposable
             new CreatePollCommand(
                 organizerId,
                 "Sweep test poll",
-                DurationMinutes: 60,
                 Platform: null,
                 Game: null,
                 Notes: null,
@@ -147,7 +146,7 @@ public sealed class PollSweepTests : IAsyncLifetime, IDisposable
                 MaxCapacity: null,
                 Visibility: ContentVisibility.Public,
             AudienceGroupIds: null,
-                OptionStartTimes: [now + Duration.FromHours(2), now + Duration.FromHours(3)],
+                Options: [new CreatePollOptionInput(now + Duration.FromHours(2), 60), new CreatePollOptionInput(now + Duration.FromHours(3), 60)],
                 DeadlineChoice: PollDeadlineChoice.Hours6,
                 InviteeUserIds: [inviteeId],
                 GuestLinkCount: null),

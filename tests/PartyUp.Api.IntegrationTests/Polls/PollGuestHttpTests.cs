@@ -433,10 +433,10 @@ public sealed class PollGuestHttpTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new
             {
                 title = "Guest HTTP poll",
-                optionStartTimes = new[]
+                options = new[]
                 {
-                    SessionEndpointTestSupport.Iso(baseTime),
-                    SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)),
+                    new { startTime = SessionEndpointTestSupport.Iso(baseTime) },
+                    new { startTime = SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)) },
                 },
                 visibility = "private",
                 minAttendance = 1,
