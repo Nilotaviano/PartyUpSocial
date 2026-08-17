@@ -151,6 +151,9 @@ public sealed class GroupLifecycleTests : IAsyncLifetime, IDisposable
             await ownerSession.GetAsync($"/api/v1/sessions/{sessionId:D}"));
         string version = detail.RootElement.GetProperty("version").GetString()!;
 
+        // Baseline: the create call inserted exactly the one junction row before any edit runs.
+        Assert.Equal(1, await JunctionRowCountAsync(sessionId));
+
         HttpResponseMessage toPublic = await ownerSession.SendUnsafeAsync(
             HttpMethod.Patch,
             $"/api/v1/sessions/{sessionId:D}",

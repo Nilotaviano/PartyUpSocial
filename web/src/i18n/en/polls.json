@@ -24,7 +24,6 @@
     "min": "Minimum attendance",
     "max": "Maximum capacity",
     "unlimited": "Unlimited capacity",
-    "private": "Private poll",
     "invitees": "Invite friends",
     "guestLinks": "Guest links",
     "defaults": "Defaults: 4 minimum, 4 maximum, 2 hours, 24-hour deadline, no platform, not private.",
@@ -39,8 +38,6 @@
       "noResults": "No matches. Your typed name will still be used.",
       "listboxLabel": "Steam catalog matches"
     },
-    "privacyPrivate": "Private",
-    "privacyPublic": "Public",
     "grid": {
       "heading": "Candidate start times",
       "hint": "Tap a time to add it. Drag a band to move it, or drag its handle to change the duration of every candidate.",

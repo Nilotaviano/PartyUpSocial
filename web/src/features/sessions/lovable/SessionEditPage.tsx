@@ -66,9 +66,8 @@ function formFrom(session: SessionDetail) {
     // live name, name absent for a group the organizer has since left —
     // D-206 retained targeting), so the picker preselects the actual current
     // audience rather than starting the organizer from a blank pick.
-    // `visibilityTouched` still gates whether visibility/audience are sent
-    // at all (A-070-style omit-when-unchanged PATCH body), it just no longer
-    // needs to also mean "the prefill was thrown away."
+    // `visibilityTouched` gates whether visibility/audience are sent at all
+    // (A-070-style omit-when-unchanged PATCH body), independent of this prefill.
     visibility: session.visibility as Visibility,
     audienceGroupIds: (session.audienceGroups ?? []).map((group) => group.id),
     visibilityTouched: false,

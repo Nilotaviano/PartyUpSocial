@@ -447,7 +447,7 @@ describe('SessionEditPage (lovable)', () => {
     const liveChip = await screen.findByRole('button', { name: /Study Group/ })
     expect(liveChip).toHaveAttribute('aria-pressed', 'true')
 
-    const maskedChip = await screen.findByRole('button', { name: /a group you left/ })
+    const maskedChip = await screen.findByRole('button', { name: /a group you're no longer in/ })
     expect(maskedChip).toHaveAttribute('aria-pressed', 'true')
   })
 
@@ -467,7 +467,7 @@ describe('SessionEditPage (lovable)', () => {
     api.patch.mockResolvedValue({ data: detail() })
     renderPage()
 
-    const maskedChip = await screen.findByRole('button', { name: /a group you left/ })
+    const maskedChip = await screen.findByRole('button', { name: /a group you're no longer in/ })
     fireEvent.click(maskedChip)
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
 

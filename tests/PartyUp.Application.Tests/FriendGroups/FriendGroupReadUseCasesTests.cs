@@ -115,6 +115,91 @@ public sealed class FriendGroupReadUseCasesTests
         Assert.False(detail.OwnerMasked);
     }
 
+    [Fact]
+    public async Task ListMineAsync_ReturnsOwnedMemberOfAndInviteRowsWithOwnerNameplates_D202()
+    {
+        var actor = UserId.New();
+        var otherOwner = UserId.New();
+        var thirdOwner = UserId.New();
+
+        FriendGroup owned = FriendGroup.Create(actor, GroupName.Create("Owned by me"), new TestClock(Now));
+        FriendGroup memberOfGroup = BuildGroup(otherOwner, [(actor, accept: true)]);
+        FriendGroup inviteGroup = BuildGroup(thirdOwner, [(actor, accept: false)]);
+
+        var groups = new FakeFriendGroupRepository();
+        groups.Items.Add(owned);
+        groups.Items.Add(memberOfGroup);
+        groups.Items.Add(inviteGroup);
+        groups.Nameplates[otherOwner.Value] = new UserNameplate(DisplayName.Create("Owner One"), Avatar.Fallback);
+        groups.Nameplates[thirdOwner.Value] = new UserNameplate(DisplayName.Create("Owner Two"), Avatar.Fallback);
+
+        var useCase = new FriendGroupReadUseCases(groups, new FakeBlockRepository());
+
+        FriendGroupListResult result = await useCase.ListMineAsync(actor, CancellationToken.None);
+
+        FriendGroupSummary ownedSummary = Assert.Single(result.Owned);
+        Assert.Equal(owned.Id, ownedSummary.Id);
+
+        FriendGroupSummary memberOfSummary = Assert.Single(result.MemberOf);
+        Assert.Equal(memberOfGroup.Id, memberOfSummary.Id);
+        Assert.False(memberOfSummary.OwnerMasked);
+        Assert.Equal("Owner One", memberOfSummary.OwnerDisplayName!.Value.Value);
+        Assert.NotNull(memberOfSummary.OwnerAvatar);
+
+        FriendGroupInviteSummary inviteSummary = Assert.Single(result.Invites);
+        Assert.Equal(inviteGroup.Id, inviteSummary.Id);
+        Assert.False(inviteSummary.OwnerMasked);
+        Assert.Equal("Owner Two", inviteSummary.OwnerDisplayName!.Value.Value);
+    }
+
+    [Fact]
+    public async Task ListMineAsync_MasksAMemberOfOwnerTheActorHasBlocked_D202()
+    {
+        var actor = UserId.New();
+        var blockedOwner = UserId.New();
+        FriendGroup memberOfGroup = BuildGroup(blockedOwner, [(actor, accept: true)]);
+
+        var groups = new FakeFriendGroupRepository();
+        groups.Items.Add(memberOfGroup);
+        groups.Nameplates[blockedOwner.Value] = new UserNameplate(DisplayName.Create("Blocked Owner"), Avatar.Fallback);
+
+        var blocks = new FakeBlockRepository();
+        blocks.Pairs.Add((actor, blockedOwner));
+
+        var useCase = new FriendGroupReadUseCases(groups, blocks);
+
+        FriendGroupListResult result = await useCase.ListMineAsync(actor, CancellationToken.None);
+
+        FriendGroupSummary memberOfSummary = Assert.Single(result.MemberOf);
+        Assert.True(memberOfSummary.OwnerMasked);
+        Assert.Null(memberOfSummary.OwnerDisplayName);
+        Assert.Null(memberOfSummary.OwnerAvatar);
+    }
+
+    [Fact]
+    public async Task ListMineAsync_MasksTheOwnerOnABlockedInviteToo_D202()
+    {
+        var actor = UserId.New();
+        var blockedOwner = UserId.New();
+        FriendGroup inviteGroup = BuildGroup(blockedOwner, [(actor, accept: false)]);
+
+        var groups = new FakeFriendGroupRepository();
+        groups.Items.Add(inviteGroup);
+        groups.Nameplates[blockedOwner.Value] = new UserNameplate(DisplayName.Create("Blocked Owner"), Avatar.Fallback);
+
+        var blocks = new FakeBlockRepository();
+        blocks.Pairs.Add((actor, blockedOwner));
+
+        var useCase = new FriendGroupReadUseCases(groups, blocks);
+
+        FriendGroupListResult result = await useCase.ListMineAsync(actor, CancellationToken.None);
+
+        FriendGroupInviteSummary inviteSummary = Assert.Single(result.Invites);
+        Assert.True(inviteSummary.OwnerMasked);
+        Assert.Null(inviteSummary.OwnerDisplayName);
+        Assert.Null(inviteSummary.OwnerAvatar);
+    }
+
     private static FriendGroup BuildGroup(UserId owner, IReadOnlyList<(UserId member, bool accept)> members)
     {
         var clock = new TestClock(Now);

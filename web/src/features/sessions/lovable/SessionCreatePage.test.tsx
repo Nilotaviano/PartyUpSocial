@@ -424,6 +424,22 @@ describe('SessionCreatePage (lovable)', () => {
     expect(screen.queryByText('A non-private session needs at least one invited friend.')).not.toBeInTheDocument()
   })
 
+  it('blocks submission with zero groups selected under the Groups visibility_D201', async () => {
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Raid night' } })
+    fireEvent.change(screen.getByLabelText('Start time'), {
+      target: { value: '2026-09-01T18:00' },
+    })
+    fireEvent.click(screen.getByRole('radio', { name: 'Groups' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
+
+    expect(
+      (await screen.findAllByText('Pick at least one group.')).length,
+    ).toBeGreaterThan(0)
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
   it('warns before discarding dirty create-form values_D152_D162', async () => {
     renderPage()
 

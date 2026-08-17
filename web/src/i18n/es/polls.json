@@ -24,7 +24,6 @@
     "min": "Asistencia mínima",
     "max": "Capacidad máxima",
     "unlimited": "Capacidad ilimitada",
-    "private": "Encuesta privada",
     "invitees": "Invitar amigos",
     "guestLinks": "Enlaces de invitado",
     "defaults": "Valores predeterminados: mínimo 4, máximo 4, 2 horas, plazo de 24 horas, sin plataforma, no privada.",
@@ -39,8 +38,6 @@
       "noResults": "Sin resultados. El nombre escrito se usará igualmente.",
       "listboxLabel": "Resultados del catálogo de Steam"
     },
-    "privacyPrivate": "Privada",
-    "privacyPublic": "Pública",
     "grid": {
       "heading": "Horarios candidatos",
       "hint": "Toca un horario para agregarlo. Arrastra una franja para moverla o arrastra su tirador para cambiar la duración de todos los candidatos.",

@@ -14,6 +14,7 @@ import {
   useActionMenu,
   useActionMenuDialog,
 } from '../../components/ui/useActionMenu'
+import { useToast } from '../../components/ui/toastStore'
 import { getGroupDetail, getGroupList, groupKeys, removeGroupMember } from '../groups/groupQueries'
 import { AvatarDisc } from './AvatarDisc'
 import { avatarImgUrl } from './avatarImage'
@@ -45,6 +46,12 @@ type UnfriendDialogProps = {
  * roster, so this resolves it with one detail fetch per owned group,
  * fired only while the dialog is open — the sanctioned per-group-detail
  * lookup (no single-call roster-membership contract exists on the wire).
+ *
+ * The fan-out is bounded by D-208's 50-owned-group cap, so a single dialog
+ * open can issue up to 50 detail requests; `staleTime: 60_000` is the trade
+ * that keeps repeat opens (e.g. reopening the dialog on the next row) from
+ * re-firing that whole fan-out within the same minute, at the cost of a
+ * membership change elsewhere not showing up here for up to 60s.
  */
 function useOwnedGroupsContaining(userId: string, enabled: boolean) {
   const list = useQuery({ queryKey: groupKeys.list, queryFn: getGroupList, enabled })
@@ -55,6 +62,7 @@ function useOwnedGroupsContaining(userId: string, enabled: boolean) {
       queryKey: groupKeys.detail(groupId),
       queryFn: () => getGroupDetail(groupId),
       enabled,
+      staleTime: 60_000,
     })),
   })
 
@@ -73,7 +81,8 @@ export function UnfriendDialog({
   dialogProps,
   contentProps,
 }: UnfriendDialogProps) {
-  const { t } = useTranslation(['friends', 'settings'])
+  const { t } = useTranslation(['friends', 'settings', 'groups'])
+  const showToast = useToast()
   const [selfOpen, setSelfOpen] = useState(false)
   const [alsoRemove, setAlsoRemove] = useState(true)
   const cancelButton = useRef<HTMLButtonElement>(null)
@@ -84,14 +93,24 @@ export function UnfriendDialog({
   async function confirm() {
     try {
       await onConfirm()
-      // D-210: member-removal mutations fire only after the unfriend mutation
-      // has succeeded, and only for the groups the actor actually saw listed.
-      if (alsoRemove && sharedGroups.length > 0) {
-        await Promise.all(sharedGroups.map((group) => removeGroupMember(group.id, userId)))
-      }
-      setOpen(false)
     } catch {
+      // The unfriend itself failed — leave the dialog open; FriendList's own
+      // mutation-error region below the list surfaces this.
       return
+    }
+
+    // The unfriend is done regardless of what happens next, so the dialog
+    // closes here rather than after the best-effort group-removal step.
+    setOpen(false)
+
+    // D-210: member-removal mutations fire only after the unfriend mutation
+    // has succeeded, and only for the groups the actor actually saw listed.
+    if (alsoRemove && sharedGroups.length > 0) {
+      try {
+        await Promise.all(sharedGroups.map((group) => removeGroupMember(group.id, userId)))
+      } catch {
+        showToast({ message: t('errors.generic', { ns: 'groups' }) })
+      }
     }
   }
 

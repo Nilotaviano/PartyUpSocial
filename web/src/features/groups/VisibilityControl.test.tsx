@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import '../../i18n'
-import { VisibilityControl, type Visibility } from './VisibilityControl'
+import { VisibilityControl } from './VisibilityControl'
 
 afterEach(() => {
   cleanup()
@@ -110,10 +110,5 @@ describe('VisibilityControl', () => {
 
     expect(screen.queryByText('Pick at least one group.')).not.toBeInTheDocument()
     expect(screen.getByText('1 selected')).toBeInTheDocument()
-  })
-
-  it('accepts every Visibility value without a type error (compile-time contract)', () => {
-    const values: Visibility[] = ['private', 'groups', 'public']
-    expect(values).toHaveLength(3)
   })
 })

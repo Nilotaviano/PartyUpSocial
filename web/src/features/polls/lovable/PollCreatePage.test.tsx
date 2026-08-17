@@ -123,6 +123,22 @@ describe('PollCreatePage (lovable)', () => {
     expect(api.post).not.toHaveBeenCalled()
   })
 
+  it('blocks submission with zero groups selected under the Groups visibility_D201', async () => {
+    mockGet()
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Title'), {
+      target: { value: 'Weekend raid' },
+    })
+    fireEvent.click(screen.getByRole('radio', { name: 'Groups' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create poll' }))
+
+    expect(
+      (await screen.findAllByText('Pick at least one group.')).length,
+    ).toBeGreaterThan(0)
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
   it('shows the invitee avatar without changing the checkbox accessible name, and toggles by click and keyboard_D050', async () => {
     api.get.mockImplementation((path: string) => {
       if (path === '/api/v1/steam-catalog') {

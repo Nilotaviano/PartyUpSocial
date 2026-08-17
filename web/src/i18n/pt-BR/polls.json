@@ -24,7 +24,6 @@
     "min": "Presença mínima",
     "max": "Capacidade máxima",
     "unlimited": "Capacidade ilimitada",
-    "private": "Enquete privada",
     "invitees": "Convidar amigos",
     "guestLinks": "Links de convidado",
     "defaults": "Padrões: mínimo 4, máximo 4, 2 horas, prazo de 24 horas, sem plataforma, não privada.",
@@ -39,8 +38,6 @@
       "noResults": "Nenhum resultado. O nome digitado ainda será usado.",
       "listboxLabel": "Resultados do catálogo da Steam"
     },
-    "privacyPrivate": "Privada",
-    "privacyPublic": "Pública",
     "grid": {
       "heading": "Opções de horário",
       "hint": "Toque em um horário para adicioná-lo. Arraste uma faixa para movê-la ou arraste a alça para mudar a duração de todas as opções.",

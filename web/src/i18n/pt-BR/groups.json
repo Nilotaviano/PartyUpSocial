@@ -119,14 +119,14 @@
   },
   "visibilityControl": {
     "ariaLabel": "Visibilidade",
-    "private": "Privado",
+    "private": "Privada",
     "groups": "Grupos",
-    "public": "Público",
+    "public": "Pública",
     "visibleTo": "Visível para membros de",
     "selectedCount_one": "{{count}} selecionado",
     "selectedCount_other": "{{count}} selecionados",
     "pickAtLeastOne": "Escolha pelo menos um grupo.",
-    "maskedGroup": "um grupo do qual você saiu"
+    "maskedGroup": "um grupo do qual você não faz mais parte"
   },
   "shareTag": {
     "via": "via {{name}}",
@@ -134,7 +134,7 @@
   },
   "unfriend": {
     "remainsIn": "Continuará em: {{names}}",
-    "alsoRemove": "Também remover dos meus grupos"
+    "alsoRemove": "Remover também dos meus grupos"
   },
   "errors": {
     "generic": "Algo deu errado.",
