@@ -159,6 +159,10 @@ public sealed class GroupLifecycleTests : IAsyncLifetime, IDisposable
         Assert.Equal("public", publicBody.RootElement.GetProperty("visibility").GetString());
         string publicVersion = publicBody.RootElement.GetProperty("version").GetString()!;
 
+        // Observe the wipe directly at the database boundary: the junction row the create call
+        // inserted is gone, not merely unreachable through the HTTP surface.
+        Assert.Equal(0, await JunctionRowCountAsync(sessionId));
+
         // Flipping back to Groups with an EMPTY audience must fail — the old targeting is gone, not
         // silently restored.
         await SessionEndpointTestSupport.AssertProblemAsync(
@@ -176,22 +180,45 @@ public sealed class GroupLifecycleTests : IAsyncLifetime, IDisposable
             JsonContent.Create(new { visibility = "groups", audienceGroupIds = new[] { groupId }, ifMatch = publicVersion }));
         using JsonDocument reGroupedBody = await SessionEndpointTestSupport.SuccessJsonAsync(backToGroups);
         Assert.Equal("groups", reGroupedBody.RootElement.GetProperty("visibility").GetString());
+        Assert.Equal(1, await JunctionRowCountAsync(sessionId));
     }
 
-    /// <summary>D-204: finalization copies the poll's audience junction rows onto the minted session.</summary>
+    private async Task<int> JunctionRowCountAsync(Guid sessionId)
+    {
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await context.Database
+            .SqlQueryRaw<int>(
+                """SELECT count(*)::int AS "Value" FROM session_audience_groups WHERE session_id = {0}""",
+                sessionId)
+            .SingleAsync();
+    }
+
+    /// <summary>
+    /// D-204: finalization copies the poll's audience junction rows onto the minted session. Proven
+    /// through a group member who is deliberately NOT a poll invitee and never votes — that member's
+    /// only possible path into the minted session is a live rule-2g grant against the copied junction
+    /// row, so this fails if the copy silently drops (unlike the poll's own invitee/voter, whose
+    /// rule-1 involvement would mask a dropped audience carry).
+    /// </summary>
     [Fact]
     public async Task PollFinalizationCarriesTheAudienceOntoTheMintedSession_D204()
     {
         SessionHttpUser owner = await SessionEndpointTestSupport.SeedAsync(_factory);
         SessionHttpUser member = await SessionEndpointTestSupport.SeedAsync(_factory);
+        SessionHttpUser nonParticipantMember = await SessionEndpointTestSupport.SeedAsync(_factory);
         await SessionEndpointTestSupport.MakeFriendsAsync(_factory, owner.Id, member.Id);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, owner.Id, nonParticipantMember.Id);
 
         using SessionHttpSession ownerSession = await SessionEndpointTestSupport.SignInAsync(_factory, owner.Id);
         using SessionHttpSession memberSession = await SessionEndpointTestSupport.SignInAsync(_factory, member.Id);
+        using SessionHttpSession nonParticipantSession =
+            await SessionEndpointTestSupport.SignInAsync(_factory, nonParticipantMember.Id);
 
         Guid groupId = await CreateGroupAsync(ownerSession, "Finalization fixture group");
-        await InviteMembersAsync(ownerSession, groupId, [member.Id.Value]);
+        await InviteMembersAsync(ownerSession, groupId, [member.Id.Value, nonParticipantMember.Id.Value]);
         await AcceptInviteAsync(memberSession, groupId);
+        await AcceptInviteAsync(nonParticipantSession, groupId);
 
         HttpResponseMessage created = await ownerSession.SendUnsafeAsync(
             HttpMethod.Post,
@@ -232,6 +259,17 @@ public sealed class GroupLifecycleTests : IAsyncLifetime, IDisposable
         using JsonDocument mintedForMember = await SessionEndpointTestSupport.SuccessJsonAsync(
             await memberSession.GetAsync($"/api/v1/sessions/{sessionId:D}"));
         Assert.Equal("groups", mintedForMember.RootElement.GetProperty("visibility").GetString());
+
+        // nonParticipantMember never voted and was never a poll invitee — the poll's own rule-1
+        // involvement can't be masking anything for them. Their only route into the minted session is
+        // a live rule-2g grant off the copied junction row.
+        using JsonDocument mintedForNonParticipant = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await nonParticipantSession.GetAsync($"/api/v1/sessions/{sessionId:D}"));
+        Assert.Equal("groups", mintedForNonParticipant.RootElement.GetProperty("visibility").GetString());
+        Assert.True(
+            mintedForNonParticipant.RootElement.TryGetProperty("viaGroup", out JsonElement viaGroup)
+            && viaGroup.ValueKind != JsonValueKind.Null);
+        Assert.Equal(groupId, viaGroup.GetProperty("id").GetGuid());
     }
 
     /// <summary>D-200: friend-group membership is invite/accept consented and survives unfriending.</summary>

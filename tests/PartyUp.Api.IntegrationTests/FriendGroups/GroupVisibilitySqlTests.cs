@@ -116,10 +116,13 @@ public sealed class GroupVisibilitySqlTests : IAsyncLifetime, IDisposable
 
         PollId groupsPollId = await CreateGroupsPollAsync(context, ownerId, groupId);
 
+        SessionPage<PollSummary> ownerInvolved = await reads.ListInvolvedAsync(ownerId, null, 20, default);
         SessionPage<PollSummary> memberDiscover = await reads.ListDiscoverableAsync(memberId, null, 20, default);
         SessionPage<PollSummary> friendOfMemberDiscover =
             await reads.ListDiscoverableAsync(friendOfMemberId, null, 20, default);
 
+        // The organizer reaches their own Groups poll through rule 1 (involvement), not rule 2g.
+        Assert.Contains(groupsPollId.Value, ownerInvolved.Items.Select(i => i.Id.Value));
         Assert.Contains(groupsPollId.Value, memberDiscover.Items.Select(i => i.Id.Value));
         Assert.DoesNotContain(groupsPollId.Value, friendOfMemberDiscover.Items.Select(i => i.Id.Value));
     }
