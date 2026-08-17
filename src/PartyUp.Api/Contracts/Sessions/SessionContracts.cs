@@ -203,6 +203,20 @@ public sealed record GroupProvenanceResponse(Guid Id, string Name)
 }
 
 /// <summary>
+/// D-206 edit-prefill: one organizer-only audience entry. <see cref="Name"/> is absent (not null) when
+/// the organizer no longer owns/holds an Accepted row in the group — the web layer renders that as a
+/// masked chip rather than dropping the id, so the organizer can still remove it explicitly on save.
+/// </summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record AudienceGroupResponse(
+    Guid Id,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name)
+{
+    public static AudienceGroupResponse From(Application.Sessions.AudienceGroupEntry entry) =>
+        new(entry.GroupId.Value, entry.Name?.Value);
+}
+
+/// <summary>
 /// Applies <see cref="JsonNamingPolicy.CamelCase"/> to an enum's string representation via
 /// <see cref="JsonStringEnumConverter{TEnum}"/> — that generic converter's own parameterless
 /// constructor (the only one <see cref="JsonConverterAttribute"/> can invoke) has no naming-policy
@@ -326,7 +340,10 @@ public sealed record SessionDetailResponse(
     string CreatedAt,
     IReadOnlyList<RosterEntryResponse> Roster,
     string Version,
-    bool Muted)
+    bool Muted,
+    // D-206: present only for the organizer's own read of a Groups-level session — every other
+    // viewer (including a non-organizer member) gets this absent, never an empty array.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AudienceGroupResponse>? AudienceGroups)
 {
     public static SessionDetailResponse From(SessionDetail detail, string version) =>
         new(
@@ -347,7 +364,8 @@ public sealed record SessionDetailResponse(
             SessionWireFormat.Format(detail.CreatedAt),
             detail.Roster.Select(RosterEntryResponse.From).ToArray(),
             version,
-            detail.Muted);
+            detail.Muted,
+            detail.AudienceGroups?.Select(AudienceGroupResponse.From).ToArray());
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

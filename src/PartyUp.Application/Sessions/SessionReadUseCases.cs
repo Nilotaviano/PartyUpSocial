@@ -49,13 +49,47 @@ public sealed class SessionReadUseCases(
 
         bool muted = await mutes.ExistsForTargetAsync(viewerId, sessionId, null, cancellationToken);
         GroupProvenance? viaGroup = await ResolveProvenanceAsync(session, viewer, cancellationToken);
+        IReadOnlyList<AudienceGroupEntry>? audienceGroups = viewerId == session.OrganizerId
+            ? await ResolveAudienceGroupsAsync(session, viewer, cancellationToken)
+            : null;
 
         return MaskBlockedPairRoster(detail, viewer) with
         {
             Muted = muted,
             Visibility = session.Visibility,
             ViaGroup = viaGroup,
+            AudienceGroups = audienceGroups,
         };
+    }
+
+    /// <summary>
+    /// D-206 edit-prefill: the organizer's own audience data, id-complete regardless of current
+    /// membership (D-201/D-203 retained targeting). The name is resolved only for ids
+    /// <see cref="Viewer.GroupIds"/> already proves owner/Accepted membership for — that set is the
+    /// intersection <c>BuildViewerAsync</c> computed for this same organizer against this same
+    /// session's audience, so no separate membership query is needed here; a group outside it gets a
+    /// null name rather than a lookup, matching <see cref="ResolveProvenanceAsync"/>'s guard.
+    /// </summary>
+    private async Task<IReadOnlyList<AudienceGroupEntry>?> ResolveAudienceGroupsAsync(
+        Session session,
+        Viewer viewer,
+        CancellationToken cancellationToken)
+    {
+        if (session.Visibility != ContentVisibility.Groups || session.AudienceGroupIds.Count == 0)
+        {
+            return null;
+        }
+
+        List<AudienceGroupEntry> entries = [];
+        foreach (FriendGroupId groupId in session.AudienceGroupIds)
+        {
+            GroupName? name = viewer.GroupIds.Contains(groupId)
+                ? await groups.FindNameAsync(groupId, cancellationToken)
+                : null;
+            entries.Add(new AudienceGroupEntry(groupId, name));
+        }
+
+        return entries;
     }
 
     /// <summary>

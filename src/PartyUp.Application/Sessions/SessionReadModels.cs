@@ -1,5 +1,6 @@
 using NodaTime;
 using PartyUp.Application.FriendGroups;
+using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Notifications;
 using PartyUp.Domain.Sessions;
@@ -69,6 +70,15 @@ public sealed record RosterEntry(
     Avatar? Avatar = null);
 
 /// <summary>
+/// One entry of the organizer-only edit-prefill audience (D-206): the id is the organizer's own edit
+/// data and always present; <see cref="Name"/> is the live group name, populated only when the
+/// organizer currently owns or holds an <c>Accepted</c> row in that group — the same membership guard
+/// <c>ViaGroup</c> uses, applied per-entry instead of to a single resolved group. A left-and-retargeted
+/// group keeps its id with a null name (D-201/D-203 retained targeting).
+/// </summary>
+public sealed record AudienceGroupEntry(FriendGroupId GroupId, GroupName? Name);
+
+/// <summary>
 /// The full session read (§8: <c>SessionDetail</c>). <see cref="ConcurrencyToken"/> is the raw
 /// Postgres <c>xmin</c>; A-071's opaque HMAC <c>version</c> string is computed at the API layer from
 /// it and is never itself stored or exposed here.
@@ -90,7 +100,8 @@ public sealed record SessionDetail(
     uint ConcurrencyToken,
     bool Muted = false,
     ContentVisibility Visibility = ContentVisibility.Public,
-    GroupProvenance? ViaGroup = null);
+    GroupProvenance? ViaGroup = null,
+    IReadOnlyList<AudienceGroupEntry>? AudienceGroups = null);
 
 public sealed record JoinRequestSummary(
     JoinRequestId Id,

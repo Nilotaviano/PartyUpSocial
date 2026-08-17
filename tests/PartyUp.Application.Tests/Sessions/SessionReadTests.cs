@@ -156,4 +156,123 @@ public sealed class SessionReadTests
         Assert.Equal(ContentVisibility.Groups, inviteeView.Visibility);
         Assert.Null(inviteeView.ViaGroup);
     }
+
+    /// <summary>
+    /// D-201: the organizer's own detail read carries the edit-prefill audience for a Groups-level
+    /// session, ids and live names both, so the edit surface never re-derives the audience from
+    /// scratch. Membership is Accepted, so both id and name come back.
+    /// </summary>
+    [Fact]
+    public async Task OrganizerOfGroupsSessionGetsAudienceIdsAndNames_D201()
+    {
+        SessionTestFixture fixture = new();
+
+        FriendGroup group = FriendGroup.Create(fixture.OrganizerId, GroupName.Create("Raid Crew"), fixture.Clock);
+        _ = group.DequeueEvents();
+        fixture.Groups.Items.Add(group);
+
+        SessionDetails details = new(
+            SessionTitle.Create("Groups-shared session"),
+            SessionTestFixture.DefaultStart,
+            Duration15.FromMinutes(120),
+            Platform.NotApplicable,
+            null,
+            SessionNotes.Empty,
+            minAttendance: 1,
+            maxCapacity: null,
+            visibility: ContentVisibility.Groups);
+        Session session = Session.Create(
+            fixture.OrganizerId, details, [], fixture.Clock, audienceGroupIds: [group.Id]);
+        _ = session.DequeueEvents();
+        fixture.Sessions.Add(session);
+
+        SessionReadUseCases reads = fixture.ReadUseCases();
+        SessionDetail? organizerView = await reads.GetSessionDetailAsync(session.Id, fixture.OrganizerId, default);
+
+        Assert.NotNull(organizerView);
+        Assert.NotNull(organizerView.AudienceGroups);
+        AudienceGroupEntry entry = Assert.Single(organizerView.AudienceGroups!);
+        Assert.Equal(group.Id, entry.GroupId);
+        Assert.Equal(group.Name.Value, entry.Name!.Value);
+    }
+
+    /// <summary>
+    /// D-206: an organizer who has since left a targeted group still gets that group's id (D-201/D-203
+    /// retained targeting) but its name comes back null — the same owner/Accepted guard <c>ViaGroup</c>
+    /// uses, applied per audience entry.
+    /// </summary>
+    [Fact]
+    public async Task OrganizerWhoLeftTargetedGroupGetsIdWithNullName_D206()
+    {
+        SessionTestFixture fixture = new();
+
+        UserId groupOwnerId = UserId.New();
+        FriendGroup group = FriendGroup.Create(groupOwnerId, GroupName.Create("Old Crew"), fixture.Clock);
+        group.Invite(groupOwnerId, fixture.OrganizerId, isAcceptedFriendOfOwner: true, fixture.Clock);
+        group.AcceptInvite(fixture.OrganizerId, fixture.Clock);
+        group.Leave(fixture.OrganizerId);
+        _ = group.DequeueEvents();
+        fixture.Groups.Items.Add(group);
+
+        SessionDetails details = new(
+            SessionTitle.Create("Groups-shared session"),
+            SessionTestFixture.DefaultStart,
+            Duration15.FromMinutes(120),
+            Platform.NotApplicable,
+            null,
+            SessionNotes.Empty,
+            minAttendance: 1,
+            maxCapacity: null,
+            visibility: ContentVisibility.Groups);
+        Session session = Session.Create(
+            fixture.OrganizerId, details, [fixture.InviteeId], fixture.Clock, audienceGroupIds: [group.Id]);
+        _ = session.DequeueEvents();
+        fixture.Sessions.Add(session);
+
+        SessionReadUseCases reads = fixture.ReadUseCases();
+        SessionDetail? organizerView = await reads.GetSessionDetailAsync(session.Id, fixture.OrganizerId, default);
+
+        Assert.NotNull(organizerView);
+        Assert.NotNull(organizerView.AudienceGroups);
+        AudienceGroupEntry entry = Assert.Single(organizerView.AudienceGroups!);
+        Assert.Equal(group.Id, entry.GroupId);
+        Assert.Null(entry.Name);
+    }
+
+    /// <summary>
+    /// D-206: the edit-prefill audience is organizer-only — a non-organizer member reading the same
+    /// Groups-level session gets a null field entirely, not a redacted list.
+    /// </summary>
+    [Fact]
+    public async Task NonOrganizerMemberGetsNullAudienceGroups_D206()
+    {
+        SessionTestFixture fixture = new();
+
+        FriendGroup group = FriendGroup.Create(fixture.OrganizerId, GroupName.Create("Raid Crew"), fixture.Clock);
+        group.Invite(fixture.OrganizerId, fixture.InviteeId, isAcceptedFriendOfOwner: true, fixture.Clock);
+        group.AcceptInvite(fixture.InviteeId, fixture.Clock);
+        _ = group.DequeueEvents();
+        fixture.Groups.Items.Add(group);
+
+        SessionDetails details = new(
+            SessionTitle.Create("Groups-shared session"),
+            SessionTestFixture.DefaultStart,
+            Duration15.FromMinutes(120),
+            Platform.NotApplicable,
+            null,
+            SessionNotes.Empty,
+            minAttendance: 1,
+            maxCapacity: null,
+            visibility: ContentVisibility.Groups);
+        Session session = Session.Create(
+            fixture.OrganizerId, details, [fixture.InviteeId], fixture.Clock, audienceGroupIds: [group.Id]);
+        _ = session.DequeueEvents();
+        fixture.Sessions.Add(session);
+
+        SessionReadUseCases reads = fixture.ReadUseCases();
+        SessionDetail? memberView = await reads.GetSessionDetailAsync(session.Id, fixture.InviteeId, default);
+
+        Assert.NotNull(memberView);
+        Assert.Null(memberView.AudienceGroups);
+    }
 }
