@@ -32,7 +32,7 @@ PartyUp gives the whole friend group one place to **publish availability**, **pr
   <sub>The "Tabletop Club" identity — cardstock &amp; ink in the light, club-green after dark. The picture follows your theme.</sub>
 </div>
 
-> 🚧 **Status:** in active development. The foundation (walking skeleton, CI/CD, deploy stack), sessions, availability, and the full visual identity — light *and* dark, WCAG 2.2 AA with a zero-exclusion axe gate on every route in both themes — are live at [partyup.social](https://partyup.social). Polls are next; the launch is a single full-scope public release. This repo is the real, working codebase — watch it grow.
+> 🚧 **Status:** the launch scope is built and live at [partyup.social](https://partyup.social) — sessions, availability, polls, friends & friend groups, notifications, three languages, and the full visual identity (light *and* dark, WCAG 2.2 AA with a zero-exclusion axe gate on every route in both themes). A few residual gaps are tracked in [TRACEABILITY.md](TRACEABILITY.md) (e.g. the D-111 calendar layer toggles aren't reachable in the UI yet). What remains is the launch itself: private beta, then a single full-scope public release. This repo is the real, working codebase — watch it grow.
 
 ## ✨ What it does (launch scope)
 
@@ -42,12 +42,13 @@ PartyUp gives the whole friend group one place to **publish availability**, **pr
 - 🕒 **Availability sharing** — one-time or weekly blocks on a drag-and-drop week grid (with full keyboard access), merged and ranked into *"here's when you can all play"* recommendations
 - 🔗 **Guest links** — friends without accounts RSVP or vote through a secure personal link; no signup wall
 - 👥 **Real friend graph** — friend codes, QR codes, profile links, Steam friend-list import; blocking with mutual invisibility
+- 🫂 **Friend groups** — name your squad once, then share sessions and polls with the whole group; membership changes propagate to what people can see, with clear provenance for *why* you can see something
 - 🌍 **Timezone-correct by construction** — NodaTime end to end; weekly availability keeps its wall-clock time across DST transitions
 - 🔔 **Web Push + in-app notifications** — invitations, confirmations, reminders, poll deadlines; per-session mute
 - 🗣️ **Three languages** — English, Português (BR), Español, including notifications and emails
 - ♿ **WCAG 2.2 AA target** — keyboard-first drag alternatives, screen-reader announcements, reduced-motion support
 
-The complete behavior is specified before code in [PRODUCT_SPEC.md](PRODUCT_SPEC.md) — **180 numbered product decisions** (D-001…D-180), each one traceable to the test that proves it.
+The complete behavior is specified before code in [PRODUCT_SPEC.md](PRODUCT_SPEC.md) — **210 numbered product decisions** (D-001…D-210), each one traceable to the test that proves it.
 
 ## 🏗️ How it's built
 
@@ -138,9 +139,11 @@ git config core.hooksPath .githooks
   `wsl -d Ubuntu-24.04 -e bash -lc "cd /mnt/c/<repo> && dotnet test PartyUp.sln -p:ArtifactsPath=/tmp/partyup-artifacts"`
   (the `ArtifactsPath` redirect keeps build output off the slow `/mnt/c` mount).
 
-Run the same mandatory gate explicitly before a push when you want the result before the hook:
+Run the same mandatory gate explicitly before a push when you want the result before the hook — `scripts/wsl-gate.sh` runs one build, then concurrent test shards mirroring CI's backend integration matrix (~3× faster than the serial run; CI's web and real-browser suites are separate jobs):
 
 ```sh
+wsl -d Ubuntu-24.04 -e bash -lc 'cd /mnt/c/Users/nilot/source/repos/PartyUpSocial && scripts/wsl-gate.sh'
+# serial fallback, identical coverage:
 wsl -d Ubuntu-24.04 -e bash -lc 'cd /mnt/c/Users/nilot/source/repos/PartyUpSocial && dotnet test PartyUp.sln -p:ArtifactsPath=/tmp/partyup-artifacts'
 ```
 - **Linux/macOS**: runs `dotnet test PartyUp.sln` directly and expects the
@@ -155,8 +158,9 @@ push. That is intended: fix the environment or the tests, don't skip the gate.
   running inside it.
 - **Linux/macOS**: .NET 10 SDK and a running Docker daemon.
 
-The run takes a few minutes (~1100+ unit tests plus the integration lane
-against real Postgres via Testcontainers).
+The run takes a few minutes (2,000+ backend test methods across the unit and
+integration lanes, integration against real Postgres via Testcontainers). The
+~780 web tests and the real-browser lane run as separate CI jobs.
 
 ### Bypassing
 
@@ -167,9 +171,11 @@ mandatory pre-push gate; fix the environment or the tests before pushing.
 
 | Document | What's inside |
 |---|---|
-| [PRODUCT_SPEC.md](PRODUCT_SPEC.md) | Full product behavior — 180 numbered, statused decisions |
+| [PRODUCT_SPEC.md](PRODUCT_SPEC.md) | Full product behavior — 210 numbered, statused decisions |
+| [DOMAIN_MODEL.md](DOMAIN_MODEL.md) | Ratified domain design — aggregates, state machines, visibility rules |
 | [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) | Phased delivery plan with honest sizing |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Technical foundation, conventions, decision record |
+| [TRACEABILITY.md](TRACEABILITY.md) | Every decision mapped to the test that proves it |
 | [deploy/](deploy/) | Dockerfile, compose files, Caddy config, backup & restore runbooks |
 
 ## 🗺️ Roadmap
@@ -179,13 +185,15 @@ mandatory pre-push gate; fix the environment or the tests before pushing.
 | 0 | Walking skeleton — CI/CD, deploy stack, health, migrations; spikes A/B/C decided (A-018..A-020) | ✅ |
 | 1 | Domain core — session/poll state machines, visibility & overlap engines, D-number test suite (DOMAIN_MODEL.md + TRACEABILITY.md, 1033 tests) | ✅ |
 | 2 | Accounts, auth (email, magic link, Google, Steam), onboarding, admin foundations, public deletion flow ([PHASE2_DESIGN.md](PHASE2_DESIGN.md)) | ✅ |
-| 3 | Friends, blocking, Steam import | ⬜ |
-| 4 | Fixed-time sessions end-to-end, guest links | ⬜ |
-| 5 | Availability, recommendations, calendar views | ⬜ |
-| 6 | Scheduling polls | ⬜ |
-| 7 | Notification transports & preferences | ⬜ |
-| 8 | Localization, WCAG 2.2 AA audit, hardening, admin area | ⬜ |
-| 9 | Go-live (VM + first TLS deploy done 2026-07-30; rclone + restore drill open), private beta → public launch | ⬜ |
+| 3 | Friends, blocking, Steam import | ✅ |
+| 4 | Fixed-time sessions end-to-end, guest links | ✅ |
+| 5 | Availability, recommendations, calendar views (+ 5.1 visual identity & dark mode) | ✅ |
+| 6 | Scheduling polls | ✅ |
+| 7 | Notification transports & preferences | ✅ |
+| 8 | Localization, WCAG 2.2 AA audit, hardening, admin area | ✅ |
+| 9 | Go-live infrastructure — VM, TLS, CI-gated auto-deploy (done 2026-07-30; rclone offsite + restore drill open) | ✅ |
+| 10 | Friend groups — shared visibility circles with provenance | ✅ |
+| — | Private beta → single full-scope public launch | ⬜ |
 
 Everything ships together in one public v1 — no stripped-down beta ([D-163](PRODUCT_SPEC.md#14-decisions)).
 
