@@ -3,13 +3,13 @@ import { Link, useLocation } from 'react-router'
 import { NAV_ITEMS, isNavItemActive } from './navItems'
 
 /**
- * Mobile section navigation. Five equal targets (>=44px), active state
+ * Mobile section navigation. Six equal targets (>=44px), active state
  * carried by an indicator chip + bold label, never colour alone.
  *
  * `Link`, not `NavLink` — see the same note in `./TopBar`.
  */
 export function BottomTabBar() {
-  const { t } = useTranslation(['common', 'sessions', 'polls', 'availability'])
+  const { t } = useTranslation(['common', 'sessions', 'polls', 'availability', 'groups'])
   const { pathname } = useLocation()
 
   return (
@@ -17,7 +17,7 @@ export function BottomTabBar() {
       aria-label={t('navigation.tabBarLabel')}
       className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
     >
-      <ul className="mx-auto grid max-w-[600px] grid-cols-5">
+      <ul className="mx-auto grid max-w-[600px] grid-cols-6">
         {NAV_ITEMS.map((item) => {
           const active = isNavItemActive(pathname, item)
           return (

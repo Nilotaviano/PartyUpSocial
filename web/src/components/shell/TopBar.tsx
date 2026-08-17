@@ -15,7 +15,7 @@ import { NAV_ITEMS, isNavItemActive } from './navItems'
 // active range (`/sessions/*`) is wider than its link target
 // (`/sessions/upcoming`) — see `isNavItemActive` in `./navItems`.
 export function TopBar() {
-  const { t } = useTranslation(['common', 'sessions', 'polls', 'availability'])
+  const { t } = useTranslation(['common', 'sessions', 'polls', 'availability', 'groups'])
   const { pathname } = useLocation()
 
   return (

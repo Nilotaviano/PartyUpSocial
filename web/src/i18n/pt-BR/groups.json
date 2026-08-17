@@ -1,0 +1,133 @@
+{
+  "nav": {
+    "groups": "Grupos"
+  },
+  "list": {
+    "heading": "Grupos",
+    "description": "Reúna amigos em grupos com nome e compartilhe sessões e enquetes só com eles.",
+    "newGroup": "Novo grupo"
+  },
+  "sections": {
+    "invites": "Convites pendentes",
+    "myGroups": "Meus grupos",
+    "memberOf": "Grupos que participo",
+    "roster": "Membros",
+    "invited": "Convidados"
+  },
+  "emptyState": {
+    "owned": {
+      "title": "Você ainda não tem nenhum grupo",
+      "body": "Crie um grupo como \"Turma de RPG\" e convide os amigos com quem mais joga."
+    },
+    "memberOf": {
+      "title": "Nenhum grupo de amigos ainda",
+      "body": "Quando um amigo te adicionar a um grupo dele, ele aparece aqui depois que você aceitar."
+    },
+    "invited": {
+      "title": "Nenhum convite enviado",
+      "body": "Convide amigos e eles aparecem aqui até aceitarem ou recusarem."
+    }
+  },
+  "roster": {
+    "memberCount_one": "{{count}} membro",
+    "memberCount_other": "{{count}} membros",
+    "invitedCount_one": "{{count}} convidado",
+    "invitedCount_other": "{{count}} convidados",
+    "ownedBy": "de {{name}}",
+    "you": "Você"
+  },
+  "badges": {
+    "owner": "Dono",
+    "invited": "Convidado"
+  },
+  "eyebrow": {
+    "owner": "Seu grupo",
+    "ownedBy": "Grupo de {{name}}"
+  },
+  "invite": {
+    "received": "{{name}} te convidou para “{{group}}”",
+    "accept": "Aceitar",
+    "decline": "Recusar",
+    "action": "Convidar amigos",
+    "dialogTitle": "Convidar amigos",
+    "dialogDescription": "Eles entram no grupo assim que aceitarem.",
+    "legend": "Amigos que não estão no grupo",
+    "submit": "Enviar convites"
+  },
+  "multiSelect": {
+    "allInvited": "Todos os seus amigos já estão aqui."
+  },
+  "newGroup": {
+    "title": "Novo grupo",
+    "description": "Dê um nome e convide amigos. Eles entram assim que aceitarem.",
+    "nameLabel": "Nome do grupo",
+    "namePlaceholder": "Turma de RPG",
+    "nameRequired": "Dê um nome ao grupo.",
+    "nameCount_one": "{{count}}/50 caractere",
+    "nameCount_other": "{{count}}/50 caracteres",
+    "inviteLegend": "Convidar amigos",
+    "submit": "Criar grupo"
+  },
+  "rename": {
+    "title": "Renomear grupo",
+    "description": "Todos no grupo verão o novo nome.",
+    "submit": "Salvar"
+  },
+  "actions": {
+    "cancel": "Cancelar",
+    "rename": "Renomear",
+    "leave": "Sair do grupo",
+    "remove": "Remover",
+    "revoke": "Cancelar convite"
+  },
+  "confirm": {
+    "delete": {
+      "title": "Excluir “{{group}}”?",
+      "description": "Os membros perdem acesso a tudo que foi compartilhado com este grupo. Isso não pode ser desfeito.",
+      "action": "Excluir grupo"
+    },
+    "leave": {
+      "title": "Sair de “{{group}}”?",
+      "description": "Você deixa de ver as sessões e enquetes compartilhadas com este grupo.",
+      "action": "Sair"
+    },
+    "remove": {
+      "title": "Remover {{name}}?",
+      "description": "A pessoa perde acesso a tudo que foi compartilhado com este grupo. Você pode convidá-la de novo depois.",
+      "action": "Remover"
+    }
+  },
+  "danger": {
+    "title": "Excluir grupo",
+    "description": "Os membros perdem acesso a tudo que foi compartilhado com este grupo. Isso não pode ser desfeito.",
+    "action": "Excluir “{{group}}”"
+  },
+  "notFound": {
+    "title": "Este grupo não existe mais",
+    "description": "Ele pode ter sido excluído, ou você pode ter saído dele."
+  },
+  "toasts": {
+    "created": "Grupo criado.",
+    "renamed": "Grupo renomeado.",
+    "invited": "Convite(s) enviado(s).",
+    "deleted": "Grupo excluído."
+  },
+  "member": {
+    "unknown": "Membro"
+  },
+  "a11y": {
+    "dialogLabel": "Diálogo de confirmação"
+  },
+  "errors": {
+    "generic": "Algo deu errado.",
+    "codes": {
+      "validation_failed": "Esse nome de grupo não é válido.",
+      "group_not_found": "Este grupo não está mais disponível.",
+      "user_not_found": "Não foi possível encontrar essa pessoa.",
+      "group_limit_reached": "Você atingiu o limite de 50 grupos.",
+      "group_member_limit_reached": "Este grupo atingiu o limite de membros.",
+      "group_name_taken": "Você já tem um grupo com esse nome.",
+      "rate_limited": "Muitas tentativas. Tente novamente em instantes."
+    }
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "nav": {
+    "groups": "Groups"
+  },
+  "list": {
+    "heading": "Groups",
+    "description": "Bundle friends into named groups, then share sessions and polls with just them.",
+    "newGroup": "New group"
+  },
+  "sections": {
+    "invites": "Pending invites",
+    "myGroups": "My groups",
+    "memberOf": "Groups I'm in",
+    "roster": "Roster",
+    "invited": "Invited"
+  },
+  "emptyState": {
+    "owned": {
+      "title": "You don't own any groups yet",
+      "body": "Create a group like \"D&D crew\" and invite the friends you play with most."
+    },
+    "memberOf": {
+      "title": "No groups from friends yet",
+      "body": "When a friend adds you to one of their groups, it shows up here after you accept."
+    },
+    "invited": {
+      "title": "No invites out",
+      "body": "Invite friends and they'll appear here until they accept or decline."
+    }
+  },
+  "roster": {
+    "memberCount_one": "{{count}} member",
+    "memberCount_other": "{{count}} members",
+    "invitedCount_one": "{{count}} invited",
+    "invitedCount_other": "{{count}} invited",
+    "ownedBy": "owned by {{name}}",
+    "you": "You"
+  },
+  "badges": {
+    "owner": "Owner",
+    "invited": "Invited"
+  },
+  "eyebrow": {
+    "owner": "Your group",
+    "ownedBy": "Owned by {{name}}"
+  },
+  "invite": {
+    "received": "{{name}} invited you to “{{group}}”",
+    "accept": "Accept",
+    "decline": "Decline",
+    "action": "Invite friends",
+    "dialogTitle": "Invite friends",
+    "dialogDescription": "They join the group once they accept.",
+    "legend": "Friends not in this group",
+    "submit": "Send invites"
+  },
+  "multiSelect": {
+    "allInvited": "Everyone on your friends list is already here."
+  },
+  "newGroup": {
+    "title": "New group",
+    "description": "Name it, then invite friends. They join once they accept.",
+    "nameLabel": "Group name",
+    "namePlaceholder": "D&D crew",
+    "nameRequired": "Give the group a name.",
+    "nameCount_one": "{{count}}/50 character",
+    "nameCount_other": "{{count}}/50 characters",
+    "inviteLegend": "Invite friends",
+    "submit": "Create group"
+  },
+  "rename": {
+    "title": "Rename group",
+    "description": "Everyone in the group sees the new name.",
+    "submit": "Save"
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "rename": "Rename",
+    "leave": "Leave group",
+    "remove": "Remove",
+    "revoke": "Revoke"
+  },
+  "confirm": {
+    "delete": {
+      "title": "Delete “{{group}}”?",
+      "description": "Members lose access to anything shared with this group. This can't be undone.",
+      "action": "Delete group"
+    },
+    "leave": {
+      "title": "Leave “{{group}}”?",
+      "description": "You'll stop seeing sessions and polls shared with this group.",
+      "action": "Leave"
+    },
+    "remove": {
+      "title": "Remove {{name}}?",
+      "description": "They lose access to anything shared with this group. You can invite them again later.",
+      "action": "Remove"
+    }
+  },
+  "danger": {
+    "title": "Delete group",
+    "description": "Members lose access to anything shared with this group. This can't be undone.",
+    "action": "Delete “{{group}}”"
+  },
+  "notFound": {
+    "title": "This group no longer exists",
+    "description": "It may have been deleted, or you left it."
+  },
+  "toasts": {
+    "created": "Group created.",
+    "renamed": "Group renamed.",
+    "invited": "Invite(s) sent.",
+    "deleted": "Group deleted."
+  },
+  "member": {
+    "unknown": "Member"
+  },
+  "a11y": {
+    "dialogLabel": "Confirmation dialog"
+  },
+  "errors": {
+    "generic": "Something went wrong.",
+    "codes": {
+      "validation_failed": "That group name isn't valid.",
+      "group_not_found": "This group is no longer available.",
+      "user_not_found": "That person couldn't be found.",
+      "group_limit_reached": "You've reached the limit of 50 groups.",
+      "group_member_limit_reached": "This group has reached its member limit.",
+      "group_name_taken": "You already have a group with that name.",
+      "rate_limited": "Too many attempts. Try again in a moment."
+    }
+  }
+}

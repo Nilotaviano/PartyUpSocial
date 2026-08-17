@@ -32,6 +32,8 @@ import { AddFriendPage } from './features/friends/AddFriendPage'
 import { FriendsPage } from './features/friends/FriendsPage'
 import { ProfilePage } from './features/friends/ProfilePage'
 import { SteamImportPage } from './features/friends/SteamImportPage'
+import { GroupDetailPage } from './features/groups/GroupDetailPage'
+import { GroupsPage } from './features/groups/GroupsPage'
 import { HomePage } from './features/home/HomePage'
 import { CommunityStandardsPage } from './features/legal/CommunityStandardsPage'
 import { PrivacyPolicyPage } from './features/legal/PrivacyPolicyPage'
@@ -208,6 +210,8 @@ function App() {
             <Route path="/discover" element={<DiscoverPage />} />
             <Route path="/friends" element={<FriendsPage />} />
             <Route path="/friends/import/steam" element={<SteamImportPage />} />
+            <Route path="/groups" element={<GroupsPage />} />
+            <Route path="/groups/:groupId" element={<GroupDetailPage />} />
             <Route path="/u/:username" element={<ProfilePage />} />
             <Route path="/add/:code" element={<AddFriendPage />} />
             <Route path="/settings/profile" element={<ProfileSettingsPage />} />

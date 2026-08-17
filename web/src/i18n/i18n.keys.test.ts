@@ -14,6 +14,7 @@ const namespaces = [
   'settings',
   'errors',
   'friends',
+  'groups',
   'sessions',
   'availability',
   'home',
@@ -168,6 +169,48 @@ describe('friends namespace rendering D-060', () => {
         (resources[locale].friends as { actions: { resolve: string } }).actions
           .resolve,
       )
+    })
+  }
+})
+
+// Closed problem-code inventory (FriendGroupEndpoints.cs `StatusFor`): the six
+// friend-group HTTP surface codes plus the shared blanket rate_limited code.
+const groupProblemCodes = [
+  'validation_failed',
+  'group_not_found',
+  'user_not_found',
+  'group_limit_reached',
+  'group_member_limit_reached',
+  'group_name_taken',
+  'rate_limited',
+] as const
+
+describe('groups namespace parity and rendering D-198/D-199', () => {
+  for (const locale of locales) {
+    it(locale + ' renders groups.list.heading', async () => {
+      await i18n.changeLanguage(locale)
+      expect(i18n.t('list.heading', { ns: 'groups' })).toBe(
+        (resources[locale].groups as { list: { heading: string } }).list.heading,
+      )
+    })
+  }
+
+  it('errors.codes contains exactly the closed friend-group problem-code inventory', () => {
+    const codes = Object.keys(
+      (registeredResources.en.groups as { errors: { codes: Record<string, string> } }).errors.codes,
+    ).sort()
+    expect(codes).toEqual([...groupProblemCodes].sort())
+  })
+
+  for (const locale of locales) {
+    it(locale + ' has one message per documented friend-group problem code', () => {
+      const codes = (
+        registeredResources[locale].groups as { errors: { codes: Record<string, string> } }
+      ).errors.codes
+      for (const code of groupProblemCodes) {
+        expect(typeof codes[code]).toBe('string')
+        expect(codes[code].length).toBeGreaterThan(0)
+      }
     })
   }
 })

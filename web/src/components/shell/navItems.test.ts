@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { NAV_ITEMS, isNavItemActive } from './navItems'
 
-describe('NAV_ITEMS — five chrome sections, no Discover (owner ruling)', () => {
-  it('has exactly five items in the ruled order', () => {
+describe('NAV_ITEMS — six chrome sections, no Discover (owner ruling)', () => {
+  it('has exactly six items in the ruled order', () => {
     expect(NAV_ITEMS.map((item) => item.to)).toEqual([
       '/app',
       '/friends',
+      '/groups',
       '/sessions/upcoming',
       '/polls',
       '/calendar',
@@ -22,6 +23,7 @@ describe('isNavItemActive — Sessions activates across /sessions/*', () => {
   const polls = NAV_ITEMS.find((item) => item.to === '/polls')!
   const home = NAV_ITEMS.find((item) => item.to === '/app')!
   const friends = NAV_ITEMS.find((item) => item.to === '/friends')!
+  const groups = NAV_ITEMS.find((item) => item.to === '/groups')!
   const calendar = NAV_ITEMS.find((item) => item.to === '/calendar')!
 
   it('activates Sessions for its own link target', () => {
@@ -63,5 +65,13 @@ describe('isNavItemActive — Sessions activates across /sessions/*', () => {
 
   it('activates Calendar for the agenda sub-route', () => {
     expect(isNavItemActive('/calendar/agenda', calendar)).toBe(true)
+  })
+
+  it('activates Groups for its detail route', () => {
+    expect(isNavItemActive('/groups/00000000-0000-0000-0000-000000000003', groups)).toBe(true)
+  })
+
+  it('does not activate Groups for an unrelated route', () => {
+    expect(isNavItemActive('/friends', groups)).toBe(false)
   })
 })

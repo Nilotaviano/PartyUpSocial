@@ -9,6 +9,7 @@ import enAvatar from './en/avatar.json'
 import enCommon from './en/common.json'
 import enErrors from './en/errors.json'
 import enFriends from './en/friends.json'
+import enGroups from './en/groups.json'
 import enHome from './en/home.json'
 import enLegal from './en/legal.json'
 import enNotifications from './en/notifications.json'
@@ -25,6 +26,7 @@ import esAvatar from './es/avatar.json'
 import esCommon from './es/common.json'
 import esErrors from './es/errors.json'
 import esFriends from './es/friends.json'
+import esGroups from './es/groups.json'
 import esHome from './es/home.json'
 import esLegal from './es/legal.json'
 import esNotifications from './es/notifications.json'
@@ -41,6 +43,7 @@ import ptBRAvatar from './pt-BR/avatar.json'
 import ptBRCommon from './pt-BR/common.json'
 import ptBRErrors from './pt-BR/errors.json'
 import ptBRFriends from './pt-BR/friends.json'
+import ptBRGroups from './pt-BR/groups.json'
 import ptBRHome from './pt-BR/home.json'
 import ptBRLegal from './pt-BR/legal.json'
 import ptBRNotifications from './pt-BR/notifications.json'
@@ -62,6 +65,7 @@ export const resources = {
     settings: enSettings,
     errors: enErrors,
     friends: enFriends,
+    groups: enGroups,
     sessions: enSessions,
     availability: enAvailability,
     home: enHome,
@@ -80,6 +84,7 @@ export const resources = {
     settings: ptBRSettings,
     errors: ptBRErrors,
     friends: ptBRFriends,
+    groups: ptBRGroups,
     sessions: ptBRSessions,
     availability: ptBRAvailability,
     home: ptBRHome,
@@ -98,6 +103,7 @@ export const resources = {
     settings: esSettings,
     errors: esErrors,
     friends: esFriends,
+    groups: esGroups,
     sessions: esSessions,
     availability: esAvailability,
     home: esHome,
@@ -125,6 +131,7 @@ void i18n
       'settings',
       'errors',
       'friends',
+      'groups',
       'sessions',
       'availability',
       'home',
