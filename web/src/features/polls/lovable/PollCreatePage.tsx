@@ -518,8 +518,10 @@ export function PollCreatePage() {
     if (!form.title.trim()) errors.title = t('validation.required')
     if (form.options.length < MIN_OPTIONS) errors.options = t('validation.optionMinimum')
     if (form.options.length > MAX_OPTIONS) errors.options = t('validation.optionCap')
-    // D-131 is now a per-option rule: every band carries its own length.
+    // D-131 is now a per-option rule: every band carries its own length. The
+    // count errors above take display priority; don't overwrite them.
     if (
+      !errors.options &&
       form.options.some(
         (option) =>
           !Number.isFinite(option.durationMinutes) ||

@@ -67,7 +67,7 @@ function buildPrefillUrl(
 
 /**
  * A-083's poll-arm producer half (design §5): each selected window contributes exactly one
- * option instant — never a duration, which is not an option property (spec §7.3-1) — accumulated
+ * option instant — the option's own length (D-211) is chosen later on the create grid — accumulated
  * into `/polls/new?startTimes=...` as a repeated query param (route query only, never a server
  * draft, D-152/D-162). This function passes the raw window starts through unclamped — the clamp
  * (`RecommendationPrefill.ForPollOption`'s `WouldClamp`) is computed on read, by

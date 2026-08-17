@@ -57,4 +57,4 @@ Thumbs.db
 .foreman/
 src/PartyUp.Api/mail-drop/
 .mail-drop/
-.push-drop/
+.push-drop/src/PartyUp.Api/wwwroot/

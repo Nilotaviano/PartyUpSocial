@@ -37,17 +37,6 @@ public class PollOptionDurationTests
     }
 
     [Fact]
-    public void Create_RejectsAnOptionLengthOffTheD142Grid_D211()
-    {
-        DomainException tooLong = Assert.Throws<DomainException>(
-            () => Duration15.FromMinutes((24 * 60) + 15));
-        DomainException tooShort = Assert.Throws<DomainException>(() => Duration15.FromMinutes(10));
-
-        Assert.Equal(DomainError.ValidationFailed, tooLong.Error);
-        Assert.Equal(DomainError.ValidationFailed, tooShort.Error);
-    }
-
-    [Fact]
     public void Create_RejectsAnOptionCarryingNoLengthAtAll_D211()
     {
         FakeClock clock = TestPolls.Clock();

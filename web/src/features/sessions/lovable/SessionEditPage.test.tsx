@@ -30,6 +30,7 @@ vi.mock('react-router', async () => {
 })
 
 import { ApiError } from '../../../api/client'
+import { BOTTOM_BAR_OFFSET_CLASSES } from '../../../components/shell/bottomBarOffset'
 import '../../../i18n'
 import { SessionEditPage } from './SessionEditPage'
 
@@ -346,6 +347,18 @@ describe('SessionEditPage (lovable)', () => {
 
     expect(privateRadio).toHaveAttribute('aria-checked', 'true')
     expect(publicRadio).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('lifts the sticky action bar above the mobile tab bar', async () => {
+    mockSessionDetail(() => detail())
+    renderPage()
+
+    const bar = (await screen.findByRole('button', { name: 'Save changes' })).closest('div.fixed')
+
+    expect(bar).not.toBeNull()
+    for (const offsetClass of BOTTOM_BAR_OFFSET_CLASSES.split(' ')) {
+      expect(bar).toHaveClass(offsetClass)
+    }
   })
 
   it('retries exactly once after a session_conflict then surfaces the error on repeat failure_A071', async () => {

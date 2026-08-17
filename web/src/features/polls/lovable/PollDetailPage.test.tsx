@@ -15,6 +15,7 @@ vi.mock('../../../auth/useSession', () => ({
   useSession: () => session,
 }))
 
+import { BOTTOM_BAR_OFFSET_CLASSES } from '../../../components/shell/bottomBarOffset'
 import '../../../i18n'
 import { PollDetailPage } from './PollDetailPage'
 
@@ -891,6 +892,18 @@ describe('PollDetailPage (lovable)', () => {
         ],
       }
     }
+
+    it('lifts the sticky preview bar above the mobile tab bar', async () => {
+      mockGet({ detail: awaitingSelectionPoll(), preview: previewResponse() })
+      renderPage()
+
+      const bar = (await screen.findByTestId('finalize-trigger')).closest('div.fixed')
+
+      expect(bar).not.toBeNull()
+      for (const offsetClass of BOTTOM_BAR_OFFSET_CLASSES.split(' ')) {
+        expect(bar).toHaveClass(offsetClass)
+      }
+    })
 
     it('finalizes the leader from the sticky preview bar and navigates to the created session_D160', async () => {
       mockGet({ detail: awaitingSelectionPoll(), preview: previewResponse() })
