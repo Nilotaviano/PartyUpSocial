@@ -480,38 +480,6 @@ export function SessionAttendanceFieldset({
   )
 }
 
-/**
- * The real two-state `isPrivate` boolean as a two-item segmented group —
- * `PollCreatePage`'s privacy skin (D-125's sessions equivalent is D-129's
- * invitee requirement, enforced by the caller's own validation, not here).
- */
-export function SessionPrivacyControl({
-  t,
-  value,
-  onChange,
-  disclosure,
-}: {
-  t: TFunction
-  value: boolean
-  onChange: (isPrivate: boolean) => void
-  disclosure?: ReactNode
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <SegmentedGroup
-        ariaLabel={t('create.private')}
-        options={[
-          { value: 'private' as const, label: t('create.privacyPrivate') },
-          { value: 'public' as const, label: t('create.privacyPublic') },
-        ]}
-        value={value ? 'private' : 'public'}
-        onChange={(v) => onChange(v === 'private')}
-      />
-      {disclosure}
-    </div>
-  )
-}
-
 export function SessionInviteesFieldset({
   t,
   friends,

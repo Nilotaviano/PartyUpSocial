@@ -23,6 +23,7 @@ import { PageHeader } from '../../../components/shell/PageHeader'
 import { StatusBanner } from '../../../components/ui/statusBanner'
 import { useToast } from '../../../components/ui/toastStore'
 import { AvatarDisc } from '../../friends/AvatarDisc'
+import { ShareTag } from '../../groups/ShareTag'
 import { getViewerProfile, viewerProfileKey } from '../../sessions/sessionQueries'
 import { cn } from '../../availability/lovable/utils'
 import {
@@ -1302,7 +1303,12 @@ export function PollDetailPage() {
         <>
           <div className="mx-auto max-w-[1400px] px-3 sm:px-6">
             <PageHeader
-              actions={<StatusPill label={t(statusLabelKey(poll.status))} status={poll.status} />}
+              actions={
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusPill label={t(statusLabelKey(poll.status))} status={poll.status} />
+                  <ShareTag share={poll} />
+                </div>
+              }
               back={{ label: t('nav.backToList'), to: '/polls' }}
               description={`${poll.game ? `${poll.game.name} · ` : ''}${platformLabel(poll.platform, t)}`}
               title={poll.title}
@@ -1315,7 +1321,13 @@ export function PollDetailPage() {
                 <Meta label={t('detailLovable.meta.duration')} value={`${poll.durationMinutes / 60}h`} />
                 <Meta
                   label={t('detailLovable.meta.privacy')}
-                  value={poll.isPrivate ? t('detailLovable.privacyPrivate') : t('detailLovable.privacyPublic')}
+                  value={
+                    poll.visibility === 'private'
+                      ? t('detailLovable.privacyPrivate')
+                      : poll.visibility === 'groups'
+                        ? t('detailLovable.privacyGroups')
+                        : t('detailLovable.privacyPublic')
+                  }
                 />
                 <Meta label={t('detailLovable.meta.minimum')} value={String(poll.minAttendance)} />
                 <Meta

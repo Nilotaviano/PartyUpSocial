@@ -116,6 +116,48 @@ function mockGetGroup(data: FriendGroupDetail = detail()) {
   })
 }
 
+/** An Invited-only viewer's detail: name + owner id only, no roster (D-199). */
+function invitedOnlyDetail(): FriendGroupDetail {
+  return {
+    id: 'g1',
+    name: 'D&D crew',
+    ownerId: 'owner-1',
+    createdAt: '2030-01-01T00:00:00Z',
+    ownerDisplayName: null,
+    ownerAvatar: null,
+    ownerMasked: false,
+    members: null,
+  }
+}
+
+function mockInvitedOnly() {
+  api.get.mockImplementation((path: string) => {
+    if (path === '/api/v1/friend-groups/{groupId}') {
+      return Promise.resolve({ data: invitedOnlyDetail() })
+    }
+    if (path === '/api/v1/friend-groups') {
+      return Promise.resolve({
+        data: {
+          owned: [],
+          memberOf: [],
+          invites: [
+            {
+              id: 'g1',
+              name: 'D&D crew',
+              ownerId: 'owner-1',
+              invitedAt: '2030-01-01T00:00:00Z',
+              ownerDisplayName: 'Owner One',
+              ownerAvatar: null,
+              ownerMasked: false,
+            },
+          ],
+        },
+      })
+    }
+    throw new Error(`Unexpected GET ${path}`)
+  })
+}
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
@@ -207,5 +249,22 @@ describe('GroupDetailPage — server-resolved roster identities, no client-side 
     expect(screen.getAllByText('Anonymous User').length).toBeGreaterThan(0)
     // Still one row per member — masking never drops the row (D-202).
     expect(screen.getAllByRole('button', { name: /^Remove/ }).length).toBe(2)
+  })
+})
+
+describe('GroupDetailPage — Invited-viewer state_D199', () => {
+  it('renders the server-fed name and owner with accept/decline, not the not-found state', async () => {
+    mockedUseSession.mockReturnValue({
+      data: { userId: 'invitee-1', profile: { displayName: 'Invitee', avatar: avatar('😀') } },
+    })
+    mockInvitedOnly()
+
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'D&D crew' })).toBeInTheDocument()
+    expect(await screen.findByText(/Owner One invited you/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument()
+    expect(screen.queryByText('This group no longer exists')).not.toBeInTheDocument()
   })
 })

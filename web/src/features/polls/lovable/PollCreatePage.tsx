@@ -19,6 +19,8 @@ import { useDirtyGuard } from '../../../components/useDirtyGuard'
 import { AvatarDisc } from '../../friends/AvatarDisc'
 import { avatarImgUrl } from '../../friends/avatarImage'
 import { friendKeys, getFriends } from '../../friends/friendGraph'
+import { getGroupList, groupKeys } from '../../groups/groupQueries'
+import { VisibilityControl, type Visibility } from '../../groups/VisibilityControl'
 import { getViewerProfile, viewerProfileKey } from '../../sessions/sessionQueries'
 import { SteamGamePicker } from '../../sessions/SteamGamePicker'
 import { cn } from '../../availability/lovable/utils'
@@ -50,9 +52,11 @@ import { createPoll, type CreatePollRequest } from '../pollQueries'
  *    controls are the real validated fields (D-131's 15-minute increments,
  *    min/max range checks), not decorative segmented pickers.
  *  - The prototype's three-state `Privacy` (`friends`/`invite`/`public`) is
- *    the real two-state `isPrivate` boolean (a two-item segmented group),
- *    with the real invitee checklist and guest-link count beneath it
- *    (D-125: a non-private poll needs at least one invited friend).
+ *    the real three-level `visibility` (Private/Groups/Public,
+ *    `VisibilityControl` from `features/groups`), with the real invitee
+ *    checklist and guest-link count beneath it (D-125: a public poll needs
+ *    at least one invited friend; D-201: a Groups poll needs at least one
+ *    targeted group).
  *  - Candidate times are S1's `CandidateGrid`, not the prototype's own copy.
  *    The grid only shows one week at a time, so — unlike the prototype,
  *    which had no week paging — this page adds Prev/Next-week controls so
@@ -111,6 +115,7 @@ const fieldIds: Record<string, string> = {
   minAttendance: 'field-min',
   maxCapacity: 'field-max',
   inviteeUserIds: 'field-invitees',
+  audienceGroupIds: 'field-visibility',
   guestLinkCount: 'field-guest-links',
   gameAppId: 'field-game-app-id',
   gameName: 'field-game-name',
@@ -137,7 +142,9 @@ const emptyForm = {
   minAttendance: '4',
   maxCapacity: '4',
   unlimited: false,
-  isPrivate: false,
+  // D-129: default visibility is Public on create.
+  visibility: 'public' as Visibility,
+  audienceGroupIds: [] as string[],
   inviteeUserIds: [] as string[],
   guestLinkCount: '0',
 }
@@ -291,6 +298,13 @@ export function PollCreatePage() {
     queryKey: friendKeys.friends,
     queryFn: getFriends,
   })
+
+  // D-201: any group the actor owns or holds an Accepted membership in can target.
+  const groupList = useQuery({ queryKey: groupKeys.list, queryFn: getGroupList })
+  const targetableGroups = [
+    ...(groupList.data?.owned ?? []),
+    ...(groupList.data?.memberOf ?? []),
+  ].map((group) => ({ id: group.id, name: group.name }))
 
   const submit = useMutation({
     mutationFn: (body: CreatePollRequest) => createPoll(body),
@@ -485,9 +499,12 @@ export function PollCreatePage() {
     if (!form.unlimited && max !== undefined && min > max) {
       errors.minAttendance = t('validation.minMax')
     }
-    // D-125: a non-private poll needs at least one directly invited registered friend.
-    if (!form.isPrivate && form.inviteeUserIds.length === 0) {
+    // D-125: a public poll needs at least one directly invited registered friend.
+    if (form.visibility === 'public' && form.inviteeUserIds.length === 0) {
       errors.inviteeUserIds = t('validation.invitedFriend')
+    }
+    if (form.visibility === 'groups' && form.audienceGroupIds.length === 0) {
+      errors.audienceGroupIds = t('validation.pickAtLeastOneGroup')
     }
     if (form.inviteeUserIds.length > 50) {
       errors.inviteeUserIds = t('validation.tooManyInvitees')
@@ -531,7 +548,8 @@ export function PollCreatePage() {
       notes: form.notes || null,
       minAttendance: Number(form.minAttendance),
       maxCapacity: form.unlimited ? null : Number(form.maxCapacity),
-      isPrivate: form.isPrivate,
+      visibility: form.visibility,
+      audienceGroupIds: form.visibility === 'groups' ? form.audienceGroupIds : [],
       inviteeUserIds: form.inviteeUserIds.length > 0 ? form.inviteeUserIds : null,
       guestLinkCount: guestLinkCountOf(form.guestLinkCount),
     })
@@ -764,15 +782,25 @@ export function PollCreatePage() {
                 {t('create.unlimited')}
               </label>
 
-              <SegmentedGroup
-                ariaLabel={t('create.private')}
-                options={[
-                  { value: 'private' as const, label: t('create.privacyPrivate') },
-                  { value: 'public' as const, label: t('create.privacyPublic') },
-                ]}
-                value={form.isPrivate ? 'private' : 'public'}
-                onChange={(v) => update('isPrivate', v === 'private')}
-              />
+              <div id="field-visibility">
+                <VisibilityControl
+                  groups={targetableGroups}
+                  selectedGroupIds={form.audienceGroupIds}
+                  value={form.visibility}
+                  onChange={(visibility) => update('visibility', visibility)}
+                  onToggleGroup={(groupId) =>
+                    update(
+                      'audienceGroupIds',
+                      form.audienceGroupIds.includes(groupId)
+                        ? form.audienceGroupIds.filter((id) => id !== groupId)
+                        : [...form.audienceGroupIds, groupId],
+                    )
+                  }
+                />
+                {fieldErrors.audienceGroupIds && (
+                  <p role="alert">{fieldErrors.audienceGroupIds}</p>
+                )}
+              </div>
 
               <fieldset className="flex flex-col gap-2" id="field-invitees">
                 <legend className="text-[12px] font-bold text-ink-soft">

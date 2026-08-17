@@ -172,6 +172,9 @@ describe('PollCreatePage (lovable)', () => {
       }
       if (path === '/api/v1/me') return Promise.resolve({ data: { timeZone: 'UTC' } })
       if (path === '/api/v1/calendar') return Promise.resolve({ data: emptyCalendarView })
+      if (path === '/api/v1/friend-groups') {
+        return Promise.resolve({ data: { owned: [], memberOf: [], invites: [] } })
+      }
       return new Promise((resolve) => {
         resolveFriends = () => resolve({ data: { items: [] } })
       })
@@ -261,7 +264,7 @@ describe('PollCreatePage (lovable)', () => {
       notes: 'Bring snacks',
       minAttendance: 4,
       maxCapacity: 4,
-      isPrivate: true,
+      visibility: 'private',
       deadlineChoice: 'hours24',
     })
     expect(options.body.optionStartTimes).toHaveLength(2)

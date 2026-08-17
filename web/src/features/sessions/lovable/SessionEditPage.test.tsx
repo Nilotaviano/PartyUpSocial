@@ -45,7 +45,9 @@ function detail(overrides: Partial<Record<string, unknown>> = {}) {
     notes: 'Bring snacks',
     minAttendance: 4,
     maxCapacity: 8,
-    isPrivate: false,
+    visibility: 'public',
+    viaGroup: null,
+    sharedWithGroup: false,
     status: 'unconfirmed',
     createdAt: '2030-08-01T00:00:00Z',
     roster: [],
@@ -78,6 +80,9 @@ function mockSessionDetail(next: (call: number) => unknown) {
   api.get.mockImplementation((path: string) => {
     if (path === '/api/v1/steam-catalog') {
       return Promise.resolve({ data: { catalogAvailable: false, results: [] } })
+    }
+    if (path === '/api/v1/friend-groups') {
+      return Promise.resolve({ data: { owned: [], memberOf: [], invites: [] } })
     }
     call += 1
     return Promise.resolve({ data: next(call) })
@@ -144,7 +149,6 @@ describe('SessionEditPage (lovable)', () => {
           durationMinutes: 120,
           platform: 'Steam',
           minAttendance: 4,
-          isPrivate: false,
           notes: 'Bring snacks',
           game: { name: 'Deep Rock Galactic', steamAppId: '548430' },
           clear: ['maxCapacity'],
@@ -328,7 +332,7 @@ describe('SessionEditPage (lovable)', () => {
     ).toBeInTheDocument()
   })
 
-  it('toggles isPrivate through the Private/Public segmented control_D123', async () => {
+  it('toggles visibility through the Private/Groups/Public segmented control_D123', async () => {
     renderPage()
 
     const privateRadio = await screen.findByRole('radio', { name: 'Private' })

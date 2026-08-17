@@ -1,10 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Crown, Inbox, Plus, UserPlus, UsersRound } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { isApiError } from '../../api/client'
-import { useSession } from '../../auth/useSession'
 import { EmptyState, SectionCard } from '../../components/shell/SectionCard'
 import { PageHeader } from '../../components/shell/PageHeader'
 import { Button } from '../../components/ui/button'
@@ -12,7 +11,6 @@ import { primaryCtaClasses } from '../../components/ui/classes'
 import { useToast } from '../../components/ui/toastStore'
 import { friendKeys, getFriends } from '../friends/friendGraph'
 import { AvatarStack, Tag, NewGroupDialog, type StackPerson } from './GroupBits'
-import { identityName, type IdentityLookup } from './identity'
 import {
   acceptGroupInvitation,
   createGroup,
@@ -30,42 +28,24 @@ import {
  *  - The prototype's in-memory `useGroups()` store is replaced by TanStack
  *    Query against the real API.
  *  - `GET /friend-groups` returns `memberCount` (owner + every Accepted
- *    member) directly on each card's summary — no per-group detail fetch
- *    needed for the count. A card's avatar stack renders only from a
- *    group's detail query that is ALREADY in the TanStack Query cache (the
- *    viewer has visited that group's detail page this session) — read
- *    passively via `queryClient.getQueryData`, never fetched here, so
- *    listing groups never fires the N+1 per-card request the count alone
- *    used to require.
+ *    member) and the owner's nameplate (`ownerDisplayName`/`ownerAvatar`/
+ *    `ownerMasked`, D-076 masking already applied server-side) directly on
+ *    each card's summary and on each pending invite — no per-group detail
+ *    fetch or client-side friends-list join needed for either. A card's
+ *    avatar stack renders only from a group's detail query that is ALREADY
+ *    in the TanStack Query cache (the viewer has visited that group's
+ *    detail page this session) — read passively via
+ *    `queryClient.getQueryData`, never fetched here, so listing groups
+ *    never fires the N+1 per-card request the count alone used to require.
  *  - The prototype's 6-tab bottom bar is not reproduced; Groups reaches the
  *    shell nav through `navItems.ts` like every other section.
  *  - Empty states render through the shell's `EmptyState` (h3 heading).
  */
 
-function useIdentityLookup() {
+/** Friends candidates for the "New group" dialog's invite step — nothing else needs the friends list. */
+function useFriendCandidates() {
   const friends = useQuery({ queryKey: friendKeys.friends, queryFn: getFriends })
-  const { data: session } = useSession()
-
-  const resolve = useMemo<IdentityLookup>(() => {
-    const map = new Map<string, { displayName: string; emoji?: string | null; imgUrl?: string | null }>()
-    for (const friend of friends.data ?? []) {
-      map.set(friend.userId, {
-        displayName: friend.displayName,
-        emoji: friend.avatar.emoji,
-        imgUrl: friend.avatar.imgUrl,
-      })
-    }
-    if (session?.userId && session.profile) {
-      map.set(session.userId, {
-        displayName: session.profile.displayName,
-        emoji: session.profile.avatar.emoji,
-        imgUrl: session.profile.avatar.imgUrl,
-      })
-    }
-    return (userId) => map.get(userId)
-  }, [friends.data, session])
-
-  return { resolve, candidates: friends.data ?? [] }
+  return friends.data ?? []
 }
 
 /** The stack people for a card, read passively from an already-cached detail — never fetched here. */
@@ -107,6 +87,15 @@ function GroupCard({
             <span className="mt-0.5 block text-[12px] text-ink-soft tabular-nums">
               {t('roster.memberCount', { count: group.memberCount })}
             </span>
+            {!owner && (
+              <span className="mt-0.5 block truncate text-[12px] text-ink-soft">
+                {t('roster.ownedBy', {
+                  name: group.ownerMasked
+                    ? t('member.anonymous')
+                    : (group.ownerDisplayName ?? t('member.unknown')),
+                })}
+              </span>
+            )}
           </span>
           {owner && (
             <Tag icon={Crown} tone="accent">
@@ -132,7 +121,7 @@ export function GroupsPage() {
   const newGroupButton = useRef<HTMLButtonElement>(null)
 
   const list = useQuery({ queryKey: groupKeys.list, queryFn: getGroupList })
-  const { resolve, candidates } = useIdentityLookup()
+  const candidates = useFriendCandidates()
 
   const owned = list.data?.owned ?? []
   const memberOf = list.data?.memberOf ?? []
@@ -210,7 +199,9 @@ export function GroupsPage() {
                   <li className="rounded-xl border-2 border-ink bg-accent/40 p-3" key={invite.id}>
                     <p className="text-[13.5px] text-ink">
                       {t('invite.received', {
-                        name: identityName(invite.ownerId, resolve, t),
+                        name: invite.ownerMasked
+                          ? t('member.anonymous')
+                          : (invite.ownerDisplayName ?? t('member.unknown')),
                         group: invite.name,
                       })}
                     </p>

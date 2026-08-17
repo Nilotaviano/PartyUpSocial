@@ -9,6 +9,8 @@ import { controlRowClasses, raisedInteractiveClasses } from '../../../components
 import { PageHeader } from '../../../components/shell/PageHeader'
 import { StatusBanner } from '../../../components/ui/statusBanner'
 import { useDirtyGuard } from '../../../components/useDirtyGuard'
+import { getGroupList, groupKeys } from '../../groups/groupQueries'
+import { VisibilityControl, type Visibility } from '../../groups/VisibilityControl'
 import {
   editSessionWithConflictRetry,
   getSessionDetail,
@@ -25,7 +27,6 @@ import {
   SessionDetailsFieldset,
   SessionDiscardDialog,
   SessionGameField,
-  SessionPrivacyControl,
   SessionStartField,
   ValidationSummary,
 } from './SessionFormBits'
@@ -47,6 +48,7 @@ const fieldIds: Record<string, string> = {
   title: 'field-title',
   minAttendance: 'field-min',
   gameAppId: 'field-game-app-id',
+  audienceGroupIds: 'field-visibility',
 }
 
 function formFrom(session: SessionDetail) {
@@ -60,7 +62,15 @@ function formFrom(session: SessionDetail) {
     notes: session.notes,
     minAttendance: String(session.minAttendance),
     maxCapacity: session.maxCapacity === null ? '' : String(session.maxCapacity),
-    isPrivate: session.isPrivate,
+    // The read model carries the viewer's own grant (`viaGroup`) and a neutral
+    // `sharedWithGroup` flag (D-206), never the session's full audience-group
+    // list — there is no read surface for that (mobile-clean contract). The
+    // control below is seeded from `visibility` alone; touching it starts a
+    // fresh group pick (`visibilityTouched`) rather than pretending to know
+    // the current audience.
+    visibility: session.visibility as Visibility,
+    audienceGroupIds: [] as string[],
+    visibilityTouched: false,
     // The single unlimited-capacity control (A-070): pre-checked when the
     // session already has no maximum, mapped onto the PATCH `clear` list
     // rather than a competing `maxCapacity: null` body value.
@@ -90,6 +100,13 @@ export function SessionEditPage() {
     enabled: Boolean(sessionId),
     retry: false,
   })
+
+  // D-201: any group the actor owns or holds an Accepted membership in can target.
+  const groupList = useQuery({ queryKey: groupKeys.list, queryFn: getGroupList })
+  const targetableGroups = [
+    ...(groupList.data?.owned ?? []),
+    ...(groupList.data?.memberOf ?? []),
+  ].map((group) => ({ id: group.id, name: group.name }))
 
   useDirtyGuard(dirty, {
     onBlockedNavigation: (target) => {
@@ -135,9 +152,15 @@ export function SessionEditPage() {
         durationMinutes: Number(form.durationMinutes),
         platform: form.platform || null,
         minAttendance: Number(form.minAttendance),
-        isPrivate: form.isPrivate,
         clear,
         ifMatch: detail.data.version,
+      }
+      // The server leaves visibility/audience untouched when omitted (D-201) — only send them
+      // once the control has actually been used, since the read model carries no full audience
+      // list to safely resend unchanged (see `formFrom`'s comment above).
+      if (form.visibilityTouched) {
+        body.visibility = form.visibility
+        body.audienceGroupIds = form.visibility === 'groups' ? form.audienceGroupIds : []
       }
       if (!form.clearMax) body.maxCapacity = Number(form.maxCapacity)
       if (!form.clearNotes) body.notes = form.notes
@@ -193,6 +216,9 @@ export function SessionEditPage() {
       !/^\d+$/.test(form.gameAppId)
     ) {
       errors.gameAppId = t('validation.steamAppIdDigits')
+    }
+    if (form.visibilityTouched && form.visibility === 'groups' && form.audienceGroupIds.length === 0) {
+      errors.audienceGroupIds = t('validation.pickAtLeastOneGroup')
     }
     return errors
   }
@@ -330,14 +356,30 @@ export function SessionEditPage() {
                 onUnlimitedChange={(checked) => update('clearMax', checked)}
               />
 
-              <SessionPrivacyControl
-                disclosure={
-                  <p className="font-body text-meta text-ink-soft">{t('edit.privacyDisclosure')}</p>
-                }
-                t={t}
-                value={form.isPrivate}
-                onChange={(isPrivate) => update('isPrivate', isPrivate)}
-              />
+              <div id="field-visibility">
+                <VisibilityControl
+                  groups={targetableGroups}
+                  selectedGroupIds={form.audienceGroupIds}
+                  value={form.visibility}
+                  onChange={(visibility) => {
+                    update('visibility', visibility)
+                    update('visibilityTouched', true)
+                  }}
+                  onToggleGroup={(groupId) => {
+                    update(
+                      'audienceGroupIds',
+                      form.audienceGroupIds.includes(groupId)
+                        ? form.audienceGroupIds.filter((id) => id !== groupId)
+                        : [...form.audienceGroupIds, groupId],
+                    )
+                    update('visibilityTouched', true)
+                  }}
+                />
+                {fieldErrors.audienceGroupIds && (
+                  <p role="alert">{fieldErrors.audienceGroupIds}</p>
+                )}
+                <p className="font-body text-meta text-ink-soft">{t('edit.privacyDisclosure')}</p>
+              </div>
             </Section>
           </div>
 

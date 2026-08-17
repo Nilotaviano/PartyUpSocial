@@ -44,7 +44,10 @@ export type MappedSessionSummary = {
   durationMinutes: number
   platform: string
   game: { name: string; steamAppId: number | string | null } | null
-  isPrivate: boolean
+  visibility: string
+  /** D-206 provenance — see `ShareTag` (`features/groups`). */
+  viaGroup: { id: string; name: string } | null
+  sharedWithGroup: boolean
   maxCapacity: number | null
   activeOccupancy: number
   organizer: OrganizerIdentity
@@ -80,7 +83,9 @@ export function mapSessionSummary(
     durationMinutes: Number(response.durationMinutes),
     platform: response.platform,
     game: response.game ? { name: response.game.name, steamAppId: response.game.steamAppId } : null,
-    isPrivate: response.isPrivate,
+    visibility: response.visibility,
+    viaGroup: response.viaGroup,
+    sharedWithGroup: response.sharedWithGroup,
     maxCapacity: response.maxCapacity == null ? null : Number(response.maxCapacity),
     activeOccupancy: Number(response.activeOccupancy),
     organizer: resolveOrganizer(response.id, response.organizerId, response.organizer, labels),

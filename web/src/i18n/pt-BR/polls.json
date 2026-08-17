@@ -61,6 +61,7 @@
     "increment": "Escolha um horário em incrementos de 15 minutos.",
     "minMax": "A presença mínima não pode exceder a capacidade máxima.",
     "invitedFriend": "Uma enquete não privada precisa de pelo menos um amigo convidado.",
+    "pickAtLeastOneGroup": "Escolha pelo menos um grupo.",
     "tooManyInvitees": "Você pode convidar até 50 amigos.",
     "tooManyGuestLinks": "Você pode criar até 20 links de convidado.",
     "optionMinimum": "Adicione pelo menos duas opções de horário.",
@@ -247,6 +248,7 @@
       "unlimited": "Ilimitada"
     },
     "privacyPrivate": "Privada",
+    "privacyGroups": "Grupos",
     "privacyPublic": "Pública",
     "countdown": {
       "votingClosesIn": "A votação encerra em {{time}}",

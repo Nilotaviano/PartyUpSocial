@@ -31,8 +31,6 @@
   "roster": {
     "memberCount_one": "{{count}} membro",
     "memberCount_other": "{{count}} membros",
-    "invitedCount_one": "{{count}} convidado",
-    "invitedCount_other": "{{count}} convidados",
     "ownedBy": "de {{name}}",
     "you": "Você"
   },
@@ -118,6 +116,24 @@
   },
   "a11y": {
     "dialogLabel": "Diálogo de confirmação"
+  },
+  "visibilityControl": {
+    "ariaLabel": "Visibilidade",
+    "private": "Privado",
+    "groups": "Grupos",
+    "public": "Público",
+    "visibleTo": "Visível para membros de",
+    "selectedCount_one": "{{count}} selecionado",
+    "selectedCount_other": "{{count}} selecionados",
+    "pickAtLeastOne": "Escolha pelo menos um grupo."
+  },
+  "shareTag": {
+    "via": "via {{name}}",
+    "sharedWithGroup": "Compartilhado com um grupo"
+  },
+  "unfriend": {
+    "remainsIn": "Continuará em: {{names}}",
+    "alsoRemove": "Também remover dos meus grupos"
   },
   "errors": {
     "generic": "Algo deu errado.",

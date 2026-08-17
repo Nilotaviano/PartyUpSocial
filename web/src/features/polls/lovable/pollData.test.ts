@@ -39,7 +39,9 @@ function pollResponse(overrides: Partial<PollDetailResponse> = {}): PollDetailRe
     notes: 'Bring snacks.',
     minAttendance: 3,
     maxCapacity: 4,
-    isPrivate: false,
+    visibility: 'public',
+    viaGroup: null,
+    sharedWithGroup: false,
     deadlineChoice: 'hours24',
     deadline: '2026-08-15T20:00:00Z',
     selectionWindowEndsAt: '2026-08-17T20:00:00Z',
@@ -148,10 +150,20 @@ describe('mapPollDetail', () => {
     expect(unmasked?.emoji).toBe('🐙')
   })
 
-  it('converts isPrivate straight through and status to the wire PollStatus', () => {
-    const mapped = mapPollDetail(pollResponse({ isPrivate: true }), 'UTC', labels)
-    expect(mapped?.isPrivate).toBe(true)
+  it('converts visibility straight through and status to the wire PollStatus', () => {
+    const mapped = mapPollDetail(pollResponse({ visibility: 'private' }), 'UTC', labels)
+    expect(mapped?.visibility).toBe('private')
     expect(mapped?.status).toBe('polling')
+  })
+
+  it('passes viaGroup and sharedWithGroup through unchanged_D206', () => {
+    const mapped = mapPollDetail(
+      pollResponse({ visibility: 'groups', viaGroup: { id: 'g1', name: 'D&D crew' }, sharedWithGroup: true }),
+      'UTC',
+      labels,
+    )
+    expect(mapped?.viaGroup).toEqual({ id: 'g1', name: 'D&D crew' })
+    expect(mapped?.sharedWithGroup).toBe(true)
   })
 
   it('maps an option availableVoters list through the same identity resolution as the roster, masking a null displayName_D076', () => {

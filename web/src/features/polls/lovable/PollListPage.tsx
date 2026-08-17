@@ -14,6 +14,7 @@ import { EmptyState } from '../../../components/shell/SectionCard'
 import { PageHeader } from '../../../components/shell/PageHeader'
 import { useToast } from '../../../components/ui/toastStore'
 import { cn } from '../../availability/lovable/utils'
+import { ShareTag } from '../../groups/ShareTag'
 import { getPollList, pollKeys, pollWindowState, type PollBand, type PollSummary } from '../pollQueries'
 import { StatusPill } from './PollBits'
 import type { PollStatus } from './pollData'
@@ -152,6 +153,7 @@ function PollCard({ poll }: { poll: PollSummary }) {
             <VoteIcon className="size-3.5" />
             {t('list.optionCount', { count: Number(poll.optionCount) })}
           </span>
+          <ShareTag share={poll} />
         </div>
       </Link>
     </li>

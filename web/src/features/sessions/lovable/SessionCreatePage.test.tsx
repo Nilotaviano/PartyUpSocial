@@ -189,10 +189,10 @@ describe('SessionCreatePage (lovable)', () => {
 
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'Steam' } })
 
-    // The privacy segmented control is the only `role="radio"` group on this
+    // The visibility segmented control is the only `role="radio"` group on this
     // page's happy path (the game field itself never grows a radio choice).
     for (const radio of screen.getAllByRole('radio')) {
-      expect(radio).toHaveAccessibleName(/^(Private|Public)$/)
+      expect(radio).toHaveAccessibleName(/^(Private|Groups|Public)$/)
     }
   })
 
@@ -408,7 +408,7 @@ describe('SessionCreatePage (lovable)', () => {
     )
   })
 
-  it('toggles isPrivate through the Private/Public segmented control_D129', async () => {
+  it('toggles visibility through the Private/Groups/Public segmented control_D129', async () => {
     renderPage()
 
     const privateRadio = screen.getByRole('radio', { name: 'Private' })

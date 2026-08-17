@@ -182,9 +182,10 @@ export function ProfileActionCard({
             {t('actions.cancelRequest')}
           </Button>
         )}
-        {relationship === 'accepted' && profile.relationship.friendshipId && (
+        {relationship === 'accepted' && profile.relationship.friendshipId && profile.disclosure === 'full' && (
           <UnfriendDialog
             pending={action.isPending}
+            userId={profile.userId}
             username={profile.username}
             onConfirm={async () => {
               await action.mutateAsync('unfriend')

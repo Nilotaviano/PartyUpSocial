@@ -17,7 +17,7 @@
   "emptyState": {
     "owned": {
       "title": "Todavía no tienes ningún grupo",
-      "body": "Crea un grupo como \"Peña de rol\" e invita a los amigos con los que más juegas."
+      "body": "Crea un grupo como \"Grupo de rol\" e invita a los amigos con los que más juegas."
     },
     "memberOf": {
       "title": "Todavía no hay grupos de amigos",
@@ -31,8 +31,6 @@
   "roster": {
     "memberCount_one": "{{count}} miembro",
     "memberCount_other": "{{count}} miembros",
-    "invitedCount_one": "{{count}} invitado",
-    "invitedCount_other": "{{count}} invitados",
     "ownedBy": "de {{name}}",
     "you": "Tú"
   },
@@ -61,7 +59,7 @@
     "title": "Nuevo grupo",
     "description": "Ponle un nombre e invita amigos. Se unen en cuanto acepten.",
     "nameLabel": "Nombre del grupo",
-    "namePlaceholder": "Peña de rol",
+    "namePlaceholder": "Grupo de rol",
     "nameRequired": "Ponle un nombre al grupo.",
     "nameCount_one": "{{count}}/50 carácter",
     "nameCount_other": "{{count}}/50 caracteres",
@@ -118,6 +116,24 @@
   },
   "a11y": {
     "dialogLabel": "Diálogo de confirmación"
+  },
+  "visibilityControl": {
+    "ariaLabel": "Visibilidad",
+    "private": "Privado",
+    "groups": "Grupos",
+    "public": "Público",
+    "visibleTo": "Visible para miembros de",
+    "selectedCount_one": "{{count}} seleccionado",
+    "selectedCount_other": "{{count}} seleccionados",
+    "pickAtLeastOne": "Elige al menos un grupo."
+  },
+  "shareTag": {
+    "via": "vía {{name}}",
+    "sharedWithGroup": "Compartido con un grupo"
+  },
+  "unfriend": {
+    "remainsIn": "Seguirá en: {{names}}",
+    "alsoRemove": "También quitar de mis grupos"
   },
   "errors": {
     "generic": "Algo salió mal.",

@@ -20,6 +20,7 @@ import { IdentityRow } from '../../../components/ui/identityRow'
 import { SegmentStrip } from '../../../components/ui/segmentStrip'
 import { StatusBanner } from '../../../components/ui/statusBanner'
 import { instantToFakeLocal } from '../../availability/lovable/zone'
+import { ShareTag } from '../../groups/ShareTag'
 import { StatusPill } from './SessionBits'
 import { isKnownSessionStatus, sessionPlatformLabel } from './sessionData'
 import {
@@ -519,6 +520,7 @@ export function SessionDetailPage() {
                   {t('detail.endsAt', { time: endText })}
                 </span>
                 {inProgress && <span className={chipClasses}>{t('detail.inProgress')}</span>}
+                <ShareTag share={data} />
                 {data.muted && (
                   <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
                     {t('detail.muted')}

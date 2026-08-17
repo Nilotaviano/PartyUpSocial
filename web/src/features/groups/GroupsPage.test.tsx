@@ -29,6 +29,9 @@ const OWNED_GROUP = {
   ownerId: 'owner-1',
   createdAt: '2030-01-01T00:00:00Z',
   memberCount: 2,
+  ownerDisplayName: null,
+  ownerAvatar: null,
+  ownerMasked: false,
 }
 const MEMBER_GROUP = {
   id: 'g2',
@@ -36,12 +39,21 @@ const MEMBER_GROUP = {
   ownerId: 'friend-1',
   createdAt: '2030-01-02T00:00:00Z',
   memberCount: 2,
+  ownerDisplayName: 'Server Friend One',
+  ownerAvatar: null,
+  ownerMasked: false,
 }
+// The invite's owner is deliberately absent from FRIENDS below: if the page ever regressed to
+// resolving the name through a client-side friends-list join, this id would resolve to nothing
+// and the fallback "Member" would render instead — pinning that the name is server-fed.
 const INVITE = {
   id: 'g3',
   name: 'Tuesday D&D',
-  ownerId: 'friend-2',
+  ownerId: 'stranger-1',
   invitedAt: '2030-01-03T00:00:00Z',
+  ownerDisplayName: 'Server Stranger',
+  ownerAvatar: null,
+  ownerMasked: false,
 }
 
 const FRIENDS = [
@@ -124,8 +136,12 @@ describe('GroupsPage', () => {
     expect(screen.getByText('D&D crew')).toBeInTheDocument()
     expect(screen.getByText("Groups I'm in · 1")).toBeInTheDocument()
     expect(screen.getByText('FPS squad')).toBeInTheDocument()
+    // Server-fed "owned by" line on the member-of card — no client-side friends join.
+    expect(screen.getByText('owned by Server Friend One')).toBeInTheDocument()
     expect(screen.getByText('Pending invites · 1')).toBeInTheDocument()
     expect(screen.getByText(/Tuesday D&D/)).toBeInTheDocument()
+    // The invite owner's name is server-fed (see INVITE fixture comment) — not "Member".
+    expect(screen.getByText(/Server Stranger invited you/)).toBeInTheDocument()
 
     // The list card's member count comes straight off FriendGroupSummary.memberCount — both
     // cards render "2 members" with no per-group detail fetch at all (asserted below).

@@ -99,6 +99,9 @@ beforeEach(() => {
         },
       })
     }
+    if (path === '/api/v1/friend-groups') {
+      return Promise.resolve({ data: { owned: [], memberOf: [], invites: [] } })
+    }
     throw new Error(`Unexpected GET ${path}`)
   })
   api.post.mockImplementation((path: string) => {

@@ -249,7 +249,10 @@ export type MappedPoll = {
   notes: string
   minAttendance: number
   maxCapacity: number | null
-  isPrivate: boolean
+  visibility: string
+  /** D-206 provenance — see `ShareTag` (`features/groups`). */
+  viaGroup: { id: string; name: string } | null
+  sharedWithGroup: boolean
   deadline: Date
   selectionWindowEndsAt: Date
   status: PollStatus
@@ -277,7 +280,9 @@ export function mapPollDetail(
     notes: response.notes,
     minAttendance: Number(response.minAttendance),
     maxCapacity: response.maxCapacity == null ? null : Number(response.maxCapacity),
-    isPrivate: response.isPrivate,
+    visibility: response.visibility,
+    viaGroup: response.viaGroup,
+    sharedWithGroup: response.sharedWithGroup,
     deadline: instantToFakeLocal(response.deadline, timeZone),
     selectionWindowEndsAt: instantToFakeLocal(response.selectionWindowEndsAt, timeZone),
     status: response.status as PollStatus,

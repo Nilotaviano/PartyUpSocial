@@ -10,6 +10,8 @@ import { PageHeader } from '../../../components/shell/PageHeader'
 import { StatusBanner } from '../../../components/ui/statusBanner'
 import { useDirtyGuard } from '../../../components/useDirtyGuard'
 import { friendKeys, getFriends } from '../../friends/friendGraph'
+import { getGroupList, groupKeys } from '../../groups/groupQueries'
+import { VisibilityControl, type Visibility } from '../../groups/VisibilityControl'
 import { createSession, type CreateSessionRequest } from '../sessionQueries'
 import {
   Section,
@@ -19,7 +21,6 @@ import {
   SessionGameField,
   SessionGuestLinksField,
   SessionInviteesFieldset,
-  SessionPrivacyControl,
   SessionStartField,
   ValidationSummary,
 } from './SessionFormBits'
@@ -39,6 +40,7 @@ const fieldIds: Record<string, string> = {
   minAttendance: 'field-min',
   maxCapacity: 'field-max',
   inviteeUserIds: 'field-invitees',
+  audienceGroupIds: 'field-visibility',
   guestLinkCount: 'field-guest-links',
   gameAppId: 'field-game-app-id',
   gameName: 'field-game-name',
@@ -62,7 +64,9 @@ const emptyForm = {
   minAttendance: '4',
   maxCapacity: '4',
   unlimited: false,
-  isPrivate: false,
+  // D-129: default visibility is Public on create.
+  visibility: 'public' as Visibility,
+  audienceGroupIds: [] as string[],
   inviteeUserIds: [] as string[],
   guestLinkCount: '0',
 }
@@ -147,6 +151,13 @@ export function SessionCreatePage() {
     queryFn: getFriends,
   })
 
+  // D-201: any group the actor owns or holds an Accepted membership in can target.
+  const groupList = useQuery({ queryKey: groupKeys.list, queryFn: getGroupList })
+  const targetableGroups = [
+    ...(groupList.data?.owned ?? []),
+    ...(groupList.data?.memberOf ?? []),
+  ].map((group) => ({ id: group.id, name: group.name }))
+
   const submit = useMutation({
     mutationFn: (body: CreateSessionRequest) => createSession(body),
     onSuccess: async (response) => {
@@ -190,8 +201,11 @@ export function SessionCreatePage() {
     if (!form.unlimited && max !== undefined && min > max) {
       errors.minAttendance = t('validation.minMax')
     }
-    if (!form.isPrivate && form.inviteeUserIds.length === 0) {
+    if (form.visibility === 'public' && form.inviteeUserIds.length === 0) {
       errors.inviteeUserIds = t('validation.invitedFriend')
+    }
+    if (form.visibility === 'groups' && form.audienceGroupIds.length === 0) {
+      errors.audienceGroupIds = t('validation.pickAtLeastOneGroup')
     }
     if (form.inviteeUserIds.length > 50) {
       errors.inviteeUserIds = t('validation.tooManyInvitees')
@@ -234,7 +248,8 @@ export function SessionCreatePage() {
       notes: form.notes || null,
       minAttendance: Number(form.minAttendance),
       maxCapacity: form.unlimited ? null : Number(form.maxCapacity),
-      isPrivate: form.isPrivate,
+      visibility: form.visibility,
+      audienceGroupIds: form.visibility === 'groups' ? form.audienceGroupIds : [],
       inviteeUserIds: form.inviteeUserIds.length > 0 ? form.inviteeUserIds : null,
       guestLinkCount: guestLinkCountOf(form.guestLinkCount),
     })
@@ -340,11 +355,25 @@ export function SessionCreatePage() {
               onUnlimitedChange={(checked) => update('unlimited', checked)}
             />
 
-            <SessionPrivacyControl
-              t={t}
-              value={form.isPrivate}
-              onChange={(isPrivate) => update('isPrivate', isPrivate)}
-            />
+            <div id="field-visibility">
+              <VisibilityControl
+                groups={targetableGroups}
+                selectedGroupIds={form.audienceGroupIds}
+                value={form.visibility}
+                onChange={(visibility) => update('visibility', visibility)}
+                onToggleGroup={(groupId) =>
+                  update(
+                    'audienceGroupIds',
+                    form.audienceGroupIds.includes(groupId)
+                      ? form.audienceGroupIds.filter((id) => id !== groupId)
+                      : [...form.audienceGroupIds, groupId],
+                  )
+                }
+              />
+              {fieldErrors.audienceGroupIds && (
+                <p role="alert">{fieldErrors.audienceGroupIds}</p>
+              )}
+            </div>
 
             <SessionInviteesFieldset
               error={fieldErrors.inviteeUserIds}

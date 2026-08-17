@@ -51,6 +51,7 @@
     "increment": "Choose a time in 15-minute increments.",
     "minMax": "Minimum attendance cannot exceed maximum capacity.",
     "invitedFriend": "A non-private session needs at least one invited friend.",
+    "pickAtLeastOneGroup": "Pick at least one group.",
     "tooManyInvitees": "You can invite up to 50 friends.",
     "tooManyGuestLinks": "You can create up to 20 guest links.",
     "steamAppIdDigits": "Enter only the numeric Steam app ID.",

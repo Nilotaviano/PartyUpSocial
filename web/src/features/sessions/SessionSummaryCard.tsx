@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { cn } from '../availability/lovable/utils'
 import { chipClasses } from '../../components/ui/classes'
+import { ShareTag } from '../groups/ShareTag'
 import { OccupancyChip, OrganizerRow, StatusPill } from './lovable/SessionBits'
 import {
   isKnownSessionStatus,
@@ -89,6 +90,7 @@ export function SessionSummaryCard({
             {t('detail.endsAt', { time: endText })}
           </span>
           {inProgress && <span className={chipClasses}>{t('list.inProgress')}</span>}
+          <ShareTag share={mapped} />
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground">

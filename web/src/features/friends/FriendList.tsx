@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Dices } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -14,6 +14,7 @@ import {
   useActionMenu,
   useActionMenuDialog,
 } from '../../components/ui/useActionMenu'
+import { getGroupDetail, getGroupList, groupKeys, removeGroupMember } from '../groups/groupQueries'
 import { AvatarDisc } from './AvatarDisc'
 import { avatarImgUrl } from './avatarImage'
 import {
@@ -25,6 +26,7 @@ import {
 
 type UnfriendDialogProps = {
   username: string
+  userId: string
   pending: boolean
   onConfirm: () => Promise<void>
   /**
@@ -36,8 +38,36 @@ type UnfriendDialogProps = {
   contentProps?: { onCloseAutoFocus: (event: Event) => void }
 }
 
+/**
+ * D-210: groups the ACTOR owns that the unfriend target belongs to
+ * (Accepted membership only — an outstanding invite isn't "remaining in"
+ * anything yet). The list read (`groupKeys.list`) carries no per-group
+ * roster, so this resolves it with one detail fetch per owned group,
+ * fired only while the dialog is open — the sanctioned per-group-detail
+ * lookup (no single-call roster-membership contract exists on the wire).
+ */
+function useOwnedGroupsContaining(userId: string, enabled: boolean) {
+  const list = useQuery({ queryKey: groupKeys.list, queryFn: getGroupList, enabled })
+  const ownedIds = list.data?.owned.map((group) => group.id) ?? []
+
+  const details = useQueries({
+    queries: ownedIds.map((groupId) => ({
+      queryKey: groupKeys.detail(groupId),
+      queryFn: () => getGroupDetail(groupId),
+      enabled,
+    })),
+  })
+
+  return details
+    .filter((query) =>
+      query.data?.members?.some((member) => member.userId === userId && member.status === 'accepted'),
+    )
+    .map((query) => ({ id: query.data!.id, name: query.data!.name }))
+}
+
 export function UnfriendDialog({
   username,
+  userId,
   pending,
   onConfirm,
   dialogProps,
@@ -45,13 +75,20 @@ export function UnfriendDialog({
 }: UnfriendDialogProps) {
   const { t } = useTranslation(['friends', 'settings'])
   const [selfOpen, setSelfOpen] = useState(false)
+  const [alsoRemove, setAlsoRemove] = useState(true)
   const cancelButton = useRef<HTMLButtonElement>(null)
   const open = dialogProps ? dialogProps.open : selfOpen
   const setOpen = dialogProps ? dialogProps.onOpenChange : setSelfOpen
+  const sharedGroups = useOwnedGroupsContaining(userId, open)
 
   async function confirm() {
     try {
       await onConfirm()
+      // D-210: member-removal mutations fire only after the unfriend mutation
+      // has succeeded, and only for the groups the actor actually saw listed.
+      if (alsoRemove && sharedGroups.length > 0) {
+        await Promise.all(sharedGroups.map((group) => removeGroupMember(group.id, userId)))
+      }
       setOpen(false)
     } catch {
       return
@@ -59,7 +96,13 @@ export function UnfriendDialog({
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (next) setAlsoRemove(true)
+        setOpen(next)
+      }}
+    >
       {!dialogProps && (
         <Dialog.Trigger asChild>
           <Button
@@ -92,6 +135,24 @@ export function UnfriendDialog({
           >
             {t('dialogs.unfriendBody')}
           </Dialog.Description>
+          {sharedGroups.length > 0 && (
+            <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3">
+              <p className="text-[12.5px] text-ink-soft">
+                {t('unfriend.remainsIn', {
+                  names: sharedGroups.map((group) => group.name).join(', '),
+                  ns: 'groups',
+                })}
+              </p>
+              <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2 text-[13px] text-ink">
+                <input
+                  checked={alsoRemove}
+                  type="checkbox"
+                  onChange={(event) => setAlsoRemove(event.target.checked)}
+                />
+                {t('unfriend.alsoRemove', { ns: 'groups' })}
+              </label>
+            </div>
+          )}
           <div className="mt-6 flex flex-wrap justify-end gap-2">
             <Dialog.Close asChild>
               <button
@@ -176,6 +237,7 @@ function FriendRow({ friend, pending, onUnfriend, onBlock }: FriendRowProps) {
         contentProps={unfriend.contentProps}
         dialogProps={unfriend.dialogProps}
         pending={pending}
+        userId={friend.userId}
         username={friend.username}
         onConfirm={onUnfriend}
       />

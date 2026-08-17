@@ -13,7 +13,9 @@ function session(overrides: Partial<SessionSummaryResponse> = {}): SessionSummar
     platform: 'Steam',
     game: { name: 'Deep Rock Galactic', steamAppId: 548430 },
     status: 'confirmed',
-    isPrivate: false,
+    visibility: 'public',
+    viaGroup: null,
+    sharedWithGroup: false,
     maxCapacity: 8,
     activeOccupancy: 2,
     organizer: { ordinal: 0, displayName: 'Mika Ortega', avatar: { kind: 'emoji', emoji: '🐙', avatarSourceId: null, imgUrl: null } },
@@ -28,10 +30,20 @@ describe('mapSessionSummary', () => {
     expect(mapSessionSummary(session({ maxCapacity: null }), 'UTC', labels).maxCapacity).toBeNull()
   })
 
-  it('converts isPrivate and status straight through the wire values', () => {
-    const mapped = mapSessionSummary(session({ isPrivate: true, status: 'unconfirmed' }), 'UTC', labels)
-    expect(mapped.isPrivate).toBe(true)
+  it('converts visibility and status straight through the wire values', () => {
+    const mapped = mapSessionSummary(session({ visibility: 'private', status: 'unconfirmed' }), 'UTC', labels)
+    expect(mapped.visibility).toBe('private')
     expect(mapped.status).toBe('unconfirmed')
+  })
+
+  it('passes viaGroup and sharedWithGroup through unchanged_D206', () => {
+    const mapped = mapSessionSummary(
+      session({ visibility: 'groups', viaGroup: { id: 'g1', name: 'D&D crew' }, sharedWithGroup: true }),
+      'UTC',
+      labels,
+    )
+    expect(mapped.viaGroup).toEqual({ id: 'g1', name: 'D&D crew' })
+    expect(mapped.sharedWithGroup).toBe(true)
   })
 
   it('maps a present game through unchanged and a null game through as null', () => {

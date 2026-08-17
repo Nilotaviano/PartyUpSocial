@@ -31,8 +31,6 @@
   "roster": {
     "memberCount_one": "{{count}} member",
     "memberCount_other": "{{count}} members",
-    "invitedCount_one": "{{count}} invited",
-    "invitedCount_other": "{{count}} invited",
     "ownedBy": "owned by {{name}}",
     "you": "You"
   },
@@ -118,6 +116,24 @@
   },
   "a11y": {
     "dialogLabel": "Confirmation dialog"
+  },
+  "visibilityControl": {
+    "ariaLabel": "Visibility",
+    "private": "Private",
+    "groups": "Groups",
+    "public": "Public",
+    "visibleTo": "Visible to members of",
+    "selectedCount_one": "{{count}} selected",
+    "selectedCount_other": "{{count}} selected",
+    "pickAtLeastOne": "Pick at least one group."
+  },
+  "shareTag": {
+    "via": "via {{name}}",
+    "sharedWithGroup": "Shared with a group"
+  },
+  "unfriend": {
+    "remainsIn": "Will remain in: {{names}}",
+    "alsoRemove": "Also remove from my groups"
   },
   "errors": {
     "generic": "Something went wrong.",

@@ -17,8 +17,11 @@ import { avatarImgUrl } from '../friends/avatarImage'
 import { friendKeys, getFriends, type FriendItem } from '../friends/friendGraph'
 import { FriendMultiSelect, Tag } from './GroupBits'
 import {
+  acceptGroupInvitation,
+  declineGroupInvitation,
   deleteGroup,
   getGroupDetail,
+  getGroupList,
   groupKeys,
   inviteGroupMembers,
   removeGroupMember,
@@ -43,6 +46,40 @@ import {
  */
 
 type ConfirmKind = { kind: 'delete' } | { kind: 'leave' } | { kind: 'remove'; userId: string }
+
+/**
+ * A roster/invited person. The masked arm is a separate call rather than a
+ * computed `variant` prop so the D-076 row keeps `IdentityRow`'s own
+ * type-level guarantee that no username can ride along with it (precedent:
+ * `SessionDetailPage.tsx`'s `RosterIdentity`).
+ */
+function RosterIdentityRow({
+  actions,
+  meta,
+  person,
+  displayName,
+}: {
+  actions?: React.ReactNode
+  meta?: React.ReactNode
+  person: RosterPerson
+  displayName: React.ReactNode
+}) {
+  const avatar = (
+    <AvatarDisc
+      emoji={person.avatar?.emoji}
+      imgUrl={avatarImgUrl(person.avatar)}
+      masked={person.masked}
+      seed={person.userId}
+      size="sm"
+    />
+  )
+
+  return person.masked ? (
+    <IdentityRow actions={actions} avatar={avatar} displayName={displayName} meta={meta} variant="masked" />
+  ) : (
+    <IdentityRow actions={actions} avatar={avatar} displayName={displayName} meta={meta} variant="full" />
+  )
+}
 
 type RosterPerson = {
   userId: string
@@ -343,6 +380,16 @@ export function GroupDetailPage() {
     retry: false,
   })
 
+  // Invited-only viewers (D-199) get a detail response with no `members` and no owner nameplate
+  // (name + owner id only) — the list read's `invites` entry is the one place their inviting
+  // owner's name/avatar rides the wire, so the "you're invited" view below borrows it. Gated on
+  // that exact case so every other viewer never fires this extra request.
+  const list = useQuery({
+    queryKey: groupKeys.list,
+    queryFn: getGroupList,
+    enabled: Boolean(detail.data) && !detail.data?.members,
+  })
+
   function reportError(error: unknown) {
     showToast({
       message: isApiError(error)
@@ -394,6 +441,23 @@ export function GroupDetailPage() {
     onError: reportError,
   })
 
+  const accept = useMutation({
+    mutationFn: () => acceptGroupInvitation(groupId),
+    onSuccess: async () => {
+      await invalidateGroup()
+    },
+    onError: reportError,
+  })
+
+  const decline = useMutation({
+    mutationFn: () => declineGroupInvitation(groupId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: groupKeys.list })
+      navigate('/groups')
+    },
+    onError: reportError,
+  })
+
   if (detail.isError && isApiError(detail.error) && detail.error.status === 404) {
     return <Navigate replace to="/groups" />
   }
@@ -409,12 +473,54 @@ export function GroupDetailPage() {
   }
 
   const group = detail.data
-  if (!group || !group.members) {
+  if (!group) {
     return (
       <main data-testid="screen-group-detail">
         <div className="mx-auto max-w-[900px] px-3 pb-6 sm:px-6">
           <PageHeader back={{ to: '/groups', label: t('list.heading') }} title={t('notFound.title')} />
           <EmptyState description={t('notFound.description')} icon={UsersRound} title={t('notFound.title')} />
+        </div>
+      </main>
+    )
+  }
+
+  if (!group.members) {
+    const listInvite = list.data?.invites.find((invite) => invite.id === groupId)
+    const ownerName = listInvite
+      ? listInvite.ownerMasked
+        ? t('member.anonymous')
+        : (listInvite.ownerDisplayName ?? t('member.unknown'))
+      : t('member.unknown')
+
+    return (
+      <main data-testid="screen-group-detail">
+        <div className="mx-auto max-w-[900px] space-y-4 px-3 pb-10 sm:px-6">
+          <PageHeader back={{ to: '/groups', label: t('list.heading') }} title={group.name} />
+          <SectionCard icon={MailPlus} title={t('sections.invites')}>
+            <p className="text-[13.5px] text-ink">
+              {t('invite.received', { name: ownerName, group: group.name })}
+            </p>
+            <div className="mt-3 flex gap-2">
+              <Button
+                aria-busy={accept.isPending}
+                className="flex-1"
+                disabled={accept.isPending}
+                variant="primary"
+                onClick={() => accept.mutate()}
+              >
+                {t('invite.accept')}
+              </Button>
+              <Button
+                aria-busy={decline.isPending}
+                className="flex-1"
+                disabled={decline.isPending}
+                variant="neutral"
+                onClick={() => decline.mutate()}
+              >
+                {t('invite.decline')}
+              </Button>
+            </div>
+          </SectionCard>
         </div>
       </main>
     )
@@ -480,16 +586,8 @@ export function GroupDetailPage() {
           <ul className="space-y-2">
             {roster.map((person) => (
               <li className="rounded-xl border-2 border-ink bg-card px-3 py-2.5" key={person.userId}>
-                <IdentityRow
-                  avatar={
-                    <AvatarDisc
-                      emoji={person.avatar?.emoji}
-                      imgUrl={avatarImgUrl(person.avatar)}
-                      masked={person.masked}
-                      seed={person.userId}
-                      size="sm"
-                    />
-                  }
+                <RosterIdentityRow
+                  person={person}
                   displayName={session?.userId === person.userId ? t('roster.you') : person.displayName}
                   meta={
                     person.isOwner && (
@@ -536,16 +634,8 @@ export function GroupDetailPage() {
                     className="rounded-xl border-2 border-dashed border-ink/50 bg-muted/40 px-3 py-2.5"
                     key={person.userId}
                   >
-                    <IdentityRow
-                      avatar={
-                        <AvatarDisc
-                          emoji={person.avatar?.emoji}
-                          imgUrl={avatarImgUrl(person.avatar)}
-                          masked={person.masked}
-                          seed={person.userId}
-                          size="sm"
-                        />
-                      }
+                    <RosterIdentityRow
+                      person={person}
                       displayName={person.displayName}
                       meta={<Tag>{t('badges.invited')}</Tag>}
                       actions={

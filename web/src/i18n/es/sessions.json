@@ -51,6 +51,7 @@
     "increment": "Elige una hora en incrementos de 15 minutos.",
     "minMax": "La asistencia mínima no puede superar la capacidad máxima.",
     "invitedFriend": "Una sesión no privada necesita al menos un amigo invitado.",
+    "pickAtLeastOneGroup": "Elige al menos un grupo.",
     "tooManyInvitees": "Puedes invitar hasta 50 amigos.",
     "tooManyGuestLinks": "Puedes crear hasta 20 enlaces de invitado.",
     "steamAppIdDigits": "Ingresa solo el ID numérico de la app de Steam.",
