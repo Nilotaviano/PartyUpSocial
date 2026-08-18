@@ -137,6 +137,25 @@ describe('VoteGrid', () => {
     expect(onVote).toHaveBeenLastCalledWith('option-1', 'available')
   })
 
+  it('announces the day along with the time when a vote is cast_F4', () => {
+    const onVote = vi.fn()
+    render(
+      <VoteGrid
+        disabled={false}
+        formatters={formatters}
+        options={[option({ viewerVote: null })]}
+        pendingOptionId={null}
+        selectedOptionId={null}
+        onVote={onVote}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('vote-grid-band-option-1'))
+
+    const dayFmt = new Intl.DateTimeFormat('en', { weekday: 'short', timeZone: 'UTC' })
+    expect(screen.getByRole('status')).toHaveTextContent(dayFmt.format(new Date('2099-01-01T10:00:00Z')))
+  })
+
   it('carries an accessible name with the option time and the current vote', () => {
     render(
       <VoteGrid

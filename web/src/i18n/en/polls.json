@@ -291,7 +291,7 @@
     "heading": "Week view",
     "hint": "Tap a time to cycle your vote: Available → Maybe → Unavailable.",
     "bandLabel": "{{day}} {{time}}, {{value}}. Tap to change your vote.",
-    "voteAnnounced": "Vote for {{time}} set to {{value}}.",
+    "voteAnnounced": "Vote for {{day}} {{time}} set to {{value}}.",
     "earlierDays": "Earlier days",
     "laterDays": "Later days"
   }

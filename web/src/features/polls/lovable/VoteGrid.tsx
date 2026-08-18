@@ -249,7 +249,9 @@ export function VoteGrid({
                     onClick={() => {
                       const next = nextVote(option.viewerVote)
                       onVote(option.id, next)
-                      setLiveMessage(t('voteGrid.voteAnnounced', { time: timeText, value: t(`vote.${next}`) }))
+                      setLiveMessage(
+                        t('voteGrid.voteAnnounced', { day: dayText, time: timeText, value: t(`vote.${next}`) }),
+                      )
                     }}
                   >
                     <span className="block truncate font-display text-[11px] font-bold tabular-nums">

@@ -291,7 +291,7 @@
     "heading": "Vista semanal",
     "hint": "Toca un horario para alternar tu voto: Disponible → Tal vez → No disponible.",
     "bandLabel": "{{day}} {{time}}, {{value}}. Toca para cambiar tu voto.",
-    "voteAnnounced": "Voto para {{time}} definido como {{value}}.",
+    "voteAnnounced": "Voto para {{day}} {{time}} definido como {{value}}.",
     "earlierDays": "Días anteriores",
     "laterDays": "Días siguientes"
   }

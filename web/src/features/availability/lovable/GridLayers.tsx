@@ -61,8 +61,10 @@ export function ResizeHandle({
 }: {
   position: "top" | "bottom";
   label: string;
-  stepMin: number;
-  onNudge: (delta: number) => void;
+  /** Required when `interactive` (the keyboard nudge step); unused otherwise. */
+  stepMin?: number;
+  /** Required when `interactive` (the keyboard nudge handler); unused otherwise. */
+  onNudge?: (delta: number) => void;
   onPointerDown: (e: React.PointerEvent<HTMLElement>) => void;
   /** Set false for a pointer-only, non-focusable handle. Defaults to true. */
   interactive?: boolean;
@@ -94,7 +96,7 @@ export function ResizeHandle({
       onKeyDown={(e) => {
         if (e.key === "ArrowUp" || e.key === "ArrowDown") {
           e.preventDefault();
-          onNudge(e.key === "ArrowUp" ? -stepMin : stepMin);
+          onNudge!(e.key === "ArrowUp" ? -stepMin! : stepMin!);
           return;
         }
         if (e.key === "Enter" || e.key === " ") {

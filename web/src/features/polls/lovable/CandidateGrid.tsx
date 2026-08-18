@@ -720,8 +720,6 @@ function CandidateBand({
       <ResizeHandle
         position="bottom"
         label={resizeLabel}
-        stepMin={DURATION_STEP}
-        onNudge={onDurationNudge}
         interactive={false}
         testId={`candidate-resize-handle-${candidate.day}-${candidate.start}`}
         onPointerDown={(e) => {
