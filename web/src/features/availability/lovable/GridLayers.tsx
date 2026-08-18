@@ -33,10 +33,22 @@ export function GridLines({ geometry }: { geometry: GridGeometry }) {
 }
 
 /**
- * A pointer resize affordance with a keyboard equivalent: the arrows nudge the
- * edge by one step, and Enter/Space are swallowed so the handle cannot re-fire
- * the selection of the block it sits on (the block's own keydown handler is an
- * ancestor of this button).
+ * A pointer resize affordance for the edge of a block.
+ *
+ * Two modes, chosen by `interactive`:
+ *  - Interactive (the default, `WeekGrid`'s own bands): a focusable button
+ *    with a keyboard equivalent — the arrows nudge the edge by one step, and
+ *    Enter/Space are swallowed so the handle cannot re-fire the selection of
+ *    the block it sits on (the block's own keydown handler is an ancestor of
+ *    this button).
+ *  - Non-interactive (poll candidate bands): a plain, non-focusable,
+ *    `aria-hidden` pointer-only affordance. Those bands already own a
+ *    keyboard resize path on the band itself (Shift+Arrow), so a second,
+ *    focusable control here would both duplicate that path and — being an
+ *    ancestor-unaware sibling inside the same band — let a bare ArrowUp/Down
+ *    on the handle bubble up to the band's own keydown handler and fire a
+ *    move alongside the resize. Keeping it out of the tab order removes that
+ *    double-fire and the nested-interactive-control a11y violation at once.
  */
 export function ResizeHandle({
   position,
@@ -44,13 +56,37 @@ export function ResizeHandle({
   stepMin,
   onNudge,
   onPointerDown,
+  interactive = true,
+  testId,
 }: {
   position: "top" | "bottom";
   label: string;
   stepMin: number;
   onNudge: (delta: number) => void;
   onPointerDown: (e: React.PointerEvent<HTMLElement>) => void;
+  /** Set false for a pointer-only, non-focusable handle. Defaults to true. */
+  interactive?: boolean;
+  testId?: string;
 }) {
+  const className = cn(
+    "absolute left-1/2 z-30 grid h-6 w-11 -translate-x-1/2 cursor-ns-resize touch-none place-items-center rounded-full border-2 border-ring bg-card shadow-[var(--shadow-card)]",
+    position === "top" ? "-top-3" : "-bottom-3",
+  );
+
+  if (!interactive) {
+    return (
+      <span
+        aria-hidden="true"
+        className={className}
+        data-testid={testId}
+        title={label}
+        onPointerDown={onPointerDown}
+      >
+        <GripHorizontal className="size-3.5 text-muted-foreground" />
+      </span>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -67,10 +103,8 @@ export function ResizeHandle({
         }
       }}
       aria-label={label}
-      className={cn(
-        "absolute left-1/2 z-30 grid h-6 w-11 -translate-x-1/2 cursor-ns-resize touch-none place-items-center rounded-full border-2 border-ring bg-card shadow-[var(--shadow-card)]",
-        position === "top" ? "-top-3" : "-bottom-3",
-      )}
+      className={className}
+      data-testid={testId}
     >
       <GripHorizontal className="size-3.5 text-muted-foreground" />
     </button>

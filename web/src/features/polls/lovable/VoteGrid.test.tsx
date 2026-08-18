@@ -152,6 +152,50 @@ describe('VoteGrid', () => {
     expect(screen.getByTestId('vote-grid-band-option-1')).toHaveAccessibleName(/Maybe/)
   })
 
+  it('gives same-time options on different days different accessible names, day included_F4', () => {
+    render(
+      <VoteGrid
+        disabled={false}
+        formatters={formatters}
+        options={[
+          option({ id: 'option-1', start: new Date('2099-01-01T10:00:00Z') }),
+          option({ id: 'option-2', start: new Date('2099-01-02T10:00:00Z') }),
+        ]}
+        pendingOptionId={null}
+        selectedOptionId={null}
+        onVote={vi.fn()}
+      />,
+    )
+
+    const dayFmt = new Intl.DateTimeFormat('en', { weekday: 'short', timeZone: 'UTC' })
+    const nameA = screen.getByTestId('vote-grid-band-option-1').getAttribute('aria-label')
+    const nameB = screen.getByTestId('vote-grid-band-option-2').getAttribute('aria-label')
+    expect(nameA).not.toBe(nameB)
+    expect(nameA).toContain(dayFmt.format(new Date('2099-01-01T10:00:00Z')))
+    expect(nameB).toContain(dayFmt.format(new Date('2099-01-02T10:00:00Z')))
+  })
+
+  it('offsets a later overlapping option so its earlier neighbor is not fully covered_F4', () => {
+    render(
+      <VoteGrid
+        disabled={false}
+        formatters={formatters}
+        options={[
+          option({ id: 'option-1', start: new Date('2099-01-01T10:00:00Z'), durationMinutes: 60 }),
+          option({ id: 'option-2', start: new Date('2099-01-01T10:30:00Z'), durationMinutes: 60 }),
+        ]}
+        pendingOptionId={null}
+        selectedOptionId={null}
+        onVote={vi.fn()}
+      />,
+    )
+
+    const first = screen.getByTestId('vote-grid-band-option-1')
+    const second = screen.getByTestId('vote-grid-band-option-2')
+    expect(first.style.left).toBe('6px')
+    expect(second.style.left).toBe('18px')
+  })
+
   it('a band with no vote yet names itself accordingly', () => {
     render(
       <VoteGrid

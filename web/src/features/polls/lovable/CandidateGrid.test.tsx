@@ -127,6 +127,25 @@ describe('CandidateGrid drag-to-paint', () => {
     })
   })
 
+  it('paints at its own 15-minute granularity, finer than the 30-minute move step_F2', () => {
+    pinRects()
+    const { onCreate, props } = baseProps()
+    render(<CandidateGrid {...props} />)
+
+    const cell = screen.getByTestId(`candidate-slot-0-${RANGE_START}`)
+    fireEvent.pointerDown(cell, { button: 0, pointerType: 'mouse', clientY: 0 })
+    // One pixel per minute (see `pinRects`): dragging to y=45 is 20:45 — a
+    // 45-minute option, not coarsened up to the next 30-minute mark.
+    fireEvent.pointerMove(window, { clientY: 45 })
+    fireEvent.pointerUp(window)
+
+    expect(onCreate).toHaveBeenCalledWith({
+      day: 0,
+      start: RANGE_START,
+      durationMinutes: 45,
+    })
+  })
+
   it('previews the painted band live, upward drags included_D211', () => {
     pinRects()
     const { props } = baseProps()
@@ -136,10 +155,10 @@ describe('CandidateGrid drag-to-paint', () => {
     fireEvent.pointerDown(cell, { button: 0, pointerType: 'mouse', clientY: 60 })
     fireEvent.pointerMove(window, { clientY: 15 })
 
-    // The anchor is the press, so dragging up paints toward 20:15 — snapped to
-    // the same 30-minute lattice a tap places on, the grid core's shared
-    // create/move step.
-    expect(screen.getByTestId('candidate-paint-0')).toHaveTextContent('20:30–21:00')
+    // The anchor is the press, so dragging up paints 20:15–21:00 — paint uses
+    // its own 15-minute create step, finer than the 30-minute move/placement
+    // lattice.
+    expect(screen.getByTestId('candidate-paint-0')).toHaveTextContent('20:15–21:00')
   })
 
   it('hands the painted length forward to the next tap_D211', () => {
@@ -344,6 +363,27 @@ describe('CandidateGrid keyboard layer', () => {
   })
 })
 
+describe('CandidateGrid pointer move-drag', () => {
+  it('snaps a whole-band drag to the 30-minute move lattice, unlike the 15-minute paint step_F2', () => {
+    pinRects()
+    const { onMove, props } = baseProps({ candidates: [candidate(0, RANGE_START, 30)] })
+    render(<CandidateGrid {...props} />)
+
+    const band = screen.getByTestId(`candidate-band-0-${RANGE_START}`)
+    fireEvent.pointerDown(band, { button: 0, pointerType: 'mouse' })
+    // One pixel per minute (see `pinRects`): a 20-minute drag snaps up to the
+    // nearest 30-minute mark (20:30) rather than landing on the 15-minute
+    // mark (20:15) the paint step would snap it to.
+    fireEvent.pointerMove(window, { clientY: 20 })
+    fireEvent.pointerUp(window)
+
+    expect(onMove).toHaveBeenCalledWith(
+      candidate(0, RANGE_START, 30),
+      candidate(0, RANGE_START + 30, 30),
+    )
+  })
+})
+
 describe('CandidateGrid resize handle', () => {
   it('drags one option own length out of its handle_D211', () => {
     pinRects()
@@ -353,7 +393,7 @@ describe('CandidateGrid resize handle', () => {
     render(<CandidateGrid {...props} />)
 
     const band = screen.getByTestId(`candidate-band-0-${RANGE_START}`)
-    const handle = band.querySelector('button') as HTMLElement
+    const handle = screen.getByTestId(`candidate-resize-handle-0-${RANGE_START}`)
     fireEvent.pointerDown(handle, { button: 0, pointerType: 'mouse' })
     // One pixel per minute (see `pinRects`): y=90 is 21:30, so this option
     // becomes 90 minutes long — and only this one.
@@ -372,8 +412,7 @@ describe('CandidateGrid resize handle', () => {
     const { onCreate, props } = baseProps({ candidates: [candidate(0, RANGE_START, 30)] })
     render(<CandidateGrid {...props} />)
 
-    const band = screen.getByTestId(`candidate-band-0-${RANGE_START}`)
-    const handle = band.querySelector('button') as HTMLElement
+    const handle = screen.getByTestId(`candidate-resize-handle-0-${RANGE_START}`)
     fireEvent.pointerDown(handle, { button: 0, pointerType: 'mouse' })
     fireEvent.pointerMove(window, { clientY: 90 })
     fireEvent.pointerUp(window)
@@ -381,6 +420,30 @@ describe('CandidateGrid resize handle', () => {
     fireEvent.click(screen.getByTestId(`candidate-slot-1-${RANGE_START}`))
 
     expect(onCreate).toHaveBeenCalledWith({ day: 1, start: RANGE_START, durationMinutes: 90 })
+  })
+
+  it('keeps the handle out of the tab order, band-level Shift+Arrow the only keyboard resize_F1', () => {
+    const { props } = baseProps({ candidates: [candidate(0, RANGE_START, 30)] })
+    render(<CandidateGrid {...props} />)
+
+    const handle = screen.getByTestId(`candidate-resize-handle-0-${RANGE_START}`)
+    expect(handle.tagName).not.toBe('BUTTON')
+    expect(handle).toHaveAttribute('aria-hidden', 'true')
+    expect(handle).not.toHaveAttribute('tabindex')
+  })
+
+  it('never both resizes and moves an option from one key event_F1', () => {
+    const { onMove, onResize, props } = baseProps({ candidates: [candidate(0, RANGE_START, 30)] })
+    render(<CandidateGrid {...props} />)
+
+    const handle = screen.getByTestId(`candidate-resize-handle-0-${RANGE_START}`)
+    // The handle carries no keydown handler of its own, so an ArrowDown fired
+    // on it bubbles straight to the band's own handler — the band's plain
+    // arrow path (move), never a second, handle-owned resize path.
+    fireEvent.keyDown(handle, { key: 'ArrowDown' })
+
+    expect(onMove).toHaveBeenCalledTimes(1)
+    expect(onResize).not.toHaveBeenCalled()
   })
 })
 
@@ -407,8 +470,7 @@ describe('CandidateGrid touch gesture safety', () => {
     const { onResize, props } = baseProps({ candidates: [candidate(0, RANGE_START)] })
     render(<CandidateGrid {...props} />)
 
-    const band = screen.getByTestId(`candidate-band-0-${RANGE_START}`)
-    const handle = band.querySelector('button') as HTMLElement
+    const handle = screen.getByTestId(`candidate-resize-handle-0-${RANGE_START}`)
     fireEvent.pointerDown(handle, { button: 0, pointerType: 'mouse' })
     fireEvent.pointerMove(window, { clientY: 90 })
     fireEvent.pointerCancel(window)

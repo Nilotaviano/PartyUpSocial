@@ -174,7 +174,8 @@ export function CandidateGrid({
     hostRef: rootRef,
     rangeStart,
     rangeEnd,
-    createStepMin: step,
+    createStepMin: SLOT_MIN,
+    moveStepMin: step,
     resizeStepMin: DURATION_STEP,
     minDurationMin: DURATION_STEP,
     initialCreateMin: 0,
@@ -721,6 +722,8 @@ function CandidateBand({
         label={resizeLabel}
         stepMin={DURATION_STEP}
         onNudge={onDurationNudge}
+        interactive={false}
+        testId={`candidate-resize-handle-${candidate.day}-${candidate.start}`}
         onPointerDown={(e) => {
           onHandlePointerDown()
           resizeHandleProps.onPointerDown(e)

@@ -34,7 +34,7 @@ const AUTO_SCROLL_EDGE_PX = 48;
 const AUTO_SCROLL_STEP_PX = 16;
 const AUTO_SCROLL_TICK_MS = 60;
 
-export const LONG_PRESS_MS = 380;
+const LONG_PRESS_MS = 380;
 
 /**
  * A finger never holds perfectly still: only movement past this radius is a
@@ -59,8 +59,10 @@ export type GridGestureConfig = {
   hostRef?: React.RefObject<HTMLElement | null>;
   rangeStart: number;
   rangeEnd: number;
-  /** Snap lattice for paint-create and move drags. */
+  /** Snap lattice for paint-create drags. */
   createStepMin?: number;
+  /** Snap lattice for whole-block move drags. Defaults to `createStepMin`. */
+  moveStepMin?: number;
   /** Snap lattice for edge resizes, which may be finer than the create step. */
   resizeStepMin?: number;
   /** Shortest range that commits, and the floor a resize may not cross. */
@@ -233,7 +235,11 @@ export function useGridGestures(config: GridGestureConfig): GridGestures {
     const stepOf = (d: GridDrag) =>
       d.mode === "resize"
         ? (configRef.current.resizeStepMin ?? DEFAULT_STEP_MIN)
-        : (configRef.current.createStepMin ?? DEFAULT_STEP_MIN);
+        : d.mode === "move"
+          ? (configRef.current.moveStepMin ??
+            configRef.current.createStepMin ??
+            DEFAULT_STEP_MIN)
+          : (configRef.current.createStepMin ?? DEFAULT_STEP_MIN);
     const extendTo = (m: number) => {
       const d = dragRef.current;
       if (!d) return;

@@ -12,10 +12,6 @@ export function fmtRange(a: number, b: number) {
   return `${fmt(a)}–${fmt(b)}`;
 }
 
-export function snap(mins: number) {
-  return Math.round(mins / SLOT_MIN) * SLOT_MIN;
-}
-
 export function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
 }

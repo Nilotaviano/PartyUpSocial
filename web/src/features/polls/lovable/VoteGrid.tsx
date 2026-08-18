@@ -93,6 +93,11 @@ export function VoteGrid({
       if (existing) existing.options.push(option)
       else map.set(key, { key, date: midnight, options: [option] })
     }
+    // Sorted by start so a later option's overlap `depth` (below) only ever
+    // looks back at options that already claimed the space it's landing on.
+    for (const day of map.values()) {
+      day.options.sort((a, b) => a.start.getTime() - b.start.getTime())
+    }
     return [...map.values()].sort((a, b) => a.date.getTime() - b.date.getTime())
   }, [options])
 
@@ -202,7 +207,7 @@ export function VoteGrid({
               style={{ height }}
             >
               <GridLines geometry={geometry} />
-              {day.options.map((option) => {
+              {day.options.map((option, index) => {
                 const startMin = option.start.getUTCHours() * 60 + option.start.getUTCMinutes()
                 const endMin = Math.min(startMin + option.durationMinutes, rangeEnd)
                 const isFinal = selectedOptionId === option.id
@@ -211,21 +216,35 @@ export function VoteGrid({
                 const isPending = pendingOptionId === option.id
                 const timeText = optionRange(option, formatters)
                 const valueText = option.viewerVote ? t(`vote.${option.viewerVote}`) : t('detail.noVoteYet')
+                const dayText = dayNameFmt.format(day.date)
+                // Same offset pattern as `CandidateGrid`'s bands: a later
+                // option that overlaps an earlier one on the same day steps
+                // right instead of sitting fully behind it, so neither is
+                // ever fully covered by its neighbor.
+                const depth = day.options.slice(0, index).filter((other) => {
+                  const otherStart = other.start.getUTCHours() * 60 + other.start.getUTCMinutes()
+                  return otherStart + other.durationMinutes > startMin
+                }).length
 
                 return (
                   <button
                     key={option.id}
                     aria-busy={isPending}
-                    aria-label={t('voteGrid.bandLabel', { time: timeText, value: valueText })}
+                    aria-label={t('voteGrid.bandLabel', { day: dayText, time: timeText, value: valueText })}
                     className={cn(
-                      'absolute inset-x-1 z-20 overflow-hidden rounded-xl border-2 px-1.5 py-1 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50',
+                      'absolute z-20 overflow-hidden rounded-xl border-2 px-1.5 py-1 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50',
                       meta ? meta.cls : 'border-border bg-card text-ink-soft',
                       isFinal && 'ring-2 ring-inset ring-primary',
                       muted && 'opacity-60',
                     )}
                     data-testid={`vote-grid-band-${option.id}`}
                     disabled={disabled}
-                    style={{ top: top(startMin), height: Math.max(hgt(startMin, endMin), 20) }}
+                    style={{
+                      top: top(startMin),
+                      height: Math.max(hgt(startMin, endMin), 20),
+                      left: 6 + depth * 12,
+                      right: 6,
+                    }}
                     type="button"
                     onClick={() => {
                       const next = nextVote(option.viewerVote)
