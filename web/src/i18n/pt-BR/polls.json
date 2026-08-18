@@ -286,5 +286,13 @@
     "voterChipsOverflow": "+{{count}} outros",
     "voterChipsOverflow_one": "+{{count}} outros",
     "voterChipsOverflow_other": "+{{count}} outros"
+  },
+  "voteGrid": {
+    "heading": "Visão da semana",
+    "hint": "Toque em um horário para alternar seu voto: Disponível → Talvez → Indisponível.",
+    "bandLabel": "{{time}}, {{value}}. Toque para mudar seu voto.",
+    "voteAnnounced": "Voto para {{time}} definido como {{value}}.",
+    "earlierDays": "Dias anteriores",
+    "laterDays": "Dias seguintes"
   }
 }

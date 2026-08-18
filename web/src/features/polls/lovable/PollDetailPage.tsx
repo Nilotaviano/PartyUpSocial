@@ -52,6 +52,7 @@ import {
   type PollDetail as PollDetailResponse,
 } from '../pollQueries'
 import { StatusPill, VoterAvatar, VoterRow } from './PollBits'
+import { VoteGrid } from './VoteGrid'
 import {
   mapFinalizationPreview,
   mapPollDetail,
@@ -1540,6 +1541,15 @@ export function PollDetailPage() {
                 <Plus className="size-4" /> {t('suggest.heading')}
               </Button>
             </div>
+
+            <VoteGrid
+              disabled={!isPolling}
+              formatters={formatters}
+              options={poll.options}
+              pendingOptionId={pendingOptionId}
+              selectedOptionId={poll.selectedOptionId}
+              onVote={handleVote}
+            />
 
             <ul className="space-y-3">
               {ranked.map((optionId, index) => {

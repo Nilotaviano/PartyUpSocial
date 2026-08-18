@@ -495,6 +495,37 @@ describe('PollDetailPage (lovable)', () => {
     expect(within(option).getByText('Available 9')).toBeInTheDocument()
   })
 
+  it('renders the tap-to-vote week grid alongside the radio VotingGrid, both surfacing every option_D211', async () => {
+    mockGet()
+    renderPage()
+
+    await screen.findByTestId('poll-option-option-1')
+    expect(screen.getByTestId('poll-vote-grid')).toBeInTheDocument()
+    expect(screen.getByTestId('vote-grid-band-option-1')).toBeInTheDocument()
+    expect(screen.getByTestId('vote-grid-band-option-2')).toBeInTheDocument()
+    // The radio path stays intact and interactive alongside the grid.
+    expect(screen.getByTestId('vote-radiogroup-option-1')).toHaveAttribute('role', 'radiogroup')
+  })
+
+  it('tapping a vote-grid band reuses the same vote mutation the radio path calls_D211', async () => {
+    mockGet()
+    api.put.mockResolvedValue({ data: {} })
+    renderPage()
+
+    const band = await screen.findByTestId('vote-grid-band-option-2')
+    fireEvent.click(band)
+
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith(
+        '/api/v1/polls/{pollId}/options/{optionId}/vote',
+        expect.objectContaining({
+          params: expect.objectContaining({ path: { pollId: 'poll-1', optionId: 'option-2' } }),
+          body: { choice: 'available' },
+        }),
+      ),
+    )
+  })
+
   it('mutes an unmuted, non-terminal poll via PUT_D090', async () => {
     mockGet({ detail: pollDetail({ status: 'polling' }) })
     api.put.mockResolvedValue({ data: {} })
