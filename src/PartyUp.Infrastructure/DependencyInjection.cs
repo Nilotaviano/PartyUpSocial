@@ -65,6 +65,11 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserProjectionReader, CurrentUserProjectionReader>();
         services.AddScoped<IAdminUserReader, AdminUserReader>();
         services.AddScoped<IUsageDashboardReader, UsageDashboardReader>();
+        services.AddScoped<FeedbackRepository>();
+        services.AddScoped<IFeedbackRepository>(services =>
+            services.GetRequiredService<FeedbackRepository>());
+        services.AddScoped<IFeedbackReader>(services =>
+            services.GetRequiredService<FeedbackRepository>());
         services.AddScoped<IUserActivityWriter, UserActivityWriter>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IAvatarSourceRepository, AvatarSourceRepository>();

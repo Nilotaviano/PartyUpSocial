@@ -1,0 +1,20 @@
+{
+  "install": {
+    "title": "Instalar o PartyUp",
+    "body": "Adicione à tela de início para um app em tela cheia que abre mais rápido.",
+    "action": "Instalar",
+    "dismiss": "Agora não",
+    "menuRow": "Instalar app",
+    "ios": {
+      "heading": "Adicionar o PartyUp à Tela de Início",
+      "description": "O Safari instala apps pelo menu Compartilhar.",
+      "step1": "Toque no botão Compartilhar na barra do Safari.",
+      "step2": "Role para baixo e escolha \"Adicionar à Tela de Início\".",
+      "step3": "Toque em \"Adicionar\" — o PartyUp passa a abrir em tela cheia pela Tela de Início.",
+      "close": "Entendi"
+    }
+  },
+  "offline": {
+    "title": "Você está offline. O que aparece aqui pode estar desatualizado até a conexão voltar."
+  }
+}

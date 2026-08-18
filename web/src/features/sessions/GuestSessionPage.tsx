@@ -17,6 +17,7 @@ import { PageScaffold } from '../../components/ui/pageScaffold'
 import { Section, SectionCard } from '../../components/ui/section'
 import { SegmentStrip } from '../../components/ui/segmentStrip'
 import { StatusBanner } from '../../components/ui/statusBanner'
+import { FeedbackLink } from '../feedback/FeedbackLink'
 import {
   claimGuestPoll,
   getGuestPoll,
@@ -364,6 +365,12 @@ export function GuestSessionPage() {
               </div>
           </SectionCard>
         )}
+
+        {/*
+          D-217's anonymous entry point: last in the column, below the RSVP the page exists
+          for, so it never competes with the primary action.
+        */}
+        <FeedbackLink />
       </PageScaffold>
     </main>
   )
@@ -629,6 +636,9 @@ function GuestPollBranch({ guestLinkId, heading, view }: GuestPollBranchProps) {
             {suggestError && <p role="alert">{suggestError}</p>}
           </Section>
         )}
+
+        {/* Same placement rule as the session arm above. */}
+        <FeedbackLink />
       </PageScaffold>
     </main>
   )

@@ -414,3 +414,39 @@ describe('GuestSessionPage — poll branch (S6, PHASE6_DESIGN.md §5.4)', () => 
     ).toBeInTheDocument()
   })
 })
+
+describe('GuestSessionPage — D-217 anonymous feedback entry point', () => {
+  it('offers a discreet feedback link on the live guest RSVP arm_D217', async () => {
+    api.get.mockResolvedValue({ data: liveClaimed() })
+    renderPage(`/guest/${linkId}`)
+
+    const link = await screen.findByRole('button', { name: 'Send feedback' })
+    expect(link).toBeInTheDocument()
+
+    // It never competes with the RSVP the page exists for: it comes after those controls.
+    const rsvp = screen.getByRole('button', { name: 'Going' })
+    expect(rsvp.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('offers the same feedback link on the live guest poll-vote arm_D217', async () => {
+    api.get.mockImplementation((path: string) =>
+      path === '/api/v1/guest/{guestLinkId}/session'
+        ? Promise.reject(new SessionNotFound())
+        : Promise.resolve({ data: livePollUnclaimed() }),
+    )
+    renderPage(`/guest/${linkId}`)
+
+    await screen.findByTestId('screen-guest-poll')
+    expect(screen.getByRole('button', { name: 'Send feedback' })).toBeInTheDocument()
+  })
+
+  it('opens the feedback dialog from the guest page with no account_D217', async () => {
+    api.get.mockResolvedValue({ data: liveClaimed() })
+    renderPage(`/guest/${linkId}`)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Send feedback' }))
+
+    expect(await screen.findByRole('heading', { name: 'Send feedback' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Your message')).toBeInTheDocument()
+  })
+})

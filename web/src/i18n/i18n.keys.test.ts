@@ -23,6 +23,8 @@ const namespaces = [
   'tour',
   'admin',
   'legal',
+  'feedback',
+  'pwa',
 ] as const
 
 // Closed problem-code inventory for the S5/S6-owned surface (PHASE7_DESIGN.md
@@ -480,4 +482,55 @@ describe('admin namespace parity and rendering D-060 (PHASE8_DESIGN.md §3 S3)',
       expect(codes.not_found.toLowerCase()).not.toContain('admin')
     }
   })
+})
+
+describe('pwa namespace parity and rendering D-219/D-220', () => {
+  for (const locale of locales) {
+    it(locale + ' renders the install promotion and the offline notice_D220', async () => {
+      await i18n.changeLanguage(locale)
+      const pwa = resources[locale].pwa as {
+        install: { title: string; action: string; menuRow: string }
+        offline: { title: string }
+      }
+      expect(i18n.t('install.title', { ns: 'pwa' })).toBe(pwa.install.title)
+      expect(i18n.t('install.action', { ns: 'pwa' })).toBe(pwa.install.action)
+      expect(i18n.t('install.menuRow', { ns: 'pwa' })).toBe(pwa.install.menuRow)
+      expect(i18n.t('offline.title', { ns: 'pwa' })).toBe(pwa.offline.title)
+    })
+
+    it(locale + ' spells out all three iOS share-sheet steps_D220', async () => {
+      await i18n.changeLanguage(locale)
+      const steps = ['step1', 'step2', 'step3'].map((step) =>
+        i18n.t(`install.ios.${step}`, { ns: 'pwa' }),
+      )
+      for (const step of steps) expect(step.trim().length).toBeGreaterThan(0)
+      expect(new Set(steps).size).toBe(3)
+    })
+  }
+})
+
+describe('feedback namespace parity and rendering D-217', () => {
+  for (const locale of locales) {
+    it(locale + ' renders the feedback dialog heading and its entry-point label_D217', async () => {
+      await i18n.changeLanguage(locale)
+      const feedback = resources[locale].feedback as {
+        heading: string
+        open: string
+        errors: { rateLimited: string }
+      }
+      expect(i18n.t('heading', { ns: 'feedback' })).toBe(feedback.heading)
+      expect(i18n.t('open', { ns: 'feedback' })).toBe(feedback.open)
+      // D-213's 429 gets its own copy in every locale, never the generic failure line.
+      expect(i18n.t('errors.rateLimited', { ns: 'feedback' })).toBe(feedback.errors.rateLimited)
+    })
+
+    it(locale + ' names all three D-212 feedback types_D217', async () => {
+      await i18n.changeLanguage(locale)
+      const labels = ['bug', 'idea', 'other'].map((type) =>
+        i18n.t(`type.${type}`, { ns: 'feedback' }),
+      )
+      for (const label of labels) expect(label.trim().length).toBeGreaterThan(0)
+      expect(new Set(labels).size).toBe(3)
+    })
+  }
 })

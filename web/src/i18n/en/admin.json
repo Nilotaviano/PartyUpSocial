@@ -31,7 +31,9 @@
     },
     "usersLink": "Manage accounts",
     "noValue": "—",
-    "noValueLabel": "No value yet"
+    "noValueLabel": "No value yet",
+    "feedbackLink": "Review feedback",
+    "unhandledFeedback": "Unhandled feedback"
   },
   "users": {
     "heading": "User management",
@@ -101,6 +103,46 @@
       "confirm": "Ban and remove content",
       "cancel": "Do not remove anything",
       "done": "The account is banned and its content removed."
+    }
+  },
+  "feedback": {
+    "heading": "Feedback",
+    "back": "Back to the dashboard",
+    "loading": "Loading feedback…",
+    "empty": "No feedback matched those filters.",
+    "total": "Showing {{shown}} of {{total}} submissions",
+    "filters": {
+      "type": "Type",
+      "handled": "Handled state",
+      "all": "All",
+      "handledOnly": "Handled",
+      "unhandledOnly": "Unhandled"
+    },
+    "types": {
+      "bug": "Bug",
+      "idea": "Idea",
+      "other": "Other",
+      "unknown": "Unknown"
+    },
+    "submitter": "Submitter",
+    "anonymous": "Anonymous",
+    "submitted": "Submitted",
+    "handledAt": "Handled {{date}}",
+    "notHandled": "Not handled",
+    "context": {
+      "heading": "Context",
+      "route": "Route",
+      "userAgent": "Browser",
+      "locale": "Language",
+      "appVersion": "App version",
+      "none": "Not attached"
+    },
+    "markHandled": "Mark handled",
+    "markUnhandled": "Mark unhandled",
+    "pagination": {
+      "previous": "Previous page",
+      "next": "Next page",
+      "page": "Page {{page}}"
     }
   },
   "errors": {

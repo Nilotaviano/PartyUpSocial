@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using PartyUp.Domain.Availability;
+using PartyUp.Domain.Feedback;
 using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Notifications;
@@ -77,6 +78,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<PollVote> PollVotes => Set<PollVote>();
 
+    public DbSet<FeedbackItem> FeedbackItems => Set<FeedbackItem>();
+
     public DbSet<SteamCatalogApp> SteamApps => Set<SteamCatalogApp>();
 
     public DbSet<SteamCatalogStateRow> SteamCatalogState => Set<SteamCatalogStateRow>();
@@ -148,5 +151,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.ApplyConfiguration(new PollVoteConfiguration());
         builder.ApplyConfiguration(new SteamCatalogAppConfiguration());
         builder.ApplyConfiguration(new SteamCatalogStateRowConfiguration());
+        builder.ApplyConfiguration(new FeedbackItemConfiguration());
     }
 }

@@ -31,7 +31,9 @@
     },
     "usersLink": "Gerenciar contas",
     "noValue": "—",
-    "noValueLabel": "Ainda sem valor"
+    "noValueLabel": "Ainda sem valor",
+    "feedbackLink": "Revisar feedback",
+    "unhandledFeedback": "Feedback sem tratar"
   },
   "users": {
     "heading": "Gestão de contas",
@@ -101,6 +103,46 @@
       "confirm": "Banir e remover o conteúdo",
       "cancel": "Não remover nada",
       "done": "A conta foi banida e o conteúdo dela removido."
+    }
+  },
+  "feedback": {
+    "heading": "Feedback",
+    "back": "Voltar para o painel",
+    "loading": "Carregando o feedback…",
+    "empty": "Nenhum feedback corresponde a esses filtros.",
+    "total": "Mostrando {{shown}} de {{total}} envios",
+    "filters": {
+      "type": "Tipo",
+      "handled": "Situação",
+      "all": "Todos",
+      "handledOnly": "Tratados",
+      "unhandledOnly": "Sem tratar"
+    },
+    "types": {
+      "bug": "Erro",
+      "idea": "Ideia",
+      "other": "Outro",
+      "unknown": "Desconhecido"
+    },
+    "submitter": "Autor",
+    "anonymous": "Anônimo",
+    "submitted": "Enviado",
+    "handledAt": "Tratado em {{date}}",
+    "notHandled": "Sem tratar",
+    "context": {
+      "heading": "Contexto",
+      "route": "Rota",
+      "userAgent": "Navegador",
+      "locale": "Idioma",
+      "appVersion": "Versão do app",
+      "none": "Não anexado"
+    },
+    "markHandled": "Marcar como tratado",
+    "markUnhandled": "Marcar como sem tratar",
+    "pagination": {
+      "previous": "Página anterior",
+      "next": "Próxima página",
+      "page": "Página {{page}}"
     }
   },
   "errors": {

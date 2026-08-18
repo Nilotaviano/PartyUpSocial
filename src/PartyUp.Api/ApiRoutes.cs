@@ -156,6 +156,10 @@ public static class ApiOperationIds
     public const string MutePoll = "MutePoll";
     public const string UnmutePoll = "UnmutePoll";
 
+    // D-213: the one feedback write, reachable with no account -- see RateLimitPolicies' dedicated
+    // feedback-ip/feedback-user dimensions.
+    public const string SubmitFeedback = "SubmitFeedback";
+
     // TOUR_DESIGN.md §4: the first-login tour's one write.
     public const string CompleteTour = "CompleteTour";
 

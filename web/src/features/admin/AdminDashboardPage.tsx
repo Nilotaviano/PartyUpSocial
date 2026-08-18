@@ -156,12 +156,20 @@ export function AdminDashboardPage() {
               surface, not inside it: this link renders only on the admin
               dashboard, which non-admins never reach, so it leaks nothing.
             */
-            <Link
-              className={`inline-flex items-center justify-center bg-card px-4 py-2 text-ink ${raisedInteractiveClasses}`}
-              to="/admin/users"
-            >
-              {t('dashboard.usersLink')}
-            </Link>
+            <>
+              <Link
+                className={`inline-flex items-center justify-center bg-card px-4 py-2 text-ink ${raisedInteractiveClasses}`}
+                to="/admin/users"
+              >
+                {t('dashboard.usersLink')}
+              </Link>
+              <Link
+                className={`inline-flex items-center justify-center bg-card px-4 py-2 text-ink ${raisedInteractiveClasses}`}
+                to="/admin/feedback"
+              >
+                {t('dashboard.feedbackLink')}
+              </Link>
+            </>
           }
           description={
             dashboard.data
@@ -200,6 +208,19 @@ export function AdminDashboardPage() {
 
         {dashboard.data && (
           <>
+            {/*
+              D-214: the live unhandled count is a tile, not a metric inside a usage window —
+              it is a work queue rather than a measurement, so it links straight to the queue.
+            */}
+            <Link
+              className={`flex flex-col gap-1 rounded-control border-2 border-ink/25 bg-card p-4 text-ink ${raisedInteractiveClasses}`}
+              to="/admin/feedback"
+            >
+              <span className="text-ink-soft">{t('dashboard.unhandledFeedback')}</span>
+              <span className="text-h2 font-display font-bold text-ink">
+                {number.format(numeric(dashboard.data.unhandledFeedback))}
+              </span>
+            </Link>
             <UsageWindowPanel
               headingId="admin-window-7"
               title={t('dashboard.windows.last7Days')}

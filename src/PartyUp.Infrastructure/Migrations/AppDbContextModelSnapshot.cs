@@ -284,6 +284,76 @@ namespace PartyUp.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("PartyUp.Domain.Feedback.FeedbackItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AppVersion")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("app_version");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("Handled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("handled");
+
+                    b.Property<Instant?>("HandledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("handled_at");
+
+                    b.Property<string>("Locale")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("locale");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("message");
+
+                    b.Property<string>("Route")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("route");
+
+                    b.Property<Guid?>("SubmitterUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("submitter_user_id");
+
+                    b.Property<short>("Type")
+                        .HasColumnType("smallint")
+                        .HasColumnName("type");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("user_agent");
+
+                    b.HasKey("Id")
+                        .HasName("pk_feedback_items");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_feedback_items_created_at");
+
+                    b.HasIndex("Handled")
+                        .HasDatabaseName("ix_feedback_items_unhandled")
+                        .HasFilter("handled = false");
+
+                    b.HasIndex("SubmitterUserId")
+                        .HasDatabaseName("ix_feedback_items_submitter_user_id");
+
+                    b.ToTable("feedback_items", (string)null);
+                });
+
             modelBuilder.Entity("PartyUp.Domain.FriendGroups.FriendGroup", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1862,6 +1932,15 @@ namespace PartyUp.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_availability_series_users_owner_id");
+                });
+
+            modelBuilder.Entity("PartyUp.Domain.Feedback.FeedbackItem", b =>
+                {
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("SubmitterUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_feedback_items_users_submitter_user_id");
                 });
 
             modelBuilder.Entity("PartyUp.Domain.FriendGroups.FriendGroup", b =>

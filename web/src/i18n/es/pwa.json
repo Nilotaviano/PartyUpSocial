@@ -1,0 +1,20 @@
+{
+  "install": {
+    "title": "Instalar PartyUp",
+    "body": "Añádelo a tu pantalla de inicio para tener una app a pantalla completa que abre más rápido.",
+    "action": "Instalar",
+    "dismiss": "Ahora no",
+    "menuRow": "Instalar app",
+    "ios": {
+      "heading": "Añadir PartyUp a la pantalla de inicio",
+      "description": "Safari instala apps desde su menú Compartir.",
+      "step1": "Toca el botón Compartir en la barra de Safari.",
+      "step2": "Baja y elige \"Añadir a pantalla de inicio\".",
+      "step3": "Toca \"Añadir\": PartyUp se abrirá a pantalla completa desde tu pantalla de inicio.",
+      "close": "Entendido"
+    }
+  },
+  "offline": {
+    "title": "Estás sin conexión. Lo que ves puede estar desactualizado hasta que vuelva la conexión."
+  }
+}

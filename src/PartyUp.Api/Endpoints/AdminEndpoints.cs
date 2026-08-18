@@ -2,10 +2,13 @@ using System.Text.Json.Serialization;
 using NodaTime;
 using NodaTime.Text;
 using PartyUp.Api.Auth;
+using PartyUp.Api.Contracts.Feedback;
 using PartyUp.Api.Hosting;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Admin;
 using PartyUp.Application.Deletion;
+using PartyUp.Application.Feedback;
+using PartyUp.Domain.Feedback;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Users;
 using PartyUp.Domain.Users.DeletionExecution;
@@ -47,6 +50,17 @@ public static class AdminEndpoints
             .WithName("RunDeletionSweep")
             .RequireAuthorization(AuthorizationPolicies.RequireAdmin)
             .Produces<DeletionMaintenanceResponse>();
+        api.MapGet("/admin/feedback", ListFeedbackAsync)
+            .WithName("ListAdminFeedback")
+            .RequireAuthorization(AuthorizationPolicies.RequireAdmin)
+            .Produces<AdminFeedbackListResponse>()
+            .ProducesProblem(StatusCodes.Status400BadRequest);
+        api.MapPost("/admin/feedback/{id:guid}/handled", SetFeedbackHandledAsync)
+            .WithName("SetAdminFeedbackHandled")
+            .RequireAuthorization(AuthorizationPolicies.RequireAdmin)
+            .Produces<AdminFeedbackResponse>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
         api.MapGet("/admin/deletion-journal", ReadDeletionJournalAsync)
             .WithName("ReadDeletionJournal")
             .RequireAuthorization(AuthorizationPolicies.RequireAdmin)
@@ -147,6 +161,66 @@ public static class AdminEndpoints
         return result.Succeeded
             ? Results.Ok(new AdminMutationResponse("unbanned"))
             : Problem(context, StatusCodes.Status404NotFound, result.Code!);
+    }
+
+    /// <summary>
+    /// D-214: newest first, optional type and handled filters, the /admin/users paging contract.
+    /// An unrecognized <paramref name="type"/> is a 400 rather than a silently ignored filter — a
+    /// dropped filter would show an admin more rows than they asked for and read as "none match".
+    /// </summary>
+    private static async Task<IResult> ListFeedbackAsync(
+        HttpContext context,
+        ListFeedbackUseCase useCase,
+        CancellationToken cancellationToken,
+        string? type = null,
+        bool? handled = null,
+        int page = 1,
+        int pageSize = 50)
+    {
+        FeedbackType? parsedType = null;
+        if (type is not null)
+        {
+            parsedType = FeedbackTypeNames.FromWire(type);
+            if (parsedType is null)
+            {
+                return Problem(context, StatusCodes.Status400BadRequest, "invalid_request");
+            }
+        }
+
+        if (page < 1 || pageSize is < 1 or > 100)
+        {
+            return Problem(context, StatusCodes.Status400BadRequest, "invalid_request");
+        }
+
+        FeedbackListResult result = await useCase.ExecuteAsync(
+            parsedType,
+            handled,
+            page,
+            pageSize,
+            cancellationToken);
+        return Results.Ok(new AdminFeedbackListResponse(
+            result.Items.Select(AdminFeedbackResponse.From).ToArray(),
+            result.Page,
+            result.PageSize,
+            result.Total));
+    }
+
+    private static async Task<IResult> SetFeedbackHandledAsync(
+        Guid id,
+        SetFeedbackHandledRequest request,
+        HttpContext context,
+        SetFeedbackHandledUseCase useCase,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        FeedbackItem? item = await useCase.ExecuteAsync(
+            FeedbackItemId.From(id),
+            request.Handled,
+            cancellationToken);
+        return item is null
+            ? Problem(context, StatusCodes.Status404NotFound, "not_found")
+            : Results.Ok(AdminFeedbackResponse.From(item));
     }
 
     private static async Task<IResult> ReadDeletionJournalAsync(
@@ -269,7 +343,8 @@ public sealed record AdminDashboardResponse(
     string GeneratedAt,
     AdminUsageWindowResponse Last7Days,
     AdminUsageWindowResponse Last30Days,
-    AdminRepeatSchedulingResponse RepeatScheduling)
+    AdminRepeatSchedulingResponse RepeatScheduling,
+    int UnhandledFeedback)
 {
     internal static AdminDashboardResponse From(UsageDashboard dashboard) =>
         new(
@@ -280,7 +355,8 @@ public sealed record AdminDashboardResponse(
                 dashboard.RepeatScheduling.Days,
                 dashboard.RepeatScheduling.Organizers,
                 dashboard.RepeatScheduling.RepeatOrganizers,
-                dashboard.RepeatScheduling.Rate));
+                dashboard.RepeatScheduling.Rate),
+            dashboard.UnhandledFeedback);
 }
 
 public sealed record AdminUsageWindowResponse(

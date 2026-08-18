@@ -1,0 +1,13 @@
+New PartyUp feedback was submitted.
+
+Type: {{Type}}
+Submitted at: {{SubmittedAt}}
+Submitter: {{Submitter}}
+Route: {{Route}}
+Locale: {{Locale}}
+App version: {{AppVersion}}
+User agent: {{UserAgent}}
+
+Message:
+
+    {{Message}}

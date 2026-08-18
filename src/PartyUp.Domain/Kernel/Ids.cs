@@ -161,3 +161,12 @@ public readonly record struct PushSubscriptionId(Guid Value) : ITypedId<PushSubs
 
     public override string ToString() => Value.ToString();
 }
+
+public readonly record struct FeedbackItemId(Guid Value) : ITypedId<FeedbackItemId>
+{
+    public static FeedbackItemId New() => new(Guid.CreateVersion7());
+
+    public static FeedbackItemId From(Guid value) => new(value);
+
+    public override string ToString() => Value.ToString();
+}

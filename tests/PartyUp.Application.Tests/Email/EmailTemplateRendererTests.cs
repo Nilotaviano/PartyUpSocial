@@ -272,5 +272,13 @@ public sealed class EmailTemplateRendererTests
                 ["Notes"] = string.Empty,
                 ["Link"] = "https://partyup.social/sessions/00000000-0000-0000-0000-000000000000",
                 ["StartTime"] = "localized-start-time",
+                ["Type"] = "Bug",
+                ["Message"] = "The vote grid drops my taps.",
+                ["Submitter"] = "anonymous",
+                ["Route"] = "/polls/1",
+                ["Locale"] = "pt-BR",
+                ["AppVersion"] = "1.4.2",
+                ["UserAgent"] = "Mozilla/5.0",
+                ["SubmittedAt"] = "2026-08-18T12:00:00Z",
             });
 }

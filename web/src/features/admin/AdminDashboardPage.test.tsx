@@ -53,6 +53,7 @@ function dashboard(overrides: Record<string, unknown> = {}) {
       confirmationRate: 0.8,
     }),
     repeatScheduling: { days: 30, organizers: 10, repeatOrganizers: 3, rate: 0.3 },
+    unhandledFeedback: 4,
     ...overrides,
   }
 }
@@ -185,5 +186,26 @@ describe('AdminDashboardPage — in-admin navigation', () => {
 
     await screen.findByRole('alert')
     expect(screen.queryByRole('link')).toBeNull()
+  })
+})
+
+describe('AdminDashboardPage — D-214 unhandled feedback tile', () => {
+  it('surfaces the live unhandled count and links it to the feedback queue_D214', async () => {
+    api.get.mockResolvedValue({ data: dashboard() })
+
+    renderPage()
+
+    const tile = await screen.findByRole('link', { name: /Unhandled feedback/ })
+    expect(tile.getAttribute('href')).toBe('/admin/feedback')
+    expect(tile).toHaveTextContent('4')
+  })
+
+  it('links the feedback queue from the header alongside account management_D214', async () => {
+    api.get.mockResolvedValue({ data: dashboard() })
+
+    renderPage()
+
+    const link = await screen.findByRole('link', { name: 'Review feedback' })
+    expect(link.getAttribute('href')).toBe('/admin/feedback')
   })
 })

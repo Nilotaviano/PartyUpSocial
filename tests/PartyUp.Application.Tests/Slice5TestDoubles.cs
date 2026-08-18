@@ -245,15 +245,23 @@ internal sealed class FakeEmailDispatcher : IEmailDispatcher
 {
     internal List<EmailMessage> Messages { get; } = [];
 
+    /// <summary>
+    /// Optional ordered event trail shared with a <see cref="FakeUnitOfWork"/> so a test can pin
+    /// A-016's commit-before-mail ordering instead of only counting messages.
+    /// </summary>
+    internal List<string>? Trail { get; set; }
+
     public Task DispatchAsync(EmailMessage message, CancellationToken cancellationToken)
     {
         Messages.Add(message);
+        Trail?.Add("mail");
         return Task.CompletedTask;
     }
 
     public bool TryDispatch(EmailMessage message)
     {
         Messages.Add(message);
+        Trail?.Add("mail");
         return true;
     }
 }
@@ -309,12 +317,20 @@ internal sealed class FakeUnitOfWork : IUnitOfWork
 {
     internal int Executions { get; private set; }
 
-    public Task<T> ExecuteAsync<T>(
+    /// <summary>
+    /// Optional ordered event trail shared with a <see cref="FakeEmailDispatcher"/> so a test can
+    /// pin A-016's commit-before-mail ordering instead of only counting messages.
+    /// </summary>
+    internal List<string>? Trail { get; set; }
+
+    public async Task<T> ExecuteAsync<T>(
         Func<CancellationToken, Task<T>> work,
         CancellationToken cancellationToken)
     {
         Executions++;
-        return work(cancellationToken);
+        T result = await work(cancellationToken);
+        Trail?.Add("commit");
+        return result;
     }
 }
 

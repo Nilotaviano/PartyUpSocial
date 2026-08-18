@@ -8,12 +8,20 @@ import '@fontsource-variable/gabarito/wght.css'
 import '@fontsource-variable/nunito-sans/wght.css'
 import './index.css'
 import App from './App.tsx'
+import { registerServiceWorker } from './features/pwa/registerServiceWorker'
 import { watchSystemTheme } from './theme'
 
 const queryClient = new QueryClient()
 registerSessionQueryClient(queryClient)
 void refreshAntiforgeryToken().catch(() => undefined)
 watchSystemTheme()
+
+// Dev is excluded from the automatic registration: a stale worker would shadow Vite's module
+// graph. Dev serves '/sw.js' as an ES module, which this classic registration cannot parse --
+// real registration paths (shell and push opt-in) need a production build.
+if (import.meta.env.PROD) {
+  registerServiceWorker()
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

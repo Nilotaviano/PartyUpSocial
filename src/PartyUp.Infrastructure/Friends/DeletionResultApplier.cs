@@ -60,7 +60,8 @@ public sealed class DeletionResultApplier(
     IAvailabilityRepository availability,
     IPushSubscriptionRepository pushSubscriptions,
     INotificationMuteRepository notificationMutes,
-    IAvatarSourceRepository avatarSources) : IDeletionResultApplier
+    IAvatarSourceRepository avatarSources,
+    IFeedbackRepository feedback) : IDeletionResultApplier
 {
     public async Task ApplyAsync(
         DeletionExecutionResult result,
@@ -99,6 +100,12 @@ public sealed class DeletionResultApplier(
         {
             await ApplyAvailabilityDeletionAsync(subject, cancellationToken);
         }
+
+        // D-216: anonymize, do not erase — feedback rows keep their message and lose only their
+        // submitter reference. Deliberately not a UserDataScope: those name purges, and nothing here
+        // is purged. Deletion-only: D-180's content removal (ApplyContentRemovalAsync) leaves a
+        // banned account's feedback attributed, exactly like the rest of its retained history.
+        await feedback.AnonymizeForUserAsync(subject, cancellationToken);
 
         ClearLastSeen(subject);
     }

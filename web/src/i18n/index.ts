@@ -8,6 +8,7 @@ import enAvailability from './en/availability.json'
 import enAvatar from './en/avatar.json'
 import enCommon from './en/common.json'
 import enErrors from './en/errors.json'
+import enFeedback from './en/feedback.json'
 import enFriends from './en/friends.json'
 import enGroups from './en/groups.json'
 import enHome from './en/home.json'
@@ -15,6 +16,7 @@ import enLegal from './en/legal.json'
 import enNotifications from './en/notifications.json'
 import enOnboarding from './en/onboarding.json'
 import enPolls from './en/polls.json'
+import enPwa from './en/pwa.json'
 import enProfile from './en/profile.json'
 import enSessions from './en/sessions.json'
 import enSettings from './en/settings.json'
@@ -25,6 +27,7 @@ import esAvailability from './es/availability.json'
 import esAvatar from './es/avatar.json'
 import esCommon from './es/common.json'
 import esErrors from './es/errors.json'
+import esFeedback from './es/feedback.json'
 import esFriends from './es/friends.json'
 import esGroups from './es/groups.json'
 import esHome from './es/home.json'
@@ -32,6 +35,7 @@ import esLegal from './es/legal.json'
 import esNotifications from './es/notifications.json'
 import esOnboarding from './es/onboarding.json'
 import esPolls from './es/polls.json'
+import esPwa from './es/pwa.json'
 import esProfile from './es/profile.json'
 import esSessions from './es/sessions.json'
 import esSettings from './es/settings.json'
@@ -42,6 +46,7 @@ import ptBRAvailability from './pt-BR/availability.json'
 import ptBRAvatar from './pt-BR/avatar.json'
 import ptBRCommon from './pt-BR/common.json'
 import ptBRErrors from './pt-BR/errors.json'
+import ptBRFeedback from './pt-BR/feedback.json'
 import ptBRFriends from './pt-BR/friends.json'
 import ptBRGroups from './pt-BR/groups.json'
 import ptBRHome from './pt-BR/home.json'
@@ -49,6 +54,7 @@ import ptBRLegal from './pt-BR/legal.json'
 import ptBRNotifications from './pt-BR/notifications.json'
 import ptBROnboarding from './pt-BR/onboarding.json'
 import ptBRPolls from './pt-BR/polls.json'
+import ptBRPwa from './pt-BR/pwa.json'
 import ptBRProfile from './pt-BR/profile.json'
 import ptBRSessions from './pt-BR/sessions.json'
 import ptBRSettings from './pt-BR/settings.json'
@@ -74,6 +80,8 @@ export const resources = {
     tour: enTour,
     admin: enAdmin,
     legal: enLegal,
+    feedback: enFeedback,
+    pwa: enPwa,
   },
   'pt-BR': {
     common: ptBRCommon,
@@ -93,6 +101,8 @@ export const resources = {
     tour: ptBRTour,
     admin: ptBRAdmin,
     legal: ptBRLegal,
+    feedback: ptBRFeedback,
+    pwa: ptBRPwa,
   },
   es: {
     common: esCommon,
@@ -112,6 +122,8 @@ export const resources = {
     tour: esTour,
     admin: esAdmin,
     legal: esLegal,
+    feedback: esFeedback,
+    pwa: esPwa,
   },
 }
 
@@ -140,6 +152,8 @@ void i18n
       'tour',
       'admin',
       'legal',
+      'feedback',
+      'pwa',
     ],
     resources,
     interpolation: {

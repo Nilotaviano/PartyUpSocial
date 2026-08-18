@@ -99,7 +99,8 @@ export class PushNotConfiguredError extends Error {
 }
 
 /**
- * Registers `sw.js` (only ever called after explicit opt-in — never on plain page load),
+ * Registers `sw.js` (idempotent — D-218 already registered the same URL at page load in
+ * production, and this call is what covers dev and any browser that loaded before it),
  * subscribes through the browser's real `PushManager` against the server's VAPID public key, and
  * POSTs the subscription, storing the returned id for this browser (design §5, D-147/D-159).
  * Throws {@link PushPermissionDeniedError} on anything but an explicit grant (D-175's fallback

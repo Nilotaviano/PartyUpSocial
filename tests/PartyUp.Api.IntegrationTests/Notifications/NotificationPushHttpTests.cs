@@ -713,13 +713,15 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
             "UnmutePoll",
         ];
 
-        // Pinned against the live op-id total this test's own factory serves (verified: 150 after
+        // Pinned against the live op-id total this test's own factory serves (verified: 153 after
         // D-178's GetAdminDashboard op-id on top of D-194's SearchSteamCatalog, D-193's
-        // InvitePollUsers, D-189's ChangeMyEmailNotifications + UnsubscribeEmailNotifications, and
-        // D-198/D-199's nine-operation FriendGroup HTTP surface, which includes the test-only
-        // `_slice2` debug sign-in endpoints the production host never registers) -- a grown-by-one
-        // total fails here even though every named id is still individually present.
-        const int expectedTotalOperationIdCount = 150;
+        // InvitePollUsers, D-189's ChangeMyEmailNotifications + UnsubscribeEmailNotifications,
+        // D-198/D-199's nine-operation FriendGroup HTTP surface, and D-212/D-213's three-operation
+        // feedback surface (SubmitFeedback, ListAdminFeedback, SetAdminFeedbackHandled), which
+        // includes the test-only `_slice2` debug sign-in endpoints the production host never
+        // registers) -- a grown-by-one total fails here even though every named id is still
+        // individually present.
+        const int expectedTotalOperationIdCount = 153;
 
         using HttpClient client = _factory.CreateClient();
         using HttpResponseMessage response = await client.GetAsync("/openapi/v1.json");

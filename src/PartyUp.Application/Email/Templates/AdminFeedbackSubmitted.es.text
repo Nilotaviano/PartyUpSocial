@@ -1,0 +1,13 @@
+Se envio un nuevo comentario de PartyUp.
+
+Tipo: {{Type}}
+Enviado el: {{SubmittedAt}}
+Autor: {{Submitter}}
+Ruta: {{Route}}
+Idioma: {{Locale}}
+Version de la app: {{AppVersion}}
+User agent: {{UserAgent}}
+
+Mensaje:
+
+    {{Message}}

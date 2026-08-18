@@ -23,5 +23,8 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // The service worker is the one source file that runs off the DOM: it needs the WebWorker
+  // lib, which cannot coexist with DOM in one program, so it compiles under tsconfig.worker.json.
+  "exclude": ["src/sw.ts"]
 }

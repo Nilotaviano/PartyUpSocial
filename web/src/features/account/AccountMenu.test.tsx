@@ -192,3 +192,83 @@ describe('AccountMenu — sheet panel (D183, ported to the shell Sheet grammar)'
     expect(api.post).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('AccountMenu — D-217 feedback entry point', () => {
+  it('offers a feedback row that swaps the sheet for the feedback dialog_D217', async () => {
+    mockProfile()
+    renderMenu()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Account menu' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Send feedback' }))
+
+    // The sheet closes first, so exactly one dialog is ever mounted and focus is never
+    // trapped in the panel behind the one the user is typing into.
+    expect(await screen.findByRole('heading', { name: 'Send feedback' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1))
+    expect(screen.getByLabelText('Your message')).toBeInTheDocument()
+  })
+
+  it('returns focus to the account trigger when the feedback dialog closes_D217', async () => {
+    mockProfile()
+    renderMenu()
+
+    const trigger = await screen.findByRole('button', { name: 'Account menu' })
+    fireEvent.click(trigger)
+    fireEvent.click(await screen.findByRole('button', { name: 'Send feedback' }))
+    await screen.findByRole('heading', { name: 'Send feedback' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(trigger).toHaveFocus())
+  })
+})
+
+describe('AccountMenu — D-220 install entry point', () => {
+  const IPHONE_UA =
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'
+  const originalUserAgent = navigator.userAgent
+
+  function mockUserAgent(userAgent: string) {
+    Object.defineProperty(navigator, 'userAgent', { configurable: true, value: userAgent })
+  }
+
+  afterEach(() => mockUserAgent(originalUserAgent))
+
+  it('offers no install row on a browser with no install path_D220', async () => {
+    mockProfile()
+    renderMenu()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Account menu' }))
+    await screen.findByRole('button', { name: 'Send feedback' })
+    expect(screen.queryByRole('button', { name: 'Install app' })).not.toBeInTheDocument()
+  })
+
+  it('offers an install row on iOS Safari that swaps the sheet for the instructions_D220', async () => {
+    mockUserAgent(IPHONE_UA)
+    mockProfile()
+    renderMenu()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Account menu' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Install app' }))
+
+    expect(
+      await screen.findByRole('heading', { name: 'Add PartyUp to your Home Screen' }),
+    ).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1))
+  })
+
+  it('returns focus to the account trigger when the install dialog closes_D220', async () => {
+    mockUserAgent(IPHONE_UA)
+    mockProfile()
+    renderMenu()
+
+    const trigger = await screen.findByRole('button', { name: 'Account menu' })
+    fireEvent.click(trigger)
+    fireEvent.click(await screen.findByRole('button', { name: 'Install app' }))
+    await screen.findByRole('heading', { name: 'Add PartyUp to your Home Screen' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Got it' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(trigger).toHaveFocus())
+  })
+})

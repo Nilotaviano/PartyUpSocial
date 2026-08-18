@@ -31,7 +31,9 @@
     },
     "usersLink": "Gestionar cuentas",
     "noValue": "—",
-    "noValueLabel": "Todavía sin valor"
+    "noValueLabel": "Todavía sin valor",
+    "feedbackLink": "Revisar comentarios",
+    "unhandledFeedback": "Comentarios sin atender"
   },
   "users": {
     "heading": "Gestión de cuentas",
@@ -101,6 +103,46 @@
       "confirm": "Vetar y eliminar el contenido",
       "cancel": "No eliminar nada",
       "done": "La cuenta quedó vetada y su contenido eliminado."
+    }
+  },
+  "feedback": {
+    "heading": "Comentarios",
+    "back": "Volver al panel",
+    "loading": "Cargando los comentarios…",
+    "empty": "Ningún comentario coincide con esos filtros.",
+    "total": "Mostrando {{shown}} de {{total}} envíos",
+    "filters": {
+      "type": "Tipo",
+      "handled": "Estado",
+      "all": "Todos",
+      "handledOnly": "Atendidos",
+      "unhandledOnly": "Sin atender"
+    },
+    "types": {
+      "bug": "Error",
+      "idea": "Idea",
+      "other": "Otro",
+      "unknown": "Desconocido"
+    },
+    "submitter": "Autor",
+    "anonymous": "Anónimo",
+    "submitted": "Enviado",
+    "handledAt": "Atendido el {{date}}",
+    "notHandled": "Sin atender",
+    "context": {
+      "heading": "Contexto",
+      "route": "Ruta",
+      "userAgent": "Navegador",
+      "locale": "Idioma",
+      "appVersion": "Versión de la app",
+      "none": "No adjuntado"
+    },
+    "markHandled": "Marcar como atendido",
+    "markUnhandled": "Marcar como sin atender",
+    "pagination": {
+      "previous": "Página anterior",
+      "next": "Página siguiente",
+      "page": "Página {{page}}"
     }
   },
   "errors": {

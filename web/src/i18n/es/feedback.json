@@ -1,0 +1,24 @@
+{
+  "open": "Enviar comentarios",
+  "heading": "Enviar comentarios",
+  "description": "Cuéntanos qué falló o qué mejoraría PartyUp. Leemos cada mensaje.",
+  "type": {
+    "legend": "¿Qué tipo de comentario es este?",
+    "bug": "Error",
+    "idea": "Idea",
+    "other": "Otro"
+  },
+  "message": {
+    "label": "Tu mensaje",
+    "counter": "{{used}} de {{limit}} caracteres"
+  },
+  "contextNotice": "Adjuntamos la página en la que estás, tu navegador y tu idioma para poder reproducir el problema.",
+  "submit": "Enviar",
+  "cancel": "Cancelar",
+  "sent": "Gracias, tus comentarios se enviaron.",
+  "errors": {
+    "required": "Escribe un mensaje antes de enviarlo.",
+    "rateLimited": "Más despacio: ya enviaste varios mensajes. Inténtalo de nuevo en unos minutos.",
+    "generic": "No se pudieron enviar los comentarios. Inténtalo de nuevo."
+  }
+}

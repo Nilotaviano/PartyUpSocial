@@ -1,0 +1,24 @@
+{
+  "open": "Enviar feedback",
+  "heading": "Enviar feedback",
+  "description": "Conte o que quebrou ou o que deixaria o PartyUp melhor. Lemos cada mensagem.",
+  "type": {
+    "legend": "Que tipo de feedback é este?",
+    "bug": "Erro",
+    "idea": "Ideia",
+    "other": "Outro"
+  },
+  "message": {
+    "label": "Sua mensagem",
+    "counter": "{{used}} de {{limit}} caracteres"
+  },
+  "contextNotice": "Anexamos a página em que você está, seu navegador e seu idioma para conseguirmos reproduzir o problema.",
+  "submit": "Enviar",
+  "cancel": "Cancelar",
+  "sent": "Obrigado — seu feedback foi enviado.",
+  "errors": {
+    "required": "Escreva uma mensagem antes de enviar.",
+    "rateLimited": "Calma — você já enviou várias mensagens. Tente de novo em alguns minutos.",
+    "generic": "Não foi possível enviar o feedback. Tente de novo."
+  }
+}

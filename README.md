@@ -48,7 +48,7 @@ PartyUp gives the whole friend group one place to **publish availability**, **pr
 - 🗣️ **Three languages** — English, Português (BR), Español, including notifications and emails
 - ♿ **WCAG 2.2 AA target** — keyboard-first drag alternatives, screen-reader announcements, reduced-motion support
 
-The complete behavior is specified before code in [PRODUCT_SPEC.md](PRODUCT_SPEC.md) — **210 numbered product decisions** (D-001…D-210), each one traceable to the test that proves it.
+The complete behavior is specified before code in [PRODUCT_SPEC.md](PRODUCT_SPEC.md) — **220 numbered product decisions** (D-001…D-220), each one traceable to the test that proves it.
 
 ## 🏗️ How it's built
 
@@ -171,7 +171,7 @@ mandatory pre-push gate; fix the environment or the tests before pushing.
 
 | Document | What's inside |
 |---|---|
-| [PRODUCT_SPEC.md](PRODUCT_SPEC.md) | Full product behavior — 210 numbered, statused decisions |
+| [PRODUCT_SPEC.md](PRODUCT_SPEC.md) | Full product behavior — 220 numbered, statused decisions |
 | [DOMAIN_MODEL.md](DOMAIN_MODEL.md) | Ratified domain design — aggregates, state machines, visibility rules |
 | [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) | Phased delivery plan with honest sizing |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Technical foundation, conventions, decision record |
@@ -196,6 +196,21 @@ mandatory pre-push gate; fix the environment or the tests before pushing.
 | — | Private beta → single full-scope public launch | ⬜ |
 
 Everything ships together in one public v1 — no stripped-down beta ([D-163](PRODUCT_SPEC.md#14-decisions)).
+
+### After launch
+
+Roughly in order — each item gets its own spec pass (new D-numbers) before any code, so scope and order may shift:
+
+1. **In-app feedback channel** — a low-friction way to tell us what's broken or missing, right from the app
+2. **Polish sweep** — small tracked residuals: accessibility refinements, doc drift, translation review
+3. **Session history** — a page for the sessions you've already played
+4. **Email deliverability** — bounce/complaint webhook handling so notifications stay out of spam folders
+5. **Shareable session cards** — link a session in Discord or WhatsApp and get a rich preview card
+6. **Guest → account upgrade** — created RSVPs as a guest? Keep them when you sign up
+7. **Referrals** — invite a friend with a personal link
+8. **Discord integration** — session and poll updates in your friend group's Discord server
+9. **Recurring sessions** — "every Thursday at 21:00" as a first-class template
+10. **Levels & streaks** — light progression tied to sessions actually played
 
 ## 🤝 Contributing
 

@@ -708,6 +708,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListAdminFeedback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/feedback/{id}/handled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SetAdminFeedbackHandled"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/deletion-journal": {
         parameters: {
             query?: never;
@@ -718,6 +750,22 @@ export interface paths {
         get: operations["ReadDeletionJournal"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SubmitFeedback"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2081,6 +2129,32 @@ export interface components {
             last7Days: components["schemas"]["AdminUsageWindowResponse"];
             last30Days: components["schemas"]["AdminUsageWindowResponse"];
             repeatScheduling: components["schemas"]["AdminRepeatSchedulingResponse"];
+            /** Format: int32 */
+            unhandledFeedback: number | string;
+        };
+        AdminFeedbackListResponse: {
+            items: components["schemas"]["AdminFeedbackResponse"][];
+            /** Format: int32 */
+            page: number | string;
+            /** Format: int32 */
+            pageSize: number | string;
+            /** Format: int32 */
+            total: number | string;
+        };
+        AdminFeedbackResponse: {
+            /** Format: uuid */
+            id: string;
+            type: string;
+            message: string;
+            /** Format: uuid */
+            submitterUserId: null | string;
+            route: null | string;
+            userAgent: null | string;
+            locale: null | string;
+            appVersion: null | string;
+            createdAt: string;
+            handled: boolean;
+            handledAt: null | string;
         };
         AdminMutationResponse: {
             status: string;
@@ -3052,6 +3126,9 @@ export interface components {
             viaGroup: null | components["schemas"]["GroupProvenanceResponse"];
             sharedWithGroup: boolean;
         };
+        SetFeedbackHandledRequest: {
+            handled: boolean;
+        };
         SetPasswordRequest: {
             newPassword: string;
             currentPassword: null | string;
@@ -3138,6 +3215,18 @@ export interface components {
             personaName?: null | string;
             avatarUrl?: null | string;
             invitationUrl: string;
+        };
+        SubmitFeedbackRequest: {
+            type: string;
+            message: string;
+            route?: null | string;
+            userAgent?: null | string;
+            locale?: null | string;
+            appVersion?: null | string;
+        };
+        SubmitFeedbackResponse: {
+            /** Format: uuid */
+            id: string;
         };
         SuggestPollOptionRequest: {
             startTime: null | string;
@@ -4623,6 +4712,87 @@ export interface operations {
             };
         };
     };
+    ListAdminFeedback: {
+        parameters: {
+            query?: {
+                type?: string;
+                handled?: boolean;
+                page?: number | string;
+                pageSize?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminFeedbackListResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SetAdminFeedbackHandled: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetFeedbackHandledRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminFeedbackResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ReadDeletionJournal: {
         parameters: {
             query?: {
@@ -4651,6 +4821,69 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SubmitFeedback: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitFeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmitFeedbackResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
                 };
             };
         };

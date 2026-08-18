@@ -125,6 +125,10 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
             ["PATCH /api/v1/me/platform-links/{id:guid}"] = Authenticated(() =>
                 JsonContent.Create(new { handle = "Player" })),
             ["DELETE /api/v1/me/platform-links/{id:guid}"] = Authenticated(() => null),
+            // D-212/D-213: the anonymous-allowed feedback write — same Public() pattern as the other
+            // account-less POSTs, kept safe by its dedicated feedback-ip/feedback-user rate limits.
+            ["POST /api/v1/feedback"] = Public(() =>
+                JsonContent.Create(new { type = "bug", message = "Antiforgery probe" })),
             ["POST /api/v1/account-deletion-requests"] = Public(() =>
                 JsonContent.Create(new { email = "not-an-email" })),
             ["POST /api/v1/account-deletion-requests/confirm"] = Public(() =>
@@ -155,6 +159,8 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 JsonContent.Create(new { removeContent = false })),
             ["POST /api/v1/admin/users/{id:guid}/unban"] = Admin(() => null),
             ["POST /api/v1/admin/maintenance/deletion-sweep"] = Admin(() => null),
+            ["POST /api/v1/admin/feedback/{id:guid}/handled"] = Admin(() =>
+                JsonContent.Create(new { handled = true })),
             ["POST /api/v1/sessions"] = Onboarded(() => JsonContent.Create(new
             {
                 title = "Antiforgery probe",

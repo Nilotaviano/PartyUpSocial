@@ -21,6 +21,7 @@ using PartyUp.Application.Abstractions;
 using PartyUp.Application.Accounts;
 using PartyUp.Application.Admin;
 using PartyUp.Application.Deletion;
+using PartyUp.Application.Feedback;
 using PartyUp.Application.Friends;
 using PartyUp.Application.FriendGroups;
 using PartyUp.Application.Onboarding;
@@ -124,6 +125,19 @@ builder.Services.AddScoped<ResolveFriendCodeUseCase>();
 builder.Services.AddScoped<ListFriendsUseCase>();
 builder.Services.AddScoped<ListFriendRequestsUseCase>();
 builder.Services.AddScoped<ListBlockedUsersUseCase>();
+builder.Services.AddScoped<SubmitFeedbackUseCase>();
+builder.Services.AddScoped<ListFeedbackUseCase>();
+builder.Services.AddScoped<SetFeedbackHandledUseCase>();
+// D-215: the same Admin:SeedEmails addresses AdminSeeder grants the admin role to. Resolved from
+// the built IConfiguration rather than read eagerly here, so deferred configuration sources (the
+// test host's overrides) are in place by the time the list is materialized.
+builder.Services.AddSingleton(services => new FeedbackEmailOptions(
+    services.GetRequiredService<IConfiguration>()
+        .GetSection("Admin:SeedEmails").Get<string[]>()?
+        .Where(value => !string.IsNullOrWhiteSpace(value))
+        .Select(value => value.Trim())
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray() ?? []));
 builder.Services.AddScoped<FriendGroupUseCases>();
 builder.Services.AddScoped<FriendGroupReadUseCases>();
 builder.Services.AddSingleton<ExternalAuthOriginOptions>();
@@ -388,6 +402,7 @@ api.MapMeEndpoints();
 api.MapFriendEndpoints();
 api.MapFriendGroupEndpoints();
 api.MapAdminMaintenanceEndpoints();
+api.MapFeedbackEndpoints();
 api.MapSessionEndpoints();
 api.MapGuestSessionEndpoints();
 api.MapAvailabilityEndpoints();
@@ -440,8 +455,17 @@ api.MapFallback(() => Results.NotFound());
 
 if (Directory.Exists(Path.Combine(app.Environment.ContentRootPath, "wwwroot")))
 {
-    app.UseStaticFiles();
-    app.MapFallbackToFile("index.html");
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        OnPrepareResponse = context =>
+            context.Context.Response.Headers.CacheControl =
+                StaticCacheHeaders.ForRequestPath(context.Context.Request.Path.Value),
+    });
+    app.MapFallbackToFile("index.html", new StaticFileOptions
+    {
+        OnPrepareResponse = context =>
+            context.Context.Response.Headers.CacheControl = StaticCacheHeaders.NoCache,
+    });
 }
 
 app.Run();

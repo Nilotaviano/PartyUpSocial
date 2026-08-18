@@ -159,6 +159,9 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
             ["push-subscribe"] = ["CreatePushSubscription", "DeletePushSubscription"],
             // STEAM_CATALOG_DESIGN.md §3: typeahead traffic must not eat the general read budget.
             ["steam-catalog-search"] = ["SearchSteamCatalog"],
+            // D-213: the account-less feedback write, bounded per IP and per authenticated user.
+            ["feedback-ip"] = ["SubmitFeedback"],
+            ["feedback-user"] = ["SubmitFeedback"],
             ["default"] = [],
         };
 
@@ -173,7 +176,7 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
     [Fact]
     public void EveryDimensionCoversItsDocumentedRoutes()
     {
-        Assert.Equal(35, RateLimitPolicies.Dimensions.Count);
+        Assert.Equal(37, RateLimitPolicies.Dimensions.Count);
         Assert.Equal(ExpectedRoutes.Keys, RateLimitPolicies.Dimensions.Select(value => value.Name));
         foreach (RateLimitDimension dimension in RateLimitPolicies.Dimensions)
         {

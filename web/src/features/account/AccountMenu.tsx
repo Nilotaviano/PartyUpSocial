@@ -1,12 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
-import { LogOut, Settings, ShieldCheck, UserRound } from 'lucide-react'
-import { useState } from 'react'
+import { Download, LogOut, MessageSquare, Settings, ShieldCheck, UserRound } from 'lucide-react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router'
 import { useLogoutMutation } from '../../auth/useSession'
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '../../components/shell/sheet'
+import { FeedbackDialog } from '../feedback/FeedbackDialog'
 import { AvatarDisc } from '../friends/AvatarDisc'
 import { avatarImgUrl } from '../friends/avatarImage'
+import { IosInstallDialog } from '../pwa/IosInstallDialog'
+import { useInstallPrompt } from '../pwa/useInstallPrompt'
 import { getViewerProfile, viewerProfileKey } from '../sessions/sessionQueries'
 
 const rowClasses =
@@ -22,9 +25,13 @@ const rowClasses =
  * sheet itself before firing the request, so it cannot be fired twice.
  */
 export function AccountMenu() {
-  const { t } = useTranslation('common')
+  const { t } = useTranslation(['common', 'feedback', 'pwa'])
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [iosInstallOpen, setIosInstallOpen] = useState(false)
+  const install = useInstallPrompt()
+  const trigger = useRef<HTMLButtonElement>(null)
   const profile = useQuery({ queryKey: viewerProfileKey, queryFn: getViewerProfile })
   const logout = useLogoutMutation()
 
@@ -40,9 +47,11 @@ export function AccountMenu() {
   const username = profile.data?.username
 
   return (
+    <>
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <button
+          ref={trigger}
           aria-label={t('accountMenu.trigger')}
           className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-xl hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           data-tour="settings"
@@ -80,6 +89,43 @@ export function AccountMenu() {
               {t('accountMenu.privacy')}
             </Link>
           </SheetClose>
+          {/*
+            D-217's signed-in entry point. It closes the sheet before opening the dialog, so the
+            two panels never stack — Radix would otherwise trap focus in the sheet behind it.
+          */}
+          <button
+            className={rowClasses}
+            type="button"
+            onClick={() => {
+              setOpen(false)
+              setFeedbackOpen(true)
+            }}
+          >
+            <MessageSquare aria-hidden className="size-4 shrink-0" />
+            {t('open', { ns: 'feedback' })}
+          </button>
+          {/*
+            D-220's durable install entry point: the first-visit banner can be dismissed for good,
+            so an installable browser keeps this row regardless of that dismissal. Like the
+            feedback row it closes the sheet before opening its dialog, so the two never stack.
+          */}
+          {!install.standalone && (install.canPromptNative || install.isIos) && (
+            <button
+              className={rowClasses}
+              type="button"
+              onClick={() => {
+                setOpen(false)
+                if (install.canPromptNative) {
+                  void install.promptInstall()
+                  return
+                }
+                setIosInstallOpen(true)
+              }}
+            >
+              <Download aria-hidden className="size-4 shrink-0" />
+              {t('install.menuRow', { ns: 'pwa' })}
+            </button>
+          )}
           <button
             className={rowClasses}
             disabled={logout.isPending}
@@ -92,5 +138,8 @@ export function AccountMenu() {
         </div>
       </SheetContent>
     </Sheet>
+    <FeedbackDialog open={feedbackOpen} triggerRef={trigger} onOpenChange={setFeedbackOpen} />
+    <IosInstallDialog open={iosInstallOpen} triggerRef={trigger} onOpenChange={setIosInstallOpen} />
+    </>
   )
 }

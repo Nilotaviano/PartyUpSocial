@@ -409,6 +409,21 @@ public static class RateLimitPolicies
             TimeSpan.FromMinutes(1),
             RateLimitPartitionKind.User,
             Operations(ApiOperationIds.SearchSteamCatalog)),
+        // D-213: the feedback write is the only /api/v1 route reachable with no account, so it gets
+        // both dimensions at once -- an anonymous caller is bound by IP alone, an authenticated one
+        // by IP and user id simultaneously (User partitions to no-limiter when unauthenticated).
+        new(
+            "feedback-ip",
+            5,
+            TimeSpan.FromMinutes(15),
+            RateLimitPartitionKind.Ip,
+            Operations(ApiOperationIds.SubmitFeedback)),
+        new(
+            "feedback-user",
+            5,
+            TimeSpan.FromMinutes(15),
+            RateLimitPartitionKind.User,
+            Operations(ApiOperationIds.SubmitFeedback)),
         new(
             "default",
             300,

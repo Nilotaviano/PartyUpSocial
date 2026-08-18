@@ -8,7 +8,10 @@ namespace PartyUp.Application.Admin;
 /// scheduling. Rates are fractions in [0, 1] and are null when their denominator is zero — an
 /// undefined rate is reported as undefined rather than as 0.
 /// </summary>
-public sealed class GetUsageDashboardUseCase(IUsageDashboardReader reader, IClock clock)
+public sealed class GetUsageDashboardUseCase(
+    IUsageDashboardReader reader,
+    IFeedbackReader feedback,
+    IClock clock)
 {
     public static readonly Duration ShortWindow = Duration.FromDays(7);
     public static readonly Duration LongWindow = Duration.FromDays(30);
@@ -21,6 +24,8 @@ public sealed class GetUsageDashboardUseCase(IUsageDashboardReader reader, ICloc
         RepeatSchedulingMeasures repeat = await reader.ReadRepeatSchedulingAsync(
             LongWindow,
             cancellationToken);
+        // D-214: a live count, not a windowed measure -- the backlog an admin still owes a reply to.
+        int unhandledFeedback = await feedback.CountUnhandledAsync(cancellationToken);
 
         return new UsageDashboard(
             now,
@@ -30,7 +35,8 @@ public sealed class GetUsageDashboardUseCase(IUsageDashboardReader reader, ICloc
                 (int)LongWindow.Days,
                 repeat.Organizers,
                 repeat.RepeatOrganizers,
-                Rate(repeat.RepeatOrganizers, repeat.Organizers)));
+                Rate(repeat.RepeatOrganizers, repeat.Organizers)),
+            unhandledFeedback);
     }
 
     private async Task<UsageWindow> ReadAsync(
@@ -60,7 +66,8 @@ public sealed record UsageDashboard(
     Instant GeneratedAt,
     UsageWindow Last7Days,
     UsageWindow Last30Days,
-    RepeatScheduling RepeatScheduling);
+    RepeatScheduling RepeatScheduling,
+    int UnhandledFeedback);
 
 public sealed record UsageWindow(
     int Days,

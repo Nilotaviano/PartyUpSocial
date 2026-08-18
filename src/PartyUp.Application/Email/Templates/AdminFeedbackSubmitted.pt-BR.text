@@ -1,0 +1,13 @@
+Um novo feedback do PartyUp foi enviado.
+
+Tipo: {{Type}}
+Enviado em: {{SubmittedAt}}
+Autor: {{Submitter}}
+Rota: {{Route}}
+Idioma: {{Locale}}
+Versao do app: {{AppVersion}}
+User agent: {{UserAgent}}
+
+Mensagem:
+
+    {{Message}}

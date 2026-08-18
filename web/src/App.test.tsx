@@ -491,3 +491,41 @@ describe('skip-to-main-content link_D139', () => {
     expect(firstFocusableElement()).toBe(skipLink)
   })
 })
+
+describe('global PWA banners', () => {
+  function setOnline(online: boolean) {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: online })
+  }
+
+  afterEach(() => {
+    setOnline(true)
+  })
+
+  it('announces offline on a shell-less guest route, not only inside the shells_D219', async () => {
+    setSession(session())
+    setOnline(false)
+    renderRoute('/guest/00000000-0000-0000-0000-000000000001')
+
+    await waitFor(() => {
+      expect(
+        screen
+          .getAllByRole('status')
+          .some((region) => region.textContent?.includes('You are offline')),
+      ).toBe(true)
+    })
+  })
+
+  it('announces offline on the shell-less age gate_D219', async () => {
+    setSession(session())
+    setOnline(false)
+    renderRoute('/age-gate')
+
+    await waitFor(() => {
+      expect(
+        screen
+          .getAllByRole('status')
+          .some((region) => region.textContent?.includes('You are offline')),
+      ).toBe(true)
+    })
+  })
+})

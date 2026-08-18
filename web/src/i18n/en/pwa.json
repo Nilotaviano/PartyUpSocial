@@ -1,0 +1,20 @@
+{
+  "install": {
+    "title": "Install PartyUp",
+    "body": "Add it to your home screen for a full-screen app that opens faster.",
+    "action": "Install",
+    "dismiss": "Not now",
+    "menuRow": "Install app",
+    "ios": {
+      "heading": "Add PartyUp to your Home Screen",
+      "description": "Safari installs apps from its Share menu.",
+      "step1": "Tap the Share button in the Safari toolbar.",
+      "step2": "Scroll down and choose \"Add to Home Screen\".",
+      "step3": "Tap \"Add\" — PartyUp then opens full screen from your Home Screen.",
+      "close": "Got it"
+    }
+  },
+  "offline": {
+    "title": "You are offline. What you can see may be out of date until the connection returns."
+  }
+}

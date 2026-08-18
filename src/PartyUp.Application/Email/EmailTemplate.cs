@@ -20,4 +20,7 @@ public enum EmailTemplate
     PollInvitation = 15,
     SessionJoinRequestApproved = 16,
     PollJoinRequestApproved = 17,
+
+    // D-215: admin-facing, never sent to a member -- the one template with no unsubscribe footer.
+    AdminFeedbackSubmitted = 18,
 }
