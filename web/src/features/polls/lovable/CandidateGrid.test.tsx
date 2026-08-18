@@ -136,8 +136,10 @@ describe('CandidateGrid drag-to-paint', () => {
     fireEvent.pointerDown(cell, { button: 0, pointerType: 'mouse', clientY: 60 })
     fireEvent.pointerMove(window, { clientY: 15 })
 
-    // The anchor is the press, so dragging up paints 20:15–21:00.
-    expect(screen.getByTestId('candidate-paint-0')).toHaveTextContent('20:15–21:00')
+    // The anchor is the press, so dragging up paints toward 20:15 — snapped to
+    // the same 30-minute lattice a tap places on, the grid core's shared
+    // create/move step.
+    expect(screen.getByTestId('candidate-paint-0')).toHaveTextContent('20:30–21:00')
   })
 
   it('hands the painted length forward to the next tap_D211', () => {
@@ -351,7 +353,7 @@ describe('CandidateGrid resize handle', () => {
     render(<CandidateGrid {...props} />)
 
     const band = screen.getByTestId(`candidate-band-0-${RANGE_START}`)
-    const handle = band.querySelector('[aria-hidden="true"]') as HTMLElement
+    const handle = band.querySelector('button') as HTMLElement
     fireEvent.pointerDown(handle, { button: 0, pointerType: 'mouse' })
     // One pixel per minute (see `pinRects`): y=90 is 21:30, so this option
     // becomes 90 minutes long — and only this one.
@@ -371,7 +373,7 @@ describe('CandidateGrid resize handle', () => {
     render(<CandidateGrid {...props} />)
 
     const band = screen.getByTestId(`candidate-band-0-${RANGE_START}`)
-    const handle = band.querySelector('[aria-hidden="true"]') as HTMLElement
+    const handle = band.querySelector('button') as HTMLElement
     fireEvent.pointerDown(handle, { button: 0, pointerType: 'mouse' })
     fireEvent.pointerMove(window, { clientY: 90 })
     fireEvent.pointerUp(window)
@@ -406,7 +408,7 @@ describe('CandidateGrid touch gesture safety', () => {
     render(<CandidateGrid {...props} />)
 
     const band = screen.getByTestId(`candidate-band-0-${RANGE_START}`)
-    const handle = band.querySelector('[aria-hidden="true"]') as HTMLElement
+    const handle = band.querySelector('button') as HTMLElement
     fireEvent.pointerDown(handle, { button: 0, pointerType: 'mouse' })
     fireEvent.pointerMove(window, { clientY: 90 })
     fireEvent.pointerCancel(window)

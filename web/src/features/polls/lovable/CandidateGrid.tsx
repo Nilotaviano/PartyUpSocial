@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { GripHorizontal } from 'lucide-react'
 import { AvatarDisc } from '../../friends/AvatarDisc'
 import { cn } from '../../availability/lovable/utils'
+import { GridLines, ResizeHandle } from '../../availability/lovable/GridLayers'
+import { createGridGeometry, type GridBlock, type GridDrag } from '../../availability/lovable/gridEditing'
+import { useGridGestures, type GridBlockPressProps } from '../../availability/lovable/useGridGestures'
 import {
   ROW_H,
   SLOT_MIN,
@@ -16,19 +18,17 @@ import {
 import { candidateKey, type Candidate } from './pollData'
 
 /**
- * The poll candidate picker, built on the calendar `WeekGrid`'s model
- * (`../../availability/lovable/WeekGrid.tsx`): one continuous column per day
- * painted at `ROW_H` px per `SLOT_MIN` minutes, the same gridline background,
- * friend-chip bucketing and session pills, the same transparent ARIA-grid
- * layer on top — and, since D-211, the same press-and-drag paint gesture.
+ * The poll candidate picker, built on the shared grid core
+ * (`../../availability/lovable/gridEditing.ts`, `useGridGestures.ts`,
+ * `GridLayers.tsx`) that also drives the calendar's `WeekGrid`: the same
+ * `ROW_H`/`SLOT_MIN` pixel geometry, the same gridline background, and — since
+ * D-211 — the same press-and-drag paint gesture, long-press arm on touch,
+ * non-passive `touchmove` veto and window auto-scroll. The gesture mechanics
+ * are the core's, not a poll-local copy: this file owns only what a poll
+ * candidate *is*, never how a finger or a mouse edits one.
+ *
  * Dragging over empty space paints one candidate owning its own start *and*
  * end; there is no poll-wide duration for a band to reflow against.
- *
- * The gesture mechanics are `WeekGrid`'s verbatim, because iOS demands all
- * three together: a long press arms the paint on touch (a plain finger drag
- * must still scroll), a non-passive `touchmove` veto refuses the pan the
- * browser already granted, and a window auto-scroll keeps rows below the fold
- * reachable mid-drag.
  *
  * What differs from `WeekGrid`, deliberately:
  *  - The ARIA cell layer is the pointer target too (`pointer-events-auto`),
@@ -49,18 +49,6 @@ import { candidateKey, type Candidate } from './pollData'
  */
 
 export type { Candidate }
-
-const AUTO_SCROLL_EDGE_PX = 48
-const AUTO_SCROLL_STEP_PX = 16
-const AUTO_SCROLL_TICK_MS = 60
-
-const LONG_PRESS_MS = 380
-
-/**
- * A finger never holds perfectly still: only movement past this radius is a
- * real scroll reclaiming the gesture from a pending long press.
- */
-const MOVE_CANCEL_PX = 10
 
 /** Duration is edited in the same 15-minute increments D-131 validates. */
 const DURATION_STEP = SLOT_MIN
@@ -83,38 +71,6 @@ function freeFriends(friends: Friend[], day: number, start: number, durationMin:
     ),
   )
 }
-
-function snapTo(mins: number, unit: number) {
-  return Math.round(mins / unit) * unit
-}
-
-type Drag =
-  | {
-      mode: 'new'
-      day: number
-      anchor: number
-      a: number
-      b: number
-      /** A press that never extended past its anchor slot is a tap, not a paint. */
-      painted: boolean
-    }
-  | {
-      mode: 'move'
-      key: string
-      day: number
-      start: number
-      originStart: number
-      durationMinutes: number
-    }
-  | {
-      mode: 'duration'
-      key: string
-      day: number
-      bandStart: number
-      minutes: number
-      originMinutes: number
-    }
-  | null
 
 type Props = {
   days: number[]
@@ -164,8 +120,6 @@ export function CandidateGrid({
   onPageStep,
 }: Props) {
   const { t } = useTranslation('polls')
-  const [drag, setDrag] = useState<Drag>(null)
-  const [armed, setArmed] = useState(false)
   const [liveMessage, setLiveMessage] = useState('')
   /**
    * The length a tap places, and the one a painted band or a resize hands
@@ -175,16 +129,6 @@ export function CandidateGrid({
   const [placementDuration, setPlacementDuration] = useState(DEFAULT_DURATION_MIN)
   const rootRef = useRef<HTMLDivElement>(null)
   const columnsRef = useRef<HTMLDivElement>(null)
-  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const touchOrigin = useRef<{ x: number; y: number } | null>(null)
-  /**
-   * The committed drag is read from here, never from `drag`: a pointermove's
-   * render can still be pending when the pointerup lands, so every mutation
-   * writes this ref in the same DOM event that queues the state update.
-   */
-  const dragRef = useRef<Drag>(null)
-  /** Mirrors `armed` for the DOM-level `touchmove` veto, which cannot read state. */
-  const armedRef = useRef(false)
   /**
    * A pointer paint ends in a native `click` on the cell it started from, and
    * that click is the discrete tap path — so a committed paint has to swallow
@@ -194,94 +138,19 @@ export function CandidateGrid({
   const suppressClickOn = useRef<EventTarget | null>(null)
   /** The cell the live paint began on, so its own click can be swallowed. */
   const paintOrigin = useRef<EventTarget | null>(null)
-  const applyDrag = useCallback((next: Drag) => {
-    dragRef.current = next
-    setDrag(next)
-  }, [])
-
-  const cancelPress = useCallback(() => {
-    if (pressTimer.current) clearTimeout(pressTimer.current)
-    pressTimer.current = null
-    touchOrigin.current = null
-  }, [])
-
-  /**
-   * A gesture the browser takes back must leave nothing behind: no pending
-   * press, no armed state, and no in-flight paint, move or duration drag that
-   * a later pointerup would commit.
-   */
-  const abortGesture = useCallback(() => {
-    cancelPress()
-    armedRef.current = false
-    setArmed(false)
-    applyDrag(null)
-  }, [applyDrag, cancelPress])
-
-  /**
-   * iOS locks `touch-action` when a gesture starts, so flipping a class
-   * mid-gesture cannot stop the pan it already granted. Vetoing `touchmove`
-   * from a non-passive listener is the only scroll refusal it honors, and only
-   * while a press is pending or armed — a plain finger drag, and the tap that
-   * places a candidate, are untouched. It sits on the grid root rather than
-   * the painted columns because the pointer target is the ARIA cell layer,
-   * which is the columns' sibling, not their descendant.
-   */
-  useEffect(() => {
-    const el = rootRef.current
-    if (!el) return
-    const onTouchMove = (event: TouchEvent) => {
-      if (pressTimer.current === null && !armedRef.current) return
-      event.preventDefault()
-    }
-    el.addEventListener('touchmove', onTouchMove, { passive: false })
-    return () => el.removeEventListener('touchmove', onTouchMove)
-  }, [])
 
   const totalMin = rangeEnd - rangeStart
-  const height = (totalMin / SLOT_MIN) * ROW_H
-  const rowCount = Math.max(1, Math.round(totalMin / step))
   const full = capReached ?? candidates.length >= max
 
-  const top = useCallback((m: number) => ((m - rangeStart) / SLOT_MIN) * ROW_H, [rangeStart])
-  const hgt = useCallback((a: number, b: number) => ((b - a) / SLOT_MIN) * ROW_H, [])
-
-  const minutesOfRow = useCallback((row: number) => rangeStart + row * step, [rangeStart, step])
-
-  /**
-   * Gridlines are real elements, not a `repeating-linear-gradient`: iOS Safari
-   * rounds each gradient tile independently at fractional device pixel ratios,
-   * so the painted spacing drifts away from the hour labels and bands down the
-   * column. The same `top()` the labels use keeps them aligned by construction.
-   */
-  const gridLines = useMemo(() => {
-    const lines: { m: number; hour: boolean }[] = []
-    for (let m = rangeStart; m < rangeEnd; m += SLOT_MIN) lines.push({ m, hour: m % 60 === 0 })
-    return lines
-  }, [rangeStart, rangeEnd])
+  const geometry = useMemo(
+    () => createGridGeometry({ rangeStart, rangeEnd, slotMin: SLOT_MIN, rowH: ROW_H, rowStepMin: step }),
+    [rangeStart, rangeEnd, step],
+  )
+  const { pixelHeight: height, rowCount, top, span: hgt, minutesOfRow } = geometry
 
   const [focusCell, setFocusCell] = useState({ col: 0, row: 0 })
   const focusCol = clamp(focusCell.col, 0, Math.max(days.length - 1, 0))
   const focusRow = clamp(focusCell.row, 0, Math.max(rowCount - 1, 0))
-
-  const yToMin = useCallback(
-    (clientY: number, el: HTMLElement, unit: number) => {
-      const rect = el.getBoundingClientRect()
-      const raw = rangeStart + ((clientY - rect.top) / (rect.height || 1)) * totalMin
-      return clamp(snapTo(raw, unit), rangeStart, rangeEnd)
-    },
-    [rangeStart, rangeEnd, totalMin],
-  )
-
-  const onCreateRef = useRef(onCreate)
-  const onMoveRef = useRef(onMove)
-  const onResizeRef = useRef(onResize)
-  const onRemoveRef = useRef(onRemove)
-  useEffect(() => {
-    onCreateRef.current = onCreate
-    onMoveRef.current = onMove
-    onResizeRef.current = onResize
-    onRemoveRef.current = onRemove
-  })
 
   const announce = useCallback(
     (key: string, day: number, start: number, durationMinutes: number) =>
@@ -294,115 +163,54 @@ export function CandidateGrid({
     [t, labels],
   )
 
-  const columnOfDay = useCallback(
-    (day: number) => columnsRef.current?.querySelector<HTMLElement>(`[data-daycol="${day}"]`) ?? null,
-    [],
-  )
+  const byKey = useMemo(() => {
+    const map = new Map<string, Candidate>()
+    for (const c of candidates) map.set(candidateKey(c), c)
+    return map
+  }, [candidates])
 
-  // Global pointer handling while dragging. Keyed on whether a drag is live,
-  // never on the drag itself: re-running on every pointermove would restart
-  // the auto-scroll interval and throw away the pointer position it steers by.
-  const dragging = drag !== null
-  useEffect(() => {
-    if (!dragging) return
-    let pointerY: number | null = null
-    const columnOf = () =>
-      columnsRef.current?.querySelector<HTMLElement>(
-        `[data-daycol="${dragRef.current ? dragRef.current.day : ''}"]`,
-      )
-    const unitOf = (d: NonNullable<Drag>) => (d.mode === 'move' ? step : DURATION_STEP)
-    const extendTo = (m: number) => {
-      const d = dragRef.current
-      if (!d) return
-      if (d.mode === 'move') {
-        applyDrag({ ...d, start: m })
-      } else if (d.mode === 'duration') {
-        applyDrag({ ...d, minutes: Math.max(DURATION_STEP, m - d.bandStart) })
-      } else {
-        const a = Math.min(d.anchor, m)
-        const b = Math.max(d.anchor, m)
-        applyDrag({ ...d, a, b, painted: d.painted || b - a >= DURATION_STEP })
-      }
-    }
-    const move = (e: PointerEvent) => {
-      const col = columnOf()
-      const d = dragRef.current
-      if (!col || !d) return
-      pointerY = e.clientY
-      extendTo(yToMin(e.clientY, col, unitOf(d)))
-      e.preventDefault()
-    }
-    const autoScroll = setInterval(() => {
-      if (pointerY === null) return
-      const distanceToBottom = window.innerHeight - pointerY
-      const delta =
-        pointerY < AUTO_SCROLL_EDGE_PX
-          ? -AUTO_SCROLL_STEP_PX
-          : distanceToBottom < AUTO_SCROLL_EDGE_PX
-            ? AUTO_SCROLL_STEP_PX
-            : 0
-      if (delta === 0) return
-      window.scrollBy(0, delta)
-      const col = columnOf()
-      const d = dragRef.current
-      if (col && d) extendTo(yToMin(pointerY, col, unitOf(d)))
-    }, AUTO_SCROLL_TICK_MS)
-    const up = () => {
-      const d = dragRef.current
-      applyDrag(null)
-      setArmed(false)
-      armedRef.current = false
-      if (!d) return
-      if (d.mode === 'move') {
-        // A press that never moved is a tap on the band: it removes the
-        // candidate it landed on.
-        if (d.start === d.originStart) {
-          onRemoveRef.current({
-            day: d.day,
-            start: d.originStart,
-            durationMinutes: d.durationMinutes,
-          })
-          announce('a11y.candidateRemoved', d.day, d.originStart, d.durationMinutes)
-          return
-        }
-        onMoveRef.current(
-          { day: d.day, start: d.originStart, durationMinutes: d.durationMinutes },
-          { day: d.day, start: d.start, durationMinutes: d.durationMinutes },
-        )
-        announce('a11y.candidateMoved', d.day, d.start, d.durationMinutes)
-        return
-      }
-      if (d.mode === 'duration') {
-        if (d.minutes === d.originMinutes) return
-        onResizeRef.current(
-          { day: d.day, start: d.bandStart, durationMinutes: d.originMinutes },
-          d.minutes,
-        )
-        setPlacementDuration(d.minutes)
-        setLiveMessage(t('a11y.durationChanged', { minutes: d.minutes }))
-        return
-      }
-      // A paint that never grew past its anchor slot is a tap; the cell's own
-      // click handler places it, so this leaves it alone.
-      if (!d.painted) return
+  const gestures = useGridGestures({
+    columnsRef,
+    hostRef: rootRef,
+    rangeStart,
+    rangeEnd,
+    createStepMin: step,
+    resizeStepMin: DURATION_STEP,
+    minDurationMin: DURATION_STEP,
+    initialCreateMin: 0,
+    initialTouchCreateMin: 0,
+    moveEnabled: true,
+    resizeEnabled: true,
+    capReached: full,
+    onBlockCreate: (day, startMin, endMin, at) => {
+      void at
       suppressClickOn.current = paintOrigin.current
-      const durationMinutes = d.b - d.a
-      onCreateRef.current({ day: d.day, start: d.a, durationMinutes })
+      const durationMinutes = endMin - startMin
+      onCreate({ day, start: startMin, durationMinutes })
       setPlacementDuration(durationMinutes)
-      announce('a11y.candidateAdded', d.day, d.a, durationMinutes)
-    }
-    window.addEventListener('pointermove', move, { passive: false })
-    window.addEventListener('pointerup', up)
-    window.addEventListener('pointercancel', abortGesture)
-    return () => {
-      clearInterval(autoScroll)
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-      window.removeEventListener('pointercancel', abortGesture)
-    }
-  }, [abortGesture, announce, applyDrag, dragging, step, t, yToMin])
-
-  useEffect(() => cancelPress, [cancelPress])
+      announce('a11y.candidateAdded', day, startMin, durationMinutes)
+    },
+    onBlockMove: (blockId, day, startMin, endMin) => {
+      const from = byKey.get(blockId)
+      if (!from) return
+      onMove(from, { day, start: startMin, durationMinutes: endMin - startMin })
+      announce('a11y.candidateMoved', day, startMin, endMin - startMin)
+    },
+    onBlockResize: (blockId, startMin, endMin) => {
+      const c = byKey.get(blockId)
+      if (!c) return
+      const durationMinutes = endMin - startMin
+      onResize(c, durationMinutes)
+      setPlacementDuration(durationMinutes)
+      setLiveMessage(t('a11y.durationChanged', { minutes: durationMinutes }))
+    },
+    onBandTap: (blockId) => {
+      const c = byKey.get(blockId)
+      if (!c) return
+      onRemove(c)
+      announce('a11y.candidateRemoved', c.day, c.start, c.durationMinutes)
+    },
+  })
 
   const byDay = useMemo(() => {
     const map = new Map<number, Candidate[]>()
@@ -436,42 +244,6 @@ export function CandidateGrid({
     const durationMinutes = clamp(placementDuration, DURATION_STEP, Math.max(totalMin, DURATION_STEP))
     onCreate({ day, start: m, durationMinutes })
     announce('a11y.candidateAdded', day, m, durationMinutes)
-  }
-
-  /** The empty-space press that paints a band, on the cell layer above a column. */
-  function onCellPointerDown(e: React.PointerEvent<HTMLDivElement>, day: number) {
-    if (e.button === 2) return
-    suppressClickOn.current = null
-    if (full) return
-    const column = columnOfDay(day)
-    if (!column) return
-    paintOrigin.current = e.currentTarget
-    const clientY = e.clientY
-    const begin = () => {
-      const m = yToMin(clientY, column, step)
-      applyDrag({ mode: 'new', day, anchor: m, a: m, b: m, painted: false })
-    }
-    if (e.pointerType === 'touch') {
-      // A plain finger drag must scroll the page: painting takes a long press,
-      // exactly as the calendar requires.
-      touchOrigin.current = { x: e.clientX, y: clientY }
-      pressTimer.current = setTimeout(() => {
-        pressTimer.current = null
-        touchOrigin.current = null
-        armedRef.current = true
-        setArmed(true)
-        if (navigator.vibrate) navigator.vibrate(12)
-        begin()
-      }, LONG_PRESS_MS)
-      return
-    }
-    begin()
-  }
-
-  function onPointerMoveWithinPress(e: React.PointerEvent) {
-    const origin = touchOrigin.current
-    if (!origin) return
-    if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > MOVE_CANCEL_PX) cancelPress()
   }
 
   function moveFocus(col: number, row: number) {
@@ -549,14 +321,13 @@ export function CandidateGrid({
   for (let m = rangeStart; m <= rangeEnd; m += 60) hours.push(m)
 
   const gridTemplate = `56px repeat(${days.length}, minmax(0,1fr))`
-  const gestureLive = armed || drag !== null
 
   return (
     <div
       ref={rootRef}
       className="relative min-w-0"
       data-candidate-grid-root
-      data-touch-dragging={gestureLive}
+      data-touch-dragging={gestures.active}
     >
       {/* header row */}
       <div className="sticky top-0 z-30 -mx-1 bg-card px-1 pt-2 pb-2">
@@ -617,8 +388,9 @@ export function CandidateGrid({
             }
 
             const isToday = day === todayIndex
+            const livePreview = gestures.previewFor(day)
             const paint =
-              drag && drag.mode === 'new' && drag.day === day && drag.painted ? drag : null
+              livePreview && livePreview.mode === 'create' && livePreview.painted ? livePreview : null
 
             return (
               <div
@@ -627,24 +399,11 @@ export function CandidateGrid({
                 className={cn(
                   'relative overflow-hidden rounded-2xl border bg-card select-none',
                   isToday ? 'border-primary' : 'border-border',
-                  gestureLive ? 'touch-none' : 'touch-pan-y',
+                  gestures.active ? 'touch-none' : 'touch-pan-y',
                 )}
                 style={{ height }}
               >
-                {/* gridlines */}
-                <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-                  {gridLines.map((line) => (
-                    <div
-                      key={line.m}
-                      className="absolute inset-x-0 h-px"
-                      data-gridline={line.hour ? 'hour' : 'quarter'}
-                      style={{
-                        top: top(line.m),
-                        background: line.hour ? 'var(--grid-hour)' : 'var(--grid-line)',
-                      }}
-                    />
-                  ))}
-                </div>
+                <GridLines geometry={geometry} />
 
                 {/* friends' availability chips */}
                 {[...buckets.entries()].map(([startKey, group]) => {
@@ -709,11 +468,18 @@ export function CandidateGrid({
                 {/* candidate bands */}
                 {dayCandidates.map((c, index) => {
                   const key = candidateKey(c)
-                  const liveStart = drag && drag.mode === 'move' && drag.key === key ? drag.start : c.start
-                  const liveDuration =
-                    drag && drag.mode === 'duration' && drag.key === key
-                      ? drag.minutes
-                      : c.durationMinutes
+                  const block: GridBlock = {
+                    id: key,
+                    day: c.day,
+                    startMin: c.start,
+                    endMin: c.start + c.durationMinutes,
+                  }
+                  const live: GridDrag | null =
+                    livePreview && livePreview.mode !== 'create' && livePreview.blockId === key
+                      ? livePreview
+                      : null
+                  const liveStart = live ? live.a : c.start
+                  const liveDuration = live ? live.b - live.a : c.durationMinutes
                   const depth = dayCandidates
                     .slice(0, index)
                     .filter((other) => other.start + other.durationMinutes > c.start).length
@@ -735,58 +501,13 @@ export function CandidateGrid({
                       }}
                       onNudge={(deltaDays, deltaMinutes) => nudgeBand(c, deltaDays, deltaMinutes)}
                       onDurationNudge={(delta) => nudgeDuration(c, delta)}
-                      onBodyPointerDown={(e) => {
-                        if (e.button === 2) return
-                        e.stopPropagation()
+                      pressProps={gestures.blockPressProps(block)}
+                      onBodyPointerDown={() => {
                         suppressClickOn.current = null
-                        const begin = () =>
-                          applyDrag({
-                            mode: 'move',
-                            key,
-                            day: c.day,
-                            start: c.start,
-                            originStart: c.start,
-                            durationMinutes: c.durationMinutes,
-                          })
-                        if (e.pointerType === 'touch') {
-                          // A plain finger drag must scroll the page: moving a
-                          // band takes a long press, as the calendar requires
-                          // for painting.
-                          touchOrigin.current = { x: e.clientX, y: e.clientY }
-                          pressTimer.current = setTimeout(() => {
-                            pressTimer.current = null
-                            touchOrigin.current = null
-                            armedRef.current = true
-                            setArmed(true)
-                            if (navigator.vibrate) navigator.vibrate(12)
-                            begin()
-                          }, LONG_PRESS_MS)
-                          return
-                        }
-                        begin()
                       }}
-                      onBodyPointerMove={onPointerMoveWithinPress}
-                      onBodyPointerCancel={abortGesture}
-                      onBodyPointerUp={() => {
-                        // Touch tap: the long press never fired, so this is a
-                        // plain tap and removes the band.
-                        if (pressTimer.current) {
-                          cancelPress()
-                          onRemove(c)
-                          announce('a11y.candidateRemoved', c.day, c.start, c.durationMinutes)
-                        }
-                      }}
-                      onHandlePointerDown={(e) => {
-                        e.stopPropagation()
+                      resizeHandleProps={gestures.resizeHandleProps(block, 'end')}
+                      onHandlePointerDown={() => {
                         suppressClickOn.current = null
-                        applyDrag({
-                          mode: 'duration',
-                          key,
-                          day: c.day,
-                          bandStart: c.start,
-                          minutes: c.durationMinutes,
-                          originMinutes: c.durationMinutes,
-                        })
                       }}
                       resizeLabel={t('create.grid.resizeDuration')}
                       bandLabel={t('a11y.candidateBand', {
@@ -826,7 +547,7 @@ export function CandidateGrid({
           aria-rowcount={rowCount}
           className={cn(
             'pointer-events-none absolute inset-0 grid',
-            gestureLive && 'touch-none',
+            gestures.active && 'touch-none',
           )}
           role="grid"
           style={{ gridTemplateRows: `repeat(${rowCount}, ${(step / SLOT_MIN) * ROW_H}px)` }}
@@ -853,6 +574,16 @@ export function CandidateGrid({
                 const isFocus = col === focusCol && row === focusRow
                 const free = freeFriends(friends, day, m, placementDuration)
                 const disabled = !covering && full
+                // `columnProps` also carries `data-daycol`, which belongs on the
+                // painted day column (above), never duplicated onto every one
+                // of its per-row ARIA cells.
+                const cellGestures = gestures.columnProps(day)
+                const columnGestureProps = {
+                  onPointerUp: cellGestures.onPointerUp,
+                  onPointerCancel: cellGestures.onPointerCancel,
+                  onPointerMove: cellGestures.onPointerMove,
+                  onContextMenu: cellGestures.onContextMenu,
+                }
                 return (
                   <div
                     key={day}
@@ -885,6 +616,7 @@ export function CandidateGrid({
                     data-testid={`candidate-slot-${day}-${m}`}
                     role="gridcell"
                     tabIndex={isFocus ? 0 : -1}
+                    {...columnGestureProps}
                     onClick={(e) => {
                       if (suppressClickOn.current === e.currentTarget) {
                         suppressClickOn.current = null
@@ -892,12 +624,12 @@ export function CandidateGrid({
                       }
                       placeAt(day, m)
                     }}
-                    onContextMenu={(e) => e.preventDefault()}
                     onFocus={() => setFocusCell({ col, row })}
-                    onPointerCancel={abortGesture}
-                    onPointerDown={(e) => onCellPointerDown(e, day)}
-                    onPointerMove={onPointerMoveWithinPress}
-                    onPointerUp={cancelPress}
+                    onPointerDown={(e) => {
+                      suppressClickOn.current = null
+                      paintOrigin.current = e.currentTarget
+                      cellGestures.onPointerDown(e)
+                    }}
                   />
                 )
               })}
@@ -925,10 +657,9 @@ function CandidateBand({
   onRemove,
   onNudge,
   onDurationNudge,
+  pressProps,
   onBodyPointerDown,
-  onBodyPointerMove,
-  onBodyPointerUp,
-  onBodyPointerCancel,
+  resizeHandleProps,
   onHandlePointerDown,
 }: {
   candidate: Candidate
@@ -942,11 +673,10 @@ function CandidateBand({
   onRemove: () => void
   onNudge: (deltaDays: number, deltaMinutes: number) => void
   onDurationNudge: (delta: number) => void
-  onBodyPointerDown: (e: React.PointerEvent) => void
-  onBodyPointerMove: (e: React.PointerEvent) => void
-  onBodyPointerUp: () => void
-  onBodyPointerCancel: () => void
-  onHandlePointerDown: (e: React.PointerEvent) => void
+  pressProps: GridBlockPressProps
+  onBodyPointerDown: () => void
+  resizeHandleProps: { onPointerDown: (e: React.PointerEvent<HTMLElement>) => void }
+  onHandlePointerDown: () => void
 }) {
   return (
     <div
@@ -977,24 +707,25 @@ function CandidateBand({
           onNudge(e.key === 'ArrowLeft' ? -1 : 1, 0)
         }
       }}
-      onPointerDown={onBodyPointerDown}
-      onPointerMove={onBodyPointerMove}
-      onPointerUp={onBodyPointerUp}
-      onPointerCancel={onBodyPointerCancel}
+      {...pressProps}
+      onPointerDown={(e) => {
+        onBodyPointerDown()
+        pressProps.onPointerDown(e)
+      }}
     >
       <span className="font-display text-[11px] leading-tight font-bold tabular-nums">
         {fmtRange(start, start + durationMin)}
       </span>
-      {/* Pointer-only affordance: the band's own Shift+Arrow keys are the
-          keyboard path, so this stays out of the tab order entirely. */}
-      <span
-        aria-hidden="true"
-        className="absolute -bottom-2 left-1/2 grid h-5 w-11 -translate-x-1/2 cursor-ns-resize touch-none place-items-center rounded-full border-2 border-primary bg-card"
-        title={resizeLabel}
-        onPointerDown={onHandlePointerDown}
-      >
-        <GripHorizontal className="size-3.5 text-ink" />
-      </span>
+      <ResizeHandle
+        position="bottom"
+        label={resizeLabel}
+        stepMin={DURATION_STEP}
+        onNudge={onDurationNudge}
+        onPointerDown={(e) => {
+          onHandlePointerDown()
+          resizeHandleProps.onPointerDown(e)
+        }}
+      />
     </div>
   )
 }

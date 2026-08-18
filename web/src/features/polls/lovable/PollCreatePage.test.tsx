@@ -703,7 +703,10 @@ describe('PollCreatePage (lovable)', () => {
     fireEvent.click(slots[1])
 
     const grid = screen.getByTestId('candidate-grid')
-    const bands = () => within(grid).getAllByRole('button')
+    // Each band's own bottom resize handle is a `button` too, so a role query
+    // here would also catch it — the `candidate-band-*` testid names the band
+    // itself.
+    const bands = () => within(grid).getAllByTestId(/^candidate-band-/)
     // Shift+Arrow is the resize handle's keyboard equivalent: it changes this
     // one option's length, in D-131's 15-minute increments.
     fireEvent.keyDown(bands()[0], { key: 'ArrowDown', shiftKey: true })
