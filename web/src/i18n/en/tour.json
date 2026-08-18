@@ -11,6 +11,10 @@
       "name": "Friends",
       "body": "Add friends by code or link — PartyUp is friends-first."
     },
+    "groups": {
+      "name": "Groups",
+      "body": "Name a squad and share sessions and polls with everyone in it at once."
+    },
     "sessions": {
       "name": "Sessions",
       "body": "Plan game nights at a fixed time, with RSVPs and a waitlist."

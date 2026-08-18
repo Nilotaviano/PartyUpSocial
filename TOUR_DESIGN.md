@@ -12,25 +12,26 @@ Scope = a first-login walkthrough of the app chrome (owner-requested 2026-08-09)
 
 ## 2. Stops
 
-Eight, in nav order, each one sentence, in a new `tour` i18n namespace (en/pt-BR/es in the same commit; the namespace registers in `src/i18n/index.ts` AND in `i18n.keys.test.ts`'s hard-coded namespace array — without the latter the key-parity gate silently skips the new keys). Anchors are the shipped chrome elements only — the tour never leaves `/app` and never depends on page content below the header.
+Nine, in nav order, each one sentence, in a new `tour` i18n namespace (en/pt-BR/es in the same commit; the namespace registers in `src/i18n/index.ts` AND in `i18n.keys.test.ts`'s hard-coded namespace array — without the latter the key-parity gate silently skips the new keys). Anchors are the shipped chrome elements only — the tour never leaves `/app` and never depends on page content below the header.
 
 | # | Anchor (shipped element) | Teaching |
 |---|---|---|
 | 1 | Home link (`App.tsx:56`) | Dashboard: what needs attention, what's next |
 | 2 | Friends | Add friends by code or link; the app is friends-first |
-| 3 | Sessions | Plan game nights: fixed time, RSVPs, waitlist |
-| 4 | Polls | Vote on times; the winner becomes a session |
-| 5 | Calendar | Paint when you're free so finding a shared time is easy |
-| 6 | Discover (`App.tsx:113-124`) | Find joinable sessions friends have made visible to you (D-149/D-018 visibility — no stranger discovery, D-004) |
-| 7 | Notifications bell (`NotificationBell`) | Invites and updates land here; push is opt-in in settings |
-| 8 | Account menu trigger (`AccountMenu`'s avatar button) | Settings and sign-out live behind the avatar; the tour is replayable from settings |
+| 3 | Groups (D-198..D-210) | Name a squad and share sessions/polls with everyone in it at once |
+| 4 | Sessions | Plan game nights: fixed time, RSVPs, waitlist |
+| 5 | Polls | Vote on times; the winner becomes a session |
+| 6 | Calendar | Paint when you're free so finding a shared time is easy |
+| 7 | Discover (`App.tsx:113-124`) | Find joinable sessions friends have made visible to you (D-149/D-018 visibility — no stranger discovery, D-004) |
+| 8 | Notifications bell (`NotificationBell`) | Invites and updates land here; push is opt-in in settings |
+| 9 | Account menu trigger (`AccountMenu`'s avatar button) | Settings and sign-out live behind the avatar; the tour is replayable from settings |
 
 D-183 moved this stop's anchor from the settings `NavLink` to the account-menu **trigger**: menu items are absent from the DOM while the menu is closed, so the tour must never depend on an open menu. Step count and the `settings` step id are unchanged.
 
 ## 3. Mechanics (web only, no new packages — two components don't justify a dependency)
 
 - **`web/src/features/tour/`**: `TourOverlay` built on the shipped Radix dialog primitive (`components/ui/dialog.tsx`), mounted once in `AuthenticatedShell`, rendering only when `location.pathname === '/app'` and the §1 gate holds. The primitive's dialog semantics and focus trap carry the load, with two **explicit overrides** (Radix defaults differ): `onInteractOutside` prevented (dimmer clicks do nothing — Skip is the explicit exit) and `onCloseAutoFocus` targeted at the Home link (no trigger element exists to restore to); Esc stays at its default (skips). Every step renders `Dialog.Title` ("Step n of 8: {stop name}") + `Dialog.Description` (blurb) — the shipped Title+Description shape (`FriendList.tsx:62-70`, `ReauthPrompt.tsx:167-175`) and what axe's dialog-name rule wants.
-- **Anchors:** `data-tour="..."` attributes on the eight chrome elements (`NotificationBell.tsx`'s `NavLink` — the fragment's first child — included; that file joins the write set). A deliberate second selector namespace: `data-testid` stays test-only, tour anchors are product markup.
+- **Anchors:** `data-tour="..."` attributes on the nine chrome elements (`NotificationBell.tsx`'s `NavLink` — the fragment's first child — included; that file joins the write set). A deliberate second selector namespace: `data-testid` stays test-only, tour anchors are product markup.
 - **Spotlight:** active anchor scrolled into view (the nav scrolls horizontally on small screens, `App.tsx:64`; `behavior: 'auto'` under `prefers-reduced-motion`, smooth otherwise) and lifted above the scrim (z-index + `outline-focus`-token ring, Tabletop Club tokens). Never color alone: ring + position + card arrow. **AT note:** `aria-modal` makes the spotlit item unreachable to assistive tech while open — by design; `Dialog.Title`/`Description` carry the full teaching, the spotlight is visual reinforcement.
 - **Step changes** inside the open dialog announce via the Title/Description content living in an `aria-live="polite"` wrapper (content swap in an open dialog is not re-announced by itself). Spotlight/card movement transitions sit under `motion-safe:` like the primitive's own animation.
 - **State:** step index local; `tourCompleted` rides the profile query already fetched on `/app` (no extra request).
@@ -43,7 +44,9 @@ D-183 moved this stop's anchor from the settings `NavLink` to the account-menu *
 
 ## 5. Spec change (proposed, needs ratification with this doc)
 
-> **D-182** — After onboarding, a registered account's first visit to the app home starts a skippable 8-stop tour of the app chrome. Finishing or skipping marks the tour completed for the **account** (any device); it never auto-shows again. The tour is replayable from account settings. Accounts that had **completed onboarding** before the feature ships are treated as completed. | Confirmed
+> **D-182** — After onboarding, a registered account's first visit to the app home starts a skippable 9-stop tour of the app chrome. Finishing or skipping marks the tour completed for the **account** (any device); it never auto-shows again. The tour is replayable from account settings. Accounts that had **completed onboarding** before the feature ships are treated as completed. | Confirmed
+>
+> Updated post-ship for D-198..D-210 (friend groups): a "Groups" stop was inserted after "Friends", bringing the count from eight to nine. `AccountMenu` trigger note and every other stop's mechanics are unchanged.
 
 PRODUCT_SPEC.md gains this row (Confirmed on ratification, T2's docs work); TRACEABILITY.md gains the D-182 row citing this feature's tests.
 

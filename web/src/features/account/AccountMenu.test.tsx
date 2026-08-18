@@ -56,7 +56,7 @@ afterEach(() => {
 })
 
 describe('AccountMenu — trigger (D183)', () => {
-  it('carries data-tour="settings" on the trigger so the D-182 tour keeps its eighth anchor_D183', async () => {
+  it('carries data-tour="settings" on the trigger so the D-182 tour keeps its final anchor_D183', async () => {
     mockProfile()
     renderMenu()
 

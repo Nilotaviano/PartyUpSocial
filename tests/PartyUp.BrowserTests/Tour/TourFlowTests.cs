@@ -44,23 +44,23 @@ public sealed class TourFlowTests(PlaywrightFixture fixture)
 
     /// <summary>
     /// TOUR_DESIGN.md §3: Radix's own focus trap puts the first tabbable footer control (Skip) under
-    /// focus on open; one more Tab reaches Next/Finish — this walks all eight stops with Tab+Enter
+    /// focus on open; one more Tab reaches Next/Finish — this walks all nine stops with Tab+Enter
     /// alone, never a mouse click, ending on the real completion POST via Finish.
     /// </summary>
     [Fact]
-    public async Task KeyboardOnly_WalksAllEightStopsViaReplayAndFinishes_D182()
+    public async Task KeyboardOnly_WalksAllNineStopsViaReplayAndFinishes_D182()
     {
         RegisteredUser user = await GetUserAsync();
         await OpenViaReplayAsync(user.Page);
 
         string[] expectedNames =
         [
-            "Home", "Friends", "Sessions", "Polls", "Calendar", "Discover", "Notifications", "Settings",
+            "Home", "Friends", "Groups", "Sessions", "Polls", "Calendar", "Discover", "Notifications", "Settings",
         ];
 
         for (int step = 0; step < expectedNames.Length - 1; step++)
         {
-            await user.Page.GetByText($"Step {step + 1} of 8: {expectedNames[step]}").WaitForAsync();
+            await user.Page.GetByText($"Step {step + 1} of 9: {expectedNames[step]}").WaitForAsync();
             if (step == 0)
             {
                 // Skip is the first tabbable footer control (Radix's own open-focus default); one
@@ -74,7 +74,7 @@ public sealed class TourFlowTests(PlaywrightFixture fixture)
             await user.Page.Keyboard.PressAsync("Enter");
         }
 
-        await user.Page.GetByText($"Step {expectedNames.Length} of 8: {expectedNames[^1]}").WaitForAsync();
+        await user.Page.GetByText($"Step {expectedNames.Length} of 9: {expectedNames[^1]}").WaitForAsync();
 
         // Focus is already retained on the same button (now labeled "Finish") from the last Enter
         // above — no Tab needed. The response barrier wraps the Enter that presses it — arming the
@@ -99,7 +99,7 @@ public sealed class TourFlowTests(PlaywrightFixture fixture)
     /// degenerate rects make this unprovable in vitest). A full-width viewport keeps every anchor
     /// on-screen (the fixed 5-tab bottom bar and compact TopBar clip nothing at this width), so
     /// this is purely a geometry check: the card actually moves across three stops
-    /// (Home and Settings at the two clamped horizontal extremes, Polls — step 4 — in the
+    /// (Home and Settings at the two clamped horizontal extremes, Polls — step 5 — in the
     /// unclamped middle of the nav row, closing the blind spot the two-extreme version left), and
     /// each sampled position mirrors <see cref="AssertCardCenteredOnAnchor"/>'s copy of
     /// `computeCardPosition`'s own clamped-center-under-anchor arithmetic for its anchor. Also
@@ -138,12 +138,12 @@ public sealed class TourFlowTests(PlaywrightFixture fixture)
 
         await AssertNotClippedAsync("Home");
 
-        for (int step = 0; step < 3; step++)
+        for (int step = 0; step < 4; step++)
         {
             await user.Page.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
         }
 
-        await user.Page.GetByText("Step 4 of 8: Polls").WaitForAsync();
+        await user.Page.GetByText("Step 5 of 9: Polls").WaitForAsync();
         await Assertions.Expect(pollsAnchor).ToBeInViewportAsync();
         double pollsAnchorCenterX = await AnchorCenterXAsync(pollsAnchor);
         double pollsCardCenterX = await StableCardCenterXAsync(user.Page);
@@ -154,7 +154,7 @@ public sealed class TourFlowTests(PlaywrightFixture fixture)
             await user.Page.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
         }
 
-        await user.Page.GetByText("Step 8 of 8: Settings").WaitForAsync();
+        await user.Page.GetByText("Step 9 of 9: Settings").WaitForAsync();
         await Assertions.Expect(settingsAnchor).ToBeInViewportAsync();
         double settingsAnchorCenterX = await AnchorCenterXAsync(settingsAnchor);
         double settingsCardCenterX = await StableCardCenterXAsync(user.Page);

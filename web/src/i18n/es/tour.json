@@ -11,6 +11,10 @@
       "name": "Amigos",
       "body": "Agrega amigos por código o enlace — PartyUp está pensado para amigos."
     },
+    "groups": {
+      "name": "Grupos",
+      "body": "Crea un grupo y comparte sesiones y encuestas con todas las personas del grupo a la vez."
+    },
     "sessions": {
       "name": "Sesiones",
       "body": "Organiza noches de juego a una hora fija, con confirmaciones y lista de espera."

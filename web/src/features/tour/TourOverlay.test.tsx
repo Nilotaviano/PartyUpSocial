@@ -19,6 +19,7 @@ Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: t
 const STEP_NAMES = [
   'Home',
   'Friends',
+  'Groups',
   'Sessions',
   'Polls',
   'Calendar',
@@ -38,6 +39,7 @@ function ChromeStub() {
     <nav>
       <a data-tour="home" href="/app" tabIndex={-1}>Home</a>
       <a data-tour="friends" href="/friends" tabIndex={-1}>Friends</a>
+      <a data-tour="groups" href="/groups" tabIndex={-1}>Groups</a>
       <a data-tour="sessions" href="/sessions" tabIndex={-1}>Sessions</a>
       <a data-tour="polls" href="/polls" tabIndex={-1}>Polls</a>
       <a data-tour="calendar" href="/calendar" tabIndex={-1}>Calendar</a>
@@ -122,7 +124,7 @@ describe('TourOverlay — §1 gate (D-182)', () => {
     renderOverlay()
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByText('Step 1 of 8: Home')).toBeInTheDocument()
+    expect(screen.getByText('Step 1 of 9: Home')).toBeInTheDocument()
   })
 
   it('never renders outside /app even with a gate-satisfying profile', async () => {
@@ -135,7 +137,7 @@ describe('TourOverlay — §1 gate (D-182)', () => {
 })
 
 describe('TourOverlay — step order (D-182)', () => {
-  it('walks all eight stops in nav order, Discover included at position 6', async () => {
+  it('walks all nine stops in nav order, Groups after Friends and Discover included at position 7', async () => {
     mockProfile(false)
     renderOverlay()
 
@@ -143,7 +145,7 @@ describe('TourOverlay — step order (D-182)', () => {
     for (let index = 0; index < STEP_NAMES.length; index++) {
       const name = STEP_NAMES[index]
       expect(
-        screen.getByText(`Step ${index + 1} of 8: ${name}`),
+        screen.getByText(`Step ${index + 1} of 9: ${name}`),
       ).toBeInTheDocument()
       if (index < STEP_NAMES.length - 1) {
         fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -417,7 +419,7 @@ describe('TourOverlay — Replay (D-182)', () => {
     renderOverlay({ pathname: '/app', state: { replayTour: true } })
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByText('Step 1 of 8: Home')).toBeInTheDocument()
+    expect(screen.getByText('Step 1 of 9: Home')).toBeInTheDocument()
 
     // Router-native consumption: `navigate(pathname, { replace: true, state: null })`, not a raw
     // `history.replaceState` — the state is gone from `useLocation()` after the open completes.
