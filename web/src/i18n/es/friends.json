@@ -1,33 +1,33 @@
 {
   "pages": {
-    "list": "Amistades",
+    "list": "Amigos",
     "listEyebrow": "Grupo",
     "listDescription": "Con quién juegas, y cómo hacer crecer el grupo.",
     "profile": "Perfil",
-    "add": "Agregar amistad",
-    "importSteam": "Buscar amistades de Steam",
+    "add": "Agregar amigo",
+    "importSteam": "Buscar amigos de Steam",
     "blocked": "Usuarios bloqueados",
-    "backToFriends": "Volver a amistades"
+    "backToFriends": "Volver a amigos"
   },
   "sections": {
-    "friends": "Amistades",
+    "friends": "Amigos",
     "incoming": "Solicitudes recibidas",
     "outgoing": "Solicitudes enviadas",
-    "share": "Comparte con amistades",
+    "share": "Comparte con amigos",
     "findByCode": "Buscar por código de amistad"
   },
   "actions": {
-    "addFriend": "Agregar amistad",
+    "addFriend": "Agregar amigo",
     "sendRequest": "Enviar solicitud de amistad",
-    "resolve": "Buscar amistad",
+    "resolve": "Buscar amigo",
     "accept": "Aceptar solicitud",
     "reject": "Rechazar solicitud",
     "cancelRequest": "Cancelar solicitud",
-    "unfriend": "Eliminar amistad",
-    "confirmUnfriend": "Eliminar amistad",
+    "unfriend": "Eliminar amigo",
+    "confirmUnfriend": "Eliminar amigo",
     "block": "Bloquear",
     "unblock": "Desbloquear",
-    "importSteam": "Buscar amistades de Steam",
+    "importSteam": "Buscar amigos de Steam",
     "retry": "Intentar de nuevo",
     "copyCode": "Copiar código de amistad",
     "copyAddLink": "Copiar enlace para agregar",
@@ -50,30 +50,30 @@
     "none": "Sin conexión",
     "pendingIncoming": "Solicitud recibida",
     "pendingOutgoing": "Solicitud enviada",
-    "friends": "Amistades",
+    "friends": "Amigos",
     "requestSent": "Solicitud de amistad enviada.",
     "requestAccepted": "Solicitud de amistad aceptada.",
     "requestRejected": "Solicitud de amistad rechazada.",
     "requestCanceled": "Solicitud de amistad cancelada.",
-    "unfriended": "Amistad eliminada.",
+    "unfriended": "Amigo eliminado.",
     "blocked": "Usuario bloqueado.",
     "unblocked": "Usuario desbloqueado."
   },
   "empty": {
-    "friends": "Aún no tienes amistades.",
+    "friends": "Aún no tienes amigos.",
     "incoming": "No hay solicitudes recibidas.",
     "outgoing": "No hay solicitudes enviadas.",
     "blocked": "No hay usuarios bloqueados.",
-    "blockedHelp": "Bloquea personas desde un perfil o una tarjeta de amistad. No podrán encontrarte ni contactarte mientras estén bloqueadas."
+    "blockedHelp": "Bloquea personas desde un perfil o una tarjeta de amigo. No podrán encontrarte ni contactarte mientras estén bloqueadas."
   },
   "profile": {
-    "usernameOnly": "Solo se muestra este nombre de usuario hasta que sean amistades.",
+    "usernameOnly": "Solo se muestra este nombre de usuario hasta que sean amigos.",
     "notFound": "No se encontró este perfil.",
     "platforms": "Plataformas de juego vinculadas",
     "blockConsequence": "Bloquear elimina la conexión y la participación compartida. La otra persona no recibe una notificación."
   },
   "share": {
-    "addLinkDescription": "Comparte este enlace para que una amistad te encuentre por código.",
+    "addLinkDescription": "Comparte este enlace para que un amigo te encuentre por código.",
     "profileLinkDescription": "Comparte este enlace a tu perfil de PartyUp."
   },
   "qr": {
@@ -81,27 +81,27 @@
   },
   "dialogs": {
     "unfriendTitle": "¿Eliminar a {{username}}?",
-    "unfriendBody": "Ya no aparecerán en sus respectivas listas de amistades. Las sesiones compartidas no cambian."
+    "unfriendBody": "Ya no aparecerán en sus respectivas listas de amigos. Las sesiones compartidas no cambian."
   },
   "steam": {
-    "readyTitle": "Amistades de Steam encontradas",
-    "privateTitle": "Tu lista de amistades de Steam es privada",
+    "readyTitle": "Amigos de Steam encontrados",
+    "privateTitle": "Tu lista de amigos de Steam es privada",
     "privateHelp": "Abrir la configuración de privacidad de Steam en una pestaña nueva",
-    "zeroFriendsTitle": "No se encontraron amistades de Steam",
-    "zeroFriendsBody": "Steam devolvió una lista de amistades vacía.",
+    "zeroFriendsTitle": "No se encontraron amigos de Steam",
+    "zeroFriendsBody": "Steam devolvió una lista de amigos vacía.",
     "zeroMatchesTitle": "Aún no hay coincidencias en PartyUp",
-    "zeroMatchesBody": "Comparte tu enlace de invitación con tus amistades de Steam.",
+    "zeroMatchesBody": "Comparte tu enlace de invitación con tus amigos de Steam.",
     "notConfiguredTitle": "La importación de Steam no está disponible",
     "notConfiguredBody": "Inténtalo más tarde o comparte tu enlace de invitación.",
     "upstreamFailureTitle": "No se pudo acceder a Steam",
     "upstreamFailureBody": "Vuelve a intentar la importación en un momento.",
     "matchDescription": "Cuenta de PartyUp: @{{username}}",
-    "unmatchedDescription": "Amistad de Steam aún no encontrada en PartyUp"
+    "unmatchedDescription": "Amigo de Steam aún no encontrado en PartyUp"
   },
   "onboarding": {
-    "title": "Comienza con amistades",
-    "body": "Encontrar amistades es opcional. Comparte tu código, busca a alguien o continúa a PartyUp.",
-    "continuation": "La amistad que abriste",
+    "title": "Comienza con amigos",
+    "body": "Encontrar amigos es opcional. Comparte tu código, busca a alguien o continúa a PartyUp.",
+    "continuation": "El amigo que abriste",
     "steamOptional": "La importación de Steam es opcional y siempre requiere una acción explícita.",
     "refreshFailed": "Tu perfil está activo, pero PartyUp no pudo actualizar tu sesión segura."
   },

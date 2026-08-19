@@ -300,7 +300,7 @@ describe('AppNavigationTests', () => {
     ],
     [
       'es',
-      'Amistades',
+      'Amigos',
       'Menú de la cuenta',
       'Configuración',
       'Sesiones',

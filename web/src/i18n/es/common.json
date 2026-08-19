@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "PartyUp",
-    "tagline": "Encuentra tiempo para jugar con tus amistades."
+    "tagline": "Encuentra tiempo para jugar con tus amigos."
   },
   "common": {
     "loading": "Cargando...",
@@ -11,7 +11,7 @@
     "label": "Navegación principal",
     "tabBarLabel": "Pestañas de secciones",
     "home": "Inicio",
-    "friends": "Amistades",
+    "friends": "Amigos",
     "settings": "Configuración",
     "skipToContent": "Saltar al contenido principal"
   },

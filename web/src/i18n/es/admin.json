@@ -62,7 +62,7 @@
       "lastActivity": "Última actividad",
       "sessionsOrganized": "Sesiones organizadas",
       "sessionsJoined": "Sesiones en las que participó",
-      "friendCount": "Amistades",
+      "friendCount": "Amigos",
       "lifecycle": "Situación de la cuenta",
       "banState": "Situación del veto"
     },
@@ -116,7 +116,7 @@
       "handled": "Estado",
       "all": "Todos",
       "handledOnly": "Atendidos",
-      "unhandledOnly": "Sin atender"
+      "unhandledOnly": "No atendidos"
     },
     "types": {
       "bug": "Error",
@@ -138,7 +138,7 @@
       "none": "No adjuntado"
     },
     "markHandled": "Marcar como atendido",
-    "markUnhandled": "Marcar como sin atender",
+    "markUnhandled": "Marcar como no atendido",
     "pagination": {
       "previous": "Página anterior",
       "next": "Página siguiente",

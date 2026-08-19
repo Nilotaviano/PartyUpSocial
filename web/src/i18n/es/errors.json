@@ -23,9 +23,9 @@
   "friendship_not_found": "No se encontró esa amistad.",
   "block_not_found": "No se encontró ese bloqueo.",
   "friend_request_already_exists": "Ya hay una solicitud de amistad pendiente.",
-  "friendship_already_exists": "Ya son amistades.",
+  "friendship_already_exists": "Ya son amigos.",
   "friend_request_not_pending": "Esa solicitud ya no está pendiente.",
-  "steam_not_linked": "Vincula Steam antes de importar amistades.",
+  "steam_not_linked": "Vincula Steam antes de importar amigos.",
   "rate_limited": "Demasiados intentos. Inténtalo más tarde.",
   "auth_validation": "Algunos de los datos que ingresaste no son válidos.",
   "validation_failed": "Revisa los campos marcados e inténtalo de nuevo."
