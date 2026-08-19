@@ -134,6 +134,41 @@ describe('SessionHistoryView', () => {
     expect(screen.getAllByText('2h 30m')).toHaveLength(2)
   })
 
+  it('shows the game under a differently-titled entry_D221', async () => {
+    mockApi({
+      items: [
+        historyItem({
+          id: 'a',
+          title: 'Raid night',
+          game: { name: 'Deep Rock Galactic', steamAppId: 548430 },
+        }),
+      ],
+    })
+    renderHistory()
+
+    const title = await screen.findByRole('heading', { level: 3, name: 'Raid night' })
+    const entry = title.closest('li') ?? title.parentElement!.parentElement!
+    expect(within(entry).getByText('Deep Rock Galactic')).toBeInTheDocument()
+    expect(within(entry).queryAllByText('Raid night')).toHaveLength(1)
+  })
+
+  it('renders the title once only when it matches the game name_D221', async () => {
+    mockApi({
+      items: [
+        historyItem({
+          id: 'a',
+          title: 'Deep Rock Galactic',
+          game: { name: 'Deep Rock Galactic', steamAppId: 548430 },
+        }),
+      ],
+    })
+    renderHistory()
+
+    const title = await screen.findByRole('heading', { level: 3, name: 'Deep Rock Galactic' })
+    const entry = title.closest('li') ?? title.parentElement!.parentElement!
+    expect(within(entry).getAllByText('Deep Rock Galactic')).toHaveLength(1)
+  })
+
   it('renders the four recap facts over the whole history_D222', async () => {
     mockApi({
       items: [historyItem()],

@@ -169,11 +169,11 @@ public sealed class SessionReadUseCases(
         reads.ListUpcomingAsync(viewerId, cursor, pageSize, cancellationToken);
 
     /// <summary>
-    /// D-221: the repository decides membership of the page; this decides who on it may be read, on
-    /// exactly the terms <c>GET /sessions/{id}</c>'s roster already uses — history is never more nor
-    /// less revealing than the detail page for the same people. A player the viewer actually played
-    /// with keeps their name; only a blocked pair loses it (D-076, which drops both channels).
-    /// The avatar is the narrower channel and stays friend-set-resolvable only (D-188).
+    /// D-221: the repository decides membership of the page; this decides who on it may be read.
+    /// Names match <c>GET /sessions/{id}</c>'s roster: a player the viewer actually played with keeps
+    /// their name, and only a blocked pair loses it (D-076, which drops both channels). Avatars are
+    /// narrower than the detail page — the detail roster hands avatars to any co-participant, while
+    /// history gates them on the friendship channel only (D-188).
     /// </summary>
     public async Task<SessionPage<SessionSummary>> ListCompletedHistoryAsync(
         UserId viewerId,

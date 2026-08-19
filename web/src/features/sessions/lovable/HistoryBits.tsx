@@ -344,7 +344,7 @@ export function HistoryEntry({ entry }: { entry: HistoryEntryView }) {
             </div>
 
             {entry.gameName != null && entry.gameName !== entry.title && (
-              <p className="mt-0.5 truncate text-meta text-ink-soft">{entry.title}</p>
+              <p className="mt-0.5 truncate text-meta text-ink-soft">{entry.gameName}</p>
             )}
 
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-meta text-ink-soft tabular-nums">

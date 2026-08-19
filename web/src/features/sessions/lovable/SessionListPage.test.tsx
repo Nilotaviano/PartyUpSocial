@@ -68,7 +68,7 @@ describe('SessionListPage', () => {
     expect(await screen.findByText('In progress')).toBeInTheDocument()
   })
 
-  it('renders only the Completed-only history list with no badge and no create-session action_D095', async () => {
+  it('renders the history list with no in-progress badge and no create-session action_D095', async () => {
     api.get.mockImplementation((path: string) => {
       if (path === '/api/v1/sessions/history/stats') {
         return Promise.resolve({
