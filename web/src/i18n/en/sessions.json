@@ -156,6 +156,54 @@
     "occupancy": "{{active}}/{{max}} going",
     "occupancyUnlimited": "{{active}} going"
   },
+  "history": {
+    "recap": {
+      "title": "Nights you've already had",
+      "sessionsPlayed": "Sessions played",
+      "hoursTogether": "Hours together",
+      "hoursValue_one": "{{count}} hour",
+      "hoursValue_other": "{{count}} hours",
+      "mostPlayed": "Most played",
+      "times_one": "{{count}} night",
+      "times_other": "{{count}} nights",
+      "usualSuspects": "Usual suspects"
+    },
+    "filters": {
+      "heading": "Narrow your history",
+      "searchLabel": "Search past sessions",
+      "searchPlaceholder": "Search game, session or friend",
+      "game": "Game",
+      "playedWith": "Played with",
+      "clear": "Clear filters",
+      "resultCount_one": "{{count}} night",
+      "resultCount_other": "{{count}} nights"
+    },
+    "entry": {
+      "canceled": "Canceled",
+      "organized": "You organized",
+      "played_one": "{{count}} played",
+      "played_other": "{{count}} played"
+    },
+    "duration": {
+      "hours": "{{hours}}h",
+      "minutes": "{{minutes}} min",
+      "hoursMinutes": "{{hours}}h {{minutes}}m"
+    },
+    "month": {
+      "count_one": "{{count}} night",
+      "count_other": "{{count}} nights"
+    },
+    "noMatches": {
+      "title": "Nothing matches those filters",
+      "body": "Try a different game or friend, or clear the filters to see every night again."
+    },
+    "empty": {
+      "title": "Your game nights will land here",
+      "body": "Once a session wraps up it becomes part of your record: who played, how long, and the games you keep coming back to.",
+      "cta": "New session"
+    },
+    "loading": "Loading your session history"
+  },
   "guest": {
     "claimHeading": "Join this session",
     "displayName": "Display name",

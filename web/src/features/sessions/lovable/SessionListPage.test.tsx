@@ -69,8 +69,15 @@ describe('SessionListPage', () => {
   })
 
   it('renders only the Completed-only history list with no badge and no create-session action_D095', async () => {
-    api.get.mockResolvedValue({
-      data: { items: [session({ status: 'completed' })], nextCursor: null },
+    api.get.mockImplementation((path: string) => {
+      if (path === '/api/v1/sessions/history/stats') {
+        return Promise.resolve({
+          data: { completedCount: 0, hoursTogether: 0, topGame: null, topMates: [] },
+        })
+      }
+      return Promise.resolve({
+        data: { items: [session({ status: 'completed' })], nextCursor: null },
+      })
     })
     renderPage('history')
 

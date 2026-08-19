@@ -722,7 +722,7 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
         // includes the test-only `_slice2` debug sign-in endpoints the production host never
         // registers) -- a grown-by-one total fails here even though every named id is still
         // individually present.
-        const int expectedTotalOperationIdCount = 154;
+        const int expectedTotalOperationIdCount = 155;
 
         using HttpClient client = _factory.CreateClient();
         using HttpResponseMessage response = await client.GetAsync("/openapi/v1.json");

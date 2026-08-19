@@ -21,6 +21,24 @@ namespace PartyUp.Infrastructure.Persistence.Repositories;
 /// </summary>
 public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRepository
 {
+    /// <summary>
+    /// D-221's attachment test as a composable SQL fragment, in the same positional style as
+    /// <see cref="SessionVisibilitySql"/>: <c>{0}</c> is the viewer's id and <c>{1}</c> is
+    /// <see cref="ParticipationStatus.Going"/>, so every caller must bind those two arguments in that
+    /// order. It is a membership test, never a status re-derivation — the session's own materialized
+    /// status is filtered separately by the caller.
+    /// </summary>
+    private const string TookPartSql = """
+        (
+            s.organizer_id = {0}
+            OR EXISTS (
+                SELECT 1 FROM session_participations sp
+                WHERE sp.session_id = s.id AND sp.user_id = {0}
+                  AND sp.status = {1} AND sp.is_waitlisted = false
+            )
+        )
+        """;
+
     public async Task<SessionDetail?> FindDetailAsync(SessionId sessionId, CancellationToken cancellationToken)
     {
         var row = await context.Sessions
@@ -80,6 +98,13 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
         return ToSummaryPage(summaries, pageSize);
     }
 
+    /// <summary>
+    /// D-221: history is what the viewer took part in, not merely what they may see — the
+    /// <see cref="TookPartSql"/> attachment test (organizer, or an active non-waitlisted <c>Going</c>
+    /// row) runs alongside, not instead of, the A-077 visibility fragment. Both terminal-with-a-past
+    /// statuses qualify: a Canceled session is part of the story and travels with its own status on
+    /// the wire. Newest-first, tie-broken by id, cursor contract unchanged (A-072).
+    /// </summary>
     public async Task<SessionPage<SessionSummary>> ListHistoryAsync(
         UserId viewerId,
         SessionListCursor? cursor,
@@ -87,32 +112,164 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
         CancellationToken cancellationToken)
     {
         short completed = (short)SessionStatus.Completed;
+        short canceled = (short)SessionStatus.Canceled;
+        short going = (short)ParticipationStatus.Going;
         Guid viewer = viewerId.Value;
         string predicate = SessionVisibilitySql.Predicate(SessionVisibilitySql.AccessKind.Any);
 
         List<Guid> ids = cursor is { } before
             ? await context.Database.SqlQuery<Guid>(FormattableStringFactory.Create($$"""
                 SELECT id FROM sessions s
-                WHERE status = {1}
-                  AND (start_time, id) < ({2}, {3})
+                WHERE status IN ({2}, {3})
+                  AND {{TookPartSql}}
+                  AND (start_time, id) < ({4}, {5})
                   AND {{predicate}}
                 ORDER BY start_time DESC, id DESC
-                LIMIT {4}
-                """, viewer, completed, before.SortKey, before.Id, pageSize))
+                LIMIT {6}
+                """, viewer, going, completed, canceled, before.SortKey, before.Id, pageSize))
                 .ToListAsync(cancellationToken)
             : await context.Database.SqlQuery<Guid>(FormattableStringFactory.Create($$"""
                 SELECT id FROM sessions s
-                WHERE status = {1}
+                WHERE status IN ({2}, {3})
+                  AND {{TookPartSql}}
                   AND {{predicate}}
                 ORDER BY start_time DESC, id DESC
-                LIMIT {2}
-                """, viewer, completed, pageSize))
+                LIMIT {4}
+                """, viewer, going, completed, canceled, pageSize))
                 .ToListAsync(cancellationToken);
 
         List<Session> sessions = await HydrateSessionsInOrderAsync(ids, cancellationToken);
         List<SessionSummary> summaries = await BuildSummariesAsync(sessions, viewerId, cancellationToken);
+        summaries = await AttachPlayersAsync(sessions, summaries, cancellationToken);
 
         return ToSummaryPage(summaries, pageSize);
+    }
+
+    /// <summary>
+    /// D-222: the recap's inputs over <see cref="ListHistoryAsync"/>'s <c>Completed</c> arm alone.
+    /// Ordered newest-first like the list it recaps, so the fold is over a deterministic sequence.
+    /// </summary>
+    public async Task<IReadOnlyList<CompletedSessionFact>> ListCompletedHistoryFactsAsync(
+        UserId viewerId,
+        CancellationToken cancellationToken)
+    {
+        short completed = (short)SessionStatus.Completed;
+        short going = (short)ParticipationStatus.Going;
+        Guid viewer = viewerId.Value;
+        string predicate = SessionVisibilitySql.Predicate(SessionVisibilitySql.AccessKind.Any);
+
+        List<Guid> ids = await context.Database.SqlQuery<Guid>(FormattableStringFactory.Create($$"""
+            SELECT id FROM sessions s
+            WHERE status = {2}
+              AND {{TookPartSql}}
+              AND {{predicate}}
+            ORDER BY start_time DESC, id DESC
+            """, viewer, going, completed))
+            .ToListAsync(cancellationToken);
+
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        List<SessionId> sessionIds = [.. ids.Select(SessionId.From)];
+        List<Session> sessions = await context.Sessions
+            .AsNoTracking()
+            .Include(session => session.Participations)
+            .Where(session => sessionIds.Contains(session.Id))
+            .ToListAsync(cancellationToken);
+
+        Dictionary<Guid, Session> byId = sessions.ToDictionary(session => session.Id.Value);
+        return [.. ids.Select(id => ToFact(byId[id], viewerId))];
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, UserNameplate>> FindNameplatesAsync(
+        IReadOnlyCollection<UserId> userIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(userIds);
+
+        if (userIds.Count == 0)
+        {
+            return new Dictionary<Guid, UserNameplate>();
+        }
+
+        List<UserId> ids = [.. userIds.Distinct()];
+        var rows = await context.DomainUsers
+            .AsNoTracking()
+            .Where(user => ids.Contains(user.Id))
+            .Select(user => new { user.Id, user.DisplayName, user.Avatar })
+            .ToListAsync(cancellationToken);
+
+        Dictionary<Guid, UserNameplate> result = [];
+        foreach (var row in rows)
+        {
+            result[row.Id.Value] = new UserNameplate(row.DisplayName, row.Avatar);
+        }
+
+        return result;
+    }
+
+    private static CompletedSessionFact ToFact(Session session, UserId viewerId)
+    {
+        List<UserId> companions = [.. PlayerIdsInOrder(session)
+            .Where(userId => userId != viewerId)];
+
+        return new CompletedSessionFact(
+            session.Id,
+            session.Duration.TotalMinutes,
+            session.Game?.Name,
+            companions);
+    }
+
+    /// <summary>
+    /// D-221: the organizer first, then every other active <c>Going</c> registered participant in
+    /// (joined-at, participation id) order — a total order that does not depend on how EF happened to
+    /// materialize the collection. A waitlisted <c>Going</c> row never occupied a slot (D-084), so it
+    /// is not a player; a guest has no user identity and cannot be one either.
+    /// </summary>
+    private static IEnumerable<UserId> PlayerIdsInOrder(Session session)
+    {
+        HashSet<UserId> seen = [];
+        foreach (Participation participation in session.Participations
+            .Where(p => p.IsActiveGoing && p.UserId is not null)
+            .OrderByDescending(p => p.UserId == session.OrganizerId)
+            .ThenBy(p => p.CreatedAt)
+            .ThenBy(p => p.Id.Value))
+        {
+            UserId userId = participation.UserId!.Value;
+            if (seen.Add(userId))
+            {
+                yield return userId;
+            }
+        }
+    }
+
+    private async Task<List<SessionSummary>> AttachPlayersAsync(
+        List<Session> sessions,
+        List<SessionSummary> summaries,
+        CancellationToken cancellationToken)
+    {
+        if (sessions.Count == 0)
+        {
+            return summaries;
+        }
+
+        Dictionary<Guid, List<UserId>> playersBySession = sessions.ToDictionary(
+            session => session.Id.Value,
+            session => PlayerIdsInOrder(session).ToList());
+
+        IReadOnlyDictionary<Guid, UserNameplate> nameplates = await FindNameplatesAsync(
+            [.. playersBySession.Values.SelectMany(ids => ids)], cancellationToken);
+
+        return [.. summaries.Select(summary => summary with
+        {
+            Players = [.. playersBySession[summary.Id.Value].Select(userId =>
+            {
+                UserNameplate? nameplate = nameplates.GetValueOrDefault(userId.Value);
+                return new HistoryPlayer(userId, nameplate?.DisplayName, nameplate?.Avatar);
+            })],
+        })];
     }
 
     /// <summary>

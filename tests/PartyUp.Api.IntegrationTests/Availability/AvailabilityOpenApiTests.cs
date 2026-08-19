@@ -75,6 +75,9 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         ApiOperationIds.ListFriendGroupsContainingUser,
     ];
 
+    /// <summary>D-222: the Session-history recap read added above the D-221 history list.</summary>
+    private static readonly string[] NewSessionHistoryOperationIds = [ApiOperationIds.GetSessionHistoryStats];
+
     /// <summary>PHASE7_DESIGN.md §4 (ticket-P7-S4): the eleven operation ids the S4 HTTP surface added.</summary>
     private static readonly string[] NewPushNotificationOperationIds =
     [
@@ -106,7 +109,8 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
     /// <see cref="NewPollLeaveOperationIds"/> (D-186), and the 1 mid-flight-invite one in
     /// <see cref="NewPollInviteOperationIds"/> (D-193), the D-178 admin usage dashboard, and the
     /// D-212/D-213 feedback surface's three ids (<c>SubmitFeedback</c>, <c>ListAdminFeedback</c>,
-    /// <c>SetAdminFeedbackHandled</c>) — 128 total. A deliberate future change
+    /// <c>SetAdminFeedbackHandled</c>), and the D-222 history recap
+    /// (<see cref="NewSessionHistoryOperationIds"/>) — 129 total. A deliberate future change
     /// to the shipped surface must update this list explicitly; it is not meant to silently absorb an
     /// added, removed, or renamed operation.
     /// </summary>
@@ -188,6 +192,7 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
             .. NewGuestPollOperationIds, .. NewPollListOperationIds, .. NewPollLeaveOperationIds,
             .. NewPushNotificationOperationIds, .. NewEmailNotificationOperationIds,
             .. NewPollInviteOperationIds, .. NewFriendGroupOperationIds,
+            .. NewSessionHistoryOperationIds,
         ];
         Assert.Equal(
             expectedOperationIds.OrderBy(id => id, StringComparer.Ordinal).ToArray(),

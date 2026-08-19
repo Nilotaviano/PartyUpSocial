@@ -39,6 +39,12 @@ public static class SessionEndpoints
                 .WithName(ApiOperationIds.ListSessions)
                 .Produces<SessionPageResponse<SessionSummaryResponse>>());
 
+        // Ahead of the {sessionId:guid} route only for readability — the guid constraint already
+        // keeps the two from colliding.
+        Common(sessions.MapGet("/sessions/history/stats", GetSessionHistoryStatsAsync)
+                .WithName(ApiOperationIds.GetSessionHistoryStats)
+                .Produces<SessionHistoryStatsResponse>());
+
         Common(sessions.MapGet("/sessions/{sessionId:guid}", GetSessionDetailAsync)
                 .WithName(ApiOperationIds.GetSessionDetail)
                 .Produces<SessionDetailResponse>())
@@ -354,6 +360,26 @@ public static class SessionEndpoints
         page = RebindNextCursor(page, listScope);
 
         return Results.Ok(SessionPageResponse.From(page, s => SessionSummaryResponse.From(s, ordinals)));
+    }
+
+    /// <summary>
+    /// D-222: the recap over the viewer's own completed history. One shared assigner, exactly like
+    /// every other person-bearing response — a top mate seen twice keeps one ordinal.
+    /// </summary>
+    private static async Task<IResult> GetSessionHistoryStatsAsync(
+        ICurrentUserAccessor currentUser,
+        SessionReadUseCases useCase,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Problem(context, StatusCodes.Status401Unauthorized, "unauthorized");
+        }
+
+        SessionHistoryStats stats = await useCase.GetHistoryStatsAsync(actorId.Value, cancellationToken);
+        return Results.Ok(SessionHistoryStatsResponse.From(stats, new MaskedParticipantAssigner()));
     }
 
     private static async Task<IResult> GetSessionDetailAsync(

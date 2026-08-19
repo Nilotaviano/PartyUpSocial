@@ -61,6 +61,11 @@ public sealed class GameSessionEndpointTests : IAsyncLifetime, IDisposable
                 ["post"] = ApiOperationIds.CreateSession,
                 ["get"] = ApiOperationIds.ListSessions,
             },
+            // D-222: the whole-history recap above the D-221 list.
+            ["/api/v1/sessions/history/stats"] = new()
+            {
+                ["get"] = ApiOperationIds.GetSessionHistoryStats,
+            },
             ["/api/v1/sessions/{sessionId}"] = new()
             {
                 ["get"] = ApiOperationIds.GetSessionDetail,

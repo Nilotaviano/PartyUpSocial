@@ -1316,6 +1316,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/history/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetSessionHistoryStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{sessionId}": {
         parameters: {
             query?: never;
@@ -2699,6 +2715,16 @@ export interface components {
             displayName: null | string;
             response: null | string;
         };
+        HistoryTopGameResponse: {
+            name: string;
+            /** Format: int32 */
+            times: number | string;
+        };
+        HistoryTopMateResponse: {
+            player: components["schemas"]["MaskedParticipant"];
+            /** Format: int32 */
+            times: number | string;
+        };
         HomeSuggestionsResponse: {
             suggestions: components["schemas"]["OverlapWindowView"][];
             hasMore: boolean;
@@ -3093,6 +3119,14 @@ export interface components {
             muted: boolean;
             audienceGroups: null | components["schemas"]["AudienceGroupResponse"][];
         };
+        SessionHistoryStatsResponse: {
+            /** Format: int32 */
+            completedCount: number | string;
+            /** Format: int32 */
+            hoursTogether: number | string;
+            topGame: null | components["schemas"]["HistoryTopGameResponse"];
+            topMates: components["schemas"]["HistoryTopMateResponse"][];
+        };
         SessionPageResponseOfJoinRequestViewResponse: {
             items: components["schemas"]["JoinRequestViewResponse"][];
             nextCursor: null | string;
@@ -3146,6 +3180,7 @@ export interface components {
             visibility: string;
             viaGroup: null | components["schemas"]["GroupProvenanceResponse"];
             sharedWithGroup: boolean;
+            players?: null | components["schemas"]["MaskedParticipant"][];
         };
         SetFeedbackHandledRequest: {
             handled: boolean;
@@ -7473,6 +7508,62 @@ export interface operations {
             };
             /** @description Service Unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    GetSessionHistoryStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionHistoryStatsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

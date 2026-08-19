@@ -61,6 +61,10 @@ public static class ApiOperationIds
     // PHASE4_DESIGN.md §8: session HTTP surface, relative to the /api/v1 group.
     public const string CreateSession = "CreateSession";
     public const string ListSessions = "ListSessions";
+
+    /// <summary>D-222: the whole-history recap that sits above the D-221 history list.</summary>
+    public const string GetSessionHistoryStats = "GetSessionHistoryStats";
+
     public const string GetSessionDetail = "GetSessionDetail";
     public const string EditSession = "EditSession";
     public const string CancelSession = "CancelSession";

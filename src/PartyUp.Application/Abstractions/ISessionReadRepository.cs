@@ -1,4 +1,5 @@
 using NodaTime;
+using PartyUp.Application.Polls;
 using PartyUp.Application.Sessions;
 using PartyUp.Domain.Kernel;
 
@@ -26,11 +27,37 @@ public interface ISessionReadRepository
         int pageSize,
         CancellationToken cancellationToken);
 
-    /// <summary>Same viewer-scoping contract as <see cref="ListUpcomingAsync"/>, over Completed history.</summary>
+    /// <summary>
+    /// D-221: the same keyset and viewer-scoping contract as <see cref="ListUpcomingAsync"/>, over the
+    /// sessions the viewer actually took part in — organizer, or an active (non-waitlisted)
+    /// <c>Going</c> participation — with materialized status <c>Completed</c> or <c>Canceled</c>. The
+    /// A-077 visibility fragment is applied on top of that attachment test rather than instead of it,
+    /// so the surface still fails closed if the two ever disagree. Each summary carries its
+    /// <see cref="SessionSummary.Players"/> roster, unmasked — the caller decides who may be read.
+    /// </summary>
     Task<SessionPage<SessionSummary>> ListHistoryAsync(
         UserId viewerId,
         SessionListCursor? cursor,
         int pageSize,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// D-222: the whole-history recap's inputs — every fact row is one session from
+    /// <see cref="ListHistoryAsync"/>'s <c>Completed</c> arm alone (a Canceled session was never
+    /// played, so it counts toward nothing). Unpaged by design: the recap summarises everything, and
+    /// each row is a handful of scalars plus its companion ids.
+    /// </summary>
+    Task<IReadOnlyList<CompletedSessionFact>> ListCompletedHistoryFactsAsync(
+        UserId viewerId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The display name and avatar of each requested user, for the handful of people a computed read
+    /// (D-222's top mates) names after the fact. Mirrors <c>IPollReadRepository.FindNameplatesAsync</c>;
+    /// a tombstoned user yields a null <c>DisplayName</c> (D-092), and a missing id yields no entry.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, UserNameplate>> FindNameplatesAsync(
+        IReadOnlyCollection<UserId> userIds,
         CancellationToken cancellationToken);
 
     Task<SessionPage<JoinRequestSummary>> ListJoinRequestsAsync(

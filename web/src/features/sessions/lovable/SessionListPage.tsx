@@ -10,6 +10,7 @@ import { EmptyState } from '../../../components/shell/SectionCard'
 import { PageHeader } from '../../../components/shell/PageHeader'
 import { StatusBanner } from '../../../components/ui/statusBanner'
 import { SessionSummaryCard } from '../SessionSummaryCard'
+import { SessionHistoryView } from './SessionHistoryView'
 import {
   getSessionList,
   getViewerProfile,
@@ -74,6 +75,44 @@ export function SessionListPage({ scope }: SessionListPageProps) {
   const headingText = scope === 'upcoming' ? t('list.upcoming') : t('list.history')
   const emptyText = scope === 'upcoming' ? t('list.emptyUpcoming') : t('list.emptyHistory')
 
+  const loadMoreButton = nextCursor ? (
+    <Button
+      aria-busy={isFetchingNextPage}
+      className="self-start"
+      disabled={isFetchingNextPage}
+      variant="neutral"
+      onClick={loadMore}
+    >
+      {t('list.loadMore')}
+    </Button>
+  ) : null
+
+  if (scope === 'history') {
+    return (
+      <main className="min-h-screen bg-background pb-24" data-testid="screen-sessions-history">
+        <div className="mx-auto max-w-[1000px] px-3 pb-6 sm:px-6">
+          <PageHeader title={headingText} />
+          {error ? (
+            <StatusBanner role="alert" variant="danger">
+              {t(isApiError(error) ? `errors.codes.${error.code}` : 'errors.generic', {
+                defaultValue: t('errors.generic'),
+              })}
+            </StatusBanner>
+          ) : (
+            <SessionHistoryView
+              isPending={isPending}
+              items={items}
+              loadMore={loadMoreButton}
+              timeZone={viewerTimeZone}
+              viewerId={profile.data?.userId}
+              viewerName={profile.data?.displayName}
+            />
+          )}
+        </div>
+      </main>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-background pb-24" data-testid={`screen-sessions-${scope}`}>
       <div className="mx-auto max-w-[1000px] px-3 pb-6 sm:px-6">
@@ -134,17 +173,7 @@ export function SessionListPage({ scope }: SessionListPageProps) {
             </ul>
           )}
 
-          {nextCursor && (
-            <Button
-              aria-busy={isFetchingNextPage}
-              className="self-start"
-              disabled={isFetchingNextPage}
-              variant="neutral"
-              onClick={loadMore}
-            >
-              {t('list.loadMore')}
-            </Button>
-          )}
+          {loadMoreButton}
         </div>
       </div>
     </main>

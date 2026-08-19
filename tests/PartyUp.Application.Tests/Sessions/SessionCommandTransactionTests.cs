@@ -544,6 +544,7 @@ internal sealed class FakeSessionReadRepository(FakeSessionRepository store) : I
 
     private readonly Dictionary<UserId, HashSet<UserId>> _friends = [];
     private readonly Dictionary<UserId, HashSet<UserId>> _blocked = [];
+    private readonly Dictionary<UserId, UserNameplate> _nameplates = [];
 
     internal void MakeFriends(UserId a, UserId b)
     {
@@ -577,19 +578,79 @@ internal sealed class FakeSessionReadRepository(FakeSessionRepository store) : I
             s.Status, s.MaxCapacity, s.ActiveOccupancy)));
     }
 
+    /// <summary>
+    /// D-221: Completed and Canceled, restricted to what the viewer took part in (organizer or an
+    /// active Going row), with the unmasked player roster attached — the real repository's SQL shape,
+    /// reproduced closely enough that the use case's masking layer is exercised for real.
+    /// </summary>
     public Task<SessionPage<SessionSummary>> ListHistoryAsync(
         UserId viewerId, SessionListCursor? cursor, int pageSize, CancellationToken cancellationToken)
     {
         List<Session> visible = [.. store.All
-            .Where(s => s.Status == SessionStatus.Completed)
+            .Where(s => s.Status is SessionStatus.Completed or SessionStatus.Canceled)
+            .Where(s => TookPart(viewerId, s))
             .Where(s => IsVisible(viewerId, s))
             .OrderByDescending(s => s.StartTime)
             .ThenByDescending(s => s.Id.Value)];
 
         return Task.FromResult(Page(visible, pageSize, s => new SessionSummary(
             s.Id, s.OrganizerId, s.Title, s.StartTime, s.Duration, s.Platform, s.Game,
-            s.Status, s.MaxCapacity, s.ActiveOccupancy)));
+            s.Status, s.MaxCapacity, s.ActiveOccupancy,
+            Players: [.. PlayerIdsInOrder(s).Select(NameplateFor)])));
     }
+
+    public Task<IReadOnlyList<CompletedSessionFact>> ListCompletedHistoryFactsAsync(
+        UserId viewerId, CancellationToken cancellationToken)
+    {
+        List<CompletedSessionFact> facts = [.. store.All
+            .Where(s => s.Status == SessionStatus.Completed)
+            .Where(s => TookPart(viewerId, s))
+            .Where(s => IsVisible(viewerId, s))
+            .OrderByDescending(s => s.StartTime)
+            .ThenByDescending(s => s.Id.Value)
+            .Select(s => new CompletedSessionFact(
+                s.Id,
+                s.Duration.TotalMinutes,
+                s.Game?.Name,
+                [.. PlayerIdsInOrder(s).Where(id => id != viewerId)]))];
+
+        return Task.FromResult<IReadOnlyList<CompletedSessionFact>>(facts);
+    }
+
+    public Task<IReadOnlyDictionary<Guid, UserNameplate>> FindNameplatesAsync(
+        IReadOnlyCollection<UserId> userIds, CancellationToken cancellationToken)
+    {
+        Dictionary<Guid, UserNameplate> result = [];
+        foreach (UserId userId in userIds.Distinct())
+        {
+            if (_nameplates.TryGetValue(userId, out UserNameplate? nameplate))
+            {
+                result[userId.Value] = nameplate;
+            }
+        }
+
+        return Task.FromResult<IReadOnlyDictionary<Guid, UserNameplate>>(result);
+    }
+
+    internal void SetNameplate(UserId userId, string displayName, Avatar? avatar = null) =>
+        _nameplates[userId] = new UserNameplate(DisplayName.Create(displayName), avatar);
+
+    private static bool TookPart(UserId viewerId, Session session) =>
+        session.OrganizerId == viewerId
+        || session.Participations.Any(p => p.UserId == viewerId && p.IsActiveGoing);
+
+    private static IEnumerable<UserId> PlayerIdsInOrder(Session session) => session.Participations
+        .Where(p => p.IsActiveGoing && p.UserId is not null)
+        .OrderByDescending(p => p.UserId == session.OrganizerId)
+        .ThenBy(p => p.CreatedAt)
+        .ThenBy(p => p.Id.Value)
+        .Select(p => p.UserId!.Value)
+        .Distinct();
+
+    private HistoryPlayer NameplateFor(UserId userId) =>
+        _nameplates.TryGetValue(userId, out UserNameplate? nameplate)
+            ? new HistoryPlayer(userId, nameplate.DisplayName, nameplate.Avatar)
+            : new HistoryPlayer(userId);
 
     public Task<SessionPage<JoinRequestSummary>> ListJoinRequestsAsync(
         SessionId sessionId, SessionListCursor? cursor, int pageSize, CancellationToken cancellationToken)

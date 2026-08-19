@@ -48,7 +48,49 @@ public sealed record SessionSummary(
     DisplayName? OrganizerDisplayName = null,
     ViewerRelation ViewerRelation = ViewerRelation.Inherited,
     ContentVisibility Visibility = ContentVisibility.Public,
-    GroupProvenance? ViaGroup = null);
+    GroupProvenance? ViaGroup = null,
+    IReadOnlyList<HistoryPlayer>? Players = null);
+
+/// <summary>
+/// D-221: one person on a history item's player roster — the organizer plus every active
+/// <c>Going</c> registered participant of a Completed or Canceled session. Guest participants carry
+/// no user identity and are therefore not on this list; <c>ActiveOccupancy</c> still counts them.
+/// <para>
+/// The repository fills <see cref="DisplayName"/>/<see cref="Avatar"/> from the users table without
+/// judging who may read them (exactly as it does for a summary's organizer name); the masking
+/// decision is <c>SessionReadUseCases</c>'s, and the wire layer renders the result through the same
+/// <c>MaskedParticipant</c> pipeline every other Phase 5 person travels on — so a player who is also
+/// this item's organizer carries the identical ordinal in one response.
+/// </para>
+/// </summary>
+public sealed record HistoryPlayer(UserId UserId, DisplayName? DisplayName = null, Avatar? Avatar = null);
+
+/// <summary>
+/// D-222: one Completed history session reduced to the recap's inputs. Produced by the read port and
+/// consumed only by <see cref="SessionHistoryStatsCalculator"/> — it deliberately carries no
+/// identities beyond the raw companion ids, so the calculator can stay pure and the masking decision
+/// can stay where every other one is (<c>SessionReadUseCases</c>).
+/// </summary>
+public sealed record CompletedSessionFact(
+    SessionId SessionId,
+    int DurationMinutes,
+    GameName? Game,
+    IReadOnlyList<UserId> Companions);
+
+/// <summary>D-222: the viewer's whole-history recap. Never paged — it summarises everything.</summary>
+public sealed record SessionHistoryStats(
+    int CompletedCount,
+    int HoursTogether,
+    HistoryTopGame? TopGame,
+    IReadOnlyList<HistoryTopMate> TopMates);
+
+public sealed record HistoryTopGame(GameName Name, int Times);
+
+/// <summary>
+/// D-222: one of the (at most three) people the viewer completed the most sessions with. Identity
+/// travels under the same rules as <see cref="HistoryPlayer"/>.
+/// </summary>
+public sealed record HistoryTopMate(HistoryPlayer Player, int Times);
 
 /// <summary>
 /// One roster row as a detail/roster read renders it — never the bearer token or link id.

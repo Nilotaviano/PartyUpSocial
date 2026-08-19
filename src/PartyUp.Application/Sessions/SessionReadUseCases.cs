@@ -1,5 +1,6 @@
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.FriendGroups;
+using PartyUp.Application.Polls;
 using PartyUp.Domain.FriendGroups;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
@@ -167,12 +168,123 @@ public sealed class SessionReadUseCases(
         CancellationToken cancellationToken) =>
         reads.ListUpcomingAsync(viewerId, cursor, pageSize, cancellationToken);
 
-    public Task<SessionPage<SessionSummary>> ListCompletedHistoryAsync(
+    /// <summary>
+    /// D-221: the repository decides membership of the page; this decides who on it may be read, on
+    /// exactly the terms <c>GET /sessions/{id}</c>'s roster already uses — history is never more nor
+    /// less revealing than the detail page for the same people. A player the viewer actually played
+    /// with keeps their name; only a blocked pair loses it (D-076, which drops both channels).
+    /// The avatar is the narrower channel and stays friend-set-resolvable only (D-188).
+    /// </summary>
+    public async Task<SessionPage<SessionSummary>> ListCompletedHistoryAsync(
         UserId viewerId,
         SessionListCursor? cursor,
         int pageSize,
-        CancellationToken cancellationToken) =>
-        reads.ListHistoryAsync(viewerId, cursor, pageSize, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        SessionPage<SessionSummary> page = await reads.ListHistoryAsync(viewerId, cursor, pageSize, cancellationToken);
+
+        HashSet<UserId> everyone = [.. page.Items
+            .SelectMany(summary => summary.Players ?? [])
+            .Select(player => player.UserId)];
+        if (everyone.Count == 0)
+        {
+            return page;
+        }
+
+        ViewerLegibility legibility = await ResolveLegibilityAsync(viewerId, everyone, cancellationToken);
+
+        List<SessionSummary> items = [.. page.Items.Select(summary => summary.Players is { } players
+            ? summary with { Players = [.. players.Select(legibility.Mask)] }
+            : summary)];
+
+        return new SessionPage<SessionSummary>(items, page.NextCursor);
+    }
+
+    /// <summary>
+    /// D-222: the recap is computed over the same Completed arm the history list uses. A top mate is
+    /// by construction a co-participant of every session they were counted on, so their identity
+    /// travels on exactly the terms a history player's does.
+    /// </summary>
+    public async Task<SessionHistoryStats> GetHistoryStatsAsync(
+        UserId viewerId,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<CompletedSessionFact> facts =
+            await reads.ListCompletedHistoryFactsAsync(viewerId, cancellationToken);
+        SessionHistoryStats stats = SessionHistoryStatsCalculator.Compute(facts);
+
+        if (stats.TopMates.Count == 0)
+        {
+            return stats;
+        }
+
+        HashSet<UserId> mateIds = [.. stats.TopMates.Select(mate => mate.Player.UserId)];
+        ViewerLegibility legibility = await ResolveLegibilityAsync(viewerId, mateIds, cancellationToken);
+        IReadOnlyDictionary<Guid, UserNameplate> nameplates =
+            await reads.FindNameplatesAsync(mateIds, cancellationToken);
+
+        List<HistoryTopMate> mates = [.. stats.TopMates.Select(mate =>
+        {
+            UserNameplate? nameplate = nameplates.GetValueOrDefault(mate.Player.UserId.Value);
+            return mate with
+            {
+                Player = legibility.Mask(
+                    new HistoryPlayer(mate.Player.UserId, nameplate?.DisplayName, nameplate?.Avatar)),
+            };
+        })];
+
+        return stats with { TopMates = mates };
+    }
+
+    /// <summary>
+    /// The two identity channels of one co-participant, decided in one place. The name follows the
+    /// detail roster (<see cref="MaskBlockedPairRoster"/>): a person the viewer shared a session with
+    /// is readable, and only a blocked pair is not (D-076, which drops the avatar with it). The
+    /// avatar is the narrower channel — it needs the friend-set resolution D-188/AVATARS_DESIGN.md
+    /// §2.4 give every list surface, so a legible-but-unfriended person travels as a name alone.
+    /// </summary>
+    private readonly record struct ViewerLegibility(HashSet<UserId> Blocked, HashSet<UserId> AvatarReadable)
+    {
+        internal HistoryPlayer Mask(HistoryPlayer player) => Blocked.Contains(player.UserId)
+            ? new HistoryPlayer(player.UserId)
+            : AvatarReadable.Contains(player.UserId) ? player : player with { Avatar = null };
+    }
+
+    /// <summary>
+    /// Two bulk, non-locking pair reads over <paramref name="counterparts"/> — never one query per
+    /// person: the blocked pairs (either direction) and the Accepted friendships whose avatars the
+    /// viewer may resolve. The viewer themselves is always avatar-readable.
+    /// </summary>
+    private async Task<ViewerLegibility> ResolveLegibilityAsync(
+        UserId viewerId,
+        HashSet<UserId> counterparts,
+        CancellationToken cancellationToken)
+    {
+        HashSet<UserId> others = [.. counterparts];
+        others.Remove(viewerId);
+
+        HashSet<UserId> avatarReadable = [viewerId];
+        if (others.Count == 0)
+        {
+            return new ViewerLegibility([], avatarReadable);
+        }
+
+        IReadOnlyList<Friendship> pairFriendships =
+            await friendships.FindPairsAmongAsync(viewerId, others, cancellationToken);
+        IReadOnlyList<Block> pairBlocks = await blocks.FindPairsAmongAsync(viewerId, others, cancellationToken);
+
+        HashSet<UserId> blocked = [.. pairBlocks.Select(b => b.BlockerId == viewerId ? b.BlockedId : b.BlockerId)];
+        foreach (Friendship friendship in pairFriendships)
+        {
+            UserId counterpart = friendship.Counterpart(viewerId);
+            if (friendship.IsAccepted && !blocked.Contains(counterpart))
+            {
+                avatarReadable.Add(counterpart);
+            }
+        }
+
+        return new ViewerLegibility(blocked, avatarReadable);
+    }
 
     /// <summary>
     /// Builds the minimal §7 viewer facts this one session needs: the organizer plus every other

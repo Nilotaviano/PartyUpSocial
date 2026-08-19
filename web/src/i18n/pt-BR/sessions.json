@@ -156,6 +156,54 @@
     "occupancy": "{{active}}/{{max}} confirmados",
     "occupancyUnlimited": "{{active}} confirmados"
   },
+  "history": {
+    "recap": {
+      "title": "Noites que você já teve",
+      "sessionsPlayed": "Sessões jogadas",
+      "hoursTogether": "Horas em conjunto",
+      "hoursValue_one": "{{count}} hora",
+      "hoursValue_other": "{{count}} horas",
+      "mostPlayed": "Mais jogado",
+      "times_one": "{{count}} noite",
+      "times_other": "{{count}} noites",
+      "usualSuspects": "Companhia frequente"
+    },
+    "filters": {
+      "heading": "Refine seu histórico",
+      "searchLabel": "Buscar sessões anteriores",
+      "searchPlaceholder": "Buscar jogo, sessão ou amigo",
+      "game": "Jogo",
+      "playedWith": "Jogou com",
+      "clear": "Limpar filtros",
+      "resultCount_one": "{{count}} noite",
+      "resultCount_other": "{{count}} noites"
+    },
+    "entry": {
+      "canceled": "Cancelada",
+      "organized": "Você organizou",
+      "played_one": "{{count}} jogou",
+      "played_other": "{{count}} jogaram"
+    },
+    "duration": {
+      "hours": "{{hours}}h",
+      "minutes": "{{minutes}} min",
+      "hoursMinutes": "{{hours}}h {{minutes}}min"
+    },
+    "month": {
+      "count_one": "{{count}} noite",
+      "count_other": "{{count}} noites"
+    },
+    "noMatches": {
+      "title": "Nada corresponde a esses filtros",
+      "body": "Tente outro jogo ou outra pessoa, ou limpe os filtros para ver todas as noites de novo."
+    },
+    "empty": {
+      "title": "Suas noites de jogo aparecem aqui",
+      "body": "Quando uma sessão termina, ela entra no seu histórico: quem jogou, quanto tempo durou e os jogos que você sempre repete.",
+      "cta": "Criar sessão"
+    },
+    "loading": "Carregando seu histórico de sessões"
+  },
   "guest": {
     "claimHeading": "Entrar nesta sessão",
     "displayName": "Nome de exibição",

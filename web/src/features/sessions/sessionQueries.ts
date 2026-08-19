@@ -17,6 +17,8 @@ export type CreateSessionResponse =
   components['schemas']['CreateSessionResponse']
 export type EditSessionRequest = components['schemas']['EditSessionRequest']
 export type ClearField = components['schemas']['ClearFieldRequest']
+export type SessionHistoryStats =
+  components['schemas']['SessionHistoryStatsResponse']
 export type SessionScope = 'upcoming' | 'history'
 export type ParticipationResponse = 'Going' | 'Maybe' | 'Declined'
 export type ReminderChoiceValue =
@@ -33,6 +35,8 @@ export const sessionKeys = {
   list: (scope: SessionScope, cursor?: string) =>
     ['sessions', scope, cursor ?? null] as const,
   listFamily: (scope: SessionScope) => ['sessions', scope] as const,
+  /** Kept under the `sessions` root so every mutation's blanket invalidation refreshes the D-222 recap. */
+  historyStats: () => ['sessions', 'history-stats'] as const,
   detail: (sessionId: string) => ['session', sessionId] as const,
   joinRequests: (sessionId: string, cursor?: string) =>
     ['session', 'join-requests', sessionId, cursor ?? null] as const,
@@ -61,6 +65,12 @@ export async function getSessionList(scope: SessionScope, cursor?: string) {
     params: { query: { scope, cursor } },
   })
   if (!data) throw new Error('Session list response was empty.')
+  return data
+}
+
+export async function getSessionHistoryStats() {
+  const { data } = await client.GET('/api/v1/sessions/history/stats')
+  if (!data) throw new Error('Session history stats response was empty.')
   return data
 }
 

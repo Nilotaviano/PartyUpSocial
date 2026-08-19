@@ -387,7 +387,14 @@ public sealed record SessionSummaryResponse(
     string ViewerRelation,
     string Visibility,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] GroupProvenanceResponse? ViaGroup,
-    bool SharedWithGroup)
+    bool SharedWithGroup,
+    // D-221: the history surface's player roster — the organizer plus every active Going registered
+    // participant, masked. It rides this one shared summary shape rather than a parallel
+    // history-only response type on purpose: `GET /sessions` is a single OpenAPI operation whose
+    // response schema cannot honestly vary by query string, and every other consumer of a summary
+    // (Home, Discover, calendar, the actionable inbox) keeps the field absent rather than empty, so
+    // "absent" reads as "this surface does not publish a roster" and never as "nobody played".
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<MaskedParticipant>? Players = null)
 {
     // The organizer's MaskedParticipant comes from a per-response MaskedParticipantAssigner shared
     // across every summary/entry a response composes — two distinct organizers in one page (or in
@@ -411,8 +418,42 @@ public sealed record SessionSummaryResponse(
             SessionWireFormat.ViewerRelation(summary.ViewerRelation),
             SessionWireFormat.Visibility(summary.Visibility),
             summary.ViaGroup is { } viaGroup ? GroupProvenanceResponse.From(viaGroup) : null,
-            summary.Visibility == ContentVisibility.Groups && summary.ViaGroup is null);
+            summary.Visibility == ContentVisibility.Groups && summary.ViaGroup is null,
+            // D-221: the same assigner the organizer went through, so a player who organized this
+            // session carries one ordinal in both places of the same response.
+            summary.Players is { } players
+                ? [.. players.Select(player => ordinals.For(player.UserId, player.DisplayName, player.Avatar))]
+                : null);
 }
+
+/// <summary>
+/// D-222: the viewer's whole-history recap, computed over every Completed session they took part in
+/// (never the Canceled ones the D-221 list also shows). <c>topGame</c> is written as an explicit
+/// null when the viewer has no completed session carrying a game, and <c>topMates</c> holds at most
+/// three people, most-played first.
+/// </summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record SessionHistoryStatsResponse(
+    int CompletedCount,
+    int HoursTogether,
+    HistoryTopGameResponse? TopGame,
+    IReadOnlyList<HistoryTopMateResponse> TopMates)
+{
+    public static SessionHistoryStatsResponse From(SessionHistoryStats stats, MaskedParticipantAssigner ordinals) =>
+        new(
+            stats.CompletedCount,
+            stats.HoursTogether,
+            stats.TopGame is { } topGame ? new HistoryTopGameResponse(topGame.Name.Value, topGame.Times) : null,
+            [.. stats.TopMates.Select(mate => new HistoryTopMateResponse(
+                ordinals.For(mate.Player.UserId, mate.Player.DisplayName, mate.Player.Avatar),
+                mate.Times))]);
+}
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record HistoryTopGameResponse(string Name, int Times);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record HistoryTopMateResponse(MaskedParticipant Player, int Times);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ParticipationViewResponse(

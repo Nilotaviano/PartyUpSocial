@@ -134,13 +134,117 @@ public sealed class SessionReadRepositoryTests : IAsyncLifetime
         Assert.Equal(expectedDescending[4], secondPage.Items[1].Id.Value);
         Assert.Null(secondPage.NextCursor);
 
-        // Non-Completed statuses (Unconfirmed, Expired, Canceled) must never surface in history.
+        // D-221: Unconfirmed and Expired never surface; Canceled now does, carrying its own status.
         await InsertSessionAsync(context, organizerId, Guid.CreateVersion7(), _baseInstant, status: 0);
         await InsertSessionAsync(context, organizerId, Guid.CreateVersion7(), _baseInstant, status: 3);
-        await InsertSessionAsync(context, organizerId, Guid.CreateVersion7(), _baseInstant, status: 4);
+        Guid canceledId = Guid.CreateVersion7();
+        await InsertSessionAsync(context, organizerId, canceledId, _baseInstant, status: 4);
 
         SessionPage<SessionSummary> everything = await repository.ListHistoryAsync(organizerId, null, 20, default);
-        Assert.Equal(5, everything.Items.Count);
+        Assert.Equal(6, everything.Items.Count);
+        Assert.Equal(
+            SessionStatus.Canceled,
+            everything.Items.Single(item => item.Id.Value == canceledId).Status);
+    }
+
+    /// <summary>
+    /// D-221: history is what the viewer took part in. The organizer arm and the active-Going arm
+    /// both qualify; a Declined row, a Pending invitation, a waitlisted Going row and pure inherited
+    /// visibility do not — even though every one of those sessions resolves visible to the viewer.
+    /// </summary>
+    [Fact]
+    public async Task ListHistoryAsync_HoldsOnlySessionsTheViewerTookPartIn_D221()
+    {
+        await using AppDbContext context = CreateContext();
+        await context.Database.MigrateAsync();
+        UserId organizerId = await SeedUserAsync(context);
+        UserId viewerId = await SeedUserAsync(context);
+        var repository = new SessionReadRepository(context);
+
+        Guid organized = Guid.CreateVersion7();
+        await InsertSessionAsync(context, viewerId, organized, _baseInstant - Duration.FromDays(9), status: 2);
+
+        Guid attended = Guid.CreateVersion7();
+        await InsertSessionAsync(context, organizerId, attended, _baseInstant - Duration.FromDays(8), status: 2);
+        await InsertParticipationAsync(context, Guid.CreateVersion7(), attended, viewerId);
+
+        Guid declined = Guid.CreateVersion7();
+        await InsertSessionAsync(context, organizerId, declined, _baseInstant - Duration.FromDays(7), status: 2);
+        await InsertParticipationAsync(context, Guid.CreateVersion7(), declined, viewerId, status: 3);
+
+        Guid invited = Guid.CreateVersion7();
+        await InsertSessionAsync(context, organizerId, invited, _baseInstant - Duration.FromDays(6), status: 2);
+        await InsertParticipationAsync(context, Guid.CreateVersion7(), invited, viewerId, status: 0);
+
+        Guid waitlisted = Guid.CreateVersion7();
+        await InsertSessionAsync(context, organizerId, waitlisted, _baseInstant - Duration.FromDays(5), status: 2);
+        await InsertParticipationAsync(
+            context, Guid.CreateVersion7(), waitlisted, viewerId, isWaitlisted: true);
+
+        // Public and organized by someone the viewer is not attached to at all: visible under rule 2
+        // for anyone whose friends are on it, never part of the viewer's own history.
+        Guid strangers = Guid.CreateVersion7();
+        await InsertSessionAsync(context, organizerId, strangers, _baseInstant - Duration.FromDays(4), status: 2);
+
+        SessionPage<SessionSummary> history = await repository.ListHistoryAsync(viewerId, null, 20, default);
+
+        Assert.Equal([attended, organized], history.Items.Select(item => item.Id.Value));
+    }
+
+    /// <summary>
+    /// D-221: each history item carries the organizer plus every active Going registered participant,
+    /// organizer first. The repository resolves the nameplates without judging who may read them —
+    /// that masking is <c>SessionReadUseCases</c>'s, proven by its own unit tests.
+    /// </summary>
+    [Fact]
+    public async Task ListHistoryAsync_CarriesTheGoingRosterOrganizerFirst_D221()
+    {
+        await using AppDbContext context = CreateContext();
+        await context.Database.MigrateAsync();
+        UserId organizerId = await SeedUserAsync(context);
+        UserId goingId = await SeedUserAsync(context);
+        UserId maybeId = await SeedUserAsync(context);
+        var repository = new SessionReadRepository(context);
+
+        Guid sessionId = Guid.CreateVersion7();
+        await InsertSessionAsync(context, organizerId, sessionId, _baseInstant - Duration.FromDays(3), status: 2);
+        await InsertParticipationAsync(context, Guid.CreateVersion7(), sessionId, organizerId);
+        await InsertParticipationAsync(context, Guid.CreateVersion7(), sessionId, goingId);
+        await InsertParticipationAsync(context, Guid.CreateVersion7(), sessionId, maybeId, status: 2);
+
+        SessionPage<SessionSummary> history = await repository.ListHistoryAsync(organizerId, null, 20, default);
+
+        IReadOnlyList<HistoryPlayer> players = Assert.Single(history.Items).Players!;
+        Assert.Equal([organizerId, goingId], players.Select(player => player.UserId));
+    }
+
+    /// <summary>
+    /// D-222: the recap's facts come from the Completed arm alone — the Canceled session the D-221
+    /// list also shows contributes neither minutes nor companions.
+    /// </summary>
+    [Fact]
+    public async Task ListCompletedHistoryFactsAsync_ExcludesCanceledAndTheViewerThemselves_D222()
+    {
+        await using AppDbContext context = CreateContext();
+        await context.Database.MigrateAsync();
+        UserId organizerId = await SeedUserAsync(context);
+        UserId mateId = await SeedUserAsync(context);
+        var repository = new SessionReadRepository(context);
+
+        Guid completed = Guid.CreateVersion7();
+        await InsertSessionAsync(context, organizerId, completed, _baseInstant - Duration.FromDays(3), status: 2);
+        await InsertParticipationAsync(context, Guid.CreateVersion7(), completed, organizerId);
+        await InsertParticipationAsync(context, Guid.CreateVersion7(), completed, mateId);
+
+        Guid canceled = Guid.CreateVersion7();
+        await InsertSessionAsync(context, organizerId, canceled, _baseInstant - Duration.FromDays(2), status: 4);
+
+        IReadOnlyList<CompletedSessionFact> facts =
+            await repository.ListCompletedHistoryFactsAsync(organizerId, default);
+
+        CompletedSessionFact fact = Assert.Single(facts);
+        Assert.Equal(completed, fact.SessionId.Value);
+        Assert.Equal([mateId], fact.Companions);
     }
 
     [Fact]
@@ -230,11 +334,16 @@ public sealed class SessionReadRepositoryTests : IAsyncLifetime
             """);
 
     private static async Task InsertParticipationAsync(
-        AppDbContext context, Guid id, Guid sessionId, UserId userId) =>
+        AppDbContext context,
+        Guid id,
+        Guid sessionId,
+        UserId userId,
+        short status = 1,
+        bool isWaitlisted = false) =>
         await context.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO session_participations
                 (id, session_id, user_id, status, is_waitlisted, origin, created_at)
-            VALUES ({id}, {sessionId}, {userId.Value}, 1, false, 0, now())
+            VALUES ({id}, {sessionId}, {userId.Value}, {status}, {isWaitlisted}, 0, now())
             """);
 
     private static async Task InsertJoinRequestAsync(
