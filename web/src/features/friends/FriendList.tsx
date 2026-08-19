@@ -1,4 +1,4 @@
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Dices } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -15,7 +15,7 @@ import {
   useActionMenuDialog,
 } from '../../components/ui/useActionMenu'
 import { useToast } from '../../components/ui/toastStore'
-import { getGroupDetail, getGroupList, groupKeys, removeGroupMember } from '../groups/groupQueries'
+import { getGroupsContainingUser, groupKeys, removeGroupMember } from '../groups/groupQueries'
 import { AvatarDisc } from './AvatarDisc'
 import { avatarImgUrl } from './avatarImage'
 import {
@@ -42,35 +42,18 @@ type UnfriendDialogProps = {
 /**
  * D-210: groups the ACTOR owns that the unfriend target belongs to
  * (Accepted membership only — an outstanding invite isn't "remaining in"
- * anything yet). The list read (`groupKeys.list`) carries no per-group
- * roster, so this resolves it with one detail fetch per owned group,
- * fired only while the dialog is open — the sanctioned per-group-detail
- * lookup (no single-call roster-membership contract exists on the wire).
- *
- * The fan-out is bounded by D-208's 50-owned-group cap, so a single dialog
- * open can issue up to 50 detail requests; `staleTime: 60_000` is the trade
- * that keeps repeat opens (e.g. reopening the dialog on the next row) from
- * re-firing that whole fan-out within the same minute, at the cost of a
- * membership change elsewhere not showing up here for up to 60s.
+ * anything yet). One request answers it: the backend scopes the read to the
+ * caller's own groups, so the client neither lists nor filters rosters.
  */
 function useOwnedGroupsContaining(userId: string, enabled: boolean) {
-  const list = useQuery({ queryKey: groupKeys.list, queryFn: getGroupList, enabled })
-  const ownedIds = list.data?.owned.map((group) => group.id) ?? []
-
-  const details = useQueries({
-    queries: ownedIds.map((groupId) => ({
-      queryKey: groupKeys.detail(groupId),
-      queryFn: () => getGroupDetail(groupId),
-      enabled,
-      staleTime: 60_000,
-    })),
+  const { data } = useQuery({
+    queryKey: groupKeys.containing(userId),
+    queryFn: () => getGroupsContainingUser(userId),
+    enabled,
+    staleTime: 60_000,
   })
 
-  return details
-    .filter((query) =>
-      query.data?.members?.some((member) => member.userId === userId && member.status === 'accepted'),
-    )
-    .map((query) => ({ id: query.data!.id, name: query.data!.name }))
+  return data ?? []
 }
 
 export function UnfriendDialog({
@@ -105,11 +88,21 @@ export function UnfriendDialog({
 
     // D-210: member-removal mutations fire only after the unfriend mutation
     // has succeeded, and only for the groups the actor actually saw listed.
+    // Each group is its own request, so the outcomes are settled per group and
+    // the ones that did not go through are named — a group the person is still
+    // in must never read as removed.
     if (alsoRemove && sharedGroups.length > 0) {
-      try {
-        await Promise.all(sharedGroups.map((group) => removeGroupMember(group.id, userId)))
-      } catch {
-        showToast({ message: t('errors.generic', { ns: 'groups' }) })
+      const outcomes = await Promise.allSettled(
+        sharedGroups.map((group) => removeGroupMember(group.id, userId)),
+      )
+      const failed = sharedGroups.filter((_, index) => outcomes[index].status === 'rejected')
+      if (failed.length > 0) {
+        showToast({
+          message: t('unfriend.removeFailed', {
+            names: failed.map((group) => group.name).join(', '),
+            ns: 'groups',
+          }),
+        })
       }
     }
   }

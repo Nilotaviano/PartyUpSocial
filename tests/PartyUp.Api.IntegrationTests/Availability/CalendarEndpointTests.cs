@@ -274,6 +274,57 @@ public sealed class CalendarEndpointTests : IAsyncLifetime, IDisposable
         Assert.True(body.RootElement.TryGetProperty("sessions", out _));
     }
 
+    /// <summary>
+    /// D-211: the calendar poll layer carries each candidate's own length, so the grid can paint a
+    /// 15-minute and a 5-hour option differently instead of assuming one fixed block.
+    /// </summary>
+    [Fact]
+    public async Task PollLayerCarriesEachOptionsOwnDuration_D211()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"cal-poll-dur-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+
+        Instant shortStart = _factory.Clock.GetCurrentInstant() + Duration.FromDays(2);
+        Instant longStart = _factory.Clock.GetCurrentInstant() + Duration.FromDays(3);
+
+        HttpResponseMessage created = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/polls",
+            JsonContent.Create(new
+            {
+                title = "Calendar poll duration fixture",
+                options = new[]
+                {
+                    new { startTime = Iso(shortStart), durationMinutes = 15 },
+                    new { startTime = Iso(longStart), durationMinutes = 300 },
+                },
+                visibility = "private",
+                minAttendance = 1,
+            }));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        using JsonDocument createdBody = await SessionEndpointTestSupport.SuccessJsonAsync(created);
+        Dictionary<Guid, int> createdDurations = createdBody.RootElement.GetProperty("poll")
+            .GetProperty("options").EnumerateArray()
+            .ToDictionary(
+                option => option.GetProperty("id").GetGuid(),
+                option => option.GetProperty("durationMinutes").GetInt32());
+        Assert.Equal([15, 300], createdDurations.Values.Order());
+
+        Instant from = _factory.Clock.GetCurrentInstant();
+        Instant to = from + Duration.FromDays(7);
+        HttpResponseMessage calendar = await organizerSession.GetAsync(
+            $"/api/v1/calendar?from={Uri.EscapeDataString(Iso(from))}&to={Uri.EscapeDataString(Iso(to))}");
+        using JsonDocument body = await SessionEndpointTestSupport.SuccessJsonAsync(calendar);
+
+        // Each candidate's own length reaches the calendar wire, keyed by the option it belongs to.
+        JsonElement pollLayerEntry = Assert.Single(body.RootElement.GetProperty("pollOptions").EnumerateArray());
+        Dictionary<Guid, int> calendarDurations = pollLayerEntry.GetProperty("options").EnumerateArray()
+            .ToDictionary(
+                option => option.GetProperty("optionId").GetGuid(),
+                option => option.GetProperty("durationMinutes").GetInt32());
+        Assert.Equal(createdDurations, calendarDurations);
+    }
+
     /// <summary>A viewer with no involvement in any poll still gets the declared-empty shape (D-111's original claim, narrowed).</summary>
     [Fact]
     public async Task PollLayerStaysEmptyForAnUninvolvedViewer_D111()

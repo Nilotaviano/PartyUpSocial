@@ -10,6 +10,7 @@ export type FriendGroupMember = components['schemas']['FriendGroupMemberResponse
 export const groupKeys = {
   list: ['friend-groups'] as const,
   detail: (id: string) => ['friend-group', id] as const,
+  containing: (userId: string) => ['friend-groups', 'containing', userId] as const,
 }
 
 const csrf = { 'X-CSRF-TOKEN': '' }
@@ -26,6 +27,15 @@ export async function getGroupDetail(groupId: string) {
   })
   if (!data) throw new Error('Friend group detail response was empty.')
   return data
+}
+
+/** D-210: the groups the caller owns that this user is an Accepted member of, in one round trip. */
+export async function getGroupsContainingUser(userId: string) {
+  const { data } = await client.GET('/api/v1/friend-groups/containing/{userId}', {
+    params: { path: { userId } },
+  })
+  if (!data) throw new Error('Friend group membership response was empty.')
+  return data.groups
 }
 
 export async function createGroup(name: string) {

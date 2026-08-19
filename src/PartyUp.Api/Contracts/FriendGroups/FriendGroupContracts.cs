@@ -78,6 +78,18 @@ public sealed record FriendGroupListResponse(
 }
 
 /// <summary>
+/// D-210: the groups the CALLER owns that a given user is an <c>Accepted</c> member of — the whole
+/// answer in one round trip, in the same card shape the list read returns, so any client (web or
+/// mobile) can render "still in: …" and offer the per-group removal without a roster fan-out.
+/// </summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record FriendGroupMembershipsResponse(IReadOnlyList<FriendGroupResponse> Groups)
+{
+    public static FriendGroupMembershipsResponse From(IReadOnlyList<FriendGroupSummary> groups) =>
+        new([.. groups.Select(FriendGroupResponse.From)]);
+}
+
+/// <summary>
 /// One roster row (D-199): "invited" | "accepted" on the wire. <c>Masked</c> is D-076's render-time
 /// posture for a member who is a blocked counterpart of the viewer — <c>DisplayName</c>/<c>Avatar</c>
 /// are absent when true, but the row (and its <c>Status</c>) is still listed: a block never removes a

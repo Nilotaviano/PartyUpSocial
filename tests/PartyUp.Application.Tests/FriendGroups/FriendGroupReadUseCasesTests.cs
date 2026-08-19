@@ -200,6 +200,48 @@ public sealed class FriendGroupReadUseCasesTests
         Assert.Null(inviteSummary.OwnerAvatar);
     }
 
+    [Fact]
+    public async Task ListOwnedContainingAsync_NamesOnlyOwnedGroupsHoldingAnAcceptedRow_D210()
+    {
+        var actor = UserId.New();
+        var target = UserId.New();
+        var otherOwner = UserId.New();
+
+        FriendGroup ownedWithTarget = BuildGroup(actor, [(target, accept: true)]);
+        FriendGroup ownedInviteOnly = BuildGroup(actor, [(target, accept: false)]);
+        FriendGroup ownedWithoutTarget = FriendGroup.Create(actor, GroupName.Create("Solo"), new TestClock(Now));
+        // The actor is only a member here — D-210 is actor-side and covers groups they OWN.
+        FriendGroup someoneElsesGroup = BuildGroup(otherOwner, [(actor, accept: true), (target, accept: true)]);
+
+        var groups = new FakeFriendGroupRepository();
+        groups.Items.AddRange([ownedWithTarget, ownedInviteOnly, ownedWithoutTarget, someoneElsesGroup]);
+
+        var useCase = new FriendGroupReadUseCases(groups, new FakeBlockRepository());
+
+        IReadOnlyList<FriendGroupSummary> result =
+            await useCase.ListOwnedContainingAsync(actor, target, CancellationToken.None);
+
+        FriendGroupSummary only = Assert.Single(result);
+        Assert.Equal(ownedWithTarget.Id, only.Id);
+        Assert.Equal(2, only.MemberCount);
+    }
+
+    [Fact]
+    public async Task ListOwnedContainingAsync_AnswersAStrangerAndSelfWithTheSameEmptyList_D210()
+    {
+        var actor = UserId.New();
+        var stranger = UserId.New();
+        FriendGroup owned = FriendGroup.Create(actor, GroupName.Create("Only mine"), new TestClock(Now));
+
+        var groups = new FakeFriendGroupRepository();
+        groups.Items.Add(owned);
+
+        var useCase = new FriendGroupReadUseCases(groups, new FakeBlockRepository());
+
+        Assert.Empty(await useCase.ListOwnedContainingAsync(actor, stranger, CancellationToken.None));
+        Assert.Empty(await useCase.ListOwnedContainingAsync(actor, actor, CancellationToken.None));
+    }
+
     private static FriendGroup BuildGroup(UserId owner, IReadOnlyList<(UserId member, bool accept)> members)
     {
         var clock = new TestClock(Now);
@@ -249,6 +291,11 @@ internal sealed class FakeFriendGroupRepository : IFriendGroupRepository
 
     public Task<IReadOnlyCollection<FriendGroup>> ListInvolvingAsync(UserId userId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyCollection<FriendGroup>>([.. Items.Where(g => g.Involves(userId))]);
+
+    public Task<IReadOnlyCollection<FriendGroup>> ListOwnedContainingAsync(
+        UserId ownerId, UserId memberId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyCollection<FriendGroup>>(
+            [.. Items.Where(g => g.OwnerId == ownerId && g.HasAcceptedMember(memberId)).OrderBy(g => g.Name.Value)]);
 
     public Task<IReadOnlyCollection<UserId>> ListDistinctOrganizersTargetingAsync(
         FriendGroupId groupId, CancellationToken cancellationToken) =>

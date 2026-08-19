@@ -30,13 +30,22 @@ public sealed class PollRepository(AppDbContext context) : IPollRepository
         context.Set<PollParticipant>().Remove(leftParticipant);
     }
 
-    public Task<Poll?> FindAsync(PollId id, CancellationToken cancellationToken) =>
-        LoadWithChildren(context.Polls).FirstOrDefaultAsync(poll => poll.Id == id, cancellationToken);
+    public async Task<Poll?> FindAsync(PollId id, CancellationToken cancellationToken)
+    {
+        Poll? poll = await LoadWithChildren(context.Polls)
+            .FirstOrDefaultAsync(poll => poll.Id == id, cancellationToken);
+        AudienceGroupOrdering.Normalize(poll);
+        return poll;
+    }
 
     /// <summary>Untracked on purpose (mirrors <see cref="ISessionRepository.FindNoTrackingAsync"/>).</summary>
-    public Task<Poll?> FindNoTrackingAsync(PollId id, CancellationToken cancellationToken) =>
-        LoadWithChildren(context.Polls.AsNoTracking())
+    public async Task<Poll?> FindNoTrackingAsync(PollId id, CancellationToken cancellationToken)
+    {
+        Poll? poll = await LoadWithChildren(context.Polls.AsNoTracking())
             .FirstOrDefaultAsync(poll => poll.Id == id, cancellationToken);
+        AudienceGroupOrdering.Normalize(poll);
+        return poll;
+    }
 
     public async Task<PollForUpdate?> LoadForUpdateAsync(PollId id, CancellationToken cancellationToken)
     {
@@ -49,6 +58,7 @@ public sealed class PollRepository(AppDbContext context) : IPollRepository
 
         Poll? poll = await LoadWithChildren(context.Polls)
             .FirstOrDefaultAsync(poll => poll.Id == id, cancellationToken);
+        AudienceGroupOrdering.Normalize(poll);
 
         if (poll is null)
         {

@@ -34,7 +34,9 @@ public sealed record JoinRequestCommandResult(bool Succeeded, string? Code, Sess
 /// active registered participant, so once the parent lock has loaded the roster,
 /// <see cref="RequestJoinAsync"/> takes a second bulk graph lock (one statement per table, A-068 order)
 /// over the requester paired with every such extender, unions it with the pre-parent-lock
-/// organizer-pair locks, and resolves the full <see cref="Viewer"/> against it. A blocked pair —
+/// organizer-pair locks, and resolves the full <see cref="Viewer"/> against it. For a Groups-visibility
+/// session, rule 2g (D-198) is resolved the same way, under the same parent lock, via
+/// <see cref="ViewerGroups.LockGrantingAsync"/> rather than the rule-2 friendship graph. A blocked pair —
 /// whether the organizer or any extender, discovered either before or after the parent lock — returns
 /// the same <c>session_not_found</c> a stranger gets (D-065); it is indistinguishable and writes
 /// nothing. <see cref="ApproveJoinRequestAsync"/> only ever attaches the already-known requester, so its

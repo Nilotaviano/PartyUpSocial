@@ -8,7 +8,7 @@
       "body": "Mira qué necesita tu atención y qué viene a continuación."
     },
     "friends": {
-      "name": "Amigos",
+      "name": "Amistades",
       "body": "Agrega amigos por código o enlace — PartyUp está pensado para amigos."
     },
     "groups": {
@@ -33,7 +33,7 @@
     },
     "notifications": {
       "name": "Notificaciones",
-      "body": "Las invitaciones y novedades llegan aquí; las notificaciones push son opcionales en ajustes."
+      "body": "Las invitaciones y novedades llegan aquí; las notificaciones push son opcionales en la configuración."
     },
     "settings": {
       "name": "Configuración",

@@ -145,6 +145,31 @@ public sealed class FriendGroupReadUseCases(IFriendGroupRepository groups, IBloc
         return new FriendGroupListResult(owned, memberOf, invites);
     }
 
+    /// <summary>
+    /// D-210's one-shot read: the groups the ACTOR owns that <paramref name="memberId"/> is an
+    /// <c>Accepted</c> member of, so the unfriend flow can name them without walking every owned
+    /// group's roster. Actor-side only, and fail-closed by construction — the query is scoped to the
+    /// actor's own groups, so a target the actor shares no owned group with (or a user id that names
+    /// nobody) is answered with the same empty list, disclosing no existence.
+    ///
+    /// No nameplate or block resolution happens here: the response names groups, never people, and
+    /// the actor already owns every group it can name.
+    /// </summary>
+    public async Task<IReadOnlyList<FriendGroupSummary>> ListOwnedContainingAsync(
+        UserId actorId,
+        UserId memberId,
+        CancellationToken cancellationToken)
+    {
+        if (actorId == memberId)
+        {
+            return [];
+        }
+
+        IReadOnlyCollection<FriendGroup> owned =
+            await groups.ListOwnedContainingAsync(actorId, memberId, cancellationToken);
+        return [.. owned.Select(FriendGroupSummary.From)];
+    }
+
     private static FriendGroupSummary WithOwner(
         FriendGroup group,
         IReadOnlyDictionary<Guid, UserNameplate> nameplates,

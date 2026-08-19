@@ -13,7 +13,7 @@
     },
     "groups": {
       "name": "Grupos",
-      "body": "Nomeie uma turma e compartilhe sessões e enquetes com todo mundo do grupo de uma vez."
+      "body": "Dê um nome à sua turma e compartilhe sessões e enquetes com todo mundo de uma vez."
     },
     "sessions": {
       "name": "Sessões",
@@ -37,7 +37,7 @@
     },
     "settings": {
       "name": "Configurações",
-      "body": "Abra o menu da conta para acessar as configurações — perfil, idioma e notificações — e para sair. Reveja este tour quando quiser, a partir das configurações."
+      "body": "Abra o menu da conta para acessar as configurações — perfil, idioma e notificações — e para sair. Reveja este tour quando quiser nas configurações."
     }
   },
   "actions": {

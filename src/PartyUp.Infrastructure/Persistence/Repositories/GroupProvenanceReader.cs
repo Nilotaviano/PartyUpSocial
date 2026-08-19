@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using PartyUp.Application.FriendGroups;
 using PartyUp.Domain.FriendGroups;
@@ -55,7 +56,13 @@ internal static class GroupProvenanceReader
 
         foreach ((Guid targetId, IReadOnlyCollection<FriendGroupId> audience) in targets)
         {
-            foreach (FriendGroupId groupId in audience)
+            // The owned audience-group collection each target's Poll/Session aggregate loads from
+            // (session_audience_groups / poll_audience_groups) carries no ORDER BY, so its
+            // materialization order is not guaranteed stable across query shapes — a page query
+            // batching many aggregates and a single-row detail query can return the same aggregate's
+            // rows in different orders. Sorting by group id here, ascending, before the "first match
+            // wins" tie-break keeps that tie-break deterministic regardless of load order.
+            foreach (FriendGroupId groupId in audience.OrderBy(id => id.Value))
             {
                 if (granting.TryGetValue(groupId, out GroupName? name))
                 {

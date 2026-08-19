@@ -564,7 +564,7 @@ function BandBlock({
 
   return (
     <div
-      role="button"
+      data-band={band.ruleId}
       tabIndex={0}
       {...pressProps}
       onKeyDown={(e) => {

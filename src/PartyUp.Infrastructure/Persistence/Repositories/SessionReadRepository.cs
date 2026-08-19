@@ -351,6 +351,7 @@ public sealed class SessionReadRepository(AppDbContext context) : ISessionReadRe
             .Include(session => session.JoinRequests)
             .Where(session => ids.Contains(session.Id))
             .ToListAsync(cancellationToken);
+        AudienceGroupOrdering.Normalize(sessions);
 
         Dictionary<Guid, Session> byId = sessions.ToDictionary(session => session.Id.Value);
         return [.. orderedIds.Select(id => byId[id])];

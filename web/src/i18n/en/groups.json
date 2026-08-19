@@ -134,7 +134,8 @@
   },
   "unfriend": {
     "remainsIn": "Will remain in: {{names}}",
-    "alsoRemove": "Also remove from my groups"
+    "alsoRemove": "Also remove from my groups",
+    "removeFailed": "Couldn't remove them from: {{names}}. Try again from the group page."
   },
   "errors": {
     "generic": "Something went wrong.",

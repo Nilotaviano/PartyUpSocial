@@ -10,18 +10,18 @@
   "sections": {
     "invites": "Convites pendentes",
     "myGroups": "Meus grupos",
-    "memberOf": "Grupos que participo",
+    "memberOf": "Grupos em que estou",
     "roster": "Membros",
     "invited": "Convidados"
   },
   "emptyState": {
     "owned": {
-      "title": "Você ainda não tem nenhum grupo",
-      "body": "Crie um grupo como \"Turma de RPG\" e convide os amigos com quem mais joga."
+      "title": "Você ainda não criou nenhum grupo",
+      "body": "Crie um grupo como \"Turma de RPG\" e convide os amigos com quem você mais joga."
     },
     "memberOf": {
       "title": "Nenhum grupo de amigos ainda",
-      "body": "Quando um amigo te adicionar a um grupo dele, ele aparece aqui depois que você aceitar."
+      "body": "Quando um amigo te adicionar a um grupo, ele aparece aqui depois que você aceitar."
     },
     "invited": {
       "title": "Nenhum convite enviado",
@@ -134,7 +134,8 @@
   },
   "unfriend": {
     "remainsIn": "Continuará em: {{names}}",
-    "alsoRemove": "Remover também dos meus grupos"
+    "alsoRemove": "Remover também dos meus grupos",
+    "removeFailed": "Não foi possível remover essa pessoa de: {{names}}. Tente novamente na página do grupo."
   },
   "errors": {
     "generic": "Algo deu errado.",

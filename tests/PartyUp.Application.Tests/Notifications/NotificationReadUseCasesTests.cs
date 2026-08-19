@@ -577,6 +577,11 @@ internal sealed class FakeFriendGroupRepository : IFriendGroupRepository
     public Task<IReadOnlyCollection<FriendGroup>> ListInvolvingAsync(UserId userId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyCollection<FriendGroup>>([.. Items.Where(g => g.Involves(userId))]);
 
+    public Task<IReadOnlyCollection<FriendGroup>> ListOwnedContainingAsync(
+        UserId ownerId, UserId memberId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyCollection<FriendGroup>>(
+            [.. Items.Where(g => g.OwnerId == ownerId && g.HasAcceptedMember(memberId)).OrderBy(g => g.Name.Value)]);
+
     public Task<IReadOnlyCollection<UserId>> ListDistinctOrganizersTargetingAsync(
         FriendGroupId groupId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyCollection<UserId>>([]);

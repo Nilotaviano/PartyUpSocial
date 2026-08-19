@@ -48,6 +48,7 @@ public static class ApiOperationIds
 
     // D-198/D-199: the friend group HTTP surface, relative to /api/v1.
     public const string ListFriendGroups = "ListFriendGroups";
+    public const string ListFriendGroupsContainingUser = "ListFriendGroupsContainingUser";
     public const string CreateFriendGroup = "CreateFriendGroup";
     public const string GetFriendGroup = "GetFriendGroup";
     public const string RenameFriendGroup = "RenameFriendGroup";

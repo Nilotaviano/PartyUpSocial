@@ -122,6 +122,21 @@ public sealed class FriendGroupRepository(AppDbContext context) : IFriendGroupRe
             .OrderBy(group => group.Id)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyCollection<FriendGroup>> ListOwnedContainingAsync(
+        UserId ownerId,
+        UserId memberId,
+        CancellationToken cancellationToken) =>
+        await context.FriendGroups
+            .AsNoTracking()
+            .Include(group => group.Members)
+            .Where(group =>
+                group.OwnerId == ownerId &&
+                group.Members.Any(member =>
+                    member.UserId == memberId && member.Status == FriendGroupMemberStatus.Accepted))
+            .OrderBy(group => group.Name)
+            .ThenBy(group => group.Id)
+            .ToListAsync(cancellationToken);
+
     /// <summary>Mirrors <c>PollReadRepository.FindNameplatesAsync</c> exactly — one bulk, non-locking read.</summary>
     public async Task<IReadOnlyDictionary<Guid, UserNameplate>> FindNameplatesAsync(
         IReadOnlyCollection<UserId> userIds,

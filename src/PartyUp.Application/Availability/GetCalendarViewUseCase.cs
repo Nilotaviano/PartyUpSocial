@@ -8,10 +8,15 @@ using PartyUp.Domain.Polls;
 namespace PartyUp.Application.Availability;
 
 /// <summary>
-/// One candidate instant on an involved poll, with the viewer's own current vote (PHASE6_DESIGN.md
-/// §5 calendar bullet) -- null when the viewer has not voted on this option yet.
+/// One candidate instant on an involved poll, with the option's own D-211 length and the viewer's
+/// own current vote (PHASE6_DESIGN.md §5 calendar bullet) -- the vote is null when the viewer has
+/// not voted on this option yet.
 /// </summary>
-public sealed record CalendarPollOptionInstant(PollOptionId OptionId, Instant StartTime, VoteChoice? OwnVote);
+public sealed record CalendarPollOptionInstant(
+    PollOptionId OptionId,
+    Instant StartTime,
+    Duration15 Duration,
+    VoteChoice? OwnVote);
 
 /// <summary>
 /// A-080's poll layer, filled by S4c (§1.2 declared it empty in Phase 5): one row per poll the viewer

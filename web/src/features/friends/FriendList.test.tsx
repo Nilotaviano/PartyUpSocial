@@ -50,33 +50,29 @@ afterEach(() => {
 })
 
 describe('UnfriendDialog — D210 shared-group surfacing', () => {
-  it('lists the owned groups the target remains in, and fires member-remove after unfriend when checked', async () => {
-    api.get.mockImplementation((path: string, options?: { params?: { path?: { groupId?: string } } }) => {
-      if (path === '/api/v1/friend-groups') {
+  const CONTAINING = '/api/v1/friend-groups/containing/{userId}'
+
+  function mockContaining(groups: { id: string; name: string }[]) {
+    api.get.mockImplementation((path: string, options?: unknown) => {
+      if (path === CONTAINING) {
         return Promise.resolve({
           data: {
-            owned: [{ id: 'g1', name: 'D&D crew', ownerId: 'me', createdAt: '2030-01-01T00:00:00Z', memberCount: 2, ownerMasked: false }],
-            memberOf: [],
-            invites: [],
-          },
-        })
-      }
-      if (path === '/api/v1/friend-groups/{groupId}') {
-        return Promise.resolve({
-          data: {
-            id: 'g1',
-            name: 'D&D crew',
-            ownerId: 'me',
-            createdAt: '2030-01-01T00:00:00Z',
-            ownerMasked: false,
-            members: [
-              { userId: 'friend-1', status: 'accepted', invitedAt: '2030-01-01T00:00:00Z', acceptedAt: '2030-01-01T00:00:00Z' },
-            ],
+            groups: groups.map((group) => ({
+              ...group,
+              ownerId: 'me',
+              createdAt: '2030-01-01T00:00:00Z',
+              memberCount: 2,
+              ownerMasked: false,
+            })),
           },
         })
       }
       throw new Error(`Unexpected GET ${path} ${JSON.stringify(options)}`)
     })
+  }
+
+  it('resolves the remains-in groups with a single request, and fires member-remove after unfriend when checked_D210', async () => {
+    mockContaining([{ id: 'g1', name: 'D&D crew' }])
     api.delete.mockResolvedValue({})
 
     renderList()
@@ -84,6 +80,14 @@ describe('UnfriendDialog — D210 shared-group surfacing', () => {
 
     const dialog = await screen.findByRole('dialog')
     expect(await within(dialog).findByText('Will remain in: D&D crew')).toBeInTheDocument()
+
+    // One round trip for the whole answer — no per-owned-group roster fan-out.
+    expect(api.get).toHaveBeenCalledTimes(1)
+    expect(api.get).toHaveBeenCalledWith(
+      CONTAINING,
+      expect.objectContaining({ params: { path: { userId: 'friend-1' } } }),
+    )
+
     const checkbox = within(dialog).getByRole('checkbox', { name: 'Also remove from my groups' })
     // Checked by default, per the Lovable canon.
     expect(checkbox).toBeChecked()
@@ -107,32 +111,7 @@ describe('UnfriendDialog — D210 shared-group surfacing', () => {
   })
 
   it('skips every group-removal mutation when the checkbox is unchecked_D210', async () => {
-    api.get.mockImplementation((path: string) => {
-      if (path === '/api/v1/friend-groups') {
-        return Promise.resolve({
-          data: {
-            owned: [{ id: 'g1', name: 'D&D crew', ownerId: 'me', createdAt: '2030-01-01T00:00:00Z', memberCount: 2, ownerMasked: false }],
-            memberOf: [],
-            invites: [],
-          },
-        })
-      }
-      if (path === '/api/v1/friend-groups/{groupId}') {
-        return Promise.resolve({
-          data: {
-            id: 'g1',
-            name: 'D&D crew',
-            ownerId: 'me',
-            createdAt: '2030-01-01T00:00:00Z',
-            ownerMasked: false,
-            members: [
-              { userId: 'friend-1', status: 'accepted', invitedAt: '2030-01-01T00:00:00Z', acceptedAt: '2030-01-01T00:00:00Z' },
-            ],
-          },
-        })
-      }
-      throw new Error(`Unexpected GET ${path}`)
-    })
+    mockContaining([{ id: 'g1', name: 'D&D crew' }])
     api.delete.mockResolvedValue({})
 
     renderList()
@@ -157,35 +136,13 @@ describe('UnfriendDialog — D210 shared-group surfacing', () => {
     )
   })
 
-  it('closes the dialog and reports the unfriend as done even when the best-effort group removal fails_D210', async () => {
-    api.get.mockImplementation((path: string) => {
-      if (path === '/api/v1/friend-groups') {
-        return Promise.resolve({
-          data: {
-            owned: [{ id: 'g1', name: 'D&D crew', ownerId: 'me', createdAt: '2030-01-01T00:00:00Z', memberCount: 2, ownerMasked: false }],
-            memberOf: [],
-            invites: [],
-          },
-        })
-      }
-      if (path === '/api/v1/friend-groups/{groupId}') {
-        return Promise.resolve({
-          data: {
-            id: 'g1',
-            name: 'D&D crew',
-            ownerId: 'me',
-            createdAt: '2030-01-01T00:00:00Z',
-            ownerMasked: false,
-            members: [
-              { userId: 'friend-1', status: 'accepted', invitedAt: '2030-01-01T00:00:00Z', acceptedAt: '2030-01-01T00:00:00Z' },
-            ],
-          },
-        })
-      }
-      throw new Error(`Unexpected GET ${path}`)
-    })
-    api.delete.mockImplementation((path: string) => {
-      if (path === '/api/v1/friend-groups/{groupId}/members/{userId}') {
+  it('names the groups whose removal failed and leaves the succeeded ones unnamed_D210', async () => {
+    mockContaining([
+      { id: 'g1', name: 'D&D crew' },
+      { id: 'g2', name: 'Raid night' },
+    ])
+    api.delete.mockImplementation((path: string, options: { params: { path: { groupId?: string } } }) => {
+      if (path === '/api/v1/friend-groups/{groupId}/members/{userId}' && options.params.path.groupId === 'g2') {
         return Promise.reject(new Error('boom'))
       }
       return Promise.resolve({})
@@ -196,28 +153,22 @@ describe('UnfriendDialog — D210 shared-group surfacing', () => {
     openUnfriendDialog()
 
     const dialog = await screen.findByRole('dialog')
-    expect(await within(dialog).findByText('Will remain in: D&D crew')).toBeInTheDocument()
+    expect(await within(dialog).findByText('Will remain in: D&D crew, Raid night')).toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remove friend' }))
 
     // The unfriend itself succeeded, so the dialog closes regardless of the
-    // group-removal outcome that follows it.
+    // group-removal outcome that follows it — but the failure is reported, and
+    // reported per group: only the one still holding them is named.
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     await waitFor(() =>
-      expect(api.delete).toHaveBeenCalledWith(
-        '/api/v1/friend-groups/{groupId}/members/{userId}',
-        expect.anything(),
-      ),
+      expect(toastSpy).toHaveBeenCalledWith({
+        message: "Couldn't remove them from: Raid night. Try again from the group page.",
+      }),
     )
-    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith({ message: 'Something went wrong.' }))
   })
 
   it('renders no remains-in note when the target is in none of the actor owned groups', async () => {
-    api.get.mockImplementation((path: string) => {
-      if (path === '/api/v1/friend-groups') {
-        return Promise.resolve({ data: { owned: [], memberOf: [], invites: [] } })
-      }
-      throw new Error(`Unexpected GET ${path}`)
-    })
+    mockContaining([])
     api.delete.mockResolvedValue({})
 
     renderList()

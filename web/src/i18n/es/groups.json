@@ -21,7 +21,7 @@
     },
     "memberOf": {
       "title": "Todavía no hay grupos de amigos",
-      "body": "Cuando un amigo te añada a uno de sus grupos, aparecerá aquí después de que lo aceptes."
+      "body": "Cuando un amigo te agregue a uno de sus grupos, aparecerá aquí después de que lo aceptes."
     },
     "invited": {
       "title": "No hay invitaciones enviadas",
@@ -57,7 +57,7 @@
   },
   "newGroup": {
     "title": "Nuevo grupo",
-    "description": "Ponle un nombre e invita amigos. Se unen en cuanto acepten.",
+    "description": "Ponle un nombre e invita a amigos. Se unen en cuanto acepten.",
     "nameLabel": "Nombre del grupo",
     "namePlaceholder": "Grupo de rol",
     "nameRequired": "Ponle un nombre al grupo.",
@@ -134,7 +134,8 @@
   },
   "unfriend": {
     "remainsIn": "Seguirá en: {{names}}",
-    "alsoRemove": "Quitar también de mis grupos"
+    "alsoRemove": "Quitar también de mis grupos",
+    "removeFailed": "No se pudo quitar a esta persona de: {{names}}. Inténtalo de nuevo desde la página del grupo."
   },
   "errors": {
     "generic": "Algo salió mal.",

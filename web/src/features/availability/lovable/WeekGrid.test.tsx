@@ -225,7 +225,7 @@ describe('WeekGrid pointer flow', () => {
     })
     stubColumn(1)
 
-    fireEvent.pointerDown(screen.getByRole('button', { name: /09:00/ }), { button: 0, clientY: 60 })
+    fireEvent.pointerDown(document.querySelector('[data-band="block-a"]')!, { button: 0, clientY: 60 })
     fireEvent.pointerUp(window, { clientX: 20, clientY: 60 })
 
     expect(onSelect).toHaveBeenCalledWith('block-a')
@@ -492,10 +492,9 @@ describe('WeekGrid layers', () => {
 
     // Both rules stay separately addressable, including the one `merged` does
     // not fully cover.
-    const bands = screen.getAllByRole('button', { name: /09:/ })
-    fireEvent.pointerDown(bands[0])
+    fireEvent.pointerDown(document.querySelector('[data-band="block-a"]')!)
     expect(onSelect).toHaveBeenCalledWith('block-a')
-    fireEvent.pointerDown(bands[1])
+    fireEvent.pointerDown(document.querySelector('[data-band="block-b"]')!)
     expect(onSelect).toHaveBeenCalledWith('block-b')
   })
 
@@ -656,6 +655,36 @@ describe('WeekGrid layers', () => {
     expect(row?.children[0]).toBe(rowHeader)
     expect(rowHeader.children).toHaveLength(1)
     expect(rowHeader.children[0]).toHaveClass('sr-only')
+  })
+})
+
+describe('WeekGrid band accessibility', () => {
+  const rules: AvailabilityRule[] = [
+    { id: 'block-a', kind: 'oneoff', days: [1], start: 540, end: 660, intent: 'free' },
+  ]
+
+  it('exposes no interactive role on the band wrapper, so its handle buttons are never nested inside another interactive control_S4', () => {
+    renderGrid({ rules, selectedId: 'block-a' })
+
+    const band = document.querySelector('[data-band="block-a"]')!
+    expect(band).not.toHaveAttribute('role', 'button')
+    // The only `button` roles under the band are its own resize handles —
+    // never the band itself, which would nest interactive-in-interactive.
+    const handles = screen.getAllByRole('button', { name: /Change (start|end) time/ })
+    expect(handles).toHaveLength(2)
+    handles.forEach((handle) => expect(band.contains(handle)).toBe(true))
+  })
+
+  it('keeps the band keyboard-focusable and selects it on Enter, the same path role="button" used to provide_S4', () => {
+    const { onSelect } = renderGrid({ rules })
+
+    const band = document.querySelector('[data-band="block-a"]')!
+    expect(band).toHaveAttribute('tabindex', '0')
+    fireEvent.keyDown(band, { key: 'Enter' })
+    expect(onSelect).toHaveBeenCalledWith('block-a')
+
+    fireEvent.keyDown(band, { key: ' ' })
+    expect(onSelect).toHaveBeenCalledTimes(2)
   })
 })
 

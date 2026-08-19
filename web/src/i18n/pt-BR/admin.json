@@ -33,7 +33,7 @@
     "noValue": "—",
     "noValueLabel": "Ainda sem valor",
     "feedbackLink": "Revisar feedback",
-    "unhandledFeedback": "Feedback sem tratar"
+    "unhandledFeedback": "Feedback não tratado"
   },
   "users": {
     "heading": "Gestão de contas",
@@ -116,7 +116,7 @@
       "handled": "Situação",
       "all": "Todos",
       "handledOnly": "Tratados",
-      "unhandledOnly": "Sem tratar"
+      "unhandledOnly": "Não tratados"
     },
     "types": {
       "bug": "Erro",
@@ -128,7 +128,7 @@
     "anonymous": "Anônimo",
     "submitted": "Enviado",
     "handledAt": "Tratado em {{date}}",
-    "notHandled": "Sem tratar",
+    "notHandled": "Não tratado",
     "context": {
       "heading": "Contexto",
       "route": "Rota",
@@ -138,7 +138,7 @@
       "none": "Não anexado"
     },
     "markHandled": "Marcar como tratado",
-    "markUnhandled": "Marcar como sem tratar",
+    "markUnhandled": "Marcar como não tratado",
     "pagination": {
       "previous": "Página anterior",
       "next": "Próxima página",

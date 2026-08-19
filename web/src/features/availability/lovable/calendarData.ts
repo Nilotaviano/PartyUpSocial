@@ -177,10 +177,9 @@ export function mapCalendar(
     title: poll.title,
     options: poll.options.flatMap((option) => {
       const start = instantToFakeLocal(option.startTime, timeZone)
-      // The calendar poll layer's wire shape (CalendarPollOptionInstant) does not
-      // carry the option's own D-211 duration yet, so the pill is painted as a
-      // one-hour block regardless of the option's real length.
-      const end = new Date(start.getTime() + 60 * 60_000)
+      // D-211: each candidate carries its own length, so the pill spans exactly
+      // that — a 15-minute and a 5-hour option must not paint identically.
+      const end = new Date(start.getTime() + Number(option.durationMinutes) * 60_000)
       const [segment] = segmentsInWeek(start, end, weekStart)
       if (!segment) return []
       return [

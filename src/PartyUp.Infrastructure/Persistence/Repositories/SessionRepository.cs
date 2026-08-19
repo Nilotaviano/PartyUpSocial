@@ -20,13 +20,22 @@ public sealed class SessionRepository(AppDbContext context) : ISessionRepository
 {
     public void Add(Session session) => context.Sessions.Add(session);
 
-    public Task<Session?> FindAsync(SessionId id, CancellationToken cancellationToken) =>
-        LoadWithChildren(context.Sessions).FirstOrDefaultAsync(session => session.Id == id, cancellationToken);
+    public async Task<Session?> FindAsync(SessionId id, CancellationToken cancellationToken)
+    {
+        Session? session = await LoadWithChildren(context.Sessions)
+            .FirstOrDefaultAsync(session => session.Id == id, cancellationToken);
+        AudienceGroupOrdering.Normalize(session);
+        return session;
+    }
 
     /// <summary>Untracked on purpose (A-069/§6.1 step 1) — see the interface doc for why.</summary>
-    public Task<Session?> FindNoTrackingAsync(SessionId id, CancellationToken cancellationToken) =>
-        LoadWithChildren(context.Sessions.AsNoTracking())
+    public async Task<Session?> FindNoTrackingAsync(SessionId id, CancellationToken cancellationToken)
+    {
+        Session? session = await LoadWithChildren(context.Sessions.AsNoTracking())
             .FirstOrDefaultAsync(session => session.Id == id, cancellationToken);
+        AudienceGroupOrdering.Normalize(session);
+        return session;
+    }
 
     public async Task<SessionForUpdate?> LoadForUpdateAsync(SessionId id, CancellationToken cancellationToken)
     {
@@ -39,6 +48,7 @@ public sealed class SessionRepository(AppDbContext context) : ISessionRepository
 
         Session? session = await LoadWithChildren(context.Sessions)
             .FirstOrDefaultAsync(session => session.Id == id, cancellationToken);
+        AudienceGroupOrdering.Normalize(session);
 
         if (session is null)
         {

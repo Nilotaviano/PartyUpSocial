@@ -54,6 +54,16 @@ public interface IFriendGroupRepository
     Task<IReadOnlyCollection<FriendGroup>> ListInvolvingAsync(UserId userId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// D-210: every group <paramref name="ownerId"/> owns that holds an <c>Accepted</c> row for
+    /// <paramref name="memberId"/>. Scoped to owned groups by the query itself, so the answer can
+    /// never name a group the caller is not the owner of.
+    /// </summary>
+    Task<IReadOnlyCollection<FriendGroup>> ListOwnedContainingAsync(
+        UserId ownerId,
+        UserId memberId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Bulk name+avatar resolution for a group's owner + roster, mirroring
     /// <c>IPollReadRepository.FindNameplatesAsync</c> exactly: one prefetch, both fields, so no read
     /// path can resolve one without the other.

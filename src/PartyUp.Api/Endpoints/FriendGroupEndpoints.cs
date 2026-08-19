@@ -26,6 +26,10 @@ public static class FriendGroupEndpoints
                 .WithName(ApiOperationIds.ListFriendGroups)
                 .Produces<FriendGroupListResponse>());
 
+        Common(groups.MapGet("/friend-groups/containing/{userId:guid}", ListFriendGroupsContainingUserAsync)
+                .WithName(ApiOperationIds.ListFriendGroupsContainingUser)
+                .Produces<FriendGroupMembershipsResponse>());
+
         BodyOperation(groups.MapPost("/friend-groups", CreateFriendGroupAsync)
                 .WithName(ApiOperationIds.CreateFriendGroup)
                 .Produces<FriendGroupResponse>(StatusCodes.Status201Created));
@@ -90,6 +94,29 @@ public static class FriendGroupEndpoints
 
         FriendGroupListResult result = await useCase.ListMineAsync(actorId.Value, cancellationToken);
         return Results.Ok(FriendGroupListResponse.From(result));
+    }
+
+    /// <summary>
+    /// D-210: the caller's own groups that <c>userId</c> is an Accepted member of. Never 404s on the
+    /// target — a user the caller shares no owned group with reads the same empty list a nonexistent
+    /// one does, so the route discloses nothing about who exists.
+    /// </summary>
+    private static async Task<IResult> ListFriendGroupsContainingUserAsync(
+        Guid userId,
+        ICurrentUserAccessor currentUser,
+        FriendGroupReadUseCases useCase,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = await ActorIdAsync(currentUser, cancellationToken);
+        if (actorId is null)
+        {
+            return Problem(context, StatusCodes.Status401Unauthorized, "unauthorized");
+        }
+
+        IReadOnlyList<FriendGroupSummary> owned = await useCase.ListOwnedContainingAsync(
+            actorId.Value, UserId.From(userId), cancellationToken);
+        return Results.Ok(FriendGroupMembershipsResponse.From(owned));
     }
 
     private static async Task<IResult> CreateFriendGroupAsync(

@@ -98,6 +98,7 @@ function calendarResponse() {
           {
             optionId: '55555555-5555-5555-5555-555555555555',
             startTime: '2026-08-13T20:00:00Z',
+            durationMinutes: 90,
             ownVote: 'available',
           },
         ],

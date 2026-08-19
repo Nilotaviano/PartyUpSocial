@@ -10,12 +10,14 @@ namespace PartyUp.Api.Contracts.Availability;
 public sealed record CalendarPollOptionInstantResponse(
     Guid OptionId,
     string StartTime,
+    int DurationMinutes,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? OwnVote)
 {
     public static CalendarPollOptionInstantResponse From(CalendarPollOptionInstant instant) =>
         new(
             instant.OptionId.Value,
             SessionWireFormat.Format(instant.StartTime),
+            instant.Duration.TotalMinutes,
             instant.OwnVote is { } choice ? PollWireFormat.VoteChoice(choice) : null);
 }
 

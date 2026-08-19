@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -112,6 +113,72 @@ public sealed class FriendGroupFlowTests : IAsyncLifetime, IDisposable
         Assert.True(followUpHasViaGroup);
         Assert.Equal(followUpViaGroup.GetProperty("id").GetGuid(), createdViaGroup.GetProperty("id").GetGuid());
         Assert.Equal(followUpViaGroup.GetProperty("name").GetString(), createdViaGroup.GetProperty("name").GetString());
+    }
+
+    /// <summary>
+    /// D-206 regression pin for the list-vs-detail nondeterminism found via ledger T9: a viewer who is
+    /// an Accepted member of two groups the session targets must resolve the exact same
+    /// <c>viaGroup</c> whether the session is read off the list page or the detail GET. The audience
+    /// is submitted group-B-then-group-A — the reverse of creation (and so of ascending id) order —
+    /// specifically so the pin exercises the tie-break, not an accidental agreement between insertion
+    /// order and the sort key. Before the audience-group load carried an explicit order, the two query
+    /// shapes could materialize the owned <c>_audienceGroups</c> collection differently and hand
+    /// <c>GroupProvenanceReader</c>'s "first match wins" tie-break a different candidate each time.
+    /// The pin also nails the tie-break to ascending group id, not just cross-page agreement, so a
+    /// regression that keeps the two pages consistent but reintroduces an unordered load elsewhere
+    /// still fails.
+    /// </summary>
+    [Fact]
+    public async Task ViaGroupTieBreakIsDeterministicAcrossListAndDetail_ViewerInTwoAudienceGroups_D206()
+    {
+        SessionHttpUser owner = await SessionEndpointTestSupport.SeedAsync(_factory);
+        SessionHttpUser viewer = await SessionEndpointTestSupport.SeedAsync(_factory);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, owner.Id, viewer.Id);
+
+        using SessionHttpSession ownerSession = await SessionEndpointTestSupport.SignInAsync(_factory, owner.Id);
+        using SessionHttpSession viewerSession = await SessionEndpointTestSupport.SignInAsync(_factory, viewer.Id);
+
+        Guid groupA = await CreateGroupAsync(ownerSession, "Tie-break group A");
+        Guid groupB = await CreateGroupAsync(ownerSession, "Tie-break group B");
+        await InviteMembersAsync(ownerSession, groupA, [viewer.Id.Value]);
+        await AcceptInviteAsync(viewerSession, groupA);
+        await InviteMembersAsync(ownerSession, groupB, [viewer.Id.Value]);
+        await AcceptInviteAsync(viewerSession, groupB);
+
+        HttpResponseMessage created = await ownerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/sessions",
+            JsonContent.Create(new
+            {
+                title = "Targeted at both groups",
+                startTime = SessionEndpointTestSupport.Iso(
+                    _factory.Clock.GetCurrentInstant() + Duration.FromDays(1)),
+                minAttendance = 1,
+                visibility = "groups",
+                // Reversed vs. creation order on purpose — see the method doc.
+                audienceGroupIds = new[] { groupB, groupA },
+            }));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        using JsonDocument createdBody = await SessionEndpointTestSupport.SuccessJsonAsync(created);
+        Guid sessionId = createdBody.RootElement.GetProperty("session").GetProperty("id").GetGuid();
+
+        Guid expectedViaGroup = groupA.CompareTo(groupB) < 0 ? groupA : groupB;
+
+        using JsonDocument detail = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await viewerSession.GetAsync($"/api/v1/sessions/{sessionId:D}"));
+        JsonElement detailViaGroup = detail.RootElement.GetProperty("viaGroup");
+        Assert.Equal(JsonValueKind.Object, detailViaGroup.ValueKind);
+        Assert.Equal(expectedViaGroup, detailViaGroup.GetProperty("id").GetGuid());
+
+        using JsonDocument list = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await viewerSession.GetAsync("/api/v1/sessions?scope=upcoming"));
+        JsonElement listItem = list.RootElement.GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == sessionId);
+        JsonElement listViaGroup = listItem.GetProperty("viaGroup");
+        Assert.Equal(JsonValueKind.Object, listViaGroup.ValueKind);
+        Assert.Equal(expectedViaGroup, listViaGroup.GetProperty("id").GetGuid());
+
+        Assert.Equal(detailViaGroup.GetProperty("id").GetGuid(), listViaGroup.GetProperty("id").GetGuid());
     }
 
     [Fact]
@@ -249,6 +316,60 @@ public sealed class FriendGroupFlowTests : IAsyncLifetime, IDisposable
             .Single(m => m.GetProperty("userId").GetGuid() == memberB.Id.Value);
         Assert.False(bRowForOwner.GetProperty("masked").GetBoolean());
         Assert.Equal("HTTP Session Test", bRowForOwner.GetProperty("displayName").GetString());
+    }
+
+    /// <summary>
+    /// D-210: the unfriend flow's one-shot read. Accepted rows in the caller's OWN groups only —
+    /// an outstanding invite is not "remaining in" anything, someone else's group is not the
+    /// caller's to surface, and a target sharing no owned group reads the same empty list a
+    /// nonexistent user does.
+    /// </summary>
+    [Fact]
+    public async Task ContainingUser_ReturnsOwnedAcceptedGroupsInOneCall_D210()
+    {
+        SessionHttpUser owner = await SessionEndpointTestSupport.SeedAsync(_factory);
+        SessionHttpUser member = await SessionEndpointTestSupport.SeedAsync(_factory);
+        SessionHttpUser bystander = await SessionEndpointTestSupport.SeedAsync(_factory);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, owner.Id, member.Id);
+        await SessionEndpointTestSupport.MakeFriendsAsync(_factory, bystander.Id, member.Id);
+
+        using SessionHttpSession ownerSession = await SessionEndpointTestSupport.SignInAsync(_factory, owner.Id);
+        using SessionHttpSession memberSession = await SessionEndpointTestSupport.SignInAsync(_factory, member.Id);
+        using SessionHttpSession bystanderSession =
+            await SessionEndpointTestSupport.SignInAsync(_factory, bystander.Id);
+
+        Guid acceptedGroupId = await CreateGroupAsync(ownerSession, "Accepted crew");
+        await InviteMembersAsync(ownerSession, acceptedGroupId, [member.Id.Value]);
+        await AcceptInviteAsync(memberSession, acceptedGroupId);
+
+        Guid invitedOnlyGroupId = await CreateGroupAsync(ownerSession, "Invite pending crew");
+        await InviteMembersAsync(ownerSession, invitedOnlyGroupId, [member.Id.Value]);
+
+        Guid bystanderGroupId = await CreateGroupAsync(bystanderSession, "Not the owner's crew");
+        await InviteMembersAsync(bystanderSession, bystanderGroupId, [member.Id.Value]);
+        await AcceptInviteAsync(memberSession, bystanderGroupId);
+
+        using JsonDocument ownerView = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await ownerSession.GetAsync($"/api/v1/friend-groups/containing/{member.Id.Value:D}"));
+        JsonElement[] groups = [.. ownerView.RootElement.GetProperty("groups").EnumerateArray()];
+        JsonElement only = Assert.Single(groups);
+        Assert.Equal(acceptedGroupId, only.GetProperty("id").GetGuid());
+        Assert.Equal("Accepted crew", only.GetProperty("name").GetString());
+        Assert.Equal(2, only.GetProperty("memberCount").GetInt32());
+
+        // A target the caller shares no owned group with, and a user id that names nobody, read alike.
+        using JsonDocument noSharedGroups = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await ownerSession.GetAsync($"/api/v1/friend-groups/containing/{bystander.Id.Value:D}"));
+        Assert.Empty(noSharedGroups.RootElement.GetProperty("groups").EnumerateArray());
+
+        using JsonDocument unknownUser = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await ownerSession.GetAsync($"/api/v1/friend-groups/containing/{Guid.NewGuid():D}"));
+        Assert.Empty(unknownUser.RootElement.GetProperty("groups").EnumerateArray());
+
+        // The member's own read of the owner names nothing — the surface is the caller's owned groups.
+        using JsonDocument memberView = await SessionEndpointTestSupport.SuccessJsonAsync(
+            await memberSession.GetAsync($"/api/v1/friend-groups/containing/{owner.Id.Value:D}"));
+        Assert.Empty(memberView.RootElement.GetProperty("groups").EnumerateArray());
     }
 
     [Fact]

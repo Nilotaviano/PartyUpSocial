@@ -5,7 +5,7 @@ Enviado em: {{SubmittedAt}}
 Autor: {{Submitter}}
 Rota: {{Route}}
 Idioma: {{Locale}}
-Versao do app: {{AppVersion}}
+Versão do app: {{AppVersion}}
 User agent: {{UserAgent}}
 
 Mensagem:

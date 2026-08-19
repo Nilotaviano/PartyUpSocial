@@ -68,7 +68,7 @@
   "list": {
     "heading": "Encuestas",
     "description": "Vota los horarios candidatos y finaliza el ganador en una sesión.",
-    "bandTabsLabel": "Grupos de encuestas",
+    "bandTabsLabel": "Secciones de encuestas",
     "involved": "Tus encuestas",
     "discoverable": "Descubrir",
     "emptyInvolved": "No tienes encuestas activas.",

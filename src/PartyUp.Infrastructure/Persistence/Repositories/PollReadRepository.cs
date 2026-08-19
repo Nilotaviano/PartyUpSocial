@@ -173,7 +173,7 @@ public sealed class PollReadRepository(AppDbContext context) : IPollReadReposito
                     .FirstOrDefault(v => v.OptionId == option.Id && v.UserId == viewerId)
                     ?.Choice;
 
-                instants.Add(new CalendarPollOptionInstant(option.Id, option.StartTime, ownVote));
+                instants.Add(new CalendarPollOptionInstant(option.Id, option.StartTime, option.Duration, ownVote));
             }
 
             if (instants.Count > 0)
@@ -199,6 +199,7 @@ public sealed class PollReadRepository(AppDbContext context) : IPollReadReposito
             .Include(poll => poll.Votes)
             .Where(poll => ids.Contains(poll.Id))
             .ToListAsync(cancellationToken);
+        AudienceGroupOrdering.Normalize(polls);
 
         Dictionary<Guid, Poll> byId = polls.ToDictionary(poll => poll.Id.Value);
         return [.. orderedIds.Select(id => byId[id])];
