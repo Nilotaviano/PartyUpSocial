@@ -5,6 +5,7 @@
     "action": "Instalar",
     "dismiss": "Ahora no",
     "menuRow": "Instalar app",
+    "accepted": "Instalando — el icono de PartyUp aparecerá en tu pantalla de inicio en breve.",
     "ios": {
       "heading": "Añadir PartyUp a la pantalla de inicio",
       "description": "Safari instala apps desde su menú Compartir.",

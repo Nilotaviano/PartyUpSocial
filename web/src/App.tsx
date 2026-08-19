@@ -42,6 +42,7 @@ import { TermsPage } from './features/legal/TermsPage'
 import { NotificationCenterPage } from './features/notifications/NotificationCenterPage'
 import { PushEnableCard } from './features/notifications/PushEnableCard'
 import { OnboardingWizard } from './features/onboarding/OnboardingWizard'
+import { InstallAcceptedNotice } from './features/pwa/InstallAcceptedNotice'
 import { InstallBanner } from './features/pwa/InstallBanner'
 import { OfflineBanner } from './features/pwa/OfflineBanner'
 import { TourOverlay } from './features/tour'
@@ -159,12 +160,16 @@ function LifecycleRedirect() {
  * D-219's offline notice and D-220's install promotion are mounted once here, outside every
  * shell: the guest RSVP/vote pages, the age gate, the /auth/* screens and the unsubscribe page
  * all render without a shell, and each of them is a surface a visitor can land on cold.
+ * `InstallAcceptedNotice` lives here too rather than inside `ToastHost` (AuthenticatedShell-only)
+ * because both install entry points — this banner and the AccountMenu row — must be able to
+ * confirm an accepted install from any of those shell-less surfaces as well.
  */
 function GlobalBanners() {
   return (
     <div className="bg-page text-ink">
       <OfflineBanner />
       <InstallBanner />
+      <InstallAcceptedNotice />
     </div>
   )
 }

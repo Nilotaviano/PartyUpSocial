@@ -59,6 +59,40 @@ export function getDeferredInstallPrompt(): BeforeInstallPromptEvent | null {
 
 export type InstallOutcome = 'accepted' | 'dismissed' | 'unavailable'
 
+let installAccepted = false
+const acceptedSubscribers = new Set<() => void>()
+
+function emitAccepted() {
+  for (const notify of acceptedSubscribers) notify()
+}
+
+/**
+ * Shared "the native dialog was just accepted" flag, set by `showNativeInstallPrompt` regardless
+ * of which caller (InstallBanner or the AccountMenu row) triggered it, so one confirmation notice
+ * mounted once at the app root (`InstallAcceptedNotice`) covers both.
+ */
+export function subscribeToInstallAccepted(onStoreChange: () => void) {
+  acceptedSubscribers.add(onStoreChange)
+  return () => {
+    acceptedSubscribers.delete(onStoreChange)
+  }
+}
+
+export function getInstallAccepted(): boolean {
+  return installAccepted
+}
+
+export function clearInstallAccepted() {
+  if (!installAccepted) return
+  installAccepted = false
+  emitAccepted()
+}
+
+function markInstallAccepted() {
+  installAccepted = true
+  emitAccepted()
+}
+
 /**
  * Shows the browser's own install dialog. The captured event is single-use: it is released
  * whatever the outcome, which collapses `canPromptNative` so no surface re-offers a dead prompt.
@@ -70,6 +104,7 @@ export async function showNativeInstallPrompt(): Promise<InstallOutcome> {
   emit()
   await event.prompt()
   const { outcome } = await event.userChoice
+  if (outcome === 'accepted') markInstallAccepted()
   return outcome
 }
 

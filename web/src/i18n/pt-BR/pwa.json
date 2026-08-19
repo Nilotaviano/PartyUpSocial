@@ -5,6 +5,7 @@
     "action": "Instalar",
     "dismiss": "Agora não",
     "menuRow": "Instalar app",
+    "accepted": "Instalando — o ícone do PartyUp vai aparecer na sua tela de início em instantes.",
     "ios": {
       "heading": "Adicionar o PartyUp à Tela de Início",
       "description": "O Safari instala apps pelo menu Compartilhar.",

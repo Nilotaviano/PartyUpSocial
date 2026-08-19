@@ -13,6 +13,8 @@ vi.mock('../../api/client', () => ({
 
 import '../../i18n'
 import { AccountMenu } from './AccountMenu'
+import { InstallAcceptedNotice } from '../pwa/InstallAcceptedNotice'
+import { clearInstallAccepted } from '../pwa/installPrompt'
 
 function mockProfile() {
   api.get.mockImplementation((path: string) => {
@@ -29,11 +31,12 @@ function mockProfile() {
   })
 }
 
-function renderMenu() {
+function renderMenu({ withInstallNotice = false } = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/app']}>
+        {withInstallNotice && <InstallAcceptedNotice />}
         <Routes>
           <Route path="/app" element={<AccountMenu />} />
           <Route path="/settings/account" element={<div data-testid="screen-settings-account" />} />
@@ -232,7 +235,20 @@ describe('AccountMenu — D-220 install entry point', () => {
     Object.defineProperty(navigator, 'userAgent', { configurable: true, value: userAgent })
   }
 
-  afterEach(() => mockUserAgent(originalUserAgent))
+  afterEach(() => {
+    mockUserAgent(originalUserAgent)
+    clearInstallAccepted()
+  })
+
+  /** Fires the real Chromium event `installPrompt.ts` captures at module scope. */
+  function fireBeforeInstallPrompt() {
+    const event = new Event('beforeinstallprompt', { cancelable: true })
+    Object.assign(event, {
+      prompt: vi.fn().mockResolvedValue(undefined),
+      userChoice: Promise.resolve({ outcome: 'accepted' as const }),
+    })
+    fireEvent(window, event)
+  }
 
   it('offers no install row on a browser with no install path_D220', async () => {
     mockProfile()
@@ -270,5 +286,20 @@ describe('AccountMenu — D-220 install entry point', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Got it' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     await waitFor(() => expect(trigger).toHaveFocus())
+  })
+
+  it('accepting the native prompt from the menu row announces the install confirmation_D220', async () => {
+    mockProfile()
+    renderMenu({ withInstallNotice: true })
+    fireBeforeInstallPrompt()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Account menu' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Install app' }))
+
+    expect(
+      await screen.findByText(
+        'Installing — the PartyUp icon will appear on your home screen shortly.',
+      ),
+    ).toBeInTheDocument()
   })
 })

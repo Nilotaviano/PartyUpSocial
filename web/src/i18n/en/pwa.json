@@ -5,6 +5,7 @@
     "action": "Install",
     "dismiss": "Not now",
     "menuRow": "Install app",
+    "accepted": "Installing — the PartyUp icon will appear on your home screen shortly.",
     "ios": {
       "heading": "Add PartyUp to your Home Screen",
       "description": "Safari installs apps from its Share menu.",
