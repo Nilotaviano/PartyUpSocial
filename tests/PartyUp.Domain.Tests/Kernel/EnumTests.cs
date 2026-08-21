@@ -163,6 +163,8 @@ public class EnumTests
                 GuestLinkState.RevokedByCancel,
                 GuestLinkState.RevokedByRemoval,
                 GuestLinkState.ExpiredPoll,
+                // D-225: the seat moved to a registered account; the link is spent.
+                GuestLinkState.Upgraded,
             ],
             Enum.GetValues<GuestLinkState>());
     }

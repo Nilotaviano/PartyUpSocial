@@ -48,7 +48,7 @@ PartyUp gives the whole friend group one place to **publish availability**, **pr
 - 🗣️ **Three languages** — English, Português (BR), Español, including notifications and emails
 - ♿ **WCAG 2.2 AA target** — keyboard-first drag alternatives, screen-reader announcements, reduced-motion support
 
-The complete behavior is specified before code in [PRODUCT_SPEC.md](PRODUCT_SPEC.md) — **224 numbered product decisions** (D-001…D-224), each one traceable to the test that proves it.
+The complete behavior is specified before code in [PRODUCT_SPEC.md](PRODUCT_SPEC.md) — **225 numbered product decisions** (D-001…D-225), each one traceable to the test that proves it.
 
 ## 🏗️ How it's built
 
@@ -171,7 +171,7 @@ mandatory pre-push gate; fix the environment or the tests before pushing.
 
 | Document | What's inside |
 |---|---|
-| [PRODUCT_SPEC.md](PRODUCT_SPEC.md) | Full product behavior — 224 numbered, statused decisions |
+| [PRODUCT_SPEC.md](PRODUCT_SPEC.md) | Full product behavior — 225 numbered, statused decisions |
 | [DOMAIN_MODEL.md](DOMAIN_MODEL.md) | Ratified domain design — aggregates, state machines, visibility rules |
 | [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) | Phased delivery plan with honest sizing |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Technical foundation, conventions, decision record |

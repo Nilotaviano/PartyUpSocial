@@ -230,6 +230,8 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 JsonContent.Create(new { displayName = "Probe Guest" })),
             ["PUT /api/v1/guest/{guestLinkId:guid}/participation"] = Public(() =>
                 JsonContent.Create(new { response = "Going" })),
+            // D-225: the only guest route that also requires an onboarded account.
+            ["POST /api/v1/guest/{guestLinkId:guid}/upgrade"] = Onboarded(() => null),
             // PHASE6_DESIGN.md §4 (ticket-P6-S4a): the registered poll HTTP surface.
             ["POST /api/v1/polls"] = Onboarded(() => JsonContent.Create(new
             {
@@ -270,6 +272,7 @@ public sealed class AntiforgeryTests : IAsyncLifetime, IDisposable
                 JsonContent.Create(new { choice = "available" })),
             ["POST /api/v1/guest/{guestLinkId:guid}/poll/options"] = Public(() =>
                 JsonContent.Create(new { startTime = "2027-01-01T00:00:00Z" })),
+            ["POST /api/v1/guest/{guestLinkId:guid}/poll/upgrade"] = Onboarded(() => null),
             ["PUT /api/v1/guest/{guestLinkId:guid}/poll/display-name"] = Public(() =>
                 JsonContent.Create(new { displayName = "Probe Guest" })),
             // PHASE7_DESIGN.md §4 (ticket-P7-S4): the S4 HTTP surface's eight unsafe routes.

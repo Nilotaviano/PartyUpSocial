@@ -63,6 +63,18 @@ public sealed class PollParticipant
     internal static PollParticipant Create(PollId pollId, ParticipantRef participant, Instant now) =>
         new(PollParticipantId.New(), pollId, participant, now);
 
+    /// <summary>D-225: the guest voter row becomes the registered user's, keeping FirstResponseAt (D-172) and CreatedAt.</summary>
+    internal void ReassignToUser(UserId userId)
+    {
+        if (!IsGuest)
+        {
+            throw new DomainException(DomainError.InvalidTransition, "Only a guest participant is reassigned to a user (D-225).");
+        }
+
+        UserId = userId;
+        GuestIdentityId = null;
+    }
+
     internal void RecordFirstResponse(Instant now) => FirstResponseAt ??= now;
 
     internal void Remove() => Status = PollParticipantStatus.Removed;

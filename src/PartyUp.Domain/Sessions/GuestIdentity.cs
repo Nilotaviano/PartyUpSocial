@@ -39,6 +39,13 @@ public sealed class GuestIdentity
 
     public Instant CreatedAt { get; private set; }
 
+    /// <summary>D-225: the account this guest's seat was linked to, null until an upgrade happens.</summary>
+    public UserId? UpgradedToUserId { get; private set; }
+
+    public Instant? UpgradedAt { get; private set; }
+
+    public bool IsUpgraded => UpgradedToUserId.HasValue;
+
     public ParticipantRef Participant => ParticipantRef.ForGuest(Id);
 
     public static GuestIdentity ForSession(SessionId sessionId, DisplayName displayName, IClock clock)
@@ -62,6 +69,21 @@ public sealed class GuestIdentity
     {
         RequireDisplayName(displayName);
         DisplayName = displayName;
+    }
+
+    /// <summary>
+    /// D-225: records the account that took this seat over. The identity row survives (the
+    /// provenance a later referral reads) and its <see cref="DisplayName"/> is left as-is.
+    /// </summary>
+    internal void MarkUpgraded(UserId userId, Instant now)
+    {
+        if (IsUpgraded)
+        {
+            throw new DomainException(DomainError.Conflict, "This guest identity has already been upgraded (D-225).");
+        }
+
+        UpgradedToUserId = userId;
+        UpgradedAt = now;
     }
 
     /// <summary>§6.4-6: finalization re-parents a poll's guests onto the created session.</summary>

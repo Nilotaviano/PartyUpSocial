@@ -102,6 +102,9 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
                 "VoteOnPollAsGuest",
                 "SuggestPollOptionAsGuest",
                 "RenameGuestPollIdentity",
+                // D-225: the guest -> account upgrade, session and poll arms.
+                "UpgradeGuestSession",
+                "UpgradeGuestPoll",
             ],
             // PHASE5_DESIGN.md A-079 (round-2 fix, disclosed extension — Phase 4 S4 precedent for
             // mechanical RateLimitTests/AntiforgeryTests inventory extensions): five new

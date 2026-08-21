@@ -75,6 +75,12 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         ApiOperationIds.ListFriendGroupsContainingUser,
     ];
 
+    /// <summary>D-225: the two operation ids the guest -> account upgrade added.</summary>
+    private static readonly string[] NewGuestUpgradeOperationIds =
+    [
+        ApiOperationIds.UpgradeGuestSession, ApiOperationIds.UpgradeGuestPoll,
+    ];
+
     /// <summary>D-222: the Session-history recap read added above the D-221 history list.</summary>
     private static readonly string[] NewSessionHistoryOperationIds = [ApiOperationIds.GetSessionHistoryStats];
 
@@ -193,7 +199,7 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
             .. NewGuestPollOperationIds, .. NewPollListOperationIds, .. NewPollLeaveOperationIds,
             .. NewPushNotificationOperationIds, .. NewEmailNotificationOperationIds,
             .. NewPollInviteOperationIds, .. NewFriendGroupOperationIds,
-            .. NewSessionHistoryOperationIds,
+            .. NewSessionHistoryOperationIds, .. NewGuestUpgradeOperationIds,
         ];
         Assert.Equal(
             expectedOperationIds.OrderBy(id => id, StringComparer.Ordinal).ToArray(),

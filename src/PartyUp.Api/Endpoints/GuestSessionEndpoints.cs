@@ -1,4 +1,5 @@
 using NodaTime;
+using PartyUp.Api.Auth;
 using PartyUp.Api.Contracts.Sessions;
 using PartyUp.Api.ErrorHandling;
 using PartyUp.Api.Security;
@@ -39,6 +40,17 @@ public static class GuestSessionEndpoints
             .ProducesPartyUpProblem(StatusCodes.Status404NotFound)
             .ProducesPartyUpProblem(StatusCodes.Status409Conflict)
             .ProducesPartyUpProblem(StatusCodes.Status422UnprocessableEntity);
+
+        // D-225: the one route on this group that ALSO requires an onboarded account — the guest
+        // cookie proves "I am that guest", the auth cookie proves "and this is my account".
+        Unsafe(guest.MapPost("/upgrade", UpgradeGuestSessionAsync)
+                .WithName(ApiOperationIds.UpgradeGuestSession)
+                .RequireAuthorization(AuthorizationPolicies.RequireOnboarded)
+                .Produces<GuestSessionUpgradeResponse>())
+            .ProducesPartyUpProblem(StatusCodes.Status401Unauthorized)
+            .ProducesPartyUpProblem(StatusCodes.Status403Forbidden)
+            .ProducesPartyUpProblem(StatusCodes.Status404NotFound)
+            .ProducesPartyUpProblem(StatusCodes.Status409Conflict);
 
         Unsafe(guest.MapPut("/participation", RespondAsGuestAsync)
                 .WithName(ApiOperationIds.RespondAsGuest)
@@ -190,6 +202,78 @@ public static class GuestSessionEndpoints
                 return await useCase.RespondAsGuestAsync(sessionId, linkId, response.Value, ct);
             },
             cancellationToken);
+
+    /// <summary>
+    /// D-225: links this guest seat to the signed-in account. Both credentials are required — the
+    /// route's <c>RequireOnboarded</c> policy for the account and the Active-mode guest cookie for
+    /// the seat — and a missing, stale or terminal-mode guest credential fails closed as a 404,
+    /// exactly like every other guest write. On success the guest cookie is cleared: the link is
+    /// terminal and the seat is now reached through the registered session route.
+    /// </summary>
+    private static async Task<IResult> UpgradeGuestSessionAsync(
+        Guid guestLinkId,
+        UpgradeGuestSessionUseCase useCase,
+        ICurrentUserAccessor currentUser,
+        GuestLinkCredentialProtector protector,
+        IClock clock,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = (await currentUser.GetAsync(cancellationToken))?.Id;
+        if (actorId is null)
+        {
+            return Problem(context, StatusCodes.Status401Unauthorized, "unauthorized");
+        }
+
+        GuestLinkCredential? credential = ReadCredential(context, guestLinkId, protector, clock);
+        if (credential is null || credential.Mode != GuestCredentialMode.Active)
+        {
+            return Problem(context, StatusCodes.Status404NotFound, "session_not_found");
+        }
+
+        GuestCommandResult result;
+        try
+        {
+            result = await useCase.UpgradeAsync(
+                credential.SessionId, credential.GuestLinkId, actorId.Value, cancellationToken);
+        }
+        catch (DomainException ex)
+        {
+            return DomainProblem(context, ex);
+        }
+
+        if (!result.Succeeded)
+        {
+            return Problem(context, UpgradeStatusFor(result.Code!), result.Code!);
+        }
+
+        ClearGuestCookie(context, credential.GuestLinkId);
+        return Results.Ok(new GuestSessionUpgradeResponse(credential.SessionId.Value));
+    }
+
+    private static int UpgradeStatusFor(string code) => code switch
+    {
+        "guest_link_terminal" or "guest_link_unclaimed" or "upgrade_unavailable" =>
+            StatusCodes.Status409Conflict,
+        _ => StatusCodes.Status404NotFound,
+    };
+
+    /// <summary>D-225: the upgraded link is spent — drop the bearer cookie on the way out.</summary>
+    private static void ClearGuestCookie(HttpContext context, GuestLinkId guestLinkId)
+    {
+        bool isDevelopment = context.RequestServices
+            .GetRequiredService<IWebHostEnvironment>().IsDevelopment();
+        string guestLinkIdN = guestLinkId.Value.ToString("N");
+        context.Response.Cookies.Delete(
+            $"pu.g.{guestLinkIdN}",
+            new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = !isDevelopment,
+                SameSite = SameSiteMode.Lax,
+                Path = $"{ApiRoutes.V1}/guest/{guestLinkIdN}",
+            });
+    }
 
     /// <summary>
     /// The shared A-074 mutation path: resolve access first (never invoking the domain mutation for a

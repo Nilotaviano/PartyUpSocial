@@ -718,11 +718,12 @@ public sealed class NotificationPushHttpTests : IAsyncLifetime, IDisposable
         // InvitePollUsers, D-189's ChangeMyEmailNotifications + UnsubscribeEmailNotifications,
         // D-198/D-199's nine-operation FriendGroup HTTP surface plus D-210's
         // ListFriendGroupsContainingUser, and D-212/D-213's three-operation
-        // feedback surface (SubmitFeedback, ListAdminFeedback, SetAdminFeedbackHandled), which
+        // feedback surface (SubmitFeedback, ListAdminFeedback, SetAdminFeedbackHandled), and
+        // D-225's two guest-upgrade operations (UpgradeGuestSession, UpgradeGuestPoll), which
         // includes the test-only `_slice2` debug sign-in endpoints the production host never
         // registers) -- a grown-by-one total fails here even though every named id is still
         // individually present.
-        const int expectedTotalOperationIdCount = 155;
+        const int expectedTotalOperationIdCount = 157;
 
         using HttpClient client = _factory.CreateClient();
         using HttpResponseMessage response = await client.GetAsync("/openapi/v1.json");

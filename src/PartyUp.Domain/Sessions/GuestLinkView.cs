@@ -31,6 +31,7 @@ public static class GuestLinkResolution
         GuestLinkState.RevokedByCancel => GuestLinkView.CanceledNotice,
         GuestLinkState.RevokedByRemoval => GuestLinkView.RevokedNotice,
         GuestLinkState.ExpiredPoll => GuestLinkView.PollExpiredNotice,
+        GuestLinkState.Upgraded => GuestLinkView.RevokedNotice,
         _ => throw new DomainException(
             DomainError.ValidationFailed,
             FormattableString.Invariant($"Unknown guest link state '{state}'.")),

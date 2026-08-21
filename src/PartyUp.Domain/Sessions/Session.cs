@@ -1199,6 +1199,54 @@ public sealed class Session : AggregateRoot
     }
 
     /// <summary>
+    /// D-225: a claimed guest seat becomes the registered user's. With no user row on the roster the
+    /// guest's <see cref="Participation"/> is re-pointed in place (status, waitlist position and
+    /// D-119 ordering preserved, occupancy unchanged); with one already present the registered row is
+    /// kept untouched and the guest row goes through the D-044 removal path, so capacity frees,
+    /// confirmation is re-evaluated and a vacancy notice is raised. Every link of that identity
+    /// becomes <see cref="GuestLinkState.Upgraded"/> — terminal, so the seat can never be re-claimed
+    /// through the token.
+    /// </summary>
+    public void UpgradeGuest(GuestIdentityId guestIdentityId, UserId userId, IClock clock)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        ApplyDueTransitions(clock);
+
+        Instant now = clock.GetCurrentInstant();
+        RequireRosterMutable(now, "upgrade a guest");
+
+        GuestIdentity identity = RequireGuestIdentity(guestIdentityId);
+        RequireNotUpgraded(identity);
+
+        Participation guestRow = Find(identity.Participant)
+            ?? throw new DomainException(DomainError.NotFound, "That guest holds no participation on this session.");
+
+        int freeBefore = FreeSlots;
+
+        if (Find(ParticipantRef.ForUser(userId)) is null)
+        {
+            guestRow.ReassignToUser(userId);
+        }
+        else if (!guestRow.IsRemoved)
+        {
+            guestRow.Remove();
+        }
+
+        foreach (GuestLink link in _guestLinks)
+        {
+            if (link.GuestIdentityId == guestIdentityId)
+            {
+                link.Revoke(GuestLinkState.Upgraded);
+            }
+        }
+
+        identity.MarkUpgraded(userId, now);
+
+        ReevaluateConfirmation(clock);
+        RaiseVacancyIfFreed(freeBefore);
+    }
+
+    /// <summary>
     /// D-150 "organizer revocation": an <em>unclaimed</em> link is revoked on its own →
     /// <c>RevokedByRemoval</c>, with no roster effect — it held no participation and reserved no
     /// capacity (§5.4). A claimed link goes through <see cref="RemoveGuest"/> instead (D-044).
@@ -1372,6 +1420,16 @@ public sealed class Session : AggregateRoot
             ?? throw new DomainException(DomainError.Conflict, "This guest link has not been claimed yet.");
 
         return ParticipantRef.ForGuest(identityId);
+    }
+
+    private static void RequireNotUpgraded(GuestIdentity identity)
+    {
+        if (identity.IsUpgraded)
+        {
+            throw new DomainException(
+                DomainError.Conflict,
+                "That guest seat already belongs to an account (D-225).");
+        }
     }
 
     private GuestIdentity RequireGuestIdentity(GuestIdentityId guestIdentityId) =>

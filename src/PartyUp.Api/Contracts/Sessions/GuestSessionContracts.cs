@@ -61,3 +61,6 @@ public sealed record GuestSessionResponse(
         _ => throw new ArgumentOutOfRangeException(nameof(notice)),
     };
 }
+
+/// <summary>D-225: what a successful guest-seat upgrade returns — the session the account now holds.</summary>
+public sealed record GuestSessionUpgradeResponse(Guid SessionId);

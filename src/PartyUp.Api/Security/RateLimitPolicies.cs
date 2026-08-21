@@ -292,7 +292,11 @@ public static class RateLimitPolicies
                 ApiOperationIds.ClaimGuestPollLink,
                 ApiOperationIds.VoteOnPollAsGuest,
                 ApiOperationIds.SuggestPollOptionAsGuest,
-                ApiOperationIds.RenameGuestPollIdentity)),
+                ApiOperationIds.RenameGuestPollIdentity,
+                // D-225: the upgrade is a guest write like any other — it rides the same
+                // {guestLinkId} partition even though it additionally requires an onboarded caller.
+                ApiOperationIds.UpgradeGuestSession,
+                ApiOperationIds.UpgradeGuestPoll)),
         // PHASE5_DESIGN.md A-079: five new User-partitioned dimensions, assigned exhaustively so §8
         // has no unassigned route.
         new(

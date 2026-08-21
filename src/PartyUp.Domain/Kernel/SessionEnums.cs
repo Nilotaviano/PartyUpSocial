@@ -43,4 +43,7 @@ public enum GuestLinkState
     RevokedByCancel = 1,
     RevokedByRemoval = 2,
     ExpiredPoll = 3,
+
+    /// <summary>D-225: the seat now belongs to a registered account; the bearer link is spent.</summary>
+    Upgraded = 4,
 }

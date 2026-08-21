@@ -95,6 +95,11 @@ public sealed class PartyUpOpenApiTransformer :
         // outcome, surfaced as a 409 alongside the admin routes' existing "not_found".
         "scope_contended",
 
+        // D-225: the guest -> account upgrade's own codes. "upgrade_unavailable" is deliberately
+        // generic: it is the answer to a blocked pair with the organizer and reveals nothing else.
+        "guest_link_unclaimed",
+        "upgrade_unavailable",
+
         // D-198/D-199: the FriendGroup HTTP surface's own codes (FriendGroupEndpoints.StatusFor).
         "group_not_found",
         "group_limit_reached",

@@ -77,3 +77,6 @@ public sealed record GuestPollResponse(
         _ => throw new ArgumentOutOfRangeException(nameof(notice)),
     };
 }
+
+/// <summary>D-225: what a successful poll guest-seat upgrade returns.</summary>
+public sealed record GuestPollUpgradeResponse(Guid PollId);

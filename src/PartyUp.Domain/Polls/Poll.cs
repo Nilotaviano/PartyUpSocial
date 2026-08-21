@@ -925,6 +925,55 @@ public sealed class Poll : AggregateRoot
         }
     }
 
+    /// <summary>
+    /// D-225, the <see cref="Session.UpgradeGuest"/> mirror: with no participant row for the user the
+    /// guest's <see cref="PollParticipant"/> and every one of its <see cref="PollVote"/>s re-point to
+    /// the account (FirstResponseAt and the D-119 ordering preserved); with one already present the
+    /// user's participant and votes stay and the guest's are dropped. Every link of that identity
+    /// becomes <see cref="GuestLinkState.Upgraded"/>.
+    /// </summary>
+    public void UpgradeGuest(GuestIdentityId guestIdentityId, UserId userId, IClock clock)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        ApplyDueTransitions(clock);
+
+        RequireNotTerminal("upgrade a guest");
+
+        GuestIdentity identity = RequireGuestIdentity(guestIdentityId);
+        RequireNotUpgraded(identity);
+
+        ParticipantRef guest = identity.Participant;
+        PollParticipant guestRow = FindParticipant(guest)
+            ?? throw new DomainException(DomainError.NotFound, "That guest holds no participant row on this poll.");
+
+        if (FindParticipant(ParticipantRef.ForUser(userId)) is null)
+        {
+            guestRow.ReassignToUser(userId);
+            foreach (PollVote vote in _votes)
+            {
+                if (vote.CastBy(guest))
+                {
+                    vote.ReassignToUser(userId);
+                }
+            }
+        }
+        else
+        {
+            _participants.Remove(guestRow);
+            _votes.RemoveAll(vote => vote.CastBy(guest));
+        }
+
+        foreach (GuestLink link in _guestLinks)
+        {
+            if (link.GuestIdentityId == guestIdentityId)
+            {
+                link.Revoke(GuestLinkState.Upgraded);
+            }
+        }
+
+        identity.MarkUpgraded(userId, clock.GetCurrentInstant());
+    }
+
     /// <summary>D-150: an unclaimed link can be revoked on its own, with no roster effect (§5.4).</summary>
     public void RevokeGuestLink(GuestLinkId guestLinkId, IClock clock)
     {
@@ -1150,6 +1199,16 @@ public sealed class Poll : AggregateRoot
             ?? throw new DomainException(DomainError.Conflict, "This guest link has not been claimed yet.");
 
         return ParticipantRef.ForGuest(identityId);
+    }
+
+    private static void RequireNotUpgraded(GuestIdentity identity)
+    {
+        if (identity.IsUpgraded)
+        {
+            throw new DomainException(
+                DomainError.Conflict,
+                "That guest seat already belongs to an account (D-225).");
+        }
     }
 
     private GuestIdentity RequireGuestIdentity(GuestIdentityId guestIdentityId) =>

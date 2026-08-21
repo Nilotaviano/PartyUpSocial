@@ -56,6 +56,18 @@ public sealed class PollVote
         VoteChoice choice,
         Instant now) => new(pollId, optionId, participant, choice, now);
 
+    /// <summary>D-225: the vote follows its participant onto the registered account, choice and timestamps intact.</summary>
+    internal void ReassignToUser(UserId userId)
+    {
+        if (GuestIdentityId is null)
+        {
+            throw new DomainException(DomainError.InvalidTransition, "Only a guest vote is reassigned to a user (D-225).");
+        }
+
+        UserId = userId;
+        GuestIdentityId = null;
+    }
+
     internal void Revise(VoteChoice choice, Instant now)
     {
         Choice = choice;

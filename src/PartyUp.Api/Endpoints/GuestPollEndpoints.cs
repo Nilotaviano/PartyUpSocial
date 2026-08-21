@@ -1,4 +1,5 @@
 using NodaTime;
+using PartyUp.Api.Auth;
 using PartyUp.Api.Contracts.Polls;
 using PartyUp.Api.ErrorHandling;
 using PartyUp.Api.Security;
@@ -57,6 +58,17 @@ public static class GuestPollEndpoints
             .ProducesPartyUpProblem(StatusCodes.Status404NotFound)
             .ProducesPartyUpProblem(StatusCodes.Status409Conflict)
             .ProducesPartyUpProblem(StatusCodes.Status422UnprocessableEntity);
+
+        // D-225: the poll arm's upgrade — the only guest-poll route that also requires an
+        // onboarded account, mirroring GuestSessionEndpoints' /upgrade.
+        Unsafe(guest.MapPost("/poll/upgrade", UpgradeGuestPollAsync)
+                .WithName(ApiOperationIds.UpgradeGuestPoll)
+                .RequireAuthorization(AuthorizationPolicies.RequireOnboarded)
+                .Produces<GuestPollUpgradeResponse>())
+            .ProducesPartyUpProblem(StatusCodes.Status401Unauthorized)
+            .ProducesPartyUpProblem(StatusCodes.Status403Forbidden)
+            .ProducesPartyUpProblem(StatusCodes.Status404NotFound)
+            .ProducesPartyUpProblem(StatusCodes.Status409Conflict);
 
         return api;
     }
@@ -295,6 +307,78 @@ public static class GuestPollEndpoints
                 return await useCase.RenameGuestAsync(pollId, linkId, displayName, ct);
             },
             cancellationToken);
+
+    /// <summary>
+    /// D-225's poll arm: both credentials required (the route's <c>RequireOnboarded</c> policy and
+    /// an Active-mode poll guest cookie), fail-closed 404 on a missing or stale one, and the guest
+    /// cookie cleared on success because the link is now terminal.
+    /// </summary>
+    private static async Task<IResult> UpgradeGuestPollAsync(
+        Guid guestLinkId,
+        UpgradeGuestPollUseCase useCase,
+        ICurrentUserAccessor currentUser,
+        PollGuestLinkCredentialProtector protector,
+        IClock clock,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        UserId? actorId = (await currentUser.GetAsync(cancellationToken))?.Id;
+        if (actorId is null)
+        {
+            return Problem(context, StatusCodes.Status401Unauthorized, "unauthorized");
+        }
+
+        PollGuestLinkCredential? credential = ReadCredential(context, guestLinkId, protector, clock);
+        if (credential is null || credential.Mode != GuestCredentialMode.Active)
+        {
+            return Problem(context, StatusCodes.Status404NotFound, "poll_not_found");
+        }
+
+        GuestPollCommandResult result;
+        try
+        {
+            result = await useCase.UpgradeAsync(
+                credential.PollId, credential.GuestLinkId, actorId.Value, cancellationToken);
+        }
+        catch (DomainException ex)
+        {
+            return ex.Error == DomainError.NotFound
+                ? Problem(context, StatusCodes.Status404NotFound, "poll_not_found")
+                : Problem(context, StatusCodes.Status409Conflict, "poll_terminal");
+        }
+
+        if (!result.Succeeded)
+        {
+            return Problem(context, UpgradeStatusFor(result.Code!), result.Code!);
+        }
+
+        ClearGuestCookie(context, credential.GuestLinkId);
+        return Results.Ok(new GuestPollUpgradeResponse(credential.PollId.Value));
+    }
+
+    private static int UpgradeStatusFor(string code) => code switch
+    {
+        "guest_link_terminal" or "guest_link_unclaimed" or "upgrade_unavailable" =>
+            StatusCodes.Status409Conflict,
+        _ => StatusCodes.Status404NotFound,
+    };
+
+    /// <summary>D-225: the upgraded link is spent — drop the bearer cookie on the way out.</summary>
+    private static void ClearGuestCookie(HttpContext context, GuestLinkId guestLinkId)
+    {
+        bool isDevelopment = context.RequestServices
+            .GetRequiredService<IWebHostEnvironment>().IsDevelopment();
+        string guestLinkIdN = guestLinkId.Value.ToString("N");
+        context.Response.Cookies.Delete(
+            $"pu.g.{guestLinkIdN}",
+            new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = !isDevelopment,
+                SameSite = SameSiteMode.Lax,
+                Path = $"{ApiRoutes.V1}/guest/{guestLinkIdN}",
+            });
+    }
 
     /// <summary>
     /// The shared mutation path, mirroring <see cref="GuestSessionEndpoints"/>'s: resolve access

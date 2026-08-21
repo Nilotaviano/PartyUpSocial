@@ -111,6 +111,7 @@ public static class DependencyInjection
         services.AddScoped<PollGuestManagementUseCases>();
         services.AddScoped<PollInvitationUseCases>();
         services.AddScoped<GuestPollUseCases>();
+        services.AddScoped<UpgradeGuestPollUseCase>();
         services.AddScoped<PollJoinRequestUseCases>();
         services.AddScoped<PollReadUseCases>();
         services.AddScoped<GuestPollReadUseCases>();
@@ -135,6 +136,7 @@ public static class DependencyInjection
         services.AddScoped<SetSessionReminderUseCase>();
         services.AddScoped<SessionReadUseCases>();
         services.AddScoped<GuestSessionUseCases>();
+        services.AddScoped<UpgradeGuestSessionUseCase>();
         services.AddScoped<SessionTransitionUseCase>();
         services.AddScoped<SessionBlockEffectsUseCase>();
         services.AddScoped<CreateAvailabilityBlockUseCase>();

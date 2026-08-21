@@ -107,6 +107,9 @@ public static class ApiOperationIds
     public const string RenameGuestSessionIdentity = "RenameGuestSessionIdentity";
     public const string RespondAsGuest = "RespondAsGuest";
 
+    /// <summary>D-225: the guest-seat -> account link, the one guest route that also requires auth.</summary>
+    public const string UpgradeGuestSession = "UpgradeGuestSession";
+
     // PHASE5_DESIGN.md §8: availability, calendar, Home and Discover HTTP surface, relative to /api/v1.
     public const string GetMyAvailability = "GetMyAvailability";
     public const string CreateAvailabilityBlock = "CreateAvailabilityBlock";
@@ -153,6 +156,9 @@ public static class ApiOperationIds
     public const string VoteOnPollAsGuest = "VoteOnPollAsGuest";
     public const string SuggestPollOptionAsGuest = "SuggestPollOptionAsGuest";
     public const string RenameGuestPollIdentity = "RenameGuestPollIdentity";
+
+    /// <summary>D-225: the poll arm of the guest-seat -> account link.</summary>
+    public const string UpgradeGuestPoll = "UpgradeGuestPoll";
 
     // PHASE7_DESIGN.md §4: the S4 HTTP surface -- eleven ids exactly, registered-user only (D-167).
     public const string GetPushConfig = "GetPushConfig";

@@ -947,6 +947,14 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("session_id");
 
+                    b.Property<Instant?>("UpgradedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("upgraded_at");
+
+                    b.Property<Guid?>("UpgradedToUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("upgraded_to_user_id");
+
                     b.HasKey("Id")
                         .HasName("pk_guest_identities");
 
@@ -2243,6 +2251,12 @@ namespace PartyUp.Infrastructure.Migrations
                         .HasForeignKey("SessionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("fk_guest_identities_sessions_session_id");
+
+                    b.HasOne("PartyUp.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpgradedToUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_guest_identities_users_upgraded_to_user_id");
                 });
 
             modelBuilder.Entity("PartyUp.Domain.Sessions.GuestLink", b =>

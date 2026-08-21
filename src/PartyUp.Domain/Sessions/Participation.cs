@@ -160,6 +160,22 @@ public sealed class Participation
         RespondedAt = null;
     }
 
+    /// <summary>
+    /// D-225: the guest row becomes the registered user's row in place — status, waitlist flag,
+    /// <see cref="CreatedAt"/> and therefore the D-119 ordering are all untouched, so occupancy is
+    /// unchanged and nothing is double-counted.
+    /// </summary>
+    internal void ReassignToUser(UserId userId)
+    {
+        if (!IsGuest)
+        {
+            throw new DomainException(DomainError.InvalidTransition, "Only a guest participation is reassigned to a user (D-225).");
+        }
+
+        UserId = userId;
+        GuestIdentityId = null;
+    }
+
     internal void Remove()
     {
         Status = ParticipationStatus.Removed;
