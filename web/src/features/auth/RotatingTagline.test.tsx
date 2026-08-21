@@ -43,7 +43,7 @@ describe('RotatingTagline', () => {
       'meet up',
     )
 
-    act(() => vi.advanceTimersByTime(ROTATE_INTERVAL_MS * 4))
+    act(() => vi.advanceTimersByTime(ROTATE_INTERVAL_MS * 3))
     expect(rotating().querySelector('.rotating-word-in')).toHaveTextContent(
       'play',
     )
