@@ -37,6 +37,26 @@ describe('friend continuation D-031', () => {
     expect(validateFriendContinuation(candidate)).toBeUndefined()
   })
 
+  it.each([
+    '/guest/0123456789abcdef0123456789abcdef',
+    '/guest/ffffffffffffffffffffffffffffffff',
+  ])('keeps the guest link page %s as a return destination_D225', (candidate) => {
+    expect(validateFriendContinuation(candidate)).toBe(candidate)
+  })
+
+  it.each([
+    '/guest/0123456789ABCDEF0123456789ABCDEF',
+    '/guest/0123456789abcdef0123456789abcde',
+    '/guest/0123456789abcdef0123456789abcdef0',
+    '/guest/0123456789abcdef0123456789abcdef/upgrade',
+    '/guest/../0123456789abcdef0123456789abcdef',
+    '/guest/invalid',
+    'https://evil.test/guest/0123456789abcdef0123456789abcdef',
+    '//evil.test/guest/0123456789abcdef0123456789abcdef',
+  ])('drops the near-miss guest destination %s_D225', (candidate) => {
+    expect(validateFriendContinuation(candidate)).toBeUndefined()
+  })
+
   it('normalizes only ASCII spaces and hyphens in a friend code', () => {
     expect(normalizeFriendCode(' 2345-6789 ab ')).toBe('23456789AB')
     expect(isWellFormedFriendCode('2345 6789 ab')).toBe(true)

@@ -214,7 +214,17 @@
     "ended": "This session has ended.",
     "invalid": "This link is not valid.",
     "linkExpiredReopen": "This link expired. Open your original invitation link again.",
-    "timezone": "Times are shown in your device's time zone."
+    "timezone": "Times are shown in your device's time zone.",
+    "upgrade": {
+      "heading": "Keep this seat",
+      "signedOut": "Have an account? Sign in to keep this seat and get notifications.",
+      "signIn": "Sign in",
+      "onboarding": "Finish setting up your account to keep this seat.",
+      "finishSetup": "Finish setup",
+      "signedIn": "Keep this seat under your account and get notifications from now on.",
+      "linkSeat": "Link this seat to {{name}}",
+      "failed": "Couldn't link this seat."
+    }
   },
   "dirty": {
     "title": "Discard unsaved changes?",

@@ -214,7 +214,17 @@
     "ended": "Esta sesión ha terminado.",
     "invalid": "Este enlace no es válido.",
     "linkExpiredReopen": "Este enlace expiró. Abre de nuevo tu enlace de invitación original.",
-    "timezone": "Las horas se muestran en la zona horaria de tu dispositivo."
+    "timezone": "Las horas se muestran en la zona horaria de tu dispositivo.",
+    "upgrade": {
+      "heading": "Quédate con este lugar",
+      "signedOut": "¿Ya tienes una cuenta? Inicia sesión para quedarte con este lugar y recibir notificaciones.",
+      "signIn": "Iniciar sesión",
+      "onboarding": "Termina de configurar tu cuenta para quedarte con este lugar.",
+      "finishSetup": "Terminar configuración",
+      "signedIn": "Quédate con este lugar en tu cuenta y recibe notificaciones desde ahora.",
+      "linkSeat": "Vincular este lugar a {{name}}",
+      "failed": "No se pudo vincular este lugar."
+    }
   },
   "dirty": {
     "title": "¿Descartar los cambios sin guardar?",

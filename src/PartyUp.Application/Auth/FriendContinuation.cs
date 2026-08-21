@@ -1,12 +1,13 @@
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using PartyUp.Application.Friends;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Users;
 
 namespace PartyUp.Application.Auth;
 
-public static class FriendContinuation
+public static partial class FriendContinuation
 {
     private const string UsernamePrefix = "/u/";
     private const string FriendCodePrefix = "/add/";
@@ -40,8 +41,14 @@ public static class FriendContinuation
                 : null;
         }
 
-        return null;
+        // D-225: the guest link page a signed-out guest is sent back to after signing in. The
+        // route is emitted as `Guid.ToString("N")`, so only lowercase hex of exactly 32 digits
+        // is a real link — everything else is someone else's redirect.
+        return GuestLinkPath().IsMatch(continuation) ? continuation : null;
     }
+
+    [GeneratedRegex("^/guest/[0-9a-f]{32}$", RegexOptions.CultureInvariant)]
+    private static partial Regex GuestLinkPath();
 
     private static bool IsValidUsername(string username)
     {

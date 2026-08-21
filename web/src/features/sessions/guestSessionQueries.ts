@@ -63,6 +63,18 @@ export async function respondAsGuest(
 }
 
 /**
+ * D-225: the claimed seat moves to the signed-in account. The guest cookie is the proof of
+ * "I am that guest", so the call carries no body — the account comes from the auth cookie.
+ */
+export async function upgradeGuestSession(guestLinkId: string) {
+  const { data } = await client.POST('/api/v1/guest/{guestLinkId}/upgrade', {
+    params: { header: csrf, path: { guestLinkId } },
+  })
+  if (!data) throw new Error('Guest upgrade response was empty.')
+  return data
+}
+
+/**
  * Terminal states (design §8.1/A-074): the guest link/session is no longer
  * live. `pollExpired` is a Poll-domain notice (`GuestLinkView.PollExpiredNotice`)
  * that a fixed-time session guest link can never resolve to (§12 interpretation:

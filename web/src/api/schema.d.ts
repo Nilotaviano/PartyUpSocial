@@ -1604,6 +1604,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/guest/{guestLinkId}/upgrade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UpgradeGuestSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/guest/{guestLinkId}/participation": {
         parameters: {
             query?: never;
@@ -2014,6 +2030,22 @@ export interface paths {
         get?: never;
         put: operations["RenameGuestPollIdentity"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/guest/{guestLinkId}/poll/upgrade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UpgradeGuestPoll"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2699,6 +2731,10 @@ export interface components {
             options: null | components["schemas"]["PollOptionResponse"][];
             roster: null | components["schemas"]["PollRosterEntryResponse"][];
         };
+        GuestPollUpgradeResponse: {
+            /** Format: uuid */
+            pollId: string;
+        };
         GuestSessionResponse: {
             state: string;
             /** Format: uuid */
@@ -2714,6 +2750,10 @@ export interface components {
             guestIdentityId: null | string;
             displayName: null | string;
             response: null | string;
+        };
+        GuestSessionUpgradeResponse: {
+            /** Format: uuid */
+            sessionId: string;
         };
         HistoryTopGameResponse: {
             name: string;
@@ -2854,7 +2894,7 @@ export interface components {
             status: number | string;
             instance: string;
             /** @enum {string} */
-            code: "validation_failed" | "friend_code_invalid" | "friend_request_self" | "block_self" | "antiforgery_failed" | "unauthorized" | "onboarding_required" | "user_not_found" | "friend_request_not_found" | "friendship_not_found" | "block_not_found" | "friend_request_already_exists" | "friendship_already_exists" | "friend_request_not_pending" | "steam_not_linked" | "unsupported_media_type" | "rate_limited" | "internal_error" | "session_not_found" | "session_validation" | "invalid_if_match" | "invalid_scope" | "invalid_cursor" | "session_conflict" | "session_terminal" | "session_time_locked" | "capacity_below_occupancy" | "waitlist_requires_capacity" | "session_invites_closed" | "session_responses_closed" | "session_leave_closed" | "session_guest_removal_closed" | "join_request_exists" | "join_request_not_pending" | "join_request_closed" | "no_session_capacity" | "not_waitlisted" | "guest_link_terminal" | "guest_link_claimed" | "reminder_not_eligible" | "transient_conflict" | "poll_not_found" | "poll_validation" | "poll_option_cap" | "poll_option_not_found" | "poll_voting_closed" | "poll_terminal" | "poll_invalid_transition" | "poll_participant_removed" | "poll_conflict" | "poll_guest_not_found" | "poll_selection_window_closed" | "poll_zero_options" | "poll_invites_closed" | "guest_link_not_claimed" | "notification_not_found" | "push_subscription_not_found" | "push_not_configured" | "push_channel_unsupported" | "scope_contended" | "group_not_found" | "group_limit_reached" | "group_member_limit_reached" | "group_name_taken";
+            code: "validation_failed" | "friend_code_invalid" | "friend_request_self" | "block_self" | "antiforgery_failed" | "unauthorized" | "onboarding_required" | "user_not_found" | "friend_request_not_found" | "friendship_not_found" | "block_not_found" | "friend_request_already_exists" | "friendship_already_exists" | "friend_request_not_pending" | "steam_not_linked" | "unsupported_media_type" | "rate_limited" | "internal_error" | "session_not_found" | "session_validation" | "invalid_if_match" | "invalid_scope" | "invalid_cursor" | "session_conflict" | "session_terminal" | "session_time_locked" | "capacity_below_occupancy" | "waitlist_requires_capacity" | "session_invites_closed" | "session_responses_closed" | "session_leave_closed" | "session_guest_removal_closed" | "join_request_exists" | "join_request_not_pending" | "join_request_closed" | "no_session_capacity" | "not_waitlisted" | "guest_link_terminal" | "guest_link_claimed" | "reminder_not_eligible" | "transient_conflict" | "poll_not_found" | "poll_validation" | "poll_option_cap" | "poll_option_not_found" | "poll_voting_closed" | "poll_terminal" | "poll_invalid_transition" | "poll_participant_removed" | "poll_conflict" | "poll_guest_not_found" | "poll_selection_window_closed" | "poll_zero_options" | "poll_invites_closed" | "guest_link_not_claimed" | "notification_not_found" | "push_subscription_not_found" | "push_not_configured" | "push_channel_unsupported" | "scope_contended" | "guest_link_unclaimed" | "upgrade_unavailable" | "group_not_found" | "group_limit_reached" | "group_member_limit_reached" | "group_name_taken";
             traceId: string;
             errors?: null | {
                 [key: string]: string[];
@@ -9653,6 +9693,112 @@ export interface operations {
             };
         };
     };
+    UpgradeGuestSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                guestLinkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestSessionUpgradeResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
     RespondAsGuest: {
         parameters: {
             query?: never;
@@ -12227,6 +12373,112 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+        };
+    };
+    UpgradeGuestPoll: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Request token returned by GET /api/v1/auth/antiforgery. */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                guestLinkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestPollUpgradeResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["PartyUpProblem"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -18,6 +18,28 @@ public sealed class FriendContinuationTests
     }
 
     [Theory]
+    [InlineData("/guest/0123456789abcdef0123456789abcdef")]
+    [InlineData("/guest/ffffffffffffffffffffffffffffffff")]
+    public void Validate_AcceptsTheGuestLinkPage_D225(string candidate)
+    {
+        Assert.Equal(candidate, FriendContinuation.Validate(candidate));
+    }
+
+    [Theory]
+    [InlineData("/guest/0123456789ABCDEF0123456789ABCDEF")]
+    [InlineData("/guest/0123456789abcdef0123456789abcde")]
+    [InlineData("/guest/0123456789abcdef0123456789abcdef0")]
+    [InlineData("/guest/0123456789abcdef0123456789abcdef/upgrade")]
+    [InlineData("/guest/../0123456789abcdef0123456789abcdef")]
+    [InlineData("/guest/invalid")]
+    [InlineData("https://evil.test/guest/0123456789abcdef0123456789abcdef")]
+    [InlineData("//evil.test/guest/0123456789abcdef0123456789abcdef")]
+    public void Validate_DropsAnythingButAnExactGuestLinkPage_D225(string candidate)
+    {
+        Assert.Null(FriendContinuation.Validate(candidate));
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("/app")]

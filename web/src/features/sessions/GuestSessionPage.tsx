@@ -37,6 +37,7 @@ import {
   respondAsGuest,
   type GuestRsvpResponse,
 } from './guestSessionQueries'
+import { GuestUpgradeBanner } from './GuestUpgradeBanner'
 
 const rsvpChoices: GuestRsvpResponse[] = ['Going', 'Maybe', 'Declined']
 const MAX_OPTIONS = 12
@@ -366,6 +367,8 @@ export function GuestSessionPage() {
           </SectionCard>
         )}
 
+        {hasClaimed && <GuestUpgradeBanner guestLinkId={guestLinkId} kind="session" />}
+
         {/*
           D-217's anonymous entry point: last in the column, below the RSVP the page exists
           for, so it never competes with the primary action.
@@ -636,6 +639,8 @@ function GuestPollBranch({ guestLinkId, heading, view }: GuestPollBranchProps) {
             {suggestError && <p role="alert">{suggestError}</p>}
           </Section>
         )}
+
+        {hasClaimed && <GuestUpgradeBanner guestLinkId={guestLinkId} kind="poll" />}
 
         {/* Same placement rule as the session arm above. */}
         <FeedbackLink />

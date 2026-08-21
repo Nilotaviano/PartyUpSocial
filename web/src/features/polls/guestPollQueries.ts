@@ -57,6 +57,15 @@ export async function suggestPollOptionAsGuest(
   return data
 }
 
+/** D-225: the poll mirror of `upgradeGuestSession` — the claimed seat moves to the account. */
+export async function upgradeGuestPoll(guestLinkId: string) {
+  const { data } = await client.POST('/api/v1/guest/{guestLinkId}/poll/upgrade', {
+    params: { header: csrf, path: { guestLinkId } },
+  })
+  if (!data) throw new Error('Guest poll upgrade response was empty.')
+  return data
+}
+
 export async function renameGuestPollIdentity(guestLinkId: string, displayName: string) {
   const { data } = await client.PUT('/api/v1/guest/{guestLinkId}/poll/display-name', {
     params: { header: csrf, path: { guestLinkId } },

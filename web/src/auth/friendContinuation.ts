@@ -1,6 +1,8 @@
 const usernamePunctuation = new Set(['.', '_', '-'])
 const friendCodeAlphabet = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{10}$/
 const usernameCharacter = /^[\p{L}\p{N}._-]$/u
+// D-225: the guest link route the exchange redirect emits — `Guid.ToString("N")`, lowercase.
+const guestLinkPath = /^\/guest\/[0-9a-f]{32}$/
 const formatCharacter = /\p{Cf}/u
 const fixedReturnPaths = new Set([
   '/app',
@@ -71,6 +73,10 @@ export function validateFriendContinuation(value: string | null | undefined) {
   if (value.startsWith('/add/')) {
     const code = normalizeFriendCode(value.slice(5))
     return friendCodeAlphabet.test(code) ? `/add/${code}` : undefined
+  }
+
+  if (guestLinkPath.test(value)) {
+    return value
   }
 
   return undefined

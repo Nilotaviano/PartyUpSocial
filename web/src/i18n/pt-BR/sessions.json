@@ -214,7 +214,17 @@
     "ended": "Esta sessão terminou.",
     "invalid": "Este link não é válido.",
     "linkExpiredReopen": "Este link expirou. Abra novamente seu link de convite original.",
-    "timezone": "Os horários são exibidos no fuso horário do seu dispositivo."
+    "timezone": "Os horários são exibidos no fuso horário do seu dispositivo.",
+    "upgrade": {
+      "heading": "Fique com este lugar",
+      "signedOut": "Já tem uma conta? Entre para ficar com este lugar e receber notificações.",
+      "signIn": "Entrar",
+      "onboarding": "Conclua a configuração da sua conta para ficar com este lugar.",
+      "finishSetup": "Concluir configuração",
+      "signedIn": "Fique com este lugar na sua conta e receba notificações a partir de agora.",
+      "linkSeat": "Vincular este lugar a {{name}}",
+      "failed": "Não foi possível vincular este lugar."
+    }
   },
   "dirty": {
     "title": "Descartar alterações não salvas?",

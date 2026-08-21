@@ -69,6 +69,12 @@ function renderPage(path: string) {
         <Routes>
           <Route path="/guest/invalid" element={<GuestSessionPage />} />
           <Route path="/guest/:guestLinkId" element={<GuestSessionPage />} />
+          {/* D-225 destinations: the upgrade leaves the guest surface for the registered one. */}
+          <Route
+            path="/sessions/:sessionId"
+            element={<div data-testid="screen-session-detail" />}
+          />
+          <Route path="/polls/:pollId" element={<div data-testid="screen-poll-detail" />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -448,5 +454,134 @@ describe('GuestSessionPage — D-217 anonymous feedback entry point', () => {
 
     expect(await screen.findByRole('heading', { name: 'Send feedback' })).toBeInTheDocument()
     expect(screen.getByLabelText('Your message')).toBeInTheDocument()
+  })
+})
+
+// D-225: the upgrade banner. The link id here is the real `Guid.ToString("N")` shape the guest
+// exchange redirects to — the continuation validator only accepts that shape, so the dashed
+// `linkId` the older tests use would silently produce a `next`-less sign-in link.
+const hexLinkId = '0123456789abcdef0123456789abcdef'
+
+function signedOut() {
+  return {
+    authenticated: false,
+    userId: null,
+    providers: [],
+    state: null,
+    isAdmin: false,
+    onboarding: null,
+    pendingDeletion: null,
+    profile: null,
+  }
+}
+
+function onboarded() {
+  return {
+    ...signedOut(),
+    authenticated: true,
+    userId: 'user-1',
+    state: 'active',
+    profile: { username: 'ana', displayName: 'Ana', avatar: null },
+  }
+}
+
+function onboarding() {
+  return { ...onboarded(), state: 'onboarding', onboarding: { step: 'username' } }
+}
+
+function mockAuthAnd(authSession: unknown, guest: unknown, pollGuest?: unknown) {
+  api.get.mockImplementation((path: string) => {
+    if (path === '/api/v1/auth/session') return Promise.resolve({ data: authSession })
+    if (path === '/api/v1/guest/{guestLinkId}/session') {
+      return pollGuest
+        ? Promise.reject(new SessionNotFound())
+        : Promise.resolve({ data: guest })
+    }
+    return Promise.resolve({ data: pollGuest })
+  })
+}
+
+describe('GuestSessionPage — guest to account upgrade (D-225)', () => {
+  it('offers nothing to upgrade before the seat is claimed_D225', async () => {
+    mockAuthAnd(onboarded(), liveUnclaimed())
+    renderPage(`/guest/${hexLinkId}`)
+
+    expect(await screen.findByLabelText('Display name')).toBeInTheDocument()
+    expect(screen.queryByText('Keep this seat')).not.toBeInTheDocument()
+  })
+
+  it('sends a signed-out claimed guest to sign-in with the guest page as the return_D225', async () => {
+    mockAuthAnd(signedOut(), liveClaimed())
+    renderPage(`/guest/${hexLinkId}`)
+
+    const signIn = await screen.findByRole('link', { name: 'Sign in' })
+    expect(signIn).toHaveAttribute(
+      'href',
+      `/login?next=%2Fguest%2F${hexLinkId}`,
+    )
+    expect(
+      screen.getByText(
+        'Have an account? Sign in to keep this seat and get notifications.',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('sends a signed-in but unfinished account to onboarding with the same return_D225', async () => {
+    mockAuthAnd(onboarding(), liveClaimed())
+    renderPage(`/guest/${hexLinkId}`)
+
+    expect(await screen.findByRole('link', { name: 'Finish setup' })).toHaveAttribute(
+      'href',
+      `/onboarding?next=%2Fguest%2F${hexLinkId}`,
+    )
+  })
+
+  it('links the claimed seat to the signed-in account and lands on the session_D225', async () => {
+    mockAuthAnd(onboarded(), liveClaimed())
+    api.post.mockResolvedValue({ data: { sessionId: 'session-1' } })
+    renderPage(`/guest/${hexLinkId}`)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Link this seat to Ana' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/guest/{guestLinkId}/upgrade',
+        expect.objectContaining({
+          params: expect.objectContaining({ path: { guestLinkId: hexLinkId } }),
+        }),
+      ),
+    )
+    expect(await screen.findByTestId('screen-session-detail')).toBeInTheDocument()
+  })
+
+  it('links a claimed poll seat and lands on the poll_D225', async () => {
+    mockAuthAnd(onboarded(), null, livePollClaimed())
+    api.post.mockResolvedValue({ data: { pollId: 'poll-1' } })
+    renderPage(`/guest/${hexLinkId}`)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Link this seat to Ana' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/v1/guest/{guestLinkId}/poll/upgrade',
+        expect.anything(),
+      ),
+    )
+    expect(await screen.findByTestId('screen-poll-detail')).toBeInTheDocument()
+  })
+
+  it('says nothing more than "couldn\'t" when the upgrade is refused_D225', async () => {
+    mockAuthAnd(onboarded(), liveClaimed())
+    const UpgradeUnavailable = class extends Error {
+      status = 409
+      code = 'upgrade_unavailable'
+    }
+    api.post.mockRejectedValue(new UpgradeUnavailable())
+    renderPage(`/guest/${hexLinkId}`)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Link this seat to Ana' }))
+
+    expect(await screen.findByText("Couldn't link this seat.")).toBeInTheDocument()
+    expect(screen.getByTestId('screen-guest-session')).toBeInTheDocument()
   })
 })
