@@ -1,7 +1,18 @@
 {
   "app": {
     "name": "PartyUp",
-    "tagline": "Find time to play with your friends."
+    "tagline": "Find time to play with your friends.",
+    "taglineRotating": {
+      "prefix": "Find time to ",
+      "verbs": [
+        "play",
+        "meet up",
+        "party",
+        "hang out",
+        "game"
+      ],
+      "suffix": " with your friends."
+    }
   },
   "common": {
     "loading": "Loading...",

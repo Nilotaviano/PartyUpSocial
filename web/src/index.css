@@ -373,3 +373,56 @@
     transform: scale(1);
   }
 }
+
+/* Welcome hero rotating verb (RotatingTagline.tsx): the outgoing word slides
+   up and out while the incoming one slides up into place. Reduced motion
+   drops the slide and just swaps the word. */
+.rotating-word {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+
+.rotating-word-in {
+  display: inline-block;
+  animation: rotating-word-in 300ms ease-out both;
+}
+
+.rotating-word-out {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  animation: rotating-word-out 300ms ease-in both;
+}
+
+@keyframes rotating-word-in {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes rotating-word-out {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rotating-word-in {
+    animation: none;
+  }
+  .rotating-word-out {
+    display: none;
+  }
+}

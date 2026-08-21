@@ -1,7 +1,18 @@
 {
   "app": {
     "name": "PartyUp",
-    "tagline": "Encontre tempo para jogar com seus amigos."
+    "tagline": "Encontre tempo para jogar com seus amigos.",
+    "taglineRotating": {
+      "prefix": "Encontre tempo para ",
+      "verbs": [
+        "jogar",
+        "se encontrar",
+        "festejar",
+        "curtir",
+        "se divertir"
+      ],
+      "suffix": " com seus amigos."
+    }
   },
   "common": {
     "loading": "Carregando...",

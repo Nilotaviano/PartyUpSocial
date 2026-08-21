@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { RotatingTagline } from './RotatingTagline'
 import { Mail } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation, useNavigate } from 'react-router'
@@ -301,7 +302,7 @@ export function Welcome() {
               `leading-[1.05]` is the display line-height (`--text-display--line-height`)
               carried onto a hero size the type scale does not name. */}
           <h1 className="max-w-[16ch] font-display text-4xl leading-[1.05] font-extrabold text-ink sm:text-5xl">
-            {t('app.tagline')}
+            <RotatingTagline />
           </h1>
           <div className="flex flex-wrap gap-3">
             <Button
