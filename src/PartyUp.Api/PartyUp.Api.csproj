@@ -17,6 +17,15 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="SixLabors.Fonts" />
+    <PackageReference Include="SixLabors.ImageSharp" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" />
+  </ItemGroup>
+
+  <!-- D-224: the aspnet:10.0 runtime image ships no system fonts, so the card renderer loads this
+       bundled OFL face from the output directory rather than looking one up on the host. -->
+  <ItemGroup>
+    <None Include="Assets\Fonts\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

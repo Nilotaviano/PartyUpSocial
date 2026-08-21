@@ -1,5 +1,7 @@
 using NodaTime;
+using PartyUp.Api.Auth;
 using PartyUp.Api.Security;
+using PartyUp.Api.Unfurl;
 using PartyUp.Application.Abstractions;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Polls;
@@ -19,6 +21,9 @@ public static class GuestExchangeEndpoints
         app.MapGet("/g/{token}", ExchangeAsync)
             .WithName(ApiOperationIds.ExchangeGuestLink)
             .ExcludeFromDescription();
+        app.MapGet("/g/{token}/card.png", UnfurlCardAsync)
+            .WithName(ApiOperationIds.GetGuestLinkUnfurlCard)
+            .ExcludeFromDescription();
         return app;
     }
 
@@ -29,12 +34,21 @@ public static class GuestExchangeEndpoints
         IPollRepository polls,
         GuestLinkCredentialProtector protector,
         PollGuestLinkCredentialProtector pollProtector,
+        GuestUnfurlResolver unfurl,
+        ExternalAuthOriginOptions origins,
         IClock clock,
         HttpContext context,
         CancellationToken cancellationToken)
     {
         context.Response.Headers.CacheControl = "no-store";
         context.Response.Headers["Referrer-Policy"] = "no-referrer";
+
+        // D-224: an allowlisted link-preview crawler is answered with metadata only, ahead of every
+        // cookie the exchange would otherwise write — the crawler is not the bearer.
+        if (CrawlerUserAgents.IsCrawler(context.Request.Headers.UserAgent))
+        {
+            return await UnfurlDocumentAsync(token, unfurl, origins, context, cancellationToken);
+        }
 
         ClearStaleGuestCookies(context, protector, pollProtector, clock);
 
@@ -72,6 +86,43 @@ public static class GuestExchangeEndpoints
 
         string guestLinkIdN = resolved.GuestLinkId.Value.ToString("N");
         return Results.Redirect($"/guest/{guestLinkIdN}");
+    }
+
+    /// <summary>
+    /// D-224's crawler answer: 200 with an Open Graph document and nothing else — no cookie, no
+    /// redirect, no database write. Anything but a live link renders the one generic card, so an
+    /// unknown token is indistinguishable from a revoked one.
+    /// </summary>
+    private static async Task<IResult> UnfurlDocumentAsync(
+        string token,
+        GuestUnfurlResolver unfurl,
+        ExternalAuthOriginOptions origins,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        context.Response.Headers["X-Robots-Tag"] = "noindex";
+        UnfurlCard card = await unfurl.ResolveAsync(token, cancellationToken);
+        string pageUrl = $"{origins.PublicOrigin}/g/{Uri.EscapeDataString(token)}";
+        string html = UnfurlDocument.Build(card, pageUrl, pageUrl + "/card.png");
+        return Results.Content(html, "text/html", System.Text.Encoding.UTF8);
+    }
+
+    /// <summary>
+    /// D-224's card image. Private and briefly cacheable so a revoked link stops rendering details
+    /// within five minutes, never indexed, and never a cookie carrier.
+    /// </summary>
+    private static async Task<IResult> UnfurlCardAsync(
+        string token,
+        GuestUnfurlResolver unfurl,
+        UnfurlCardRenderer renderer,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        context.Response.Headers.CacheControl = "private, max-age=300";
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        context.Response.Headers["X-Robots-Tag"] = "noindex";
+        UnfurlCard card = await unfurl.ResolveAsync(token, cancellationToken);
+        return Results.Bytes(renderer.Render(card), "image/png");
     }
 
     /// <summary>

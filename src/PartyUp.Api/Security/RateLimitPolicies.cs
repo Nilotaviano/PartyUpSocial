@@ -265,7 +265,9 @@ public static class RateLimitPolicies
             20,
             TimeSpan.FromMinutes(1),
             RateLimitPartitionKind.Ip,
-            Operations(ApiOperationIds.ExchangeGuestLink)),
+            // D-224: the crawler document and its card share the exchange's dimension — one paste
+            // into a chat app is one visitor's worth of traffic, whoever fetched it.
+            Operations(ApiOperationIds.ExchangeGuestLink, ApiOperationIds.GetGuestLinkUnfurlCard)),
         // AVATARS_DESIGN.md §3.3: sized for a page load, not an API call -- a 150-friend roster
         // fans out to ~150 GETs in one paint, which would burn through `default`'s 300/min/IP on
         // its own and 429 the caller's real API traffic behind it.

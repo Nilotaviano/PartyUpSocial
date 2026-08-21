@@ -87,7 +87,8 @@ public sealed class RateLimitTests : IAsyncLifetime, IDisposable
                 "PromoteSessionWaitlistParticipant",
                 "RejectSessionWaitlistParticipant",
             ],
-            ["guest-link-exchange"] = ["ExchangeGuestLink"],
+            // D-224: the crawler card shares the exchange's dimension.
+            ["guest-link-exchange"] = ["ExchangeGuestLink", "GetGuestLinkUnfurlCard"],
             // AVATARS_DESIGN.md §3.3: sized for page loads, its own dimension so a large friend
             // roster's avatar fan-out never competes with `default`'s API-call ceiling.
             ["avatar-proxy"] = ["GetAvatarProxy"],

@@ -182,6 +182,7 @@ public sealed class AvailabilityOpenApiTests : IAsyncLifetime, IDisposable
         }
 
         Assert.DoesNotContain(ApiOperationIds.ExchangeGuestLink, operationIds);
+        Assert.DoesNotContain(ApiOperationIds.GetGuestLinkUnfurlCard, operationIds);
         Assert.DoesNotContain(ApiOperationIds.GetAvatarProxy, operationIds);
 
         // S8 hardening: the exact shipped set, not merely its count — a swap (one operation added,

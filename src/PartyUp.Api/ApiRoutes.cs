@@ -90,6 +90,12 @@ public static class ApiOperationIds
     // exception outside /api/v1 and outside the OpenAPI document; the rest are ordinary /api/v1
     // guest resource operations.
     public const string ExchangeGuestLink = "ExchangeGuestLink";
+
+    /// <summary>
+    /// D-224's server-rendered unfurl card, the same A-064 transport exception as
+    /// <see cref="ExchangeGuestLink"/> — outside <c>/api/v1</c> and outside the OpenAPI document.
+    /// </summary>
+    public const string GetGuestLinkUnfurlCard = "GetGuestLinkUnfurlCard";
     public const string GetGuestSession = "GetGuestSession";
 
     /// <summary>

@@ -17,6 +17,7 @@ using PartyUp.Api.ErrorHandling;
 using PartyUp.Api.Hosting;
 using PartyUp.Api.Logging;
 using PartyUp.Api.Security;
+using PartyUp.Api.Unfurl;
 using PartyUp.Application.Abstractions;
 using PartyUp.Application.Accounts;
 using PartyUp.Application.Admin;
@@ -141,6 +142,10 @@ builder.Services.AddSingleton(services => new FeedbackEmailOptions(
 builder.Services.AddScoped<FriendGroupUseCases>();
 builder.Services.AddScoped<FriendGroupReadUseCases>();
 builder.Services.AddSingleton<ExternalAuthOriginOptions>();
+// D-224: the bundled OFL faces are parsed once at startup; the renderer is stateless above them.
+builder.Services.AddSingleton<UnfurlCardFonts>();
+builder.Services.AddSingleton<UnfurlCardRenderer>();
+builder.Services.AddScoped<GuestUnfurlResolver>();
 builder.Services.AddSingleton(new AccountEmailOptions(
     builder.Configuration["PublicBaseUrl"] ?? "http://localhost:5173"));
 TimeSpan tokenRetention = ReadTimeSpan(
