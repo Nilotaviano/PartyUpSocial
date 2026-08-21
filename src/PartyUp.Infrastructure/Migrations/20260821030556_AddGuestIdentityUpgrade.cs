@@ -24,6 +24,11 @@ namespace PartyUp.Infrastructure.Migrations
                 type: "uuid",
                 nullable: true);
 
+            migrationBuilder.CreateIndex(
+                name: "ix_guest_identities_upgraded_to_user_id",
+                table: "guest_identities",
+                column: "upgraded_to_user_id");
+
             migrationBuilder.AddForeignKey(
                 name: "fk_guest_identities_users_upgraded_to_user_id",
                 table: "guest_identities",
@@ -38,6 +43,10 @@ namespace PartyUp.Infrastructure.Migrations
         {
             migrationBuilder.DropForeignKey(
                 name: "fk_guest_identities_users_upgraded_to_user_id",
+                table: "guest_identities");
+
+            migrationBuilder.DropIndex(
+                name: "ix_guest_identities_upgraded_to_user_id",
                 table: "guest_identities");
 
             migrationBuilder.DropColumn(

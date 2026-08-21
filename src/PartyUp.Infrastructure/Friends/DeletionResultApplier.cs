@@ -107,6 +107,8 @@ public sealed class DeletionResultApplier(
         // banned account's feedback attributed, exactly like the rest of its retained history.
         await feedback.AnonymizeForUserAsync(subject, cancellationToken);
 
+        await ClearGuestUpgradeProvenanceAsync(subject, cancellationToken);
+
         ClearLastSeen(subject);
     }
 
@@ -143,6 +145,21 @@ public sealed class DeletionResultApplier(
             context.FriendGroups.RemoveRange(deleted);
         }
     }
+
+    /// <summary>
+    /// D-225: the guest rows a deleted account once upgraded keep their history, but the pointer at
+    /// the account goes — the same anonymize-do-not-erase shape as D-216's feedback step, and it has
+    /// to be explicit because the tombstone leaves the user row in place, so the FK's ON DELETE SET
+    /// NULL never fires. Set-based: the executor needs no rows, only the columns cleared.
+    /// </summary>
+    private Task<int> ClearGuestUpgradeProvenanceAsync(UserId subject, CancellationToken cancellationToken) =>
+        context.GuestIdentities
+            .Where(identity => identity.UpgradedToUserId == subject)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(identity => identity.UpgradedToUserId, (UserId?)null)
+                    .SetProperty(identity => identity.UpgradedAt, (Instant?)null),
+                cancellationToken);
 
     /// <summary>
     /// PHASE8_DESIGN.md §2 Q1: a tombstone must not keep counting as an active user, so the deletion

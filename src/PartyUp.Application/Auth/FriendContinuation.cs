@@ -47,7 +47,7 @@ public static partial class FriendContinuation
         return GuestLinkPath().IsMatch(continuation) ? continuation : null;
     }
 
-    [GeneratedRegex("^/guest/[0-9a-f]{32}$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\A/guest/[0-9a-f]{32}\z", RegexOptions.CultureInvariant)]
     private static partial Regex GuestLinkPath();
 
     private static bool IsValidUsername(string username)

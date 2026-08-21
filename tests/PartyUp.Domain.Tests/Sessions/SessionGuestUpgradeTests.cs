@@ -87,7 +87,54 @@ public class SessionGuestUpgradeTests
     }
 
     [Fact]
-    public void UpgradeGuest_LeavesEveryLinkOfThatGuestTerminal_D225()
+    public void UpgradeGuest_KeepsARemovedRegisteredRowAsItIs_D225()
+    {
+        FakeClock clock = TestSessions.Clock();
+        SessionUnderTest fixture = TestSessions.New(clock, inviteeCount: 1, minAttendance: 1, maxCapacity: 3);
+        UserId invitee = fixture.Invitee(0);
+        fixture.Session.Rsvp(fixture.InviteeRef(0), ParticipationStatus.Going, clock);
+        fixture.Session.RemoveParticipation(fixture.InviteeRef(0), clock);
+
+        (GuestLink link, _) = fixture.Session.CreateGuestLink(clock);
+        GuestIdentity guest = fixture.Session.ClaimGuestLink(
+            link.Id, DisplayName.Create("Robin"), ParticipationStatus.Going, clock);
+        Participation registered = fixture.Row(ParticipantRef.ForUser(invitee));
+        fixture.Drain();
+
+        fixture.Session.UpgradeGuest(guest.Id, invitee, clock);
+
+        // The registered row wins even when it is Removed or Declined: upgrade never resurrects a
+        // seat the organizer (or the account) already settled — the guest row leaves instead.
+        Assert.Same(registered, fixture.Row(ParticipantRef.ForUser(invitee)));
+        Assert.Equal(ParticipationStatus.Removed, registered.Status);
+        Assert.Equal(ParticipationStatus.Removed, fixture.Row(guest.Participant).Status);
+        Assert.Equal(GuestLinkState.Upgraded, link.State);
+        Assert.Equal(invitee, guest.UpgradedToUserId);
+    }
+
+    [Fact]
+    public void UpgradeGuest_KeepsADeclinedRegisteredRowAsItIs_D225()
+    {
+        FakeClock clock = TestSessions.Clock();
+        SessionUnderTest fixture = TestSessions.New(clock, inviteeCount: 1, minAttendance: 1, maxCapacity: 3);
+        UserId invitee = fixture.Invitee(0);
+        fixture.Session.DeclineInvitation(fixture.InviteeRef(0), clock);
+
+        (GuestLink link, _) = fixture.Session.CreateGuestLink(clock);
+        GuestIdentity guest = fixture.Session.ClaimGuestLink(
+            link.Id, DisplayName.Create("Robin"), ParticipationStatus.Going, clock);
+        Participation registered = fixture.Row(ParticipantRef.ForUser(invitee));
+        fixture.Drain();
+
+        fixture.Session.UpgradeGuest(guest.Id, invitee, clock);
+
+        Assert.Same(registered, fixture.Row(ParticipantRef.ForUser(invitee)));
+        Assert.Equal(ParticipationStatus.Declined, registered.Status);
+        Assert.Equal(ParticipationStatus.Removed, fixture.Row(guest.Participant).Status);
+    }
+
+    [Fact]
+    public void UpgradeGuest_LeavesTheGuestsOwnLinkTerminalAndOtherLinksAlone_D225()
     {
         FakeClock clock = TestSessions.Clock();
         SessionUnderTest fixture = TestSessions.GuestOnly(clock, minAttendance: 1);
@@ -101,7 +148,9 @@ public class SessionGuestUpgradeTests
         Assert.Equal(GuestLinkState.Upgraded, link.State);
         Assert.Equal(GuestLinkView.RevokedNotice, fixture.Session.ResolveGuestLink(link.Id, clock));
 
-        // Another guest's still-unclaimed link is untouched.
+        // A claim mints a fresh identity per link, so an identity holds exactly one claimed link —
+        // that single link is what turns terminal, and another still-unclaimed link is untouched.
+        Assert.Single(fixture.Session.GuestLinks, l => l.GuestIdentityId == guest.Id);
         Assert.Equal(GuestLinkState.Active, untouched.State);
 
         // The bearer token is spent: no further guest write and no second upgrade land on that seat.

@@ -34,9 +34,12 @@ public sealed class PollGuestUpgradeCommandTests
             harness.Poll.FindVote(harness.Poll.Options[0].Id, userRef)!.Choice);
         Assert.Equal(GuestLinkState.Upgraded, harness.Link.State);
 
+        // A-068 order: the affected registered users are locked before the poll parent.
+        IReadOnlyCollection<UserId> lockedUsers = Assert.Single(harness.Locks.LockedUserBatches);
+        Assert.Contains(harness.OrganizerId, lockedUsers);
+        Assert.Contains(newcomer, lockedUsers);
         IReadOnlyCollection<PollId> locked = Assert.Single(harness.Locks.LockedPollBatches);
         Assert.Contains(harness.Poll.Id, locked);
-        Assert.Empty(harness.Locks.LockedUserBatches);
     }
 
     [Fact]

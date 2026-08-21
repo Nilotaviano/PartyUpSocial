@@ -28,6 +28,24 @@ public sealed class UpgradeGuestPollUseCase(
         unitOfWork.ExecuteAsync(
             async ct =>
             {
+                // A-068 lock order (§6.1, the SessionJoinRequestUseCases convention): a non-locking
+                // probe names the affected registered users, those rows and the block pair are
+                // locked, and only then is the poll parent locked and loaded.
+                Poll? probe = await polls.FindNoTrackingAsync(pollId, ct);
+                if (probe is null)
+                {
+                    return GuestPollCommandResult.Failed("poll_not_found");
+                }
+
+                UserId organizerId = probe.OrganizerId;
+                await pollLocks.LockUsersAsync([organizerId, userId], ct);
+
+                IReadOnlyList<Block> pair = await blocks.LockPairsAsync(userId, [organizerId], ct);
+                if (pair.Count > 0)
+                {
+                    return GuestPollCommandResult.Failed("upgrade_unavailable");
+                }
+
                 await pollLocks.LockPollsAsync([pollId], ct);
 
                 PollForUpdate? forUpdate = await polls.LoadForUpdateAsync(pollId, ct);
@@ -61,13 +79,14 @@ public sealed class UpgradeGuestPollUseCase(
                     return GuestPollCommandResult.Failed("guest_link_unclaimed");
                 }
 
-                IReadOnlyList<Block> pair = await blocks.FindPairAsync(userId, poll.OrganizerId, ct);
-                if (pair.Count > 0)
+                // The duplicate branch severs the guest participant and its votes from the
+                // aggregate; both FKs are required and non-cascading, so the deletion is handed to
+                // the repository explicitly (the D-186 self-removal idiom).
+                PollGuestUpgradeResult upgrade = poll.UpgradeGuest(guestIdentityId, userId, clock);
+                if (upgrade.RemovedParticipant is { } removedParticipant)
                 {
-                    return GuestPollCommandResult.Failed("upgrade_unavailable");
+                    polls.RemoveParticipationAndWithdrawnVotes(removedParticipant, upgrade.RemovedVotes);
                 }
-
-                poll.UpgradeGuest(guestIdentityId, userId, clock);
 
                 IReadOnlyList<IDomainEvent> events = poll.DequeueEvents();
                 await materializer.MaterializeAsync(poll, events, ct);

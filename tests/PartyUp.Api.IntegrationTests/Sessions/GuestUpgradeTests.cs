@@ -7,6 +7,7 @@ using NodaTime;
 using PartyUp.Domain.Friendships;
 using PartyUp.Domain.Kernel;
 using PartyUp.Domain.Sessions;
+using PartyUp.Api.Security;
 using PartyUp.Infrastructure.Persistence;
 
 namespace PartyUp.Api.IntegrationTests.Sessions;
@@ -179,6 +180,45 @@ public sealed class GuestUpgradeTests : IAsyncLifetime, IDisposable
     }
 
     // ---- fixture helpers -------------------------------------------------------------------------
+
+    /// <summary>
+    /// A-074 branch (c) on the D-225 route: a terminal-mode credential against a still-live claimed
+    /// link cannot upgrade, and fails closed as "not found" rather than a distinguishable 409.
+    /// </summary>
+    [Fact]
+    public async Task Upgrade_WithATerminalModeCredential_Is404_D225()
+    {
+        SessionHttpUser organizer = await SessionEndpointTestSupport.SeedAsync(_factory);
+        (SessionId sessionId, string token) = await SeedSessionAsync(organizer.Id);
+        (_, Guid guestLinkId) = await ExchangeAndClaimAsync(token, "Robin", "Going");
+
+        Instant now = _factory.Clock.GetCurrentInstant();
+        string terminalCookie;
+        await using (AsyncServiceScope protectorScope = _factory.Services.CreateAsyncScope())
+        {
+            GuestLinkCredentialProtector protector = protectorScope.ServiceProvider
+                .GetRequiredService<GuestLinkCredentialProtector>();
+            string value = protector.Protect(new GuestLinkCredential(
+                GuestLinkId.From(guestLinkId),
+                sessionId,
+                GuestCredentialMode.Terminal,
+                now,
+                now + GuestLinkCredentialProtector.TerminalLifetime));
+            terminalCookie = $"pu.g.{guestLinkId:N}={value}";
+        }
+
+        SessionHttpUser account = await SessionEndpointTestSupport.SeedAsync(_factory);
+        using SessionHttpSession session = await SessionEndpointTestSupport.SignInAsync(_factory, account.Id);
+
+        HttpResponseMessage upgrade = await AntiforgeryTestClient.PostAsync(
+            session.Client,
+            $"/api/v1/guest/{guestLinkId:N}/upgrade",
+            content: null,
+            $"{terminalCookie}; {session.AuthCookie}");
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            upgrade, HttpStatusCode.NotFound, "session_not_found");
+    }
 
     private async Task<(SessionId SessionId, string Token)> SeedSessionAsync(UserId organizerId, UserId? invitee = null)
     {

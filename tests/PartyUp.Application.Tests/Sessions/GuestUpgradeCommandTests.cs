@@ -32,11 +32,13 @@ public sealed class GuestUpgradeCommandTests
         Assert.Null(session.Find(ParticipantRef.ForGuest(guest.Id)));
         Assert.Equal(GuestLinkState.Upgraded, link.State);
 
-        // The occupancy-touching write took the session parent lock, and introduced no new
-        // registered counterpart to lock (the account is already the one calling).
+        // A-068 order: the affected registered users are locked first, then the session parent
+        // whose occupancy the write reads.
+        IReadOnlyCollection<UserId> lockedUsers = Assert.Single(fixture.Locks.LockedUserBatches);
+        Assert.Contains(fixture.OrganizerId, lockedUsers);
+        Assert.Contains(newcomer, lockedUsers);
         IReadOnlyCollection<SessionId> locked = Assert.Single(fixture.Locks.LockedSessionBatches);
         Assert.Contains(session.Id, locked);
-        Assert.Empty(fixture.Locks.LockedUserBatches);
         Assert.Single(fixture.Materializer.Calls);
     }
 

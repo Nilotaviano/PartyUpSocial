@@ -24,6 +24,10 @@ public sealed class GuestIdentityConfiguration : IEntityTypeConfiguration<GuestI
         builder.Ignore(identity => identity.Participant);
         builder.Ignore(identity => identity.IsUpgraded);
 
+        // D-225: the account-deletion step clears every row that upgraded into the deleted account,
+        // and the referral provenance read looks rows up the same way.
+        builder.HasIndex(identity => identity.UpgradedToUserId);
+
         // D-225: provenance, not access — a deleted account leaves the guest row and its history in
         // place with the pointer nulled.
         builder.HasOne<User>().WithMany()

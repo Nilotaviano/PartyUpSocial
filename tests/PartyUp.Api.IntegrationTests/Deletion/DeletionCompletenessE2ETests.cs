@@ -338,6 +338,38 @@ public sealed class DeletionCompletenessE2ETests : IAsyncLifetime, IDisposable
             ? [.. Directory.EnumerateFiles(_journalPath, "*.ndjson").SelectMany(File.ReadAllLines)]
             : [];
 
+    /// <summary>
+    /// D-225 / §11: a guest identity the subject upgraded into their account is history, not access —
+    /// the row survives deletion with its display name, and only the two provenance columns pointing
+    /// at the deleted account are cleared, in the execution's own transaction.
+    /// </summary>
+    [Fact]
+    public async Task GraceExpirySweep_ClearsTheGuestUpgradeProvenance_D225()
+    {
+        DeletionCompletenessSeed seed = await SeedAsync();
+
+        await using (AsyncServiceScope before = _factory.Services.CreateAsyncScope())
+        {
+            GuestIdentity seeded = await before.ServiceProvider.GetRequiredService<AppDbContext>()
+                .GuestIdentities.AsNoTracking()
+                .SingleAsync(identity => identity.Id == seed.UpgradedGuestIdentityId);
+            Assert.Equal(seed.SubjectId, seeded.UpgradedToUserId);
+            Assert.NotNull(seeded.UpgradedAt);
+        }
+
+        _factory.Clock.Advance(Duration.FromHours(84));
+        DeletionSweepResult sweep = await RunSweepAsync();
+        Assert.Equal(1, sweep.Executed);
+
+        await using AsyncServiceScope verification = _factory.Services.CreateAsyncScope();
+        GuestIdentity identity = await verification.ServiceProvider.GetRequiredService<AppDbContext>()
+            .GuestIdentities.AsNoTracking()
+            .SingleAsync(row => row.Id == seed.UpgradedGuestIdentityId);
+        Assert.Null(identity.UpgradedToUserId);
+        Assert.Null(identity.UpgradedAt);
+        Assert.Equal("Upgraded Guest", identity.DisplayName.Value);
+    }
+
     private async Task<DeletionSweepResult> RunSweepAsync()
     {
         await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
@@ -541,6 +573,7 @@ public sealed class DeletionCompletenessE2ETests : IAsyncLifetime, IDisposable
         JoinRequestId ownSessionJoinRequestId;
         JoinRequestId thirdPartyOnCanceledId;
         JoinRequestId thirdPartyOnRetainedId;
+        GuestIdentityId upgradedGuestIdentityId;
         Guid reminderHandoffId = Guid.NewGuid();
 
         await using (AsyncServiceScope scope = _factory.Services.CreateAsyncScope())
@@ -590,6 +623,14 @@ public sealed class DeletionCompletenessE2ETests : IAsyncLifetime, IDisposable
             Session requestTarget = Session.Create(
                 sessionRequestHostId, DetailsFor("Other's request target", futureLeadMinutes), [], _factory.Clock);
             ownSessionJoinRequestId = requestTarget.OpenJoinRequest(subjectId, _factory.Clock).Id;
+
+            // D-225: a guest seat the subject upgraded into their account. The identity row is
+            // history and is retained; only its provenance pointer at the subject must go.
+            (GuestLink upgradedLink, _) = requestTarget.CreateGuestLink(_factory.Clock);
+            GuestIdentity upgradedGuest = requestTarget.ClaimGuestLink(
+                upgradedLink.Id, DisplayName.Create("Upgraded Guest"), ParticipationStatus.Going, _factory.Clock);
+            requestTarget.UpgradeGuest(upgradedGuest.Id, subjectId, _factory.Clock);
+            upgradedGuestIdentityId = upgradedGuest.Id;
             _ = requestTarget.DequeueEvents();
 
             context.Sessions.AddRange(
@@ -648,6 +689,7 @@ public sealed class DeletionCompletenessE2ETests : IAsyncLifetime, IDisposable
             ownSessionJoinRequestId,
             thirdPartyOnCanceledId,
             thirdPartyOnRetainedId,
+            upgradedGuestIdentityId,
             reminderHandoffId,
             ownedPollId,
             participatedPollId,
@@ -719,6 +761,7 @@ internal sealed record DeletionCompletenessSeed(
     JoinRequestId OwnSessionJoinRequestId,
     JoinRequestId ThirdPartyRequestOnCanceledSessionId,
     JoinRequestId ThirdPartyRequestOnRetainedSessionId,
+    GuestIdentityId UpgradedGuestIdentityId,
     Guid ReminderHandoffId,
     PollId OwnedPollId,
     PollId ParticipatedPollId,

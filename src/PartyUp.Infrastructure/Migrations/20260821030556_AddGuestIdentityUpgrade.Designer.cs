@@ -14,7 +14,7 @@ using PartyUp.Infrastructure.Persistence;
 namespace PartyUp.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260821021800_AddGuestIdentityUpgrade")]
+    [Migration("20260821030556_AddGuestIdentityUpgrade")]
     partial class AddGuestIdentityUpgrade
     {
         /// <inheritdoc />
@@ -960,6 +960,9 @@ namespace PartyUp.Infrastructure.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_guest_identities");
+
+                    b.HasIndex("UpgradedToUserId")
+                        .HasDatabaseName("ix_guest_identities_upgraded_to_user_id");
 
                     b.ToTable("guest_identities", null, t =>
                         {

@@ -30,6 +30,24 @@ public sealed class UpgradeGuestSessionUseCase(
         unitOfWork.ExecuteAsync(
             async ct =>
             {
+                // A-068 lock order (§6.1, the SessionJoinRequestUseCases convention): a non-locking
+                // probe names the affected registered users, those rows and the block pair are
+                // locked, and only then is the session parent locked and loaded.
+                Session? probe = await sessions.FindNoTrackingAsync(sessionId, ct);
+                if (probe is null)
+                {
+                    return GuestCommandResult.Failed("session_not_found");
+                }
+
+                UserId organizerId = probe.OrganizerId;
+                await sessionLocks.LockUsersAsync([organizerId, userId], ct);
+
+                IReadOnlyList<Block> pair = await blocks.LockPairsAsync(userId, [organizerId], ct);
+                if (pair.Count > 0)
+                {
+                    return GuestCommandResult.Failed("upgrade_unavailable");
+                }
+
                 await sessionLocks.LockSessionsAsync([sessionId], ct);
 
                 SessionForUpdate? forUpdate = await sessions.LoadForUpdateAsync(sessionId, ct);
@@ -56,12 +74,6 @@ public sealed class UpgradeGuestSessionUseCase(
                 if (link.GuestIdentityId is not { } guestIdentityId)
                 {
                     return GuestCommandResult.Failed("guest_link_unclaimed");
-                }
-
-                IReadOnlyList<Block> pair = await blocks.FindPairAsync(userId, session.OrganizerId, ct);
-                if (pair.Count > 0)
-                {
-                    return GuestCommandResult.Failed("upgrade_unavailable");
                 }
 
                 session.UpgradeGuest(guestIdentityId, userId, clock);

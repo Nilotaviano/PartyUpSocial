@@ -930,9 +930,11 @@ public sealed class Poll : AggregateRoot
     /// guest's <see cref="PollParticipant"/> and every one of its <see cref="PollVote"/>s re-point to
     /// the account (FirstResponseAt and the D-119 ordering preserved); with one already present the
     /// user's participant and votes stay and the guest's are dropped. Every link of that identity
-    /// becomes <see cref="GuestLinkState.Upgraded"/>.
+    /// becomes <see cref="GuestLinkState.Upgraded"/>. The dropped rows are returned because severing
+    /// them from these collections is not a deletion the persistence layer can infer (see
+    /// <c>IPollRepository.RemoveParticipationAndWithdrawnVotes</c>).
     /// </summary>
-    public void UpgradeGuest(GuestIdentityId guestIdentityId, UserId userId, IClock clock)
+    public PollGuestUpgradeResult UpgradeGuest(GuestIdentityId guestIdentityId, UserId userId, IClock clock)
     {
         ArgumentNullException.ThrowIfNull(clock);
         ApplyDueTransitions(clock);
@@ -946,6 +948,7 @@ public sealed class Poll : AggregateRoot
         PollParticipant guestRow = FindParticipant(guest)
             ?? throw new DomainException(DomainError.NotFound, "That guest holds no participant row on this poll.");
 
+        PollGuestUpgradeResult result;
         if (FindParticipant(ParticipantRef.ForUser(userId)) is null)
         {
             guestRow.ReassignToUser(userId);
@@ -956,11 +959,15 @@ public sealed class Poll : AggregateRoot
                     vote.ReassignToUser(userId);
                 }
             }
+
+            result = PollGuestUpgradeResult.NothingRemoved;
         }
         else
         {
+            List<PollVote> droppedVotes = _votes.FindAll(vote => vote.CastBy(guest));
             _participants.Remove(guestRow);
             _votes.RemoveAll(vote => vote.CastBy(guest));
+            result = new PollGuestUpgradeResult(guestRow, droppedVotes);
         }
 
         foreach (GuestLink link in _guestLinks)
@@ -972,6 +979,8 @@ public sealed class Poll : AggregateRoot
         }
 
         identity.MarkUpgraded(userId, clock.GetCurrentInstant());
+
+        return result;
     }
 
     /// <summary>D-150: an unclaimed link can be revoked on its own, with no roster effect (§5.4).</summary>

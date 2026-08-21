@@ -958,6 +958,9 @@ namespace PartyUp.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_guest_identities");
 
+                    b.HasIndex("UpgradedToUserId")
+                        .HasDatabaseName("ix_guest_identities_upgraded_to_user_id");
+
                     b.ToTable("guest_identities", null, t =>
                         {
                             t.HasCheckConstraint("ck_guest_identities_target", "(session_id IS NOT NULL) <> (poll_id IS NOT NULL)");

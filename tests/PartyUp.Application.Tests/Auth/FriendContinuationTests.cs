@@ -34,6 +34,8 @@ public sealed class FriendContinuationTests
     [InlineData("/guest/invalid")]
     [InlineData("https://evil.test/guest/0123456789abcdef0123456789abcdef")]
     [InlineData("//evil.test/guest/0123456789abcdef0123456789abcdef")]
+    [InlineData("/guest/0123456789abcdef0123456789abcdef\n")]
+    [InlineData("/guest/0123456789abcdef0123456789abcdef\r\n")]
     public void Validate_DropsAnythingButAnExactGuestLinkPage_D225(string candidate)
     {
         Assert.Null(FriendContinuation.Validate(candidate));

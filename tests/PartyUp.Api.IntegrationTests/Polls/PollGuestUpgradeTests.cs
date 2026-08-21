@@ -103,6 +103,67 @@ public sealed class PollGuestUpgradeTests : IAsyncLifetime, IDisposable
             upgrade, HttpStatusCode.NotFound, "poll_not_found");
     }
 
+    /// <summary>
+    /// D-225's duplicate branch over HTTP: the account already votes in this poll, so its own
+    /// participant and votes stand and the guest's leave. The guest rows are severed from the
+    /// aggregate but their FKs do not cascade, so a merge that forgets to erase them explicitly
+    /// fails the transaction — this is the regression that keeps that erase in place.
+    /// </summary>
+    [Fact]
+    public async Task Upgrade_WhenTheAccountAlreadyVotes_KeepsItsVotesAndErasesTheGuestRows_D225()
+    {
+        SessionHttpUser account = await SessionEndpointTestSupport.SeedAsync(_factory);
+        SeededGuestPoll seeded = await SeedPollWithGuestLinkAsync(invitee: account.Id);
+
+        using SessionHttpSession session = await SessionEndpointTestSupport.SignInAsync(_factory, account.Id);
+        HttpResponseMessage ownVote = await session.SendUnsafeAsync(
+            HttpMethod.Put,
+            $"/api/v1/polls/{seeded.PollId:D}/options/{seeded.FirstOptionId:D}/vote",
+            JsonContent.Create(new { choice = "unavailable" }));
+        Assert.True(ownVote.IsSuccessStatusCode, await ownVote.Content.ReadAsStringAsync());
+
+        using HttpClient guestClient = CreateGuestClient();
+        string guestCookie = await ExchangeAsync(guestClient, seeded.Token);
+        await ClaimAsync(guestClient, seeded.GuestLinkId, guestCookie, "Robin");
+        foreach (Guid optionId in new[] { seeded.FirstOptionId, seeded.SecondOptionId })
+        {
+            HttpResponseMessage guestVote = await AntiforgeryTestClient.SendAsync(
+                guestClient,
+                HttpMethod.Put,
+                $"/api/v1/guest/{seeded.GuestLinkId:N}/poll/options/{optionId:D}/vote",
+                JsonContent.Create(new { choice = "available" }),
+                guestCookie);
+            Assert.Equal(HttpStatusCode.OK, guestVote.StatusCode);
+        }
+
+        HttpResponseMessage upgrade = await AntiforgeryTestClient.PostAsync(
+            session.Client,
+            $"/api/v1/guest/{seeded.GuestLinkId:N}/poll/upgrade",
+            content: null,
+            $"{guestCookie}; {session.AuthCookie}");
+        Assert.Equal(HttpStatusCode.OK, upgrade.StatusCode);
+
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        PollId typedPollId = PollId.From(seeded.PollId);
+
+        // The account keeps exactly the one vote it cast itself; the guest's contradicting vote and
+        // its vote on the second option are gone from the database, not merely detached.
+        PollVote kept = await context.PollVotes
+            .SingleAsync(v => v.PollId == typedPollId && v.UserId == account.Id);
+        Assert.Equal(PollOptionId.From(seeded.FirstOptionId), kept.OptionId);
+        Assert.Equal(VoteChoice.Unavailable, kept.Choice);
+        Assert.Empty(context.PollVotes.Where(v => v.PollId == typedPollId && v.GuestIdentityId != null));
+        Assert.Empty(context.PollParticipants.Where(p => p.PollId == typedPollId && p.GuestIdentityId != null));
+        Assert.Single(context.PollParticipants.Where(p => p.PollId == typedPollId && p.UserId == account.Id));
+
+        // The identity row itself survives with its provenance; only its roster rows left.
+        GuestIdentity identity = await context.GuestIdentities.SingleAsync(g => g.PollId == typedPollId);
+        Assert.Equal(account.Id, identity.UpgradedToUserId);
+        GuestLink link = await context.GuestLinks.SingleAsync(l => l.Id == GuestLinkId.From(seeded.GuestLinkId));
+        Assert.Equal(GuestLinkState.Upgraded, link.State);
+    }
+
     // ---- fixture helpers -------------------------------------------------------------------------
 
     private static async Task<string> ExchangeAsync(HttpClient client, string token)
@@ -136,7 +197,18 @@ public sealed class PollGuestUpgradeTests : IAsyncLifetime, IDisposable
 
     private async Task<(Guid PollId, Guid OptionId, Guid GuestLinkId, string Token)> SeedPollWithGuestLinkAsync()
     {
+        SeededGuestPoll seeded = await SeedPollWithGuestLinkAsync(invitee: null);
+        return (seeded.PollId, seeded.FirstOptionId, seeded.GuestLinkId, seeded.Token);
+    }
+
+    private async Task<SeededGuestPoll> SeedPollWithGuestLinkAsync(UserId? invitee)
+    {
         UserId organizerId = await _factory.SeedUserAsync(email: $"poll-upgrade-{Guid.NewGuid():N}@example.test");
+        if (invitee is { } inviteeId)
+        {
+            await SessionEndpointTestSupport.MakeFriendsAsync(_factory, organizerId, inviteeId);
+        }
+
         using SessionHttpSession organizerSession =
             await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
         Instant baseTime = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
@@ -155,6 +227,7 @@ public sealed class PollGuestUpgradeTests : IAsyncLifetime, IDisposable
                 visibility = "private",
                 minAttendance = 1,
                 guestLinkCount = 1,
+                inviteeUserIds = invitee is { } id ? new[] { id.Value } : [],
             }));
         using JsonDocument body = await SessionEndpointTestSupport.SuccessJsonAsync(created);
         Guid pollId = body.RootElement.GetProperty("poll").GetProperty("id").GetGuid();
@@ -162,7 +235,15 @@ public sealed class PollGuestUpgradeTests : IAsyncLifetime, IDisposable
         Guid guestLinkId = body.RootElement.GetProperty("guestLinks")[0].GetProperty("guestLinkId").GetGuid();
         string url = body.RootElement.GetProperty("guestLinks")[0].GetProperty("url").GetString()!;
         string token = url[(url.LastIndexOf("/g/", StringComparison.Ordinal) + 3)..];
+        Guid secondOptionId = body.RootElement.GetProperty("poll").GetProperty("options")[1].GetProperty("id").GetGuid();
 
-        return (pollId, optionId, guestLinkId, token);
+        return new SeededGuestPoll(pollId, optionId, secondOptionId, guestLinkId, token);
     }
+
+    private sealed record SeededGuestPoll(
+        Guid PollId,
+        Guid FirstOptionId,
+        Guid SecondOptionId,
+        Guid GuestLinkId,
+        string Token);
 }
