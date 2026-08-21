@@ -87,7 +87,8 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
         bool admin = false,
         string? email = "player@example.test",
         bool emailConfirmed = true,
-        string? password = null)
+        string? password = null,
+        string locale = "en")
     {
         await using AsyncServiceScope scope = Services.CreateAsyncScope();
         AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -119,7 +120,7 @@ internal sealed class PartyUpApiFactory : WebApplicationFactory<Program>
                 DisplayName.Create("Test Player"),
                 Avatar.FromEmoji("🙂"),
                 DateTimeZoneProviders.Tzdb["America/Fortaleza"],
-                Locale.Create("en"),
+                Locale.Create(locale),
                 Clock);
         }
 

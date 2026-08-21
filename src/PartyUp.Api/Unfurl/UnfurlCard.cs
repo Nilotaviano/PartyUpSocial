@@ -16,7 +16,9 @@ public enum UnfurlCardKind
 /// <summary>
 /// The already-localized, already-clamped lines both the Open Graph document and the PNG render, so
 /// the two can never disagree. A <see cref="UnfurlCardKind.Unavailable"/> card carries no session or
-/// poll detail at all: its title is the generic "Invite link" and its primary line is the notice.
+/// poll detail at all: its title is the generic "Invite link", its primary line is the notice, and
+/// both are always English — a localized notice would leak the organizer's locale, which an unknown
+/// token has none of, and D-224 requires the two to be indistinguishable.
 /// </summary>
 /// <param name="Kind">Which card this is.</param>
 /// <param name="Title">The card's heading — a session or poll title, or the generic fallback.</param>
@@ -35,12 +37,12 @@ public sealed record UnfurlCard(
     /// <summary>The one-line description the metadata carries; the card renders the same parts stacked.</summary>
     public string Description => UnfurlText.JoinParts(GameName, PrimaryLine, SecondaryLine);
 
-    /// <summary>The generic card, in <paramref name="locale"/> when an organizer is known and English otherwise.</summary>
-    public static UnfurlCard Unavailable(UnfurlLocale locale) => new(
+    /// <summary>The one generic card, always English, whatever the link's state or organizer.</summary>
+    public static UnfurlCard Unavailable() => new(
         UnfurlCardKind.Unavailable,
-        UnfurlStrings.InviteLink(locale),
+        UnfurlStrings.InviteLink(),
         GameName: null,
-        UnfurlStrings.Unavailable(locale),
+        UnfurlStrings.Unavailable(),
         SecondaryLine: null,
-        locale);
+        UnfurlLocale.English);
 }

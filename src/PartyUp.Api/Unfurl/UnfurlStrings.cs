@@ -38,7 +38,11 @@ public static class UnfurlStrings
         "ddd d 'de' MMM '·' HH:mm",
     ];
 
-    private static readonly string[] GoingFormats = ["{0} going", "{0} vão", "{0} van"];
+    // Mirrors the SPA's sessions.json occupancyUnlimited ("{{active}} going" / "{{active}} confirmados"),
+    // with the singular the Romance catalogs inflect for.
+    private static readonly string[] GoingFormats = ["{0} going", "{0} confirmados", "{0} confirmados"];
+
+    private static readonly string[] GoingSingularFormats = ["{0} going", "{0} confirmado", "{0} confirmado"];
 
     private static readonly string[] VoteInvitations =
     [
@@ -49,14 +53,9 @@ public static class UnfurlStrings
 
     private static readonly string[] ClosesFormats = ["closes {0}", "encerra {0}", "cierra {0}"];
 
-    private static readonly string[] UnavailableNotices =
-    [
-        "This invite is no longer available",
-        "Este convite não está mais disponível",
-        "Esta invitación ya no está disponible",
-    ];
+    private const string UnavailableNotice = "This invite is no longer available";
 
-    private static readonly string[] InviteLinkTitles = ["Invite link", "Link de convite", "Enlace de invitación"];
+    private const string InviteLinkTitle = "Invite link";
 
     /// <summary>Maps a stored BCP-47 tag onto the three supported locales; unknown tags become English.</summary>
     public static UnfurlLocale Resolve(string? locale)
@@ -78,7 +77,10 @@ public static class UnfurlStrings
 
     /// <summary>"N going" — the active Going count on a live session card.</summary>
     public static string Going(UnfurlLocale locale, int count) =>
-        string.Format(Culture(locale), GoingFormats[(int)locale], count);
+        string.Format(
+            Culture(locale),
+            (count == 1 ? GoingSingularFormats : GoingFormats)[(int)locale],
+            count);
 
     /// <summary>The live poll card's call to action.</summary>
     public static string VoteOnWhenToPlay(UnfurlLocale locale) => VoteInvitations[(int)locale];
@@ -87,11 +89,15 @@ public static class UnfurlStrings
     public static string Closes(UnfurlLocale locale, string when) =>
         string.Format(Culture(locale), ClosesFormats[(int)locale], when);
 
-    /// <summary>The single generic notice every non-live link unfurls as.</summary>
-    public static string Unavailable(UnfurlLocale locale) => UnavailableNotices[(int)locale];
+    /// <summary>
+    /// The single generic notice every non-live link unfurls as. Always English: the generic card is
+    /// also what an unknown token renders, and that token has no organizer to take a locale from, so
+    /// D-224's "unknown is indistinguishable from revoked" only holds if neither is localized.
+    /// </summary>
+    public static string Unavailable() => UnavailableNotice;
 
-    /// <summary>The title a generic card carries — it names no session and no poll.</summary>
-    public static string InviteLink(UnfurlLocale locale) => InviteLinkTitles[(int)locale];
+    /// <summary>The title a generic card carries — it names no session and no poll; always English.</summary>
+    public static string InviteLink() => InviteLinkTitle;
 
     /// <summary>
     /// A date and time in the organizer's zone and locale, with the zone's UTC offset spelled out —

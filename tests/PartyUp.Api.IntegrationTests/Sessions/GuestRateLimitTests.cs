@@ -80,6 +80,35 @@ public sealed class GuestRateLimitTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task CardImageSharesTheExchangeBucketAndIsRejectedOnceItIsSpent_D224()
+    {
+        // D-224: the card is not a cheaper door — it draws on the same guest-link-exchange dimension,
+        // so a crawler hammering /card.png exhausts the very bucket the exchange uses.
+        using HttpClient client = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = false,
+            BaseAddress = new Uri("https://localhost"),
+        });
+
+        RateLimitDimension dimension = RateLimitPolicies.Dimensions.Single(d => d.Name == "guest-link-exchange");
+        HttpStatusCode? rejected = null;
+        for (int i = 0; i < dimension.PermitLimit + 1; i++)
+        {
+            HttpResponseMessage response = await client.GetAsync($"/g/{Guid.NewGuid():N}/card.png");
+            if (response.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                rejected = response.StatusCode;
+                break;
+            }
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, rejected);
+    }
+
+    [Fact]
     public void MissingOrMalformedLinkRouteValueFallsBackToTheIpPartition_A073()
     {
         RateLimitDimension guestWrite = RateLimitPolicies.Dimensions.Single(d => d.Name == "guest-write");

@@ -1,4 +1,6 @@
 using System.Text;
+using SixLabors.Fonts;
+using SixLabors.Fonts.Unicode;
 
 namespace PartyUp.Api.Unfurl;
 
@@ -65,6 +67,40 @@ public static class UnfurlText
 
         return head.TrimEnd() + "…";
     }
+
+    /// <summary>
+    /// Drops every Unicode scalar <paramref name="font"/> has no glyph for — emoji and CJK are outside
+    /// the bundled Latin face and would otherwise draw as tofu boxes — then collapses the whitespace
+    /// the removals left behind and trims. Only the PNG needs this; the Open Graph metadata carries
+    /// the full text. Whitespace is kept regardless so word boundaries survive the filter.
+    /// </summary>
+    public static string KeepRenderable(string? value, Font font)
+    {
+        ArgumentNullException.ThrowIfNull(font);
+
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder(value.Length);
+        foreach (Rune rune in value.EnumerateRunes())
+        {
+            if (Rune.IsWhiteSpace(rune) || HasGlyph(font, rune))
+            {
+                _ = builder.Append(rune.ToString());
+            }
+        }
+
+        return Sanitize(builder.ToString());
+    }
+
+    // SixLabors.Fonts answers TryGetGlyphs for any code point (it hands back .notdef), so glyph
+    // presence has to be read off the glyph id: 0 is .notdef, the tofu box.
+    private static bool HasGlyph(Font font, Rune rune) =>
+        font.TryGetGlyphs(new CodePoint(rune.Value), out IReadOnlyList<Glyph>? glyphs)
+        && glyphs.Count > 0
+        && glyphs[0].GlyphMetrics.GlyphId != 0;
 
     /// <summary>Joins the non-empty parts of a description with the card's separator.</summary>
     public static string JoinParts(params string?[] parts) =>

@@ -317,6 +317,9 @@ if (Directory.Exists(DataProtectionKeyPath))
 
 var app = builder.Build();
 _ = app.Services.GetRequiredService<ExternalAuthOriginOptions>();
+// D-224: parse the bundled faces here so a missing or unreadable Assets/Fonts kills the process at
+// startup instead of failing the first crawler's card request.
+_ = app.Services.GetRequiredService<UnfurlCardFonts>();
 
 if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {

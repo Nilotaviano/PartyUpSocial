@@ -104,7 +104,9 @@ public sealed class GuestUnfurlTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task CrawlerOnAnUnknownToken_GetsTheSameBodyAsARevokedLink_D224()
     {
-        (Session session, string revokedToken) = await SeedSessionWithGuestLinkAsync(MarkupTitle);
+        // The revoked link's organizer is pt-BR: an unknown token has no organizer and therefore no
+        // locale, so the generic card can only be indistinguishable if it is always English.
+        (Session session, string revokedToken) = await SeedSessionWithGuestLinkAsync(MarkupTitle, "pt-BR");
         await RevokeAsync(session);
         string unknownToken = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
         using HttpClient client = CreateClient();
@@ -113,11 +115,49 @@ public sealed class GuestUnfurlTests : IAsyncLifetime, IDisposable
             .Content.ReadAsStringAsync();
         string unknown = await (await FetchAsync(client, $"/g/{unknownToken}", CrawlerUserAgent))
             .Content.ReadAsStringAsync();
+        byte[] revokedCard = await (await FetchAsync(client, $"/g/{revokedToken}/card.png", CrawlerUserAgent))
+            .Content.ReadAsByteArrayAsync();
+        byte[] unknownCard = await (await FetchAsync(client, $"/g/{unknownToken}/card.png", CrawlerUserAgent))
+            .Content.ReadAsByteArrayAsync();
 
         // The only difference either body may carry is the token echoed back in its own URLs.
         Assert.Equal(
             revoked.Replace(revokedToken, "TOKEN", StringComparison.Ordinal),
             unknown.Replace(unknownToken, "TOKEN", StringComparison.Ordinal));
+        Assert.Contains("This invite is no longer available", revoked, StringComparison.Ordinal);
+        Assert.DoesNotContain("disponível", revoked, StringComparison.Ordinal);
+        Assert.Equal(revokedCard, unknownCard);
+    }
+
+    [Fact]
+    public async Task CrawlerOnALivePtBrSessionLink_GetsTheOrganizerLocaleDescription_D224()
+    {
+        (_, string token) = await SeedSessionWithGuestLinkAsync("Noite de jogos", "pt-BR");
+        using HttpClient client = CreateClient();
+
+        string body = await (await FetchAsync(client, $"/g/{token}", CrawlerUserAgent)).Content.ReadAsStringAsync();
+
+        Assert.Contains("<title>Noite de jogos</title>", body, StringComparison.Ordinal);
+        Assert.Contains("confirmado", body, StringComparison.Ordinal);
+        Assert.DoesNotContain(" going", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CrawlerGetDoesNotMutateDomainState_A064_D224()
+    {
+        (Session session, string token) = await SeedSessionWithGuestLinkAsync(MarkupTitle);
+        using HttpClient client = CreateClient();
+
+        (int participations, GuestLinkState state) before = await SnapshotAsync(session.Id);
+        HttpResponseMessage document = await FetchAsync(client, $"/g/{token}", CrawlerUserAgent);
+        HttpResponseMessage card = await FetchAsync(client, $"/g/{token}/card.png", CrawlerUserAgent);
+
+        Assert.Equal(HttpStatusCode.OK, document.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, card.StatusCode);
+        Assert.Equal(before, await SnapshotAsync(session.Id));
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Empty(context.GuestIdentities.Where(guest => guest.SessionId == session.Id));
     }
 
     [Fact]
@@ -187,6 +227,18 @@ public sealed class GuestUnfurlTests : IAsyncLifetime, IDisposable
             BaseAddress = new Uri("https://localhost"),
         });
 
+    private async Task<(int Participations, GuestLinkState State)> SnapshotAsync(SessionId sessionId)
+    {
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        AppDbContext context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        int participations = await context.SessionParticipations.CountAsync(p => p.SessionId == sessionId);
+        Session session = await context.Sessions
+            .AsNoTracking()
+            .Include(s => s.GuestLinks)
+            .SingleAsync(s => s.Id == sessionId);
+        return (participations, session.GuestLinks[0].State);
+    }
+
     private async Task RevokeAsync(Session session)
     {
         await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
@@ -199,9 +251,13 @@ public sealed class GuestUnfurlTests : IAsyncLifetime, IDisposable
         await context.SaveChangesAsync();
     }
 
-    private async Task<(Session Session, string Token)> SeedSessionWithGuestLinkAsync(string title)
+    private async Task<(Session Session, string Token)> SeedSessionWithGuestLinkAsync(
+        string title,
+        string organizerLocale = "en")
     {
-        UserId organizerId = await _factory.SeedUserAsync(email: $"guest-unfurl-{Guid.NewGuid():N}@example.test");
+        UserId organizerId = await _factory.SeedUserAsync(
+            email: $"guest-unfurl-{Guid.NewGuid():N}@example.test",
+            locale: organizerLocale);
         SessionDetails details = new(
             SessionTitle.Create(title),
             _factory.Clock.GetCurrentInstant() + Duration.FromDays(1),

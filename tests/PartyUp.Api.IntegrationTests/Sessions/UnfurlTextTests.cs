@@ -1,4 +1,5 @@
 using PartyUp.Api.Unfurl;
+using SixLabors.Fonts;
 
 namespace PartyUp.Api.IntegrationTests.Sessions;
 
@@ -49,6 +50,56 @@ public sealed class UnfurlTextTests
         Assert.Equal(UnfurlLocale.Spanish, UnfurlStrings.Resolve("es-419"));
         Assert.Equal(UnfurlLocale.English, UnfurlStrings.Resolve("de-DE"));
         Assert.Equal(UnfurlLocale.English, UnfurlStrings.Resolve(null));
+    }
+
+    [Fact]
+    public void KeepRenderable_DropsCodePointsTheBundledFaceHasNoGlyphFor_D224()
+    {
+        Font font = new UnfurlCardFonts().Bold(62);
+
+        Assert.Equal("Board game night", UnfurlText.KeepRenderable("🎲 Board game night 週末", font));
+        Assert.Equal("Noite de jogos", UnfurlText.KeepRenderable("Noite de jogos 🎲", font));
+        Assert.Equal(string.Empty, UnfurlText.KeepRenderable("週末 🎲", font));
+        Assert.Equal(string.Empty, UnfurlText.KeepRenderable(null, font));
+    }
+
+    [Fact]
+    public void Render_DrawsATitleOfUnsupportedGlyphsAsTheGenericTitleWithoutThrowing_D224()
+    {
+        var fonts = new UnfurlCardFonts();
+        var renderer = new UnfurlCardRenderer(fonts);
+        var card = new UnfurlCard(
+            UnfurlCardKind.Session,
+            "🎲 週末",
+            GameName: "🎲",
+            "Fri 21 Aug · 19:00 UTC+00:00",
+            "1 going",
+            UnfurlLocale.English);
+
+        byte[] png = renderer.Render(card);
+
+        Assert.NotEmpty(png);
+    }
+
+    [Fact]
+    public void Going_MirrorsTheSpaWordingIncludingTheRomanceSingular_D224()
+    {
+        Assert.Equal("1 going", UnfurlStrings.Going(UnfurlLocale.English, 1));
+        Assert.Equal("2 going", UnfurlStrings.Going(UnfurlLocale.English, 2));
+        Assert.Equal("1 confirmado", UnfurlStrings.Going(UnfurlLocale.BrazilianPortuguese, 1));
+        Assert.Equal("3 confirmados", UnfurlStrings.Going(UnfurlLocale.BrazilianPortuguese, 3));
+        Assert.Equal("1 confirmado", UnfurlStrings.Going(UnfurlLocale.Spanish, 1));
+        Assert.Equal("3 confirmados", UnfurlStrings.Going(UnfurlLocale.Spanish, 3));
+    }
+
+    [Fact]
+    public void Unavailable_IsTheSameEnglishCardWhateverTheOrganizerLocale_D224()
+    {
+        UnfurlCard card = UnfurlCard.Unavailable();
+
+        Assert.Equal(UnfurlLocale.English, card.Locale);
+        Assert.Equal("Invite link", card.Title);
+        Assert.Equal("This invite is no longer available", card.PrimaryLine);
     }
 
     [Fact]

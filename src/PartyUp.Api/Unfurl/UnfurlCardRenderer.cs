@@ -67,10 +67,17 @@ public sealed class UnfurlCardRenderer(UnfurlCardFonts fonts)
     private void DrawBody(IImageProcessingContext context, UnfurlCard card)
     {
         float y = 210f;
-        RichTextOptions heading = HeadingOptions(y);
+        Font headingFont = fonts.Bold(62);
+        RichTextOptions heading = HeadingOptions(y, headingFont);
         string headingText = card.Kind == UnfurlCardKind.Unavailable
             ? card.PrimaryLine ?? card.Title
             : card.Title;
+        headingText = UnfurlText.KeepRenderable(headingText, headingFont);
+        if (headingText.Length == 0)
+        {
+            headingText = UnfurlStrings.InviteLink();
+        }
+
         headingText = ClampToLines(headingText, heading, maxLines: 2);
         context.DrawText(heading, headingText, Ink);
 
@@ -93,7 +100,8 @@ public sealed class UnfurlCardRenderer(UnfurlCardFonts fonts)
         Color color,
         float gap)
     {
-        if (string.IsNullOrEmpty(text))
+        string renderable = UnfurlText.KeepRenderable(text, font);
+        if (renderable.Length == 0)
         {
             return y;
         }
@@ -103,12 +111,12 @@ public sealed class UnfurlCardRenderer(UnfurlCardFonts fonts)
             Origin = new PointF(Margin, y),
             WrappingLength = TextWidth,
         };
-        string clamped = ClampToLines(text, options, maxLines: 1);
+        string clamped = ClampToLines(renderable, options, maxLines: 1);
         context.DrawText(options, clamped, color);
         return y + TextMeasurer.MeasureSize(clamped, options).Height + gap;
     }
 
-    private RichTextOptions HeadingOptions(float y) => new(fonts.Bold(62))
+    private static RichTextOptions HeadingOptions(float y, Font font) => new(font)
     {
         Origin = new PointF(Margin, y),
         WrappingLength = TextWidth,

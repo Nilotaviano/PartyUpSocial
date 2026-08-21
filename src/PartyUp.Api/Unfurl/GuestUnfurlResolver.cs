@@ -11,7 +11,8 @@ namespace PartyUp.Api.Unfurl;
 /// Graph document and the PNG. Link state is the domain's answer (<c>ResolveGuestLink</c>) on top of
 /// <see cref="IGuestLinkResolver"/> — never re-derived from timestamps here — and only a live link
 /// ever reaches <see cref="IGuestLinkUnfurlReader"/> for detail. Every failure is the same generic
-/// card, so an unknown token is indistinguishable from a revoked one.
+/// card — always English, so an unknown token is byte-for-byte indistinguishable from a revoked one
+/// whatever locale the organizer behind the revoked link kept.
 /// </summary>
 public sealed class GuestUnfurlResolver(
     IGuestLinkResolver links,
@@ -34,7 +35,7 @@ public sealed class GuestUnfurlResolver(
 
         ResolvedPollGuestLink? resolvedPoll = await links.ResolvePollAsync(token, cancellationToken);
         return resolvedPoll is null
-            ? UnfurlCard.Unavailable(UnfurlLocale.English)
+            ? UnfurlCard.Unavailable()
             : await ResolvePollAsync(resolvedPoll, cancellationToken);
     }
 
@@ -45,7 +46,7 @@ public sealed class GuestUnfurlResolver(
         Session? session = await sessions.FindNoTrackingAsync(resolved.SessionId, cancellationToken);
         if (session is null)
         {
-            return UnfurlCard.Unavailable(UnfurlLocale.English);
+            return UnfurlCard.Unavailable();
         }
 
         GuestLinkView view;
@@ -55,13 +56,13 @@ public sealed class GuestUnfurlResolver(
         }
         catch (DomainException)
         {
-            return UnfurlCard.Unavailable(UnfurlLocale.English);
+            return UnfurlCard.Unavailable();
         }
 
         UnfurlSessionDetails? details = await reader.GetSessionDetailsAsync(resolved.SessionId, cancellationToken);
         if (details is null)
         {
-            return UnfurlCard.Unavailable(UnfurlLocale.English);
+            return UnfurlCard.Unavailable();
         }
 
         UnfurlLocale locale = UnfurlStrings.Resolve(details.Locale);
@@ -73,7 +74,7 @@ public sealed class GuestUnfurlResolver(
                 UnfurlStrings.Moment(locale, details.StartTime, details.TimeZone),
                 UnfurlStrings.Going(locale, details.GoingCount),
                 locale)
-            : UnfurlCard.Unavailable(locale);
+            : UnfurlCard.Unavailable();
     }
 
     private async Task<UnfurlCard> ResolvePollAsync(
@@ -83,7 +84,7 @@ public sealed class GuestUnfurlResolver(
         Poll? poll = await polls.FindNoTrackingAsync(resolved.PollId, cancellationToken);
         if (poll is null)
         {
-            return UnfurlCard.Unavailable(UnfurlLocale.English);
+            return UnfurlCard.Unavailable();
         }
 
         GuestLinkView view;
@@ -93,13 +94,13 @@ public sealed class GuestUnfurlResolver(
         }
         catch (DomainException)
         {
-            return UnfurlCard.Unavailable(UnfurlLocale.English);
+            return UnfurlCard.Unavailable();
         }
 
         UnfurlPollDetails? details = await reader.GetPollDetailsAsync(resolved.PollId, cancellationToken);
         if (details is null)
         {
-            return UnfurlCard.Unavailable(UnfurlLocale.English);
+            return UnfurlCard.Unavailable();
         }
 
         UnfurlLocale locale = UnfurlStrings.Resolve(details.Locale);
@@ -111,6 +112,6 @@ public sealed class GuestUnfurlResolver(
                 UnfurlStrings.VoteOnWhenToPlay(locale),
                 UnfurlStrings.Closes(locale, UnfurlStrings.Moment(locale, details.Deadline, details.TimeZone)),
                 locale)
-            : UnfurlCard.Unavailable(locale);
+            : UnfurlCard.Unavailable();
     }
 }
