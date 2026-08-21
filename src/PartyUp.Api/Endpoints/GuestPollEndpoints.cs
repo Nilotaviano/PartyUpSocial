@@ -358,7 +358,7 @@ public static class GuestPollEndpoints
 
     private static int UpgradeStatusFor(string code) => code switch
     {
-        "guest_link_terminal" or "guest_link_unclaimed" or "upgrade_unavailable" =>
+        "poll_terminal" or "guest_link_terminal" or "guest_link_unclaimed" or "upgrade_unavailable" =>
             StatusCodes.Status409Conflict,
         _ => StatusCodes.Status404NotFound,
     };

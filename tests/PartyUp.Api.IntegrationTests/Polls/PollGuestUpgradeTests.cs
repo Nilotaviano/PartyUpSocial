@@ -164,6 +164,63 @@ public sealed class PollGuestUpgradeTests : IAsyncLifetime, IDisposable
         Assert.Equal(GuestLinkState.Upgraded, link.State);
     }
 
+    /// <summary>
+    /// D-225's terminal-poll refusal: a finalized poll's live, claimed guest cookie is answered
+    /// <c>poll_terminal</c> rather than falling through to the generic 404 arm — the seeding mirrors
+    /// <see cref="PollProblemCodeClosureTests.PollTerminal_DeletingAnOptionAfterFinalization_Is409"/>.
+    /// </summary>
+    [Fact]
+    public async Task Upgrade_OnAFinalizedPoll_Is409PollTerminal_D225()
+    {
+        UserId organizerId = await _factory.SeedUserAsync(email: $"poll-upgrade-term-{Guid.NewGuid():N}@example.test");
+        using SessionHttpSession organizerSession = await SessionEndpointTestSupport.SignInAsync(_factory, organizerId);
+        Instant baseTime = _factory.Clock.GetCurrentInstant() + Duration.FromDays(1);
+
+        HttpResponseMessage created = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post,
+            "/api/v1/polls",
+            JsonContent.Create(new
+            {
+                title = "Guest upgrade terminal poll",
+                options = new[]
+                {
+                    new { startTime = SessionEndpointTestSupport.Iso(baseTime) },
+                    new { startTime = SessionEndpointTestSupport.Iso(baseTime + Duration.FromHours(1)) },
+                },
+                visibility = "private",
+                minAttendance = 1,
+                guestLinkCount = 1,
+                inviteeUserIds = Array.Empty<Guid>(),
+            }));
+        using JsonDocument body = await SessionEndpointTestSupport.SuccessJsonAsync(created);
+        Guid pollId = body.RootElement.GetProperty("poll").GetProperty("id").GetGuid();
+        Guid optionId = body.RootElement.GetProperty("poll").GetProperty("options")[0].GetProperty("id").GetGuid();
+        Guid guestLinkId = body.RootElement.GetProperty("guestLinks")[0].GetProperty("guestLinkId").GetGuid();
+        string url = body.RootElement.GetProperty("guestLinks")[0].GetProperty("url").GetString()!;
+        string token = url[(url.LastIndexOf("/g/", StringComparison.Ordinal) + 3)..];
+
+        using HttpClient guestClient = CreateGuestClient();
+        string guestCookie = await ExchangeAsync(guestClient, token);
+        await ClaimAsync(guestClient, guestLinkId, guestCookie, "Robin");
+
+        _factory.Clock.Advance(Duration.FromHours(25));
+        HttpResponseMessage finalize = await organizerSession.SendUnsafeAsync(
+            HttpMethod.Post, $"/api/v1/polls/{pollId:D}/finalize", JsonContent.Create(new { optionId }));
+        Assert.Equal(HttpStatusCode.OK, finalize.StatusCode);
+
+        SessionHttpUser account = await SessionEndpointTestSupport.SeedAsync(_factory);
+        using SessionHttpSession session = await SessionEndpointTestSupport.SignInAsync(_factory, account.Id);
+
+        HttpResponseMessage upgrade = await AntiforgeryTestClient.PostAsync(
+            session.Client,
+            $"/api/v1/guest/{guestLinkId:N}/poll/upgrade",
+            content: null,
+            $"{guestCookie}; {session.AuthCookie}");
+
+        await SessionEndpointTestSupport.AssertProblemAsync(
+            upgrade, HttpStatusCode.Conflict, "poll_terminal");
+    }
+
     // ---- fixture helpers -------------------------------------------------------------------------
 
     private static async Task<string> ExchangeAsync(HttpClient client, string token)

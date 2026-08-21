@@ -40,11 +40,10 @@ public sealed class UpgradeGuestPollUseCase(
                 UserId organizerId = probe.OrganizerId;
                 await pollLocks.LockUsersAsync([organizerId, userId], ct);
 
+                // The blocked-pair lock is acquired here to preserve the users -> pairs -> parent
+                // lock order, but the decision it feeds is deferred past the terminal/unclaimed
+                // checks below so a terminal or unclaimed link never answers "upgrade_unavailable".
                 IReadOnlyList<Block> pair = await blocks.LockPairsAsync(userId, [organizerId], ct);
-                if (pair.Count > 0)
-                {
-                    return GuestPollCommandResult.Failed("upgrade_unavailable");
-                }
 
                 await pollLocks.LockPollsAsync([pollId], ct);
 
@@ -56,15 +55,18 @@ public sealed class UpgradeGuestPollUseCase(
 
                 Poll poll = forUpdate.Poll;
 
+                // Checked on the poll itself, ahead of the guest-link lookup: finalization hands the
+                // poll's guest links to the newly created session and clears them from this
+                // collection (Poll.Finalize), so a link-first check would never see this branch.
+                if (poll.Status == PollStatus.Finalized)
+                {
+                    return GuestPollCommandResult.Failed("poll_terminal");
+                }
+
                 GuestLink? link = poll.GuestLinks.FirstOrDefault(l => l.Id == guestLinkId);
                 if (link is null)
                 {
                     return GuestPollCommandResult.Failed("poll_not_found");
-                }
-
-                if (poll.Status == PollStatus.Finalized)
-                {
-                    return GuestPollCommandResult.Failed("poll_terminal");
                 }
 
                 // A revoked link AND a canceled or expired poll both land on a notice; neither is
@@ -77,6 +79,11 @@ public sealed class UpgradeGuestPollUseCase(
                 if (link.GuestIdentityId is not { } guestIdentityId)
                 {
                     return GuestPollCommandResult.Failed("guest_link_unclaimed");
+                }
+
+                if (pair.Count > 0)
+                {
+                    return GuestPollCommandResult.Failed("upgrade_unavailable");
                 }
 
                 // The duplicate branch severs the guest participant and its votes from the

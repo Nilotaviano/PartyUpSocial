@@ -42,11 +42,10 @@ public sealed class UpgradeGuestSessionUseCase(
                 UserId organizerId = probe.OrganizerId;
                 await sessionLocks.LockUsersAsync([organizerId, userId], ct);
 
+                // The blocked-pair lock is acquired here to preserve the users -> pairs -> parent
+                // lock order, but the decision it feeds is deferred past the terminal/unclaimed
+                // checks below so a terminal or unclaimed link never answers "upgrade_unavailable".
                 IReadOnlyList<Block> pair = await blocks.LockPairsAsync(userId, [organizerId], ct);
-                if (pair.Count > 0)
-                {
-                    return GuestCommandResult.Failed("upgrade_unavailable");
-                }
 
                 await sessionLocks.LockSessionsAsync([sessionId], ct);
 
@@ -74,6 +73,11 @@ public sealed class UpgradeGuestSessionUseCase(
                 if (link.GuestIdentityId is not { } guestIdentityId)
                 {
                     return GuestCommandResult.Failed("guest_link_unclaimed");
+                }
+
+                if (pair.Count > 0)
+                {
+                    return GuestCommandResult.Failed("upgrade_unavailable");
                 }
 
                 session.UpgradeGuest(guestIdentityId, userId, clock);

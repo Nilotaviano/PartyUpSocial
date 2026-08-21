@@ -179,8 +179,6 @@ public sealed class GuestUpgradeTests : IAsyncLifetime, IDisposable
         Assert.Equal(GuestLinkState.Active, link.State);
     }
 
-    // ---- fixture helpers -------------------------------------------------------------------------
-
     /// <summary>
     /// A-074 branch (c) on the D-225 route: a terminal-mode credential against a still-live claimed
     /// link cannot upgrade, and fails closed as "not found" rather than a distinguishable 409.
@@ -219,6 +217,8 @@ public sealed class GuestUpgradeTests : IAsyncLifetime, IDisposable
         await SessionEndpointTestSupport.AssertProblemAsync(
             upgrade, HttpStatusCode.NotFound, "session_not_found");
     }
+
+    // ---- fixture helpers -------------------------------------------------------------------------
 
     private async Task<(SessionId SessionId, string Token)> SeedSessionAsync(UserId organizerId, UserId? invitee = null)
     {
