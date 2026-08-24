@@ -32,7 +32,7 @@
     <!-- D-224: text layout for the server-rendered invite-unfurl card. -->
     <PackageVersion Include="SixLabors.Fonts" Version="2.1.3" />
     <!-- A-084: capture-time re-encoding of avatar pictures to WebP (AVATARS_DESIGN.md §3.2). -->
-    <PackageVersion Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <PackageVersion Include="SixLabors.ImageSharp" Version="4.1.1" />
     <!-- D-224: shape and text drawing for the invite-unfurl card; the 2.1.x line is the one built
          against ImageSharp 3.1.x. -->
     <PackageVersion Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />
